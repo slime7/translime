@@ -1,0 +1,57 @@
+{
+  "name": "translime",
+  "version": "1.0.0",
+  "author": {
+    "name": "Slime7",
+    "email": "slime7@foxmail.com",
+    "url": "https://github.com/slime7"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=v14.16",
+    "npm": ">=7.7"
+  },
+  "main": "dist/main/index.cjs",
+  "scripts": {
+    "dev": "node scripts/watch.js",
+    "serve": "node scripts/watch.js",
+    "build": "rimraf dist && node scripts/build.js",
+    "postinstall": "electron-builder install-app-deps",
+    "postuninstall": "electron-builder install-app-deps",
+    "lint": "eslint . --ext js,ts,vue"
+  },
+  "browserslist": [
+    "Chrome 94"
+  ],
+  "dependencies": {
+    "custom-electron-titlebar": "^3.2.10",
+    "electron-updater": "4.6.1",
+    "material-design-icons": "^3.0.1",
+    "vue": "^2.6.14",
+    "vue-router": "^3.5.2",
+    "vuetify": "^2.6.2",
+    "vuex": "^3.6.2"
+  },
+  "devDependencies": {
+    "cross-env": "7.0.3",
+    "electron": "16.0.6",
+    "electron-builder": "22.13.1",
+    "electron-devtools-installer": "3.2.0",
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-vue": "^7.20.0",
+    "playwright": "1.15.2",
+    "rimraf": "^3.0.2",
+    "rollup-plugin-auto-external": "^2.0.0",
+    "sass": "~1.26.12",
+    "sass-loader": "^10.1.1",
+    "vite": "^2.6.10",
+    "vite-plugin-components": "^0.13.3",
+    "vite-plugin-vue2": "^1.9.0",
+    "vue-template-compiler": "^2.6.14",
+    "wait-on": "^6.0.0"
+  },
+  "nodeExternals": []
+}
