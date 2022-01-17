@@ -1,6 +1,6 @@
 {
   "name": "translime",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "author": {
     "name": "Slime7",
     "email": "slime7@foxmail.com",
@@ -24,7 +24,7 @@
     "Chrome 94"
   ],
   "dependencies": {
-    "custom-electron-titlebar": "^3.2.10",
+    "electron-store": "^8.0.1",
     "electron-updater": "4.6.1",
     "material-design-icons": "^3.0.1",
     "vue": "^2.6.14",
@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "cross-env": "7.0.3",
-    "electron": "16.0.6",
+    "electron": "16.0.7",
     "electron-builder": "22.13.1",
     "electron-devtools-installer": "3.2.0",
     "eslint": "^7.32.0",

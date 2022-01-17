@@ -1,13 +1,26 @@
-import { app, BrowserWindow, protocol } from 'electron';
-import { join } from 'path';
-import createProtocol from '@pkg/main/createProtocol';
+import {
+  app,
+  ipcMain,
+  protocol,
+} from 'electron';
+import '@pkg/main/utils/global';
+import createMainWindow from './main';
+import createLaunchWindow from './launch';
 
-const isDevelopment = import.meta.env.DEV;
-const isSingleInstance = app.requestSingleInstanceLock();
-
-if (!isSingleInstance) {
+const isDevelopment = process.env.NODE_ENV !== 'production';
+global.mainProcessLock = app.requestSingleInstanceLock();
+if (!global.mainProcessLock) {
   app.quit();
-  process.exit(0);
+} else {
+  app.on('second-instance', () => {
+    // 当运行第二个实例时,将会聚焦到 global.win 这个窗口
+    if (global.win) {
+      if (global.win.isMinimized()) {
+        global.win.restore();
+      }
+      global.win.focus();
+    }
+  });
 }
 
 // Scheme must be registered before the app is ready
@@ -18,48 +31,6 @@ protocol.registerSchemesAsPrivileged([{
     standard: true,
   },
 }]);
-
-let win;
-const createMainWindow = () => {
-  win = new BrowserWindow({
-    show: false, // Use 'ready-to-show' event to show window
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.cjs'),
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  /**
-   * URL for main window.
-   * Vite dev server for development.
-   * `file://../renderer/index.html` for production and test
-   */
-  if (isDevelopment && import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
-    win.loadURL(import.meta.env.VITE_DEV_SERVER_URL);
-    win.webContents.openDevTools({ mode: 'undocked' });
-  } else {
-    createProtocol('app');
-    // win.loadURL(new URL('../renderer/index.html', `file://${__dirname}`).toString());
-    win.loadURL('app://./index.html');
-  }
-
-  /**
-   * If you install `show: true` then it can cause issues when trying to close the window.
-   * Use `show: false` and listener events `ready-to-show` to fix these issues.
-   *
-   * @see https://github.com/electron/electron/issues/25012
-   */
-  win.on('ready-to-show', () => {
-    win?.show();
-  });
-
-  win.on('closed', () => {
-    win = null;
-  });
-};
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
@@ -73,16 +44,14 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   // On macOS it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
-  if (win === null) {
+  if (global.win === null) {
     createMainWindow();
   }
 });
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady()
   .then(() => {
+    createLaunchWindow();
     createMainWindow();
   });
 if (isDevelopment) {
@@ -99,13 +68,11 @@ if (isDevelopment) {
     .catch((e) => console.error('Vue Devtools failed to install:', e.toString()));
 }
 
-app.on('second-instance', () => {
-  if (win) {
-    if (win.isMinimized()) {
-      win.restore();
-    }
-    win.focus();
+ipcMain.on('main-renderer-ready', () => {
+  if (global.launchWin) {
+    global.launchWin.close();
   }
+  global.win.show();
 });
 
 // Exit cleanly on request from parent process in development mode.

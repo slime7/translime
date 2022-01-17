@@ -15,7 +15,7 @@ const moduleDialog = {
       attr = {},
     }) {
       const defaultAttr = {
-        'max-width': 360,
+        maxWidth: 360,
       };
       state.dialogs.push({
         title,

@@ -3,11 +3,30 @@
 </template>
 
 <script>
+const { ipcRenderer } = window.electron;
+
 export default {
   name: 'app',
 
+  methods: {
+    initAppConfig() {
+      this.$store.dispatch('initAppConfig');
+    },
+    remoteConsoleListener() {
+      this.$ipcRenderer.on('console', ({ type, args }) => {
+        // eslint-disable-next-line no-console
+        console[type](...args);
+      });
+    },
+  },
+
+  created() {
+    this.remoteConsoleListener();
+    this.initAppConfig();
+  },
+
   mounted() {
-    window.electron.ipcRenderer.send('main-renderer-ready');
+    ipcRenderer.send('main-renderer-ready');
   },
 };
 </script>

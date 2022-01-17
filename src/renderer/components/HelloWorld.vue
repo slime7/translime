@@ -17,7 +17,11 @@
     <v-btn @click="count++" color="primary">
       <v-icon>favorite</v-icon>
       <span>count is: {{ count }}</span>
-      </v-btn>
+    </v-btn>
+
+    <v-btn @click="openChildWindow" class="ml-4" color="primary">
+      open child window
+    </v-btn>
     <p>
       Edit
       <code>components/HelloWorld.vue</code> to test hot module replacement.
@@ -26,6 +30,8 @@
 </template>
 
 <script>
+import * as ipcType from '@pkg/share/utils/ipcConstant';
+
 export default {
   props: {
     msg: String,
@@ -35,6 +41,12 @@ export default {
     return {
       count: 0,
     };
+  },
+
+  methods: {
+    openChildWindow() {
+      this.$ipcRenderer.send(ipcType.OPEN_NEW_WINDOW, { name: 'childWinTest' });
+    },
   },
 };
 </script>

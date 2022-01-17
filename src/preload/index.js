@@ -10,6 +10,7 @@ const ipcWhiteList = {
     'ipc-reply',
   ],
   invoke: [
+    'appConfigStore',
     'ipc-fn',
   ],
 };
@@ -54,3 +55,9 @@ const api = {
  * @see https://www.electronjs.org/docs/api/context-bridge
  */
 contextBridge.exposeInMainWorld(apiKey, api);
+ipcRenderer.invoke('ipc-fn', {
+  type: 'get-path',
+  args: ['userData'],
+}).then((path) => {
+  contextBridge.exposeInMainWorld('APPDATA_PATH', path);
+});
