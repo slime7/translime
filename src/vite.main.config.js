@@ -1,6 +1,5 @@
 import { join } from 'path';
 import { builtinModules } from 'module';
-import { node } from '../electron-vendors.config.json';
 
 const PACKAGE_ROOT = join(__dirname, 'main');
 
@@ -25,8 +24,8 @@ const config = {
     ],
   },
   build: {
-    sourcemap: 'inline',
-    target: `node${node}`,
+    sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
+    target: 'node14',
     outDir: join(PACKAGE_ROOT, '../../dist/main'),
     assetsDir: '.',
     minify: process.env.MODE === 'development' ? false : 'terser',
@@ -48,7 +47,7 @@ const config = {
         ...builtinModules,
       ],
       output: {
-        entryFileNames: '[name].cjs',
+        entryFileNames: '[name].js',
       },
     },
     emptyOutDir: true,

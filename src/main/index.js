@@ -4,6 +4,7 @@ import {
   protocol,
 } from 'electron';
 import '@pkg/main/utils/global';
+import pluginLoader from '@pkg/share/lib/pluginLoader';
 import createMainWindow from './main';
 import createLaunchWindow from './launch';
 
@@ -73,6 +74,9 @@ ipcMain.on('main-renderer-ready', () => {
     global.launchWin.close();
   }
   global.win.show();
+
+  // 开始加载插件
+  pluginLoader.getPlugins();
 });
 
 // Exit cleanly on request from parent process in development mode.

@@ -6,7 +6,6 @@ import { createVuePlugin } from 'vite-plugin-vue2';
 import viteComponents, {
   VuetifyResolver,
 } from 'vite-plugin-components';
-import { chrome } from '../electron-vendors.config.json';
 
 const RENDERER_ROOT = join(__dirname, 'renderer');
 
@@ -59,8 +58,8 @@ const config = {
     emptyOutDir: true,
     minify: false,
     commonjsOptions: {},
-    sourcemap: true,
-    target: `chrome${chrome}`,
+    sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
+    target: 'es2021',
     rollupOptions: {
       external: [
         ...builtinModules,

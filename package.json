@@ -11,7 +11,7 @@
     "node": ">=v14.16",
     "npm": ">=7.7"
   },
-  "main": "dist/main/index.cjs",
+  "main": "dist/main/index.js",
   "scripts": {
     "dev": "node scripts/watch.js",
     "serve": "node scripts/watch.js",
@@ -24,6 +24,7 @@
     "Chrome 94"
   ],
   "dependencies": {
+    "cross-spawn": "^7.0.3",
     "electron-store": "^8.0.1",
     "electron-updater": "4.6.1",
     "material-design-icons": "^3.0.1",

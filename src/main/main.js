@@ -1,4 +1,5 @@
 import {
+  app,
   BrowserWindow,
   ipcMain,
   screen,
@@ -39,7 +40,7 @@ export default async () => {
     show: false,
     minWidth: 700,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.cjs'),
+      preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -85,5 +86,6 @@ export default async () => {
 
   global.win.on('closed', () => {
     global.win = null;
+    app.quit();
   });
 };

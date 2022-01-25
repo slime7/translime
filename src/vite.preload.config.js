@@ -1,6 +1,5 @@
 import { join } from 'path';
 import { builtinModules } from 'module';
-import { chrome } from '../electron-vendors.config.json';
 
 const PACKAGE_ROOT = join(__dirname, 'preload');
 
@@ -25,8 +24,8 @@ const config = {
     ],
   },
   build: {
-    sourcemap: 'inline',
-    target: `chrome${chrome}`,
+    sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
+    target: 'es2021',
     outDir: join(PACKAGE_ROOT, '../../dist/preload'),
     assetsDir: '.',
     minify: process.env.MODE === 'development' ? false : 'terser',
@@ -47,7 +46,7 @@ const config = {
         ...builtinModules,
       ],
       output: {
-        entryFileNames: '[name].cjs',
+        entryFileNames: '[name].js',
       },
     },
     emptyOutDir: true,

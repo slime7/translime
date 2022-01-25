@@ -13,6 +13,11 @@ const mode = process.env.MODE = process.env.MODE || 'development';
 /** @type {import('vite').LogLevel} */
 const LOG_LEVEL = 'info';
 
+let manualRestart = false;
+
+/** @type {ChildProcessWithoutNullStreams | null} */
+let spawnProcess = null;
+
 /** @type {import('vite').InlineConfig} */
 const sharedConfig = {
   mode,
@@ -61,19 +66,18 @@ const setupMainPackageWatcher = (viteDevServer) => {
     prefix: '[main]',
   });
 
-  /** @type {ChildProcessWithoutNullStreams | null} */
-  let spawnProcess = null;
-
   return getWatcher({
     name: 'reload-app-on-main-package-change',
     configFile: 'src/vite.main.config.js',
     writeBundle() {
       if (spawnProcess !== null) {
+        manualRestart = true;
         spawnProcess.kill('SIGINT');
         spawnProcess = null;
+        logger.warn('Electron app restarted', { timestamp: true });
       }
 
-      spawnProcess = spawn(String(electronPath), ['.']);
+      spawnProcess = spawn(String(electronPath), ['--inspect=5858', '.']);
       spawnProcess.stdout.on('data', (d) => d.toString().trim() && logger.warn(d.toString(), { timestamp: true }));
       spawnProcess.stderr.on('data', (d) => {
         const data = d.toString().trim();
@@ -81,6 +85,15 @@ const setupMainPackageWatcher = (viteDevServer) => {
         const mayIgnore = stderrFilterPatterns.some((r) => r.test(data));
         if (mayIgnore) return;
         logger.error(data, { timestamp: true });
+      });
+      spawnProcess.on('exit', (_, signal) => {
+        if (!manualRestart) {
+          if (!signal) {
+            process.exit(0);
+          }
+        } else {
+          manualRestart = false;
+        }
       });
     },
   });
@@ -116,14 +129,18 @@ const start = async () => {
     const viteDevServer = await startViteServer();
 
     await setupPreloadPackageWatcher(viteDevServer);
-    // 等待 preload.cjs 构建完成
+    // 等待 preload.js 构建完成
     await waitOn({
-      resources: [join(__dirname, '../dist/preload/index.cjs')],
+      resources: [join(__dirname, '../dist/preload/index.js')],
       timeout: 5000,
     });
     await setupMainPackageWatcher(viteDevServer);
   } catch (e) {
     console.error(e);
+    if (spawnProcess !== null) {
+      spawnProcess.kill('SIGINT');
+      spawnProcess = null;
+    }
     process.exit(1);
   }
 };
