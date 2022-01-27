@@ -12,7 +12,11 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.APP_MAXIMIZE]() {
     if (global.win) {
-      global.win.maximize();
+      if (global.win.isMaximized()) {
+        global.win.unmaximize();
+      } else {
+        global.win.maximize();
+      }
     }
   },
   [ipcType.APP_UNMAXIMIZE]() {
@@ -95,6 +99,44 @@ const ipcHandler = (ipc) => ({
         resolve(path);
       } catch (err) {
         reject(err);
+      }
+    });
+  },
+  [ipcType.GET_PLUGINS]() {
+    return new Promise(async (resolve, reject) => {
+      if (global.plugin) {
+        const plugins = await global.plugin.getPlugins();
+        resolve(JSON.parse(JSON.stringify(plugins)));
+      } else {
+        reject(new Error('插件未初始化'));
+      }
+    });
+  },
+  [ipcType.INSTALL_PLUGIN](packageName) {
+    return new Promise(async (resolve, reject) => {
+      if (global.plugin) {
+        try {
+          const result = await global.plugin.installPlugin(packageName);
+          resolve(result);
+        } catch (err) {
+          reject(new Error(`插件安装出错: ${err.message}`));
+        }
+      } else {
+        reject(new Error('插件未初始化'));
+      }
+    });
+  },
+  [ipcType.UNINSTALL_PLUGIN](packageName) {
+    return new Promise(async (resolve, reject) => {
+      if (global.plugin) {
+        try {
+          const result = await global.plugin.uninstallPlugin(packageName);
+          resolve(result);
+        } catch (err) {
+          reject(new Error(`插件卸载出错: ${err.message}`));
+        }
+      } else {
+        reject(new Error('插件未初始化'));
       }
     });
   },

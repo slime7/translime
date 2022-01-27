@@ -11,6 +11,9 @@ export const RELOAD = 'reload';
 export const SHOW_OPEN_DIALOG = 'show-open-dialog';
 export const OPEN_NEW_WINDOW = 'open-new-window';
 export const GET_PATH = 'get-path';
+export const GET_PLUGINS = 'get-plugins';
+export const INSTALL_PLUGIN = 'install-plugin';
+export const UNINSTALL_PLUGIN = 'uninstall-plugin';
 
 export default {
   DEVTOOLS,
@@ -26,4 +29,7 @@ export default {
   SHOW_OPEN_DIALOG,
   OPEN_NEW_WINDOW,
   GET_PATH,
+  GET_PLUGINS,
+  INSTALL_PLUGIN,
+  UNINSTALL_PLUGIN,
 };

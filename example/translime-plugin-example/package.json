@@ -21,6 +21,7 @@
   },
   "plugin": {
     "title": "plugin title",
-    "description": "plugin description"
+    "description": "plugin description",
+    "icon": "./icon.png"
   }
 }

@@ -76,6 +76,7 @@ ipcMain.on('main-renderer-ready', () => {
   global.win.show();
 
   // 开始加载插件
+  global.plugin = pluginLoader;
   pluginLoader.getPlugins();
 });
 

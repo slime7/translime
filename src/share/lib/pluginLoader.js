@@ -1,4 +1,4 @@
-import { join } from 'path';
+import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
 import EventEmitter from 'events';
@@ -6,14 +6,14 @@ import spawn from 'cross-spawn';
 import createWindow from '@pkg/main/utils/createWindow';
 
 const APPDATA_PATH = app.getPath('userData');
-const PLUGIN_DIR = join(APPDATA_PATH, 'plugins');
-const PLUGIN_JSON_PATH = join(PLUGIN_DIR, 'package.json');
-const PLUGIN_MODULES_PATH = join(PLUGIN_DIR, 'node_modules');
+const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
+const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
+const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
 
-const resolvePluginPath = (pluginName) => join(PLUGIN_MODULES_PATH, pluginName);
+const resolvePluginPath = (pluginName) => path.join(PLUGIN_MODULES_PATH, pluginName);
 
 const readPlugin = (pluginPath) => {
-  const pluginPkg = JSON.parse(fs.readFileSync(join(pluginPath, 'package.json'), 'utf8'));
+  const pluginPkg = JSON.parse(fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'));
   const plugin = pluginPkg.plugin || {};
   plugin.packageName = pluginPkg.name;
   if (!plugin.title) {
@@ -27,6 +27,25 @@ const readPlugin = (pluginPath) => {
   }
   if (!plugin.description) {
     plugin.description = pluginPkg.description || '';
+  }
+  if (plugin.icon) {
+    const imgPath = path.resolve(pluginPath, plugin.icon);
+    try {
+      const mimeTypes = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        bmp: 'image/bmp',
+        webp: 'image/webp',
+      };
+      const ext = path.extname(imgPath).toLowerCase();
+      plugin.icon = `data:${mimeTypes[ext]};base64, ${fs.readFileSync(imgPath, { encoding: 'base64' })}`;
+    } catch (err) {
+      plugin.icon = null;
+    }
+  } else {
+    plugin.icon = null;
   }
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
@@ -81,7 +100,7 @@ const processPlugin = (plugin) => {
       width: mainWinBound.width,
       height: mainWinBound.height,
       webPreferences: {
-        preload: join(__dirname, '../preload/index.cjs'),
+        preload: path.join(__dirname, '../preload/index.cjs'),
         nodeIntegration: false,
         contextIsolation: true,
       },
@@ -181,12 +200,14 @@ class PluginLoader extends EventEmitter {
     return mergedPlugin;
   }
 
-  disablePlugin(packageName) {
-    const plugin = this.getPlugin(packageName);
+  disablePlugin(packageName, isUninstall = false) {
+    const plugin = this.getPlugin(packageName) || {};
     Object.assign(plugin, {
       enabled: false,
     });
-    global.store.set(`plugin.${plugin.packageName}.enabled`, false);
+    if (!isUninstall) {
+      global.store.set(`plugin.${plugin.packageName}.enabled`, false);
+    }
     if (typeof plugin.pluginWillUnload === 'function') {
       plugin.pluginWillUnload();
     }
@@ -195,15 +216,34 @@ class PluginLoader extends EventEmitter {
     }
   }
 
-  async installPlugin(packageName, version) {
+  installPlugin(packageName, version) {
     const module = version ? `${packageName}@${version}` : packageName;
-    const result = await execCommand('install', module);
-    console.log(result);
-    await this.enablePlugin(packageName);
+    return new Promise(async (resolve, reject) => {
+      const result = await execCommand('install', module);
+      if (!result.code) {
+        resolve(result.data);
+      } else {
+        reject(new Error(result.data));
+      }
+      try {
+        const plugin = await this.enablePlugin(packageName);
+        this.plugins.push(plugin);
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
 
   uninstallPlugin(packageName) {
-    // todo
+    return new Promise((resolve, reject) => {
+      this.disablePlugin(packageName, true);
+      const result = execCommand('uninstall', packageName);
+      if (!result.code) {
+        resolve(result.data);
+      } else {
+        reject(new Error(result.data));
+      }
+    });
   }
 }
 

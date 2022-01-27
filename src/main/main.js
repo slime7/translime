@@ -39,6 +39,7 @@ export default async () => {
     frame: true,
     show: false,
     minWidth: 700,
+    titleBarStyle: 'hidden',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
