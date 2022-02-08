@@ -9,6 +9,7 @@ const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
 const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
 const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
+const NPM_EXEC_PATH = path.join(global.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
 const resolvePluginPath = (pluginName) => path.join(PLUGIN_MODULES_PATH, pluginName);
 
@@ -39,7 +40,7 @@ const readPlugin = (pluginPath) => {
         bmp: 'image/bmp',
         webp: 'image/webp',
       };
-      const ext = path.extname(imgPath).toLowerCase();
+      const ext = path.extname(imgPath).toLowerCase().replace('.', '');
       plugin.icon = `data:${mimeTypes[ext]};base64, ${fs.readFileSync(imgPath, { encoding: 'base64' })}`;
     } catch (err) {
       plugin.icon = null;
@@ -54,20 +55,40 @@ const readPlugin = (pluginPath) => {
   return plugin;
 };
 
-const execCommand = (cmd, module, options = {}) => {
+const execNpmCommand = (cmd, module, options = {}) => {
+  const internalOptions = {
+    ...{
+      registry: global.store.get('pluginManager.registry', 'https://registry.npmmirror.com/'),
+    },
+    ...options,
+  };
   const args = [
     cmd,
     module,
     '--save',
   ];
-  if (options.registry) {
-    args.push(`--registry=${options.registry}`);
+  if (cmd === 'install') {
+    args.push(...[
+      '--no-progress',
+      '--no-prune',
+      '--global-style',
+      '--ignore-scripts',
+      '--legacy-peer-deps',
+    ]);
   }
-  if (options.proxy) {
-    args.push(`--proxy=${options.proxy}`);
+  if (cmd === 'uninstall') {
+    args.push(...[
+      '--no-progress',
+    ]);
+  }
+  if (internalOptions.registry) {
+    args.push(`--registry=${internalOptions.registry}`);
+  }
+  if (internalOptions.proxy) {
+    args.push(`--proxy=${internalOptions.proxy}`);
   }
   return new Promise((resolve) => {
-    const npm = spawn('npm', args, {
+    const npm = spawn(NPM_EXEC_PATH, args, {
       cwd: PLUGIN_DIR,
     });
 
@@ -155,6 +176,7 @@ class PluginLoader extends EventEmitter {
   async readPlugins() {
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
+    // 读取插件
     const modules = deps.filter((name) => {
       if (!/^translime-plugin-/.test(name)) {
         return false;
@@ -169,6 +191,7 @@ class PluginLoader extends EventEmitter {
     })
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath)));
 
+    // 将插件列表保存到 this.plugins 中，并启用在设置在设置为 enabled 的插件
     await this.enablePlugins(modules);
     return this.plugins;
   }
@@ -185,7 +208,11 @@ class PluginLoader extends EventEmitter {
   }
 
   async enablePlugin(packageName) {
-    const plugin = this.getPlugin(packageName);
+    let plugin = this.getPlugin(packageName);
+    const pluginPath = resolvePluginPath(packageName);
+    if (!plugin) {
+      plugin = readPlugin(pluginPath);
+    }
     let pluginMain;
     try {
       pluginMain = await import(plugin.pluginPath);
@@ -205,39 +232,41 @@ class PluginLoader extends EventEmitter {
     Object.assign(plugin, {
       enabled: false,
     });
-    if (!isUninstall) {
-      global.store.set(`plugin.${plugin.packageName}.enabled`, false);
-    }
     if (typeof plugin.pluginWillUnload === 'function') {
       plugin.pluginWillUnload();
     }
     if (global.childWins[packageName]) {
       global.childWins[packageName].close();
     }
+    if (!isUninstall) {
+      global.store.set(`plugin.${plugin.packageName}.enabled`, false);
+    } else {
+      this.plugins.splice(this.plugins.indexOf(plugin), 1);
+    }
   }
 
   installPlugin(packageName, version) {
     const module = version ? `${packageName}@${version}` : packageName;
     return new Promise(async (resolve, reject) => {
-      const result = await execCommand('install', module);
-      if (!result.code) {
-        resolve(result.data);
-      } else {
+      const result = await execNpmCommand('install', module);
+      if (result.code) {
         reject(new Error(result.data));
       }
       try {
+        // 启用新插件并加入到 this.plugins
         const plugin = await this.enablePlugin(packageName);
         this.plugins.push(plugin);
       } catch (err) {
         reject(err);
       }
+      resolve(result.data);
     });
   }
 
   uninstallPlugin(packageName) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       this.disablePlugin(packageName, true);
-      const result = execCommand('uninstall', packageName);
+      const result = await execNpmCommand('uninstall', packageName);
       if (!result.code) {
         resolve(result.data);
       } else {

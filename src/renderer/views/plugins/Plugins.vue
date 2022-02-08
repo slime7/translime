@@ -38,22 +38,11 @@
         >
           <plugin-card
             :plugin="pluginItem"
+            @uninstall="uninstallPlugins"
+            @disable="disablePlugin"
+            @enable="enablePlugin"
           />
         </v-col>
-
-        <v-col
-          sm="12"
-          md="6"
-          lg="4"
-          v-for="mockPluginIndex in 10"
-          :key="`mock-${mockPluginIndex}`"
-        >
-          <plugin-card
-            :plugin="mockPluginData"
-          />
-        </v-col>
-
-        <v-spacer />
       </v-row>
     </div>
   </v-container>
@@ -61,10 +50,13 @@
 
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import mixins from '@/mixins';
 import PluginCard from './PluginCard.vue';
 
 export default {
   name: 'Plugins',
+
+  mixins: [mixins],
 
   components: {
     PluginCard,
@@ -77,20 +69,6 @@ export default {
     },
     search: '',
     plugins: [],
-    mockPluginData: {
-      author: 'mock',
-      description: 'plugin description',
-      enabled: true,
-      link: '',
-      main: '',
-      packageName: 'translime-plugin-example',
-      pluginMenu: [],
-      pluginPath: 'C:\\Users\\admin\\AppData\\Roaming\\translime\\plugins\\node_modules\\translime-plugin-example',
-      settingMenu: [],
-      title: 'mock plugin',
-      version: '1.0.0',
-      windowMode: false,
-    },
   }),
 
   methods: {
@@ -106,9 +84,10 @@ export default {
         const result = await this.$ipcRenderer.invoke(ipcType.INSTALL_PLUGIN, this.search);
         console.log(result);
       } catch (err) {
-        console.error(err);
+        this.alert(err.message, 'error');
       } finally {
         this.loading.install = false;
+        this.getPlugins();
       }
     },
     async uninstallPlugins(packageName) {
@@ -119,21 +98,41 @@ export default {
         return;
       }
       this.loading.uninstall = true;
+      this.showLoader();
       try {
-        const result = await this.$ipcRenderer.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
-        console.log(result);
+        await this.$ipcRenderer.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
       } catch (err) {
-        console.error(err);
+        this.alert(err.message, 'error');
       } finally {
         this.loading.uninstall = false;
+        this.hideLoader();
+        this.getPlugins();
       }
     },
     async getPlugins() {
       try {
         this.plugins = await this.$ipcRenderer.invoke(ipcType.GET_PLUGINS);
-        console.log(this.plugins);
+        console.log([...this.plugins.map((item) => ({ ...item }))]);
       } catch (err) {
-        console.log(err);
+        this.alert(err.message, 'error');
+      }
+    },
+    async disablePlugin(packageName) {
+      try {
+        await this.$ipcRenderer.invoke(ipcType.DISABLE_PLUGIN, packageName);
+      } catch (err) {
+        this.alert(err.message, 'error');
+      } finally {
+        this.getPlugins();
+      }
+    },
+    async enablePlugin(packageName) {
+      try {
+        await this.$ipcRenderer.invoke(ipcType.ENABLE_PLUGIN, packageName);
+      } catch (err) {
+        this.alert(err.message, 'error');
+      } finally {
+        this.getPlugins();
       }
     },
   },

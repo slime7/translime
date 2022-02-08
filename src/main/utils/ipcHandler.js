@@ -140,6 +140,34 @@ const ipcHandler = (ipc) => ({
       }
     });
   },
+  [ipcType.DISABLE_PLUGIN](packageName) {
+    return new Promise((resolve, reject) => {
+      if (global.plugin) {
+        try {
+          global.plugin.disablePlugin(packageName);
+          resolve(true);
+        } catch (err) {
+          reject(new Error(`插件停用出错: ${err.message}`));
+        }
+      } else {
+        reject(new Error('插件未初始化'));
+      }
+    });
+  },
+  [ipcType.ENABLE_PLUGIN](packageName) {
+    return new Promise(async (resolve, reject) => {
+      if (global.plugin) {
+        try {
+          await global.plugin.enablePlugin(packageName);
+          resolve(true);
+        } catch (err) {
+          reject(new Error(`插件启用出错: ${err.message}`));
+        }
+      } else {
+        reject(new Error('插件未初始化'));
+      }
+    });
+  },
   ping() {
     global.console.log('pong', new Date());
   },

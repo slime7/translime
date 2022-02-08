@@ -28,6 +28,7 @@
     "electron-store": "^8.0.1",
     "electron-updater": "4.6.1",
     "material-design-icons": "^3.0.1",
+    "npm": "^8.4.1",
     "vue": "^2.6.14",
     "vue-router": "^3.5.2",
     "vuetify": "^2.6.2",
@@ -54,5 +55,7 @@
     "vue-template-compiler": "^2.6.14",
     "wait-on": "^6.0.0"
   },
-  "nodeExternals": []
+  "nodeExternals": [
+    "npm"
+  ]
 }

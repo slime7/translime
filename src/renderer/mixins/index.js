@@ -1,9 +1,19 @@
 import store from '../store';
 
 const mixins = {
+  data: () => ({
+    isDev: process.env.NODE_ENV === 'development',
+  }),
+
   methods: {
     toast(msg, timeout = 6000) {
       store.dispatch('toast/show', { msg, timeout });
+    },
+    alert(msg, type = 'info') {
+      store.dispatch('alert/push', { msg, type });
+    },
+    hideAlert(uuid) {
+      store.dispatch('alert/dismiss', { uuid });
     },
     netFail(err = null) {
       console.log('请求错误: ', { error: err });

@@ -23,8 +23,9 @@
               icon
               height="40px"
               width="40px"
+              @click="enable"
             >
-              <v-icon>play</v-icon>
+              <v-icon>play_arrow</v-icon>
             </v-btn>
 
             <v-btn
@@ -34,6 +35,7 @@
               icon
               height="40px"
               width="40px"
+              @click="disable"
             >
               <v-icon>pause</v-icon>
             </v-btn>
@@ -44,8 +46,9 @@
               icon
               height="40px"
               width="40px"
+              @click="uninstall"
             >
-              <v-icon>settings</v-icon>
+              <v-icon>delete</v-icon>
             </v-btn>
           </v-card-actions>
         </div>
@@ -78,6 +81,19 @@ export default {
 
   data: () => ({
     defaultIcon,
+    uninstallConfirmVisible: false,
   }),
+
+  methods: {
+    uninstall() {
+      this.$emit('uninstall', this.plugin.packageName);
+    },
+    disable() {
+      this.$emit('disable', this.plugin.packageName);
+    },
+    enable() {
+      this.$emit('enable', this.plugin.packageName);
+    },
+  },
 };
 </script>

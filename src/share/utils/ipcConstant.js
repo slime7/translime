@@ -14,6 +14,8 @@ export const GET_PATH = 'get-path';
 export const GET_PLUGINS = 'get-plugins';
 export const INSTALL_PLUGIN = 'install-plugin';
 export const UNINSTALL_PLUGIN = 'uninstall-plugin';
+export const DISABLE_PLUGIN = 'disable-plugin';
+export const ENABLE_PLUGIN = 'enable-plugin';
 
 export default {
   DEVTOOLS,
@@ -32,4 +34,6 @@ export default {
   GET_PLUGINS,
   INSTALL_PLUGIN,
   UNINSTALL_PLUGIN,
+  DISABLE_PLUGIN,
+  ENABLE_PLUGIN,
 };

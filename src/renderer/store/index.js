@@ -2,6 +2,7 @@ import Vue from 'vue';
 import Vuex from 'vuex';
 import toast from '@/store/moduleToast';
 import dialog from '@/store/moduleDialog';
+import alert from '@/store/moduleAlert';
 
 const appConfigStore = (method, ...args) => window.electron.ipcRenderer.invoke('appConfigStore', method, ...args);
 
@@ -32,5 +33,6 @@ export default new Vuex.Store({
   modules: {
     toast,
     dialog,
+    alert,
   },
 });
