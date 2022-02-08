@@ -38,10 +38,14 @@ const api = {
         console.log('ipc receive: 信号不在白名单');
       }
     },
-    invoke: (channel, ...data) => {
+    invoke: async (channel, ...data) => {
       const validChannels = ipcWhiteList.invoke;
       if (validChannels.includes(channel)) {
-        return ipcRenderer.invoke(channel, ...data);
+        const result = await ipcRenderer.invoke(channel, ...data);
+        if (!result.err) {
+          return Promise.resolve(result.data);
+        }
+        return Promise.reject(new Error(result.err));
       }
       return Promise.reject(new Error('ipc invoke: 信号不在白名单'));
     },

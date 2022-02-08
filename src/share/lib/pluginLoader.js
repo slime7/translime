@@ -246,6 +246,9 @@ class PluginLoader extends EventEmitter {
   }
 
   installPlugin(packageName, version) {
+    if (!/^translime-plugin-/.test(packageName)) {
+      return Promise.reject(new Error('该包不是这个软件的插件'));
+    }
     const module = version ? `${packageName}@${version}` : packageName;
     return new Promise(async (resolve, reject) => {
       const result = await execNpmCommand('install', module);

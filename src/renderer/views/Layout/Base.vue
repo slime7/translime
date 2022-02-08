@@ -13,8 +13,10 @@
     <v-main class="fill-height">
       <div class="d-flex flex-column fill-height" id="app-main-container">
         <div class="scroll-content flex">
-          <v-scroll-y-transition hide-on-leave>
-            <router-view />
+          <v-scroll-y-transition mode="out-in">
+            <keep-alive>
+              <router-view />
+            </keep-alive>
           </v-scroll-y-transition>
         </div>
       </div>
