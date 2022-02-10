@@ -29,11 +29,11 @@ export default {
   props: {
     to: [Object, String],
     color: {
-      default: 'light-blue accent-2',
+      default: 'primary',
       type: String,
     },
     textColor: {
-      default: 'light-blue--text text--accent-2',
+      default: 'primary--text',
       type: String,
     },
     icon: {

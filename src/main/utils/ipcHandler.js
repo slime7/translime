@@ -168,6 +168,18 @@ const ipcHandler = (ipc) => ({
       }
     });
   },
+  [ipcType.GET_PLUGIN_SETTING](packageName) {
+    return new Promise(async (resolve) => {
+      const settings = global.store.get(`plugin.${packageName}.settings`, {});
+      resolve(settings);
+    });
+  },
+  [ipcType.SET_PLUGIN_SETTING](packageName, settings) {
+    return new Promise(async (resolve) => {
+      global.store.set(`plugin.${packageName}.settings`, settings);
+      resolve(true);
+    });
+  },
   ping() {
     global.console.log('pong', new Date());
   },

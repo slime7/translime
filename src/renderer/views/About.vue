@@ -6,6 +6,8 @@
       <div class="mt-4">
         <v-btn class="ma-2" color="primary" @click="testAlert">发送 alert</v-btn>
 
+        <v-btn class="ma-2" color="primary" @click="testConfirm">发送 confirm</v-btn>
+
         <v-btn class="ma-2" color="primary" @click="appDir">打开 app 目录</v-btn>
 
         <v-btn class="ma-2" color="primary" @click="reloadApp">重载</v-btn>
@@ -41,6 +43,10 @@ export default {
   methods: {
     testAlert() {
       this.alert('测试 alert');
+    },
+    async testConfirm() {
+      const result = await this.confirm('测试 confirm');
+      console.log('confirm result: ', result);
     },
     reloadApp() {
       this.$ipcRenderer.send(ipcType.RELOAD);

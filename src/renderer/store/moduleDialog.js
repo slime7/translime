@@ -6,6 +6,13 @@ const moduleDialog = {
     dialogs: [],
     titleClass: 'headline',
     loader: false,
+    confirm: {
+      visible: false,
+      title: '',
+      content: '',
+      resolve: () => {},
+      reject: () => {},
+    },
   },
 
   mutations: {
@@ -32,6 +39,25 @@ const moduleDialog = {
     setLoader(state, show) {
       state.loader = show;
     },
+    setConfirm(state, {
+      title,
+      content,
+    }) {
+      state.confirm.title = title;
+      state.confirm.content = content;
+      state.confirm.visible = true;
+    },
+    clearConfirm(state) {
+      state.confirm.visible = false;
+      state.confirm.title = '';
+      state.confirm.content = '';
+      state.confirm.resolve = () => {};
+      state.confirm.reject = () => {};
+    },
+    setConfirmPromise(state, { resolve = null, reject = null } = {}) {
+      state.confirm.resolve = resolve;
+      state.confirm.reject = reject;
+    },
   },
 
   actions: {
@@ -46,6 +72,12 @@ const moduleDialog = {
     },
     hideLoader({ commit }) {
       commit('setLoader', false);
+    },
+    confirm({ commit }, { title = '提示', content }) {
+      commit('setConfirm', { title, content });
+      return new Promise((resolve, reject) => {
+        commit('setConfirmPromise', { resolve, reject });
+      });
     },
   },
 };

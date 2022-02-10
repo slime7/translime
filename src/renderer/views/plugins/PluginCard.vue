@@ -13,12 +13,14 @@
             v-text="plugin.title"
           />
 
-          <v-card-subtitle v-text="plugin.description" />
+          <v-card-subtitle v-text="plugin.version" />
+
+          <v-card-text v-text="plugin.description" />
 
           <v-card-actions>
             <v-btn
               v-if="!plugin.enabled"
-              class="ml-2 mt-3"
+              class="ml-2"
               fab
               icon
               height="40px"
@@ -30,7 +32,7 @@
 
             <v-btn
               v-else
-              class="ml-2 mt-3"
+              class="ml-2"
               fab
               icon
               height="40px"
@@ -41,14 +43,26 @@
             </v-btn>
 
             <v-btn
-              class="ml-2 mt-3"
+              class="ml-2"
               fab
               icon
               height="40px"
               width="40px"
-              @click="uninstall"
+              @click="uninstallConfirm"
             >
               <v-icon>delete</v-icon>
+            </v-btn>
+
+            <v-btn
+              v-if="plugin.settingMenu.length"
+              class="ml-2"
+              fab
+              icon
+              height="40px"
+              width="40px"
+              @click="showSettingPanel"
+            >
+              <v-icon>settings</v-icon>
             </v-btn>
           </v-card-actions>
         </div>
@@ -62,15 +76,28 @@
           <v-img v-else :src="defaultIcon" />
         </v-avatar>
       </div>
+
+      <plugin-setting-panel
+        v-model="settingPanelVisible"
+        :plugin="plugin"
+      />
     </v-card>
   </v-hover>
 </template>
 
 <script>
+import mixins from '@/mixins';
 import defaultIcon from '../../assets/plugin-default-image.png';
+import PluginSettingPanel from './PluginSettingPanel.vue';
 
 export default {
   name: 'PluginCard',
+
+  components: {
+    PluginSettingPanel,
+  },
+
+  mixins: [mixins],
 
   props: {
     plugin: {
@@ -82,9 +109,16 @@ export default {
   data: () => ({
     defaultIcon,
     uninstallConfirmVisible: false,
+    settingPanelVisible: false,
   }),
 
   methods: {
+    async uninstallConfirm() {
+      const confirmResult = await this.confirm(`确定要卸载插件”${this.plugin.title}“吗？`, '卸载确认');
+      if (confirmResult.confirm) {
+        this.uninstall();
+      }
+    },
     uninstall() {
       this.$emit('uninstall', this.plugin.packageName);
     },
@@ -93,6 +127,9 @@ export default {
     },
     enable() {
       this.$emit('enable', this.plugin.packageName);
+    },
+    showSettingPanel() {
+      this.settingPanelVisible = true;
     },
   },
 };

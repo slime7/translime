@@ -63,6 +63,29 @@ const mixins = {
     hideLoader() {
       store.dispatch('dialog/hideLoader');
     },
+    confirm(content, title = null) {
+      const payload = {
+        content,
+      };
+      if (title) {
+        payload.title = title;
+      }
+      return new Promise(async (resolve) => {
+        const result = {
+          confirm: true,
+          cancel: false,
+        };
+        try {
+          await store.dispatch('dialog/confirm', payload);
+        } catch (err) {
+          result.confirm = false;
+          result.cancel = true;
+        } finally {
+          store.commit('dialog/clearConfirm');
+        }
+        resolve(result);
+      });
+    },
   },
 };
 

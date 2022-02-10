@@ -44,6 +44,10 @@ html {
   height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  & > .v-dialog__content {
+    top: 24px;
+  }
 }
 
 #app pre {

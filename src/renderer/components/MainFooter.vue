@@ -13,6 +13,7 @@ import AlertGroup from './AlertGroup.vue';
 
 export default {
   name: 'MainFooter',
+
   components: {
     Toast,
     SimpleDialog,
