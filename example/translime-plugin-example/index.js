@@ -6,6 +6,8 @@ export const windowMode = false;
 // 加载时执行
 export const pluginDidLoad = () => {
   console.log('plugin loaded');
+  const setting = global.store.get('plugin.translime-plugin-example.settings', {});
+  console.log('settings: ', setting);
 };
 
 // 禁用时执行

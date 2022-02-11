@@ -54,7 +54,7 @@
             </v-btn>
 
             <v-btn
-              v-if="plugin.settingMenu.length"
+              v-if="plugin.settingMenu && plugin.settingMenu.length"
               class="ml-2"
               fab
               icon

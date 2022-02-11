@@ -174,9 +174,13 @@ const ipcHandler = (ipc) => ({
       resolve(settings);
     });
   },
-  [ipcType.SET_PLUGIN_SETTING](packageName, settings) {
+  [ipcType.SET_PLUGIN_SETTING](packageName, key, settings = null) {
     return new Promise(async (resolve) => {
-      global.store.set(`plugin.${packageName}.settings`, settings);
+      if (typeof key === 'object' && !settings) {
+        global.store.set(`plugin.${packageName}.settings`, key);
+      } else {
+        global.store.set(`plugin.${packageName}.settings.${key}`, settings);
+      }
       resolve(true);
     });
   },

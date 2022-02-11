@@ -153,7 +153,7 @@ export default {
       },
     },
     settingMenu() {
-      return this.parseMenuItem(this.plugin.settingMenu);
+      return this.plugin.settingMenu ? this.parseMenuItem(this.plugin.settingMenu) : [];
     },
   },
 
@@ -164,7 +164,10 @@ export default {
     async initSettings() {
       const { packageName } = this.plugin;
       this.loading.getSettings = true;
-      this.settings = await this.$ipcRenderer.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
+      const settings = await this.$ipcRenderer.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
+      if (typeof settings === 'object') {
+        this.settings = settings;
+      }
       this.loading.getSettings = false;
     },
     parseMenuItem(settingMenu) {

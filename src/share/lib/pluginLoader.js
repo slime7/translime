@@ -173,6 +173,10 @@ class PluginLoader extends EventEmitter {
     return this.plugins.find((plugin) => plugin.packageName === name);
   }
 
+  getPluginIndex(name) {
+    return this.plugins.findIndex((plugin) => plugin.packageName === name);
+  }
+
   async readPlugins() {
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
@@ -212,6 +216,7 @@ class PluginLoader extends EventEmitter {
     const pluginPath = resolvePluginPath(packageName);
     if (!plugin) {
       plugin = readPlugin(pluginPath);
+      console.log('reload plugin: ', { ...plugin });
     }
     let pluginMain;
     try {
@@ -220,6 +225,7 @@ class PluginLoader extends EventEmitter {
       global.store.set(`plugin.${plugin.packageName}.enabled`, true);
     } catch (err) {
       // todo: handle error
+      console.log('plugin enable error: ', err);
     }
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     processPlugin(mergedPlugin);
@@ -238,10 +244,12 @@ class PluginLoader extends EventEmitter {
     if (global.childWins[packageName]) {
       global.childWins[packageName].close();
     }
+    this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
+      const p = readPlugin(resolvePluginPath(packageName));
+      p.enabled = false;
+      this.plugins.push(p);
       global.store.set(`plugin.${plugin.packageName}.enabled`, false);
-    } else {
-      this.plugins.splice(this.plugins.indexOf(plugin), 1);
     }
   }
 
