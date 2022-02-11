@@ -14,6 +14,7 @@ export default new Vuex.Store({
     appSetting: {
       openAtLogin: false,
     },
+    plugins: [],
   },
   mutations: {
     setVersions(state, versions) {
@@ -21,6 +22,9 @@ export default new Vuex.Store({
     },
     setAppOpenAtLogin(state, open) {
       state.appSetting.openAtLogin = open;
+    },
+    setPlugins(state, plugins) {
+      state.plugins = plugins;
     },
   },
   actions: {

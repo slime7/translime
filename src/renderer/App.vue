@@ -3,6 +3,8 @@
 </template>
 
 <script>
+import * as ipcType from '@pkg/share/utils/ipcConstant';
+
 const { ipcRenderer } = window.electron;
 
 export default {
@@ -18,6 +20,14 @@ export default {
         console[type](...args);
       });
     },
+    async getPlugins() {
+      try {
+        const plugins = await this.$ipcRenderer.invoke(ipcType.GET_PLUGINS);
+        this.$store.commit('setPlugins', plugins);
+      } catch (err) {
+        this.alert(err.message, 'error');
+      }
+    },
   },
 
   created() {
@@ -27,6 +37,7 @@ export default {
 
   mounted() {
     ipcRenderer.send('main-renderer-ready');
+    this.getPlugins();
   },
 };
 </script>

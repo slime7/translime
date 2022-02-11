@@ -24,6 +24,7 @@
     "Chrome 94"
   ],
   "dependencies": {
+    "@vue/compiler-sfc": "^3.2.30",
     "cross-spawn": "^7.0.3",
     "electron-store": "^8.0.1",
     "electron-updater": "4.6.1",

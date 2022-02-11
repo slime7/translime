@@ -13,6 +13,7 @@
           :rounded="hover || isExactActive ? 'xl' : 'circle'"
         >
           <v-icon v-if="icon" :color="hover || isExactActive ? 'white' : color">{{ icon }}</v-icon>
+          <img v-else-if="image" :src="image" alt="" />
           <div v-else :class="hover || isExactActive ? 'white--text' : textColor">
             <slot></slot>
           </div>
@@ -37,6 +38,10 @@ export default {
       type: String,
     },
     icon: {
+      default: false,
+      type: [Boolean, String, null],
+    },
+    image: {
       default: false,
       type: [Boolean, String, null],
     },

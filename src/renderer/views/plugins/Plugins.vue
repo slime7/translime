@@ -68,8 +68,18 @@ export default {
       uninstall: false,
     },
     search: '',
-    plugins: [],
   }),
+
+  computed: {
+    plugins: {
+      get() {
+        return this.$store.state.plugins;
+      },
+      set(plugins) {
+        this.$store.commit('setPlugins', plugins);
+      },
+    },
+  },
 
   methods: {
     async installPlugins() {
@@ -112,7 +122,6 @@ export default {
     async getPlugins() {
       try {
         this.plugins = await this.$ipcRenderer.invoke(ipcType.GET_PLUGINS);
-        console.log([...this.plugins.map((item) => ({ ...item }))]);
       } catch (err) {
         this.alert(err.message, 'error');
       }
@@ -135,10 +144,6 @@ export default {
         this.getPlugins();
       }
     },
-  },
-
-  mounted() {
-    this.getPlugins();
   },
 };
 </script>
