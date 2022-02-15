@@ -1,5 +1,6 @@
 <template>
   <v-navigation-drawer
+    class="navi-drawer"
     app
     permanent
     width="72px"
@@ -57,6 +58,12 @@ export default {
   },
 };
 </script>
+
+<style lang="scss">
+.navi-drawer .v-navigation-drawer__content::-webkit-scrollbar {
+  display: none;
+}
+</style>
 
 <style scoped lang="scss">
 .navi-panel > * + * {

@@ -48,6 +48,9 @@ const readPlugin = (pluginPath) => {
   } else {
     plugin.icon = null;
   }
+  if (plugin.main) {
+    plugin.main = path.resolve(pluginPath, plugin.main);
+  }
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
   plugin.enabled = global.store.get(`plugin.${plugin.packageName}.enabled`, true);
@@ -112,6 +115,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
 };
 
 const processPlugin = (plugin) => {
+  console.log(plugin);
   if (plugin.windowMode && plugin.main) {
     const pluginPackageName = plugin.title;
     const mainWinBound = global.win.getBounds();

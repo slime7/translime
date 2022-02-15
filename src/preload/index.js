@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import path from 'path';
 
 const apiKey = 'electron';
 const ipcWhiteList = {
@@ -50,6 +51,7 @@ const api = {
       return Promise.reject(new Error('ipc invoke: 信号不在白名单'));
     },
   },
+  APP_ROOT: path.resolve(__dirname, '../'),
 };
 
 /**
@@ -62,6 +64,6 @@ contextBridge.exposeInMainWorld(apiKey, api);
 ipcRenderer.invoke('ipc-fn', {
   type: 'get-path',
   args: ['userData'],
-}).then((path) => {
-  contextBridge.exposeInMainWorld('APPDATA_PATH', path);
+}).then((p) => {
+  contextBridge.exposeInMainWorld('APPDATA_PATH', p);
 });

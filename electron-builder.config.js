@@ -3,7 +3,7 @@
  * @see https://www.electron.build/configuration/configuration
  */
 const config = {
-  asar: false,
+  asar: true,
   directories: {
     output: 'dist_electron',
     buildResources: 'buildResources',

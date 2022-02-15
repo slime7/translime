@@ -1,8 +1,3 @@
-// eslint-disable-next-line import/no-unresolved
-import ui from './ui.vue?raw';
-
-export const windowMode = false;
-
 // 加载时执行
 export const pluginDidLoad = () => {
   console.log('plugin loaded');
@@ -72,5 +67,3 @@ export const settingMenu = [
 
 // 插件菜单
 export const pluginMenu = [];
-
-export const main = ui;

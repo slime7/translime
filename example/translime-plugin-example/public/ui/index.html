@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' blob: 'unsafe-inline'">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>translime-plugin-example</title>
+</head>
+<body>
+<div>hello plugin</div>
+<pre>
+  <script>
+  document.write(JSON.stringify(window.electron.versions, null, 2));
+  </script>
+
+  <script>
+  document.write(window.electron.APP_ROOT);
+  </script>
+</pre>
+</body>
+</html>

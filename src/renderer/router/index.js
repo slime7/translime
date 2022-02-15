@@ -29,6 +29,7 @@ const routes = [
         path: '/plugins/:packageName',
         name: 'PluginPage',
         component: () => import('@/views/plugins/PluginPage.vue'),
+        props: true,
       },
     ],
   },

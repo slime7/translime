@@ -12,16 +12,21 @@
       "require": "./dist/index.umd.js"
     }
   },
+  "files": [
+    "**"
+  ],
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build"
   },
   "devDependencies": {
-    "vite": "^2.7.2"
+    "vite": "^2.7.2",
+    "vite-plugin-vue2": "^1.9.3"
   },
   "plugin": {
     "title": "plugin title",
     "description": "plugin description",
-    "icon": "./icon.png"
+    "icon": "./icon.png",
+    "main": "dist/ui/index.html"
   }
 }

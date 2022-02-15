@@ -15,7 +15,7 @@
         <div class="scroll-content flex">
           <v-scroll-y-transition mode="out-in">
             <keep-alive>
-              <router-view />
+              <router-view :key="$route.fullPath" />
             </keep-alive>
           </v-scroll-y-transition>
         </div>
