@@ -5,34 +5,39 @@ import createWindow from '@pkg/main/utils/createWindow';
 import { join } from 'path';
 
 const ipcHandler = (ipc) => ({
-  [ipcType.DEVTOOLS]() {
-    if (global.win) {
-      global.win.webContents.openDevTools();
+  [ipcType.DEVTOOLS](win = 'app') {
+    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    if (targetWin) {
+      targetWin.webContents.openDevTools();
     }
   },
-  [ipcType.APP_MAXIMIZE]() {
-    if (global.win) {
-      if (global.win.isMaximized()) {
-        global.win.unmaximize();
+  [ipcType.APP_MAXIMIZE](win = 'app') {
+    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    if (targetWin) {
+      if (targetWin.isMaximized()) {
+        targetWin.unmaximize();
       } else {
-        global.win.maximize();
+        targetWin.maximize();
       }
     }
   },
-  [ipcType.APP_UNMAXIMIZE]() {
-    if (global.win) {
-      global.win.unmaximize();
+  [ipcType.APP_UNMAXIMIZE](win = 'app') {
+    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    if (targetWin) {
+      targetWin.unmaximize();
     }
   },
-  [ipcType.APP_MINIMIZE]() {
-    if (global.win) {
-      global.win.minimize();
+  [ipcType.APP_MINIMIZE](win = 'app') {
+    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    if (targetWin) {
+      targetWin.minimize();
     }
   },
-  [ipcType.APP_CLOSE]() {
-    if (global.win) {
-      global.win.webContents.closeDevTools();
-      global.win.close();
+  [ipcType.APP_CLOSE](win = 'app') {
+    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    if (targetWin) {
+      targetWin.webContents.closeDevTools();
+      targetWin.close();
     }
   },
   [ipcType.APP_VERSIONS]() {

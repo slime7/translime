@@ -70,6 +70,9 @@ export const wait = (time) => new Promise((resolve, reject) => {
  */
 export const apiError = (error, appendData = {}) => {
   /* eslint-disable no-param-reassign */
+  if (typeof error === 'string') {
+    error = new Error(error);
+  }
   Object.keys(appendData).forEach((dataKey) => {
     error[dataKey] = appendData[dataKey];
   });

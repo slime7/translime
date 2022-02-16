@@ -8,14 +8,39 @@
 </head>
 <body>
 <div>hello plugin</div>
-<pre>
-  <script>
-  document.write(JSON.stringify(window.electron.versions, null, 2));
-  </script>
+<pre class="pre"></pre>
 
-  <script>
-  document.write(window.electron.APP_ROOT);
-  </script>
-</pre>
+<div>
+  <button class="open-devtool">打开 devtools</button>
+  <button class="win-maximize">最大化窗口</button>
+  <button class="win-close">关闭窗口</button>
+</div>
+
+<div>
+  <input value="status" />
+</div>
+<script>
+(function() {
+  const data = {
+    versions: window.electron.versions,
+    root: window.electron.APP_ROOT,
+    pre: document.querySelector('.pre'),
+    btnDev: document.querySelector('.open-devtool'),
+    btnMaximize: document.querySelector('.win-maximize'),
+    btnClose: document.querySelector('.win-close'),
+  };
+
+  data.pre.innerHTML = `${JSON.stringify(data.versions, null, 2)}\n\n${data.root}`;
+  data.btnDev.addEventListener('click', () => {
+    window.windowControl.devtools('translime-plugin-example');
+  });
+  data.btnMaximize.addEventListener('click', () => {
+    window.windowControl.maximize('translime-plugin-example');
+  });
+  data.btnClose.addEventListener('click', () => {
+    window.windowControl.close('translime-plugin-example');
+  });
+})();
+</script>
 </body>
 </html>

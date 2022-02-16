@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import path from 'path';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 
 const apiKey = 'electron';
 const ipcWhiteList = {
@@ -64,6 +65,58 @@ contextBridge.exposeInMainWorld(apiKey, api);
 ipcRenderer.invoke('ipc-fn', {
   type: 'get-path',
   args: ['userData'],
-}).then((p) => {
-  contextBridge.exposeInMainWorld('APPDATA_PATH', p);
+}).then((result) => {
+  contextBridge.exposeInMainWorld('APPDATA_PATH', result.data);
 });
+
+// 快捷接口
+// 获取插件设置
+const getPluginSetting = async (...args) => {
+  const result = await ipcRenderer.invoke('ipc-fn', {
+    type: ipcType.GET_PLUGIN_SETTING,
+    args,
+  });
+  if (!result.err) {
+    return Promise.resolve(result.data);
+  }
+  return Promise.reject(new Error(result.err));
+};
+contextBridge.exposeInMainWorld('getPluginSetting', getPluginSetting);
+
+// 设置插件设置
+const setPluginSetting = async (...args) => {
+  const result = await ipcRenderer.invoke('ipc-fn', {
+    type: ipcType.SET_PLUGIN_SETTING,
+    args,
+  });
+  if (!result.err) {
+    return Promise.resolve(result.data);
+  }
+  return Promise.reject(new Error(result.err));
+};
+contextBridge.exposeInMainWorld('setPluginSetting', setPluginSetting);
+
+// 窗口控制
+const windowControl = {
+  devtools: (win) => ipcRenderer.send('ipc-msg', {
+    type: ipcType.DEVTOOLS,
+    data: win,
+  }),
+  maximize: (win) => ipcRenderer.send('ipc-msg', {
+    type: ipcType.APP_MAXIMIZE,
+    data: win,
+  }),
+  unmaximize: (win) => ipcRenderer.send('ipc-msg', {
+    type: ipcType.APP_UNMAXIMIZE,
+    data: win,
+  }),
+  minimize: (win) => ipcRenderer.send('ipc-msg', {
+    type: ipcType.APP_MINIMIZE,
+    data: win,
+  }),
+  close: (win) => ipcRenderer.send('ipc-msg', {
+    type: ipcType.APP_CLOSE,
+    data: win,
+  }),
+};
+contextBridge.exposeInMainWorld('windowControl', windowControl);
