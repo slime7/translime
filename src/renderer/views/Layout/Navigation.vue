@@ -9,16 +9,19 @@
       <navi-link
         :to="{ name: 'Home' }"
         icon="home"
-      ></navi-link>
+        tooltip="首页"
+      />
 
       <navi-link
         :to="{ name: 'Plugins' }"
+        tooltip="插件"
       >
         插件
       </navi-link>
 
       <navi-link
         :to="{ name: 'About' }"
+        tooltip="关于"
       >
         关于
       </navi-link>
@@ -31,8 +34,10 @@
         <navi-link
           v-for="plugin in pluginPages"
           :key="plugin.packageName"
-          :to="{ name: 'PluginPage', params: { packageName: plugin.packageName } }"
+          :to="plugin.windowMode ? null : { name: 'PluginPage', params: { packageName: plugin.packageName } }"
+          :open="plugin.windowMode ? { id: plugin.packageName, index: plugin.main } : null"
           :image="plugin.icon"
+          :tooltip="plugin.title"
         >
           {{ plugin.title }}
         </navi-link>
@@ -53,7 +58,7 @@ export default {
 
   computed: {
     pluginPages() {
-      return this.$store.state.plugins.filter((p) => !!p.main);
+      return this.$store.state.plugins.filter((p) => p.enabled && !!p.main);
     },
   },
 };

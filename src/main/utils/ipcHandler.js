@@ -67,7 +67,7 @@ const ipcHandler = (ipc) => ({
     const result = await dialog.showSaveDialog(...electronOptions);
     ipc.sendToClient(ipcType.SHOW_OPEN_DIALOG, result);
   },
-  [ipcType.OPEN_NEW_WINDOW]({ name }) {
+  [ipcType.OPEN_NEW_WINDOW]({ name, options = {} }) {
     if (global.childWins[name]) {
       if (global.childWins[name].isMinimized()) {
         global.childWins[name].restore();
@@ -75,17 +75,19 @@ const ipcHandler = (ipc) => ({
       global.childWins[name].focus();
     } else {
       const mainWinBound = global.win.getBounds();
-      global.childWins[name] = createWindow('child-window.html', {
-        x: mainWinBound.x + 10,
-        y: mainWinBound.y + 10,
-        width: mainWinBound.width,
-        height: mainWinBound.height,
+      const indexPage = options.index || 'child-window.html';
+      global.childWins[name] = createWindow(indexPage, {
+        x: options.x ? options.x : mainWinBound.x + 10,
+        y: options.y ? options.y : mainWinBound.y + 10,
+        width: options.width ? options.width : mainWinBound.width,
+        height: options.height ? options.height : mainWinBound.height,
+        titleBarStyle: options.titleBarStyle || 'default',
         webPreferences: {
-          preload: join(__dirname, '../preload/index.cjs'),
+          preload: join(__dirname, '../preload/index.js'),
           nodeIntegration: false,
           contextIsolation: true,
         },
-      });
+      }, null);
 
       global.childWins[name].on('closed', () => {
         delete global.childWins[name];

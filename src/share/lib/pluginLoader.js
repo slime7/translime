@@ -3,7 +3,6 @@ import fs from 'fs';
 import { app } from 'electron';
 import EventEmitter from 'events';
 import spawn from 'cross-spawn';
-import createWindow from '@pkg/main/utils/createWindow';
 
 const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
@@ -116,29 +115,6 @@ const execNpmCommand = (cmd, module, options = {}) => {
 
 const processPlugin = (plugin) => {
   console.log(plugin);
-  if (plugin.windowMode && plugin.main) {
-    const pluginPackageName = plugin.title;
-    const mainWinBound = global.win.getBounds();
-    global.childWins[pluginPackageName] = createWindow('child-window.html', {
-      x: mainWinBound.x + 10,
-      y: mainWinBound.y + 10,
-      width: mainWinBound.width,
-      height: mainWinBound.height,
-      webPreferences: {
-        preload: path.join(__dirname, '../preload/index.cjs'),
-        nodeIntegration: false,
-        contextIsolation: true,
-      },
-    });
-
-    global.childWins[pluginPackageName].once('ready-to-show', () => {
-      global.childWins[pluginPackageName].setTitle(plugin.title);
-    });
-
-    global.childWins[pluginPackageName].on('closed', () => {
-      delete global.childWins[pluginPackageName];
-    });
-  }
 
   if (typeof plugin.pluginDidLoad === 'function') {
     plugin.pluginDidLoad();
@@ -245,8 +221,8 @@ class PluginLoader extends EventEmitter {
     if (typeof plugin.pluginWillUnload === 'function') {
       plugin.pluginWillUnload();
     }
-    if (global.childWins[packageName]) {
-      global.childWins[packageName].close();
+    if (global.childWins[`plugin-window-${packageName}`]) {
+      global.childWins[`plugin-window-${packageName}`].close();
     }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {

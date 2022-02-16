@@ -1,11 +1,12 @@
 <template>
   <v-hover v-slot="{ hover }">
     <router-link
+      v-if="to"
       :to="to"
       custom
       v-slot="{ isExactActive, href }"
     >
-      <a class="text-decoration-none d-block ease-animation" :href="href">
+      <a class="text-decoration-none d-block ease-animation" :href="href" ref="link">
         <v-avatar
           class="ease-animation"
           size="56"
@@ -18,17 +19,56 @@
             <slot></slot>
           </div>
         </v-avatar>
+
+        <v-tooltip
+          v-if="tooltip"
+          right
+          :activator="$refs.link"
+        >
+          <span>{{ tooltip }}</span>
+        </v-tooltip>
       </a>
     </router-link>
+
+    <a
+      class="text-decoration-none d-block ease-animation"
+      v-else
+      ref="open"
+      @click="openPluginWindow"
+    >
+      <v-avatar
+        class="ease-animation"
+        size="56"
+        :color="hover ? color : 'grey darken-2'"
+        :rounded="hover ? 'xl' : 'circle'"
+      >
+        <v-icon v-if="icon" :color="hover ? 'white' : color">{{ icon }}</v-icon>
+        <img v-else-if="image" :src="image" alt="" />
+        <div v-else :class="hover ? 'white--text' : textColor">
+          <slot></slot>
+        </div>
+      </v-avatar>
+
+      <v-tooltip
+        v-if="tooltip"
+        right
+        :activator="$refs.open"
+      >
+        <span>{{ tooltip }}</span>
+      </v-tooltip>
+    </a>
   </v-hover>
 </template>
 
 <script>
+import * as ipcType from '@pkg/share/utils/ipcConstant';
+
 export default {
   name: 'NaviLink',
 
   props: {
-    to: [Object, String],
+    to: [Object, String, null, undefined],
+    open: [Object, null, undefined],
     color: {
       default: 'primary',
       type: String,
@@ -44,6 +84,22 @@ export default {
     image: {
       default: false,
       type: [Boolean, String, null],
+    },
+    tooltip: {
+      default: '',
+      type: String,
+    },
+  },
+
+  methods: {
+    openPluginWindow() {
+      this.$ipcRenderer.send(ipcType.OPEN_NEW_WINDOW, {
+        name: `plugin-window-${this.open.id}`,
+        options: {
+          index: `file://${this.open.index}`,
+          appMenu: null,
+        },
+      });
     },
   },
 };

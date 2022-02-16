@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import createProtocol from '@pkg/main/utils/createProtocol';
 
-export default (fileUrl, browserWindowOptions) => {
+export default (fileUrl, browserWindowOptions, menu = false) => {
   let window = new BrowserWindow({
     width: 200,
     height: 200,
@@ -17,7 +17,9 @@ export default (fileUrl, browserWindowOptions) => {
     ...browserWindowOptions,
   });
 
-  if (import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
+  if (fileUrl.startsWith('file://')) {
+    window.loadURL(fileUrl);
+  } else if (import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
     // Load the url of the dev server if in development mode
     window.loadURL(`${import.meta.env.VITE_DEV_SERVER_URL}/${fileUrl}`);
   } else {
@@ -27,6 +29,9 @@ export default (fileUrl, browserWindowOptions) => {
   }
 
   window.once('ready-to-show', () => {
+    if (menu !== false) {
+      window.setMenu(menu);
+    }
     window.show();
   });
 

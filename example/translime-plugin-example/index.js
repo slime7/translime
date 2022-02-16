@@ -67,3 +67,5 @@ export const settingMenu = [
 
 // 插件菜单
 export const pluginMenu = [];
+
+export const windowMode = true;
