@@ -3,7 +3,9 @@ import fs from 'fs';
 import { app } from 'electron';
 import EventEmitter from 'events';
 import spawn from 'cross-spawn';
+import { createRequire } from 'module';
 
+const requireFresh = createRequire(import.meta.url);
 const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
 const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
@@ -49,6 +51,12 @@ const readPlugin = (pluginPath) => {
   }
   if (plugin.main) {
     plugin.main = path.resolve(pluginPath, plugin.main);
+  }
+  plugin.exports = pluginPkg.main;
+  if (pluginPkg.exports) {
+    if (pluginPkg.exports['.'] && pluginPkg.exports['.'].require) {
+      plugin.exports = pluginPkg.exports['.'].require;
+    }
   }
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
@@ -142,9 +150,9 @@ class PluginLoader extends EventEmitter {
     });
   }
 
-  async getPlugins() {
+  getPlugins() {
     if (!this.plugins.length) {
-      await this.readPlugins();
+      this.readPlugins();
     }
     return this.plugins;
   }
@@ -157,7 +165,7 @@ class PluginLoader extends EventEmitter {
     return this.plugins.findIndex((plugin) => plugin.packageName === name);
   }
 
-  async readPlugins() {
+  readPlugins() {
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
     // 读取插件
@@ -176,22 +184,22 @@ class PluginLoader extends EventEmitter {
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath)));
 
     // 将插件列表保存到 this.plugins 中，并启用在设置在设置为 enabled 的插件
-    await this.enablePlugins(modules);
+    this.enablePlugins(modules);
     return this.plugins;
   }
 
-  async enablePlugins(plugins) {
+  enablePlugins(plugins) {
     // eslint-disable-next-line no-restricted-syntax
     for (const plugin of plugins) {
       this.plugins.push(plugin);
       if (plugin.enabled) {
         // eslint-disable-next-line no-await-in-loop
-        await this.enablePlugin(plugin.packageName);
+        this.enablePlugin(plugin.packageName);
       }
     }
   }
 
-  async enablePlugin(packageName) {
+  enablePlugin(packageName) {
     let plugin = this.getPlugin(packageName);
     const pluginPath = resolvePluginPath(packageName);
     if (!plugin) {
@@ -200,7 +208,8 @@ class PluginLoader extends EventEmitter {
     }
     let pluginMain;
     try {
-      pluginMain = await import(plugin.pluginPath);
+      const pluginExports = path.join(plugin.pluginPath, plugin.exports);
+      pluginMain = requireFresh(`${pluginExports}`);
       pluginMain.enabled = true;
       global.store.set(`plugin.${plugin.packageName}.enabled`, true);
     } catch (err) {
@@ -224,6 +233,8 @@ class PluginLoader extends EventEmitter {
     if (global.childWins[`plugin-window-${packageName}`]) {
       global.childWins[`plugin-window-${packageName}`].close();
     }
+    // 删除 require 缓存
+    delete requireFresh.cache[path.join(plugin.pluginPath, plugin.exports)];
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
       const p = readPlugin(resolvePluginPath(packageName));
