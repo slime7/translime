@@ -1,23 +1,11 @@
 <template>
   <div class="plugin-container">
-    <webview
-      v-if="plugin"
-      class="webview"
-      autosize="on"
-      :src="`file://${plugin.main}`"
-      :preload="preloadPath"
-      ref="webview"
-    />
-
-    <div class="dev-fab" v-if="isDev">
-      <v-btn fab @click="openDevtools">
-        <v-icon>code</v-icon>
-      </v-btn>
-    </div>
+    <component v-if="ui" :is="ui" />
   </div>
 </template>
 
 <script>
+import Vue from 'vue';
 import mixins from '@/mixins';
 
 export default {
@@ -32,6 +20,10 @@ export default {
     },
   },
 
+  data: () => ({
+    ui: null,
+  }),
+
   computed: {
     plugin() {
       return this.packageName ? this.$store.state.plugins[this.$store.state.plugins.findIndex((p) => p.packageName === this.packageName)] : null;
@@ -39,22 +31,42 @@ export default {
     containerId() {
       return `plugin-container-${this.plugin.packageName}`;
     },
-    preloadPath() {
-      return `file://${window.electron.APP_ROOT}\\preload\\index.js`;
+  },
+
+  watch: {
+    'plugin.enabled': function (v, prevV) {
+      if (!prevV && v) {
+        this.loadUi();
+      }
     },
   },
 
   methods: {
-    init() {},
-    openDevtools() {
-      const webviewRef = this.$refs.webview;
-      if (webviewRef) {
-        if (!webviewRef.isDevToolsOpened()) {
-          webviewRef.openDevTools();
-        } else {
-          webviewRef.closeDevTools();
+    init() {
+      this.loadUi();
+    },
+    async loadUi() {
+      if (this.plugin && this.plugin.ui) {
+        const uiBlob = window.loadPluginUi(this.plugin.ui);
+        const uiUrl = URL.createObjectURL(uiBlob);
+        try {
+          await this.loadScript(uiUrl);
+          this.ui = Vue.extend(window[this.packageName]);
+        } catch (err) {
+          this.alert('加载插件页面失败', 'error');
         }
       }
+    },
+    loadScript(url) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const target = document.getElementsByTagName('script')[0] || document.head;
+        script.type = 'text/javascript';
+        script.src = url;
+        script.onload = resolve;
+        script.onerror = reject;
+        target.parentNode.insertBefore(script, target);
+      });
     },
   },
 

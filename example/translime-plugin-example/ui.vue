@@ -1,5 +1,15 @@
 <template>
-<div class="plugin-main">plugin content {{ msg }}</div>
+  <div>
+    <div class="plugin-main">plugin content {{ msg }}</div>
+
+    <div>
+      <input v-model="input" />
+    </div>
+
+    <pre>{{ setting }}</pre>
+
+    <v-btn>vuetify component</v-btn>
+  </div>
 </template>
 
 <script>
@@ -8,7 +18,19 @@ export default {
 
   data: () => ({
     msg: 'hello',
+    input: '',
+    setting: null,
   }),
+
+  methods: {
+    async readSetting() {
+      this.setting = await window.getPluginSetting('translime-plugin-example');
+    },
+  },
+
+  mounted() {
+    this.readSetting();
+  },
 };
 </script>
 

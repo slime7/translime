@@ -49,8 +49,14 @@ const readPlugin = (pluginPath) => {
   } else {
     plugin.icon = null;
   }
-  if (plugin.main) {
-    plugin.main = path.resolve(pluginPath, plugin.main);
+  if (plugin.windowUrl) {
+    plugin.windowUrl = path.resolve(pluginPath, plugin.windowUrl);
+    plugin.ui = null;
+    plugin.windowMode = true;
+  }
+  if (!plugin.windowUrl && plugin.ui) {
+    plugin.ui = path.resolve(pluginPath, plugin.ui);
+    plugin.windowMode = false;
   }
   plugin.exports = pluginPkg.main;
   if (pluginPkg.exports) {

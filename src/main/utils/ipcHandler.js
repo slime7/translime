@@ -80,7 +80,7 @@ const ipcHandler = (ipc) => ({
       global.childWins[name].focus();
     } else {
       const mainWinBound = global.win.getBounds();
-      const indexPage = options.index || 'child-window.html';
+      const indexPage = options.windowUrl || 'child-window.html';
       global.childWins[name] = createWindow(indexPage, {
         x: options.x ? options.x : mainWinBound.x + 10,
         y: options.y ? options.y : mainWinBound.y + 10,

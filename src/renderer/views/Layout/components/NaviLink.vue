@@ -96,7 +96,7 @@ export default {
       this.$ipcRenderer.send(ipcType.OPEN_NEW_WINDOW, {
         name: `plugin-window-${this.open.id}`,
         options: {
-          index: `file://${this.open.index}`,
+          windowUrl: `file://${this.open.windowUrl}`,
           appMenu: null,
         },
       });

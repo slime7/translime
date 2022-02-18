@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import path from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import fs from 'fs';
 
 const apiKey = 'electron';
 const ipcWhiteList = {
@@ -120,3 +121,10 @@ const windowControl = {
   }),
 };
 contextBridge.exposeInMainWorld('windowControl', windowControl);
+
+// eslint-disable-next-line global-require,import/no-dynamic-require
+const loadPluginUi = (pluginPath) => {
+  const ui = fs.readFileSync(pluginPath, 'utf8');
+  return new Blob([ui], { type: 'text/javascript' });
+};
+contextBridge.exposeInMainWorld('loadPluginUi', loadPluginUi);

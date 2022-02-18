@@ -17,7 +17,9 @@
   ],
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build"
+    "build:plugin": "vite build",
+    "build:ui": "vite build -c ui.vite.config.js",
+    "build": "yarn build:plugin && yarn build:ui"
   },
   "devDependencies": {
     "vite": "^2.7.2",
@@ -27,6 +29,7 @@
     "title": "plugin title",
     "description": "plugin description",
     "icon": "./icon.png",
-    "main": "dist/ui/index.html"
+    "windowUrl": "dist/ui/index.html",
+    "ui":  "dist/ui.umd.js"
   }
 }

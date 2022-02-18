@@ -61,6 +61,10 @@ const config = {
     sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
     target: 'es2021',
     rollupOptions: {
+      input: {
+        main: join(RENDERER_ROOT, 'index.html'),
+        pluginIndex: join(RENDERER_ROOT, 'plugin-index.html'),
+      },
       external: [
         ...builtinModules,
       ],

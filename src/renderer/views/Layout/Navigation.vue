@@ -35,7 +35,7 @@
           v-for="plugin in pluginPages"
           :key="plugin.packageName"
           :to="plugin.windowMode ? null : { name: 'PluginPage', params: { packageName: plugin.packageName } }"
-          :open="plugin.windowMode ? { id: plugin.packageName, index: plugin.main } : null"
+          :open="plugin.windowMode ? { id: plugin.packageName, windowUrl: plugin.windowUrl } : null"
           :image="plugin.icon"
           :tooltip="plugin.title"
         >
@@ -58,7 +58,7 @@ export default {
 
   computed: {
     pluginPages() {
-      return this.$store.state.plugins.filter((p) => p.enabled && !!p.main);
+      return this.$store.state.plugins.filter((p) => p.enabled && !(!p.main && !p.windowMode));
     },
   },
 };

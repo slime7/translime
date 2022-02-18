@@ -72,6 +72,7 @@ if (isDevelopment) {
 ipcMain.on('main-renderer-ready', () => {
   if (global.launchWin) {
     global.launchWin.close();
+    global.launchWin = null;
   }
   global.win.show();
 
