@@ -8,13 +8,23 @@
 
     <pre>{{ setting }}</pre>
 
-    <v-btn>vuetify component</v-btn>
+    <div>
+      <button @click="showThis">this</button>
+    </div>
+
+    <v-btn color="primary">vuetify component</v-btn>
   </div>
 </template>
 
 <script>
+const { VBtn } = window.vuetify$.components;
+
 export default {
   name: 'ui',
+
+  components: {
+    VBtn,
+  },
 
   data: () => ({
     msg: 'hello',
@@ -25,6 +35,9 @@ export default {
   methods: {
     async readSetting() {
       this.setting = await window.getPluginSetting('translime-plugin-example');
+    },
+    showThis() {
+      console.log(this);
     },
   },
 

@@ -58,7 +58,7 @@ export default {
 
   computed: {
     pluginPages() {
-      return this.$store.state.plugins.filter((p) => p.enabled && !(!p.main && !p.windowMode));
+      return this.$store.state.plugins.filter((p) => p.enabled && !(!p.ui && !p.windowUrl));
     },
   },
 };

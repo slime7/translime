@@ -6,13 +6,13 @@ import { join } from 'path';
 
 const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {
-    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    const targetWin = win === 'app' ? global.win : global.childWins[win];
     if (targetWin) {
       targetWin.webContents.openDevTools();
     }
   },
   [ipcType.APP_MAXIMIZE](win = 'app') {
-    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    const targetWin = win === 'app' ? global.win : global.childWins[win];
     if (targetWin) {
       if (targetWin.isMaximized()) {
         targetWin.unmaximize();
@@ -22,23 +22,30 @@ const ipcHandler = (ipc) => ({
     }
   },
   [ipcType.APP_UNMAXIMIZE](win = 'app') {
-    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    const targetWin = win === 'app' ? global.win : global.childWins[win];
     if (targetWin) {
       targetWin.unmaximize();
     }
   },
   [ipcType.APP_MINIMIZE](win = 'app') {
-    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    const targetWin = win === 'app' ? global.win : global.childWins[win];
     if (targetWin) {
       targetWin.minimize();
     }
   },
   [ipcType.APP_CLOSE](win = 'app') {
-    const targetWin = win === 'app' ? global.win : global.childWins[`plugin-window-${win}`];
+    const targetWin = win === 'app' ? global.win : global.childWins[win];
     if (targetWin) {
       targetWin.webContents.closeDevTools();
       targetWin.close();
     }
+  },
+  [ipcType.APP_IS_MAXIMIZE](win = 'app') {
+    const targetWin = win === 'app' ? global.win : global.childWins[win];
+    if (targetWin) {
+      return Promise.resolve(targetWin.isMaximized());
+    }
+    return Promise.reject(new Error('targetWin is null'));
   },
   [ipcType.APP_VERSIONS]() {
     const versions = {
@@ -86,6 +93,7 @@ const ipcHandler = (ipc) => ({
         y: options.y ? options.y : mainWinBound.y + 10,
         width: options.width ? options.width : mainWinBound.width,
         height: options.height ? options.height : mainWinBound.height,
+        frame: typeof options.frame !== 'undefined' ? options.frame : false,
         titleBarStyle: options.titleBarStyle || 'default',
         webPreferences: {
           preload: join(__dirname, '../preload/index.js'),
@@ -109,10 +117,10 @@ const ipcHandler = (ipc) => ({
       }
     });
   },
-  [ipcType.GET_PLUGINS]() {
+  [ipcType.GET_PLUGINS](packageName) {
     return new Promise(async (resolve, reject) => {
       if (global.plugin) {
-        const plugins = await global.plugin.getPlugins();
+        const plugins = packageName ? await global.plugin.getPlugin(packageName) : await global.plugin.getPlugins();
         resolve(JSON.parse(JSON.stringify(plugins)));
       } else {
         reject(new Error('插件未初始化'));

@@ -5,13 +5,13 @@
 </template>
 
 <script>
-import Vue from 'vue';
 import mixins from '@/mixins';
+import pluginUi from '@/mixins/pluginUi';
 
 export default {
   name: 'PluginPage',
 
-  mixins: [mixins],
+  mixins: [mixins, pluginUi],
 
   props: {
     packageName: {
@@ -19,10 +19,6 @@ export default {
       type: String,
     },
   },
-
-  data: () => ({
-    ui: null,
-  }),
 
   computed: {
     plugin() {
@@ -36,42 +32,21 @@ export default {
   watch: {
     'plugin.enabled': function (v, prevV) {
       if (!prevV && v) {
-        this.loadUi();
+        this.loadUi(this.plugin.ui, this.packageName);
       }
     },
   },
 
   methods: {
-    init() {
-      this.loadUi();
-    },
-    async loadUi() {
+    onMounted() {
       if (this.plugin && this.plugin.ui) {
-        const uiBlob = window.loadPluginUi(this.plugin.ui);
-        const uiUrl = URL.createObjectURL(uiBlob);
-        try {
-          await this.loadScript(uiUrl);
-          this.ui = Vue.extend(window[this.packageName]);
-        } catch (err) {
-          this.alert('加载插件页面失败', 'error');
-        }
+        this.loadUi(this.plugin.ui, this.packageName);
       }
-    },
-    loadScript(url) {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        const target = document.getElementsByTagName('script')[0] || document.head;
-        script.type = 'text/javascript';
-        script.src = url;
-        script.onload = resolve;
-        script.onerror = reject;
-        target.parentNode.insertBefore(script, target);
-      });
     },
   },
 
   mounted() {
-    this.init();
+    this.onMounted();
   },
 };
 </script>

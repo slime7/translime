@@ -29,7 +29,7 @@
     "title": "plugin title",
     "description": "plugin description",
     "icon": "./icon.png",
-    "windowUrl": "dist/ui/index.html",
-    "ui":  "dist/ui.umd.js"
+    "windowUrlxx": "dist/ui/index.html",
+    "ui": "dist/ui.umd.js"
   }
 }

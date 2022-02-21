@@ -56,6 +56,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    win: {
+      default: 'app',
+      type: String,
+    },
   },
 
   data: () => ({
@@ -69,16 +73,20 @@ export default {
 
   methods: {
     appMinimize() {
-      this.$ipcRenderer.send(APP_MINIMIZE);
+      this.$ipcRenderer.send(APP_MINIMIZE, this.win);
+      this.$emit('windowMinimize');
     },
     appUnmaximize() {
-      this.$ipcRenderer.send(APP_UNMAXIMIZE);
+      this.$ipcRenderer.send(APP_UNMAXIMIZE, this.win);
+      this.$emit('windowUnmaximize');
     },
     appMaximize() {
-      this.$ipcRenderer.send(APP_MAXIMIZE);
+      this.$ipcRenderer.send(APP_MAXIMIZE, this.win);
+      this.$emit('windowMaximize');
     },
     appClose() {
-      this.$ipcRenderer.send(APP_CLOSE);
+      this.$ipcRenderer.send(APP_CLOSE, this.win);
+      this.$emit('windowClose');
     },
   },
 };

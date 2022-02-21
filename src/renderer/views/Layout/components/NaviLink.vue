@@ -96,8 +96,11 @@ export default {
       this.$ipcRenderer.send(ipcType.OPEN_NEW_WINDOW, {
         name: `plugin-window-${this.open.id}`,
         options: {
-          windowUrl: `file://${this.open.windowUrl}`,
+          // windowUrl: `file://${this.open.windowUrl}`,
+          windowUrl: `plugin-index.html?pluginId=${this.open.id}`,
           appMenu: null,
+          frame: false,
+          titleBarStyle: 'hidden',
         },
       });
     },

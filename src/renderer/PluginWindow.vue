@@ -1,59 +1,15 @@
 <template>
-  <v-app>
-    <v-system-bar app class="system-bar pa-0">
-      <div class="px-4">translime</div>
-
-      <v-spacer />
-
-      <window-controls :is-maximize="isMaximize"></window-controls>
-    </v-system-bar>
-
-    <v-main class="fill-height">
-      <div class="d-flex flex-column fill-height" id="app-main-container">
-        <div class="scroll-content flex">
-          <plugin-page :packageName="'translime-plugin-example'" />
-        </div>
-      </div>
-    </v-main>
-  </v-app>
+  <layout-plugin-window />
 </template>
 
 <script>
-import WindowControls from '@/components/WindowControls.vue';
-import PluginPage from '@/views/plugins/PluginPage.vue';
+import LayoutPluginWindow from '@/views/Layout/PluginWindow.vue';
 
 export default {
   name: 'PluginWindow',
 
   components: {
-    PluginPage,
-    WindowControls,
-  },
-
-  data: () => ({
-    isMaximize: false,
-  }),
-
-  methods: {
-    onMaximizeStatusChange() {
-      this.$ipcRenderer.on('set-maximize-status', (maximize) => {
-        this.isMaximize = maximize;
-      });
-    },
-    onMounted() {
-      this.onMaximizeStatusChange();
-    },
-    onUnmounted() {
-      this.$ipcRenderer.detach('set-maximize-status');
-    },
-  },
-
-  mounted() {
-    this.onMounted();
-  },
-
-  destroyed() {
-    this.onUnmounted();
+    LayoutPluginWindow,
   },
 };
 </script>

@@ -51,12 +51,9 @@ const readPlugin = (pluginPath) => {
   }
   if (plugin.windowUrl) {
     plugin.windowUrl = path.resolve(pluginPath, plugin.windowUrl);
-    plugin.ui = null;
-    plugin.windowMode = true;
   }
-  if (!plugin.windowUrl && plugin.ui) {
+  if (plugin.ui) {
     plugin.ui = path.resolve(pluginPath, plugin.ui);
-    plugin.windowMode = false;
   }
   plugin.exports = pluginPkg.main;
   if (pluginPkg.exports) {
@@ -223,6 +220,11 @@ class PluginLoader extends EventEmitter {
       console.log('plugin enable error: ', err);
     }
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
+    if (mergedPlugin.windowUrl) {
+      mergedPlugin.windowMode = true;
+    } else if (typeof mergedPlugin.windowMode === 'undefined') {
+      mergedPlugin.windowMode = global.store.get(`plugin.${plugin.packageName}.windowMode`, false);
+    }
     processPlugin(mergedPlugin);
 
     return mergedPlugin;
