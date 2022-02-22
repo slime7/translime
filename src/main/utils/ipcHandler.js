@@ -199,6 +199,11 @@ const ipcHandler = (ipc) => ({
       resolve(true);
     });
   },
+  [ipcType.OPEN_PLUGIN_CONTEXT_MENU](packageName) {
+    if (global.plugin) {
+      global.plugin.popPluginMenu(packageName, ipc);
+    }
+  },
   ping() {
     global.console.log('pong', new Date());
   },

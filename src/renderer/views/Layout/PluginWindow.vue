@@ -32,10 +32,12 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
 import pluginUi from '@/mixins/pluginUi';
 
-window.vuetify$ = {
-  components,
-  directives,
-};
+if (!window.vuetify$) {
+  window.vuetify$ = {
+    components,
+    directives,
+  };
+}
 
 export default {
   name: 'LayoutPluginWindow',

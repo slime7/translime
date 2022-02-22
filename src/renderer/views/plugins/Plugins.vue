@@ -144,6 +144,22 @@ export default {
         this.getPlugins();
       }
     },
+    onPluginsChanged() {
+      this.$ipcRenderer.on(ipcType.PLUGINS_CHANGED, () => {
+        this.getPlugins();
+      });
+    },
+    offPluginChanged() {
+      this.$ipcRenderer.detach(ipcType.PLUGINS_CHANGED);
+    },
+  },
+
+  mounted() {
+    this.onPluginsChanged();
+  },
+
+  destroyed() {
+    this.offPluginChanged();
   },
 };
 </script>

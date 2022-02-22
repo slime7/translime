@@ -4,11 +4,14 @@
 
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import mixins from '@/mixins';
 
 const { ipcRenderer } = window.electron;
 
 export default {
   name: 'app',
+
+  mixins: [mixins],
 
   methods: {
     initAppConfig() {

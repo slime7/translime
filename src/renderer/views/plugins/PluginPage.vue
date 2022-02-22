@@ -5,8 +5,17 @@
 </template>
 
 <script>
+import * as components from 'vuetify/lib/components';
+import * as directives from 'vuetify/lib/directives';
 import mixins from '@/mixins';
 import pluginUi from '@/mixins/pluginUi';
+
+if (!window.vuetify$) {
+  window.vuetify$ = {
+    components,
+    directives,
+  };
+}
 
 export default {
   name: 'PluginPage',

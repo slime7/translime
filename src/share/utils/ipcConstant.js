@@ -18,7 +18,10 @@ export const UNINSTALL_PLUGIN = 'uninstall-plugin';
 export const DISABLE_PLUGIN = 'disable-plugin';
 export const ENABLE_PLUGIN = 'enable-plugin';
 export const GET_PLUGIN_SETTING = 'get-plugin-setting';
-export const SET_PLUGIN_SETTING = 'Set-plugin-setting';
+export const SET_PLUGIN_SETTING = 'set-plugin-setting';
+export const OPEN_PLUGIN_CONTEXT_MENU = 'open-plugin-context-menu';
+export const OPEN_PLUGIN_SETTING_PANEL = 'open-plugin-setting-panel';
+export const PLUGINS_CHANGED = 'plugins-changed';
 
 export default {
   DEVTOOLS,
@@ -42,4 +45,7 @@ export default {
   ENABLE_PLUGIN,
   GET_PLUGIN_SETTING,
   SET_PLUGIN_SETTING,
+  OPEN_PLUGIN_CONTEXT_MENU,
+  OPEN_PLUGIN_SETTING_PANEL,
+  PLUGINS_CHANGED,
 };

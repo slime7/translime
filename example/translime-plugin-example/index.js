@@ -1,7 +1,9 @@
+const id = 'translime-plugin-example';
+
 // 加载时执行
 export const pluginDidLoad = () => {
   console.log('plugin loaded');
-  const setting = global.store.get('plugin.translime-plugin-example.settings', {});
+  const setting = global.store.get(`plugin.${id}.settings`, {});
   console.log('settings: ', setting);
 };
 
@@ -65,5 +67,14 @@ export const settingMenu = [
   },
 ];
 
-// 插件菜单
-export const pluginMenu = [];
+// 插件上下文菜单
+// https://www.electronjs.org/zh/docs/latest/api/menu-item
+export const pluginMenu = [
+  {
+    id: `${id}-custom-menu`,
+    label: 'custom menu',
+    click() {
+      console.log('custom menu clicked');
+    },
+  },
+];

@@ -1,9 +1,10 @@
 import path from 'path';
 import fs from 'fs';
-import { app } from 'electron';
+import { app, Menu } from 'electron';
 import EventEmitter from 'events';
 import spawn from 'cross-spawn';
 import { createRequire } from 'module';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 
 const requireFresh = createRequire(import.meta.url);
 const APPDATA_PATH = app.getPath('userData');
@@ -127,6 +128,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
 const processPlugin = (plugin) => {
   console.log(plugin);
 
+  // 运行插件加载方法
   if (typeof plugin.pluginDidLoad === 'function') {
     plugin.pluginDidLoad();
   }
@@ -283,6 +285,76 @@ class PluginLoader extends EventEmitter {
         reject(new Error(result.data));
       }
     });
+  }
+
+  popPluginMenu(packageName, ipcEv) {
+    const plugin = this.getPlugin(packageName);
+    const self = this;
+
+    // 注册菜单
+    const contextMenuItems = [
+      {
+        id: 'disable-plugin',
+        label: '禁用插件',
+        visible: plugin.enabled,
+        click() {
+          self.disablePlugin(packageName);
+          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+        },
+      },
+      {
+        id: 'enable-plugin',
+        label: '启用插件',
+        visible: !plugin.enabled,
+        click() {
+          self.enablePlugin(packageName);
+          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+        },
+      },
+      {
+        id: 'uninstall-plugin',
+        label: '卸载插件',
+        click() {
+          self.uninstallPlugin(packageName).then(() => {
+            ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+          });
+        },
+      },
+      {
+        id: 'open-plugin-setting-panel',
+        label: '设置',
+        visible: plugin.enabled && plugin.settingMenu && plugin.settingMenu.length,
+        click() {
+          ipcEv.sendToClient(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${packageName}`, {
+            packageName,
+          });
+        },
+      },
+      {
+        id: 'switch-plugin-window-mode',
+        label: '新窗口打开插件',
+        type: 'checkbox',
+        checked: plugin.windowMode,
+        visible: plugin.ui && plugin.windowUrl,
+        click() {
+          plugin.windowMode = !plugin.windowMode;
+          global.store.set(`plugin.${packageName}.windowMode`, plugin.windowMode);
+          if (!plugin.windowMode && global.childWins[`plugin-window-${packageName}`]) {
+            global.childWins[`plugin-window-${packageName}`].close();
+          }
+          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+        },
+      },
+    ];
+    const menuDivider = {
+      type: 'separator',
+    };
+    if (Array.isArray(plugin.pluginMenu) && plugin.pluginMenu.length) {
+      contextMenuItems.push(menuDivider, ...plugin.pluginMenu);
+    }
+
+    const menu = Menu.buildFromTemplate(contextMenuItems);
+    menu.popup();
   }
 }
 

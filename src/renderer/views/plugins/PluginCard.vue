@@ -54,13 +54,12 @@
             </v-btn>
 
             <v-btn
-              v-if="plugin.settingMenu && plugin.settingMenu.length"
               class="ml-2"
               fab
               icon
               height="40px"
               width="40px"
-              @click="showSettingPanel"
+              @click="showContextMenu"
             >
               <v-icon>settings</v-icon>
             </v-btn>
@@ -86,6 +85,7 @@
 </template>
 
 <script>
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mixins from '@/mixins';
 import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
@@ -128,9 +128,30 @@ export default {
     enable() {
       this.$emit('enable', this.plugin.packageName);
     },
+    showContextMenu() {
+      this.$ipcRenderer.send(ipcType.OPEN_PLUGIN_CONTEXT_MENU, this.plugin.packageName);
+    },
     showSettingPanel() {
       this.settingPanelVisible = true;
     },
+    onShowSettingPanel() {
+      this.$ipcRenderer.on(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`, ({ packageName }) => {
+        if (packageName === this.plugin.packageName) {
+          this.showSettingPanel();
+        }
+      });
+    },
+    offShowSettingPanel() {
+      this.$ipcRenderer.detach(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`);
+    },
+  },
+
+  mounted() {
+    this.onShowSettingPanel();
+  },
+
+  destroyed() {
+    this.offShowSettingPanel();
   },
 };
 </script>
