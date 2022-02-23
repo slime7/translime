@@ -5,12 +5,16 @@
 
       <v-spacer />
 
+      <v-icon class="action-btn" @click="showNotification">notifications</v-icon>
+
       <window-controls :is-maximize="isMaximize"></window-controls>
     </v-system-bar>
 
     <navigation />
 
     <v-main class="fill-height">
+      <notification />
+
       <div class="d-flex flex-column fill-height" id="app-main-container">
         <div class="scroll-content flex">
           <v-scroll-y-transition mode="out-in">
@@ -29,7 +33,8 @@
 <script>
 import WindowControls from '@/components/WindowControls.vue';
 import MainFooter from '@/components/MainFooter.vue';
-import Navigation from '@/views/Layout/Navigation.vue';
+import Navigation from '@/views/Layout/components/Navigation.vue';
+import Notification from '@/views/Layout/components/Notification.vue';
 import { useIpc } from '@/hooks/electron';
 
 const ipc = useIpc();
@@ -39,6 +44,7 @@ export default {
 
   components: {
     Navigation,
+    Notification,
     MainFooter,
     WindowControls,
   },
@@ -59,6 +65,9 @@ export default {
     onUnmounted() {
       ipc.detach('set-maximize-status');
     },
+    showNotification() {
+      this.$store.commit('alert/setDrawerVisible', true);
+    },
   },
 
   mounted() {
@@ -75,6 +84,10 @@ export default {
 .system-bar {
   -webkit-app-region: drag;
   z-index: 300;
+
+  .action-btn {
+    -webkit-app-region: no-drag;
+  }
 }
 
 #app-main-container > .scroll-content {

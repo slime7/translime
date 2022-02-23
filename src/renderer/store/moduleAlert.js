@@ -7,6 +7,7 @@ const moduleAlert = {
     contents: [],
     show: false,
     timeout: 6000,
+    drawerVisible: false,
   },
 
   mutations: {
@@ -31,6 +32,9 @@ const moduleAlert = {
         clearTimeout(alert.timer);
         alert.visible = visible;
       }
+    },
+    setDrawerVisible(state, visible) {
+      state.drawerVisible = visible;
     },
   },
 

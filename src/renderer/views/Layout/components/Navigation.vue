@@ -50,7 +50,7 @@
 import NaviLink from '@/views/Layout/components/NaviLink.vue';
 
 export default {
-  name: 'Navigation',
+  name: 'LayoutNavigation',
 
   components: {
     NaviLink,
