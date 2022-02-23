@@ -117,6 +117,9 @@
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mixins from '@/mixins';
+import { useIpc } from '@/hooks/electron';
+
+const ipc = useIpc();
 
 export default {
   name: 'PluginSettingPanel',
@@ -164,7 +167,7 @@ export default {
     async initSettings() {
       const { packageName } = this.plugin;
       this.loading.getSettings = true;
-      const settings = await this.$ipcRenderer.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
+      const settings = await ipc.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
       if (typeof settings === 'object') {
         this.settings = settings;
       }
@@ -241,7 +244,7 @@ export default {
       }
       const { packageName } = this.plugin;
       this.loading.setSettings = true;
-      await this.$ipcRenderer.invoke(ipcType.SET_PLUGIN_SETTING, packageName, this.settings);
+      await ipc.invoke(ipcType.SET_PLUGIN_SETTING, packageName, this.settings);
       this.loading.setSettings = false;
       this.toast('设置已保存');
     },

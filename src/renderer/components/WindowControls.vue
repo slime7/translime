@@ -47,6 +47,9 @@ import {
   APP_UNMAXIMIZE,
   APP_CLOSE,
 } from '@pkg/share/utils/ipcConstant';
+import { useIpc } from '@/hooks/electron';
+
+const ipc = useIpc();
 
 export default {
   name: 'WindowControls',
@@ -73,19 +76,19 @@ export default {
 
   methods: {
     appMinimize() {
-      this.$ipcRenderer.send(APP_MINIMIZE, this.win);
+      ipc.send(APP_MINIMIZE, this.win);
       this.$emit('windowMinimize');
     },
     appUnmaximize() {
-      this.$ipcRenderer.send(APP_UNMAXIMIZE, this.win);
+      ipc.send(APP_UNMAXIMIZE, this.win);
       this.$emit('windowUnmaximize');
     },
     appMaximize() {
-      this.$ipcRenderer.send(APP_MAXIMIZE, this.win);
+      ipc.send(APP_MAXIMIZE, this.win);
       this.$emit('windowMaximize');
     },
     appClose() {
-      this.$ipcRenderer.send(APP_CLOSE, this.win);
+      ipc.send(APP_CLOSE, this.win);
       this.$emit('windowClose');
     },
   },

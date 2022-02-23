@@ -5,8 +5,10 @@
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mixins from '@/mixins';
+import { useIpc } from '@/hooks/electron';
 
-const { ipcRenderer } = window.electron;
+const ipc = useIpc();
+const ipcRaw = useIpc(false);
 
 export default {
   name: 'app',
@@ -18,14 +20,14 @@ export default {
       this.$store.dispatch('initAppConfig');
     },
     remoteConsoleListener() {
-      this.$ipcRenderer.on('console', ({ type, args }) => {
+      ipc.on('console', ({ type, args }) => {
         // eslint-disable-next-line no-console
         console[type](...args);
       });
     },
     async getPlugins() {
       try {
-        const plugins = await this.$ipcRenderer.invoke(ipcType.GET_PLUGINS);
+        const plugins = await ipc.invoke(ipcType.GET_PLUGINS);
         this.$store.commit('setPlugins', plugins);
       } catch (err) {
         this.alert(err.message, 'error');
@@ -39,7 +41,7 @@ export default {
   },
 
   mounted() {
-    ipcRenderer.send('main-renderer-ready');
+    ipcRaw.send('main-renderer-ready');
     this.getPlugins();
   },
 };

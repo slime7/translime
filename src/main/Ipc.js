@@ -16,14 +16,18 @@ export default class Ipc {
     });
   }
 
-  sendMsg(channel, msgBody) {
-    this.sender.send(channel, msgBody);
+  sendMsg(channel, msgBody, clientWin) {
+    if (!clientWin) {
+      this.sender.send(channel, msgBody);
+    } else {
+      clientWin.send(channel, msgBody);
+    }
   }
 
-  sendToClient(type, data) {
+  sendToClient(type, data, clientWin = null) {
     this.sendMsg('ipc-reply', {
       type,
       data,
-    });
+    }, clientWin);
   }
 }

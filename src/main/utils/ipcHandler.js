@@ -47,7 +47,7 @@ const ipcHandler = (ipc) => ({
     }
     return Promise.reject(new Error('targetWin is null'));
   },
-  [ipcType.APP_VERSIONS]() {
+  [ipcType.APP_VERSIONS](ipcId) {
     const versions = {
       app: pkg.version,
       electron: process.versions.electron,
@@ -55,7 +55,7 @@ const ipcHandler = (ipc) => ({
       v8: process.versions.v8,
       node: process.versions.node,
     };
-    ipc.sendToClient(ipcType.APP_VERSIONS, versions);
+    ipc.sendToClient(ipcId || ipcType.APP_VERSIONS, versions);
   },
   [ipcType.OPEN_LINK]({ url }) {
     shell.openExternal(url);
@@ -95,12 +95,21 @@ const ipcHandler = (ipc) => ({
         height: options.height ? options.height : mainWinBound.height,
         frame: typeof options.frame !== 'undefined' ? options.frame : false,
         titleBarStyle: options.titleBarStyle || 'default',
+        title: options.title || 'translime',
         webPreferences: {
           preload: join(__dirname, '../preload/index.js'),
           nodeIntegration: false,
           contextIsolation: true,
         },
       }, null);
+
+      global.childWins[name].on('maximize', () => {
+        ipc.sendToClient(`set-maximize-status:${name}`, true, global.childWins[name].webContents);
+      });
+
+      global.childWins[name].on('unmaximize', () => {
+        ipc.sendToClient(`set-maximize-status:${name}`, false, global.childWins[name].webContents);
+      });
 
       global.childWins[name].on('closed', () => {
         delete global.childWins[name];
@@ -203,6 +212,21 @@ const ipcHandler = (ipc) => ({
     if (global.plugin) {
       global.plugin.popPluginMenu(packageName, ipc);
     }
+  },
+  [ipcType.DIALOG_SHOW_OPEN_DIALOG](options) {
+    return dialog.showOpenDialog(options);
+  },
+  [ipcType.DIALOG_SHOW_SAVE_DIALOG](options) {
+    return dialog.showSaveDialog(options);
+  },
+  [ipcType.DIALOG_SHOW_MESSAGE_BOX](options) {
+    return dialog.showMessageBox(options);
+  },
+  [ipcType.DIALOG_SHOW_ERROR_BOX](title, content) {
+    return dialog.showErrorBox(title, content);
+  },
+  [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](options) {
+    return dialog.showCertificateTrustDialog(options);
   },
   ping() {
     global.console.log('pong', new Date());

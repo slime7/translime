@@ -52,6 +52,9 @@
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mixins from '@/mixins';
 import PluginCard from './PluginCard.vue';
+import { useIpc } from '@/hooks/electron';
+
+const ipc = useIpc();
 
 export default {
   name: 'Plugins',
@@ -91,7 +94,7 @@ export default {
       }
       this.loading.install = true;
       try {
-        const result = await this.$ipcRenderer.invoke(ipcType.INSTALL_PLUGIN, this.search);
+        const result = await ipc.invoke(ipcType.INSTALL_PLUGIN, this.search);
         console.log(result);
       } catch (err) {
         this.alert(err.message, 'error');
@@ -110,7 +113,7 @@ export default {
       this.loading.uninstall = true;
       this.showLoader();
       try {
-        await this.$ipcRenderer.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
+        await ipc.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
       } catch (err) {
         this.alert(err.message, 'error');
       } finally {
@@ -121,14 +124,14 @@ export default {
     },
     async getPlugins() {
       try {
-        this.plugins = await this.$ipcRenderer.invoke(ipcType.GET_PLUGINS);
+        this.plugins = await ipc.invoke(ipcType.GET_PLUGINS);
       } catch (err) {
         this.alert(err.message, 'error');
       }
     },
     async disablePlugin(packageName) {
       try {
-        await this.$ipcRenderer.invoke(ipcType.DISABLE_PLUGIN, packageName);
+        await ipc.invoke(ipcType.DISABLE_PLUGIN, packageName);
       } catch (err) {
         this.alert(err.message, 'error');
       } finally {
@@ -137,7 +140,7 @@ export default {
     },
     async enablePlugin(packageName) {
       try {
-        await this.$ipcRenderer.invoke(ipcType.ENABLE_PLUGIN, packageName);
+        await ipc.invoke(ipcType.ENABLE_PLUGIN, packageName);
       } catch (err) {
         this.alert(err.message, 'error');
       } finally {
@@ -145,12 +148,12 @@ export default {
       }
     },
     onPluginsChanged() {
-      this.$ipcRenderer.on(ipcType.PLUGINS_CHANGED, () => {
+      ipc.on(ipcType.PLUGINS_CHANGED, () => {
         this.getPlugins();
       });
     },
     offPluginChanged() {
-      this.$ipcRenderer.detach(ipcType.PLUGINS_CHANGED);
+      ipc.detach(ipcType.PLUGINS_CHANGED);
     },
   },
 

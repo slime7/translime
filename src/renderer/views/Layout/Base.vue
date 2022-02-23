@@ -30,6 +30,9 @@
 import WindowControls from '@/components/WindowControls.vue';
 import MainFooter from '@/components/MainFooter.vue';
 import Navigation from '@/views/Layout/Navigation.vue';
+import { useIpc } from '@/hooks/electron';
+
+const ipc = useIpc();
 
 export default {
   name: 'Base',
@@ -46,7 +49,7 @@ export default {
 
   methods: {
     onMaximizeStatusChange() {
-      this.$ipcRenderer.on('set-maximize-status', (maximize) => {
+      ipc.on('set-maximize-status', (maximize) => {
         this.isMaximize = maximize;
       });
     },
@@ -54,7 +57,7 @@ export default {
       this.onMaximizeStatusChange();
     },
     onUnmounted() {
-      this.$ipcRenderer.detach('set-maximize-status');
+      ipc.detach('set-maximize-status');
     },
   },
 

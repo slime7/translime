@@ -62,6 +62,9 @@
 
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import { useIpc } from '@/hooks/electron';
+
+const ipc = useIpc();
 
 export default {
   name: 'NaviLink',
@@ -93,7 +96,8 @@ export default {
 
   methods: {
     openPluginWindow() {
-      this.$ipcRenderer.send(ipcType.OPEN_NEW_WINDOW, {
+      const plugin = this.$store.getters.plugin(this.open.id);
+      ipc.send(ipcType.OPEN_NEW_WINDOW, {
         name: `plugin-window-${this.open.id}`,
         options: {
           // windowUrl: `file://${this.open.windowUrl}`,
@@ -101,6 +105,7 @@ export default {
           appMenu: null,
           frame: false,
           titleBarStyle: 'hidden',
+          title: plugin.title,
         },
       });
     },

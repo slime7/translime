@@ -22,6 +22,11 @@
     <v-btn @click="openChildWindow" class="ml-4" color="primary">
       open child window
     </v-btn>
+
+    <v-btn @click="getVersions" class="ml-4" color="primary">
+      ipc test
+    </v-btn>
+
     <p>
       Edit
       <code>components/HelloWorld.vue</code> to test hot module replacement.
@@ -31,6 +36,9 @@
 
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import { useIpc } from '@/hooks/electron';
+
+const ipc = useIpc();
 
 export default {
   props: {
@@ -45,8 +53,20 @@ export default {
 
   methods: {
     openChildWindow() {
-      this.$ipcRenderer.send(ipcType.OPEN_NEW_WINDOW, { name: 'childWinTest' });
+      ipc.send(ipcType.OPEN_NEW_WINDOW, { name: 'childWinTest' });
     },
+    getVersions() {
+      ipc.send(ipcType.APP_VERSIONS);
+    },
+    onGetVersions() {
+      ipc.on(ipcType.APP_VERSIONS, (versions) => {
+        console.log(versions);
+      });
+    },
+  },
+
+  mounted() {
+    this.onGetVersions();
   },
 };
 </script>

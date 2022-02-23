@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, clipboard, ipcRenderer } from 'electron';
 import path from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import fs from 'fs';
@@ -52,6 +52,29 @@ const api = {
       }
       return Promise.reject(new Error('ipc invoke: 信号不在白名单'));
     },
+  },
+  clipboard,
+  dialog: {
+    showOpenDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.DIALOG_SHOW_OPEN_DIALOG,
+      args,
+    }),
+    showSaveDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.DIALOG_SHOW_SAVE_DIALOG,
+      args,
+    }),
+    showMessageBox: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.DIALOG_SHOW_MESSAGE_BOX,
+      args,
+    }),
+    showErrorBox: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.DIALOG_SHOW_ERROR_BOX,
+      args,
+    }),
+    showCertificateTrustDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG,
+      args,
+    }),
   },
   APP_ROOT: path.resolve(__dirname, '../'),
 };

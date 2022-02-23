@@ -1,7 +1,8 @@
 <template>
   <v-app>
     <v-system-bar app class="system-bar pa-0">
-      <div class="px-4">translime</div>
+      <div v-if="!plugin" class="px-4">translime</div>
+      <div v-else class="px-4">{{ plugin.title }} - translime</div>
 
       <v-spacer />
 
@@ -31,7 +32,9 @@ import * as directives from 'vuetify/lib/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
 import pluginUi from '@/mixins/pluginUi';
+import { useIpc } from '@/hooks/electron';
 
+const ipc = useIpc();
 if (!window.vuetify$) {
   window.vuetify$ = {
     components,
@@ -51,27 +54,33 @@ export default {
   data: () => ({
     isMaximize: false,
     plugin: null,
-    pluginId: 'translime-plugin-example',
+    pluginId: '',
   }),
 
   methods: {
     async getIsMaximize() {
-      this.isMaximize = await this.$ipcRenderer.invoke(ipcType.APP_IS_MAXIMIZE, `plugin-window-${this.pluginId}`);
+      this.isMaximize = await ipc.invoke(ipcType.APP_IS_MAXIMIZE, `plugin-window-${this.pluginId}`);
+    },
+    onMaximizeStatusChange() {
+      ipc.on(`set-maximize-status:plugin-window-${this.pluginId}`, (maximize) => {
+        this.isMaximize = maximize;
+      });
     },
     async onMounted() {
-      await this.getIsMaximize();
       this.getPluginId();
+      this.onMaximizeStatusChange();
+      await this.getIsMaximize();
       await this.getPlugin();
       if (this.plugin && this.plugin.ui) {
         await this.loadUi(this.plugin.ui, this.pluginId);
       }
     },
     onUnmounted() {
-      this.$ipcRenderer.detach('set-maximize-status');
+      ipc.detach(`set-maximize-status:plugin-window-${this.pluginId}`);
     },
     async getPlugin() {
       try {
-        this.plugin = await this.$ipcRenderer.invoke(ipcType.GET_PLUGINS, this.pluginId);
+        this.plugin = await ipc.invoke(ipcType.GET_PLUGINS, this.pluginId);
       } catch (err) {
         //
       }

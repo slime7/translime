@@ -22,6 +22,11 @@ export const SET_PLUGIN_SETTING = 'set-plugin-setting';
 export const OPEN_PLUGIN_CONTEXT_MENU = 'open-plugin-context-menu';
 export const OPEN_PLUGIN_SETTING_PANEL = 'open-plugin-setting-panel';
 export const PLUGINS_CHANGED = 'plugins-changed';
+export const DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG = 'dialog-show-certificate-trust-dialog';
+export const DIALOG_SHOW_ERROR_BOX = 'dialog-show-error-box';
+export const DIALOG_SHOW_MESSAGE_BOX = 'dialog-show-message-box';
+export const DIALOG_SHOW_OPEN_DIALOG = 'dialog-show-open-dialog';
+export const DIALOG_SHOW_SAVE_DIALOG = 'dialog-show-save-dialog';
 
 export default {
   DEVTOOLS,
@@ -48,4 +53,9 @@ export default {
   OPEN_PLUGIN_CONTEXT_MENU,
   OPEN_PLUGIN_SETTING_PANEL,
   PLUGINS_CHANGED,
+  DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG,
+  DIALOG_SHOW_ERROR_BOX,
+  DIALOG_SHOW_MESSAGE_BOX,
+  DIALOG_SHOW_OPEN_DIALOG,
+  DIALOG_SHOW_SAVE_DIALOG,
 };

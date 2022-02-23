@@ -87,8 +87,11 @@
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mixins from '@/mixins';
+import { useIpc } from '@/hooks/electron';
 import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
+
+const ipc = useIpc();
 
 export default {
   name: 'PluginCard',
@@ -129,20 +132,20 @@ export default {
       this.$emit('enable', this.plugin.packageName);
     },
     showContextMenu() {
-      this.$ipcRenderer.send(ipcType.OPEN_PLUGIN_CONTEXT_MENU, this.plugin.packageName);
+      ipc.send(ipcType.OPEN_PLUGIN_CONTEXT_MENU, this.plugin.packageName);
     },
     showSettingPanel() {
       this.settingPanelVisible = true;
     },
     onShowSettingPanel() {
-      this.$ipcRenderer.on(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`, ({ packageName }) => {
+      ipc.on(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`, ({ packageName }) => {
         if (packageName === this.plugin.packageName) {
           this.showSettingPanel();
         }
       });
     },
     offShowSettingPanel() {
-      this.$ipcRenderer.detach(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`);
+      ipc.detach(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`);
     },
   },
 

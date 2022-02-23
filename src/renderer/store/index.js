@@ -3,8 +3,11 @@ import Vuex from 'vuex';
 import toast from '@/store/moduleToast';
 import dialog from '@/store/moduleDialog';
 import alert from '@/store/moduleAlert';
+import { useIpc } from '@/hooks/electron';
 
-const appConfigStore = (method, ...args) => window.electron.ipcRenderer.invoke('appConfigStore', method, ...args);
+const ipcRaw = useIpc(false);
+
+const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
 
 Vue.use(Vuex);
 
@@ -15,6 +18,9 @@ export default new Vuex.Store({
       openAtLogin: false,
     },
     plugins: [],
+  },
+  getters: {
+    plugin: (state) => (packageName) => state.plugins.find((plugin) => plugin.packageName === packageName),
   },
   mutations: {
     setVersions(state, versions) {

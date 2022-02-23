@@ -29,7 +29,11 @@
 
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import { getUuiD } from '@pkg/share/utils';
 import mixins from '@/mixins';
+import { useIpc } from '@/hooks/electron';
+
+const ipc = useIpc();
 
 export default {
   name: 'About',
@@ -37,7 +41,8 @@ export default {
   mixins: [mixins],
 
   data: () => ({
-    versions: window.electron.versions,
+    versions: {},
+    versionsIpcId: `${ipcType.APP_VERSIONS}-${getUuiD()}`,
   }),
 
   methods: {
@@ -49,11 +54,24 @@ export default {
       console.log('confirm result: ', result);
     },
     reloadApp() {
-      this.$ipcRenderer.send(ipcType.RELOAD);
+      ipc.send(ipcType.RELOAD);
     },
     appDir() {
-      this.$ipcRenderer.send(ipcType.OPEN_APP_PATH);
+      ipc.send(ipcType.OPEN_APP_PATH);
     },
+    getVersions() {
+      ipc.send(ipcType.APP_VERSIONS, this.versionsIpcId);
+    },
+    onGetVersions() {
+      ipc.on(this.versionsIpcId, (versions) => {
+        this.versions = versions;
+      });
+    },
+  },
+
+  mounted() {
+    this.onGetVersions();
+    this.getVersions();
   },
 };
 </script>
