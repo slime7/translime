@@ -7,26 +7,38 @@
     right
     width="560"
   >
-    <div class="pa-4" v-if="!alertList.length">
-      <div class="d-flex justify-center">无新通知</div>
+    <div class="notify-container pa-4 fill-height d-flex flex-column" v-scroll.self="onAlertContainerScroll">
+      <v-spacer />
+
+      <div v-if="!alertList.length">
+        <div class="d-flex justify-center">无新通知</div>
+      </div>
+
+      <div class="d-flex flex-column">
+        <v-alert
+          v-for="alertItem in alertList"
+          :key="alertItem.uuid"
+          :type="alertItem.type"
+          border="left"
+        >
+          <div>{{ alertItem.time | alertTime }}</div>
+          <div>{{ alertItem.msg }}</div>
+        </v-alert>
+      </div>
+      <div id="notify-list-bottom"></div>
     </div>
-    <div class="notify-container pa-4 d-flex flex-column-reverse" v-else>
-      <v-alert
-        v-for="alertItem in alertList"
-        :key="alertItem.uuid"
-        :type="alertItem.type"
-        border="left"
-      >
-        {{ alertItem.msg }}
-      </v-alert>
-    </div>
-    <div id="notify-list-bottom"></div>
   </v-navigation-drawer>
 </template>
 
 <script>
+import { myDate } from '@pkg/share/utils';
+
 export default {
   name: 'LayoutNotification',
+
+  data: () => ({
+    keepBottom: true,
+  }),
 
   computed: {
     drawerVisible: {
@@ -39,6 +51,37 @@ export default {
     },
     alertList() {
       return this.$store.state.alert.contents;
+    },
+  },
+
+  methods: {
+    scrollToBottom() {
+      console.log('scrollToBottom');
+      this.$vuetify.goTo('#notify-list-bottom', {
+        container: '.notify-container',
+      });
+    },
+    onAlertContainerScroll(ev) {
+      console.log(ev.target.scrollTop, ev.target.clientHeight, ev.target.scrollHeight, ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight);
+      this.keepBottom = ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight;
+    },
+  },
+
+  watch: {
+    drawerVisible(value) {
+      if (value && this.keepBottom) {
+        this.scrollToBottom();
+      }
+    },
+  },
+
+  filters: {
+    alertTime(time) {
+      return myDate(Math.round(time / 1000), {
+        format: '-',
+        showTime: true,
+        showSecond: true,
+      });
     },
   },
 };

@@ -25,6 +25,9 @@ const moduleAlert = {
         time: +new Date(),
         timer,
       });
+      if (state.contents.contents.length > 300) {
+        state.contents.shift();
+      }
     },
     setVisible(state, { uuid, visible }) {
       const alert = state.contents.find((a) => a.uuid === uuid);
