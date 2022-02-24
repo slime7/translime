@@ -10,6 +10,7 @@ global.childWins = {};
 global.ipc = null;
 global.store = appConfigStore;
 global.mainProcessLock = null;
+global.tray = null;
 
 ipcMain.handle('appConfigStore', (event, method, ...rest) => {
   if (!rest.length) {

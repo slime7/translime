@@ -7,6 +7,7 @@ import '@pkg/main/utils/global';
 import pluginLoader from '@pkg/share/lib/pluginLoader';
 import createMainWindow from './main';
 import createLaunchWindow from './launch';
+import createTray from './tray';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 global.mainProcessLock = app.requestSingleInstanceLock();
@@ -54,6 +55,7 @@ app.whenReady()
   .then(() => {
     createLaunchWindow();
     createMainWindow();
+    createTray();
   });
 if (isDevelopment) {
   app.whenReady()
