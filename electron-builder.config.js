@@ -3,6 +3,7 @@
  * @see https://www.electron.build/configuration/configuration
  */
 const config = {
+  appId: 'translime.app',
   asar: true,
   directories: {
     output: 'dist_electron',
