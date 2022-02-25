@@ -1,4 +1,8 @@
-import { contextBridge, clipboard, ipcRenderer } from 'electron';
+import {
+  contextBridge,
+  clipboard,
+  ipcRenderer,
+} from 'electron';
 import path from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import fs from 'fs';
@@ -74,6 +78,15 @@ const api = {
     showCertificateTrustDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
       type: ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG,
       args,
+    }),
+  },
+  notification: {
+    show: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.SHOW_NOTIFICATION,
+      args,
+    }),
+    isSupported: () => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.IS_NOTIFICATION_SUPPORTED,
     }),
   },
   APP_ROOT: path.resolve(__dirname, '../'),

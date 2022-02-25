@@ -1,4 +1,9 @@
-import { app, dialog, shell } from 'electron';
+import {
+  app,
+  dialog,
+  Notification,
+  shell,
+} from 'electron';
 import pkg from '@pkg/../package.json';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '@pkg/main/utils/createWindow';
@@ -227,6 +232,23 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](options) {
     return dialog.showCertificateTrustDialog(options);
+  },
+  [ipcType.SHOW_NOTIFICATION](options, timeout = 0) {
+    if (Notification.isSupported()) {
+      const notification = new Notification(options);
+      notification.show();
+      if (timeout > 0) {
+        setTimeout(() => {
+          notification.close();
+        }, timeout);
+      }
+      return Promise.resolve();
+    }
+    return Promise.reject(new Error('通知调用失败'));
+  },
+  [ipcType.IS_NOTIFICATION_SUPPORTED]() {
+    const isSupported = Notification.isSupported();
+    return Promise.resolve(isSupported);
   },
   ping() {
     global.console.log('pong', new Date());

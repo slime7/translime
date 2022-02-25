@@ -27,6 +27,8 @@ export const DIALOG_SHOW_ERROR_BOX = 'dialog-show-error-box';
 export const DIALOG_SHOW_MESSAGE_BOX = 'dialog-show-message-box';
 export const DIALOG_SHOW_OPEN_DIALOG = 'dialog-show-open-dialog';
 export const DIALOG_SHOW_SAVE_DIALOG = 'dialog-show-save-dialog';
+export const SHOW_NOTIFICATION = 'show-notification';
+export const IS_NOTIFICATION_SUPPORTED = 'is-notification-supported';
 
 export default {
   DEVTOOLS,
@@ -58,4 +60,6 @@ export default {
   DIALOG_SHOW_MESSAGE_BOX,
   DIALOG_SHOW_OPEN_DIALOG,
   DIALOG_SHOW_SAVE_DIALOG,
+  SHOW_NOTIFICATION,
+  IS_NOTIFICATION_SUPPORTED,
 };

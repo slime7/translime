@@ -1,8 +1,15 @@
-const { clipboard, ipcRenderer, dialog } = window.electron;
+const {
+  clipboard,
+  ipcRenderer,
+  dialog,
+  notification,
+} = window.electron;
 
 export const useClipboard = () => clipboard;
 
 export const useDialog = () => dialog;
+
+export const useNotify = () => notification;
 
 const callbackCache = [];
 ipcRenderer.receive('ipc-reply', (msg) => {

@@ -1,4 +1,5 @@
 import { getUuiD } from '@pkg/share/utils';
+import { useNotify } from '@/hooks/electron';
 
 const moduleAlert = {
   namespaced: true,
@@ -16,16 +17,17 @@ const moduleAlert = {
       msg,
       type = 'info',
       timer = null,
+      visible = true,
     }) {
       state.contents.push({
         uuid,
         msg,
         type,
-        visible: true,
+        visible,
         time: +new Date(),
         timer,
       });
-      if (state.contents.contents.length > 300) {
+      if (state.contents.length > 300) {
         state.contents.shift();
       }
     },
@@ -42,23 +44,51 @@ const moduleAlert = {
   },
 
   actions: {
-    push({ commit }, { msg, type, timeout = 6000 }) {
+    async push({ commit }, { msg, type, timeout = 6000 }) {
+      const notifyTypes = {
+        info: '提示',
+        error: '出错',
+        success: '成功',
+        warning: '警告',
+      };
+      const notify = useNotify();
       const uuid = getUuiD();
+      const isSupportedSystemNotification = notify.isSupported();
       if (timeout > 0) {
-        const timer = setTimeout(() => {
-          commit('setVisible', { uuid, visible: false });
-        }, timeout);
-        commit('push', {
-          msg,
-          type,
-          uuid,
-          timer,
-        });
+        if (!isSupportedSystemNotification) {
+          const timer = setTimeout(() => {
+            commit('setVisible', { uuid, visible: false });
+          }, timeout);
+          commit('push', {
+            msg,
+            type,
+            uuid,
+            timer,
+          });
+        } else {
+          commit('push', {
+            msg,
+            type,
+            uuid,
+            visible: false,
+          });
+          await notify.show({
+            title: notifyTypes[type],
+            body: msg,
+            timeoutType: 'never',
+          }, timeout);
+        }
       } else {
         commit('push', {
           msg,
           type,
           uuid,
+          visible: false,
+        });
+        await notify.show({
+          title: notifyTypes[type],
+          body: msg,
+          timeoutType: 'never',
         });
       }
     },
