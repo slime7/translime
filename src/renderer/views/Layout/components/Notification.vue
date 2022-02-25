@@ -56,7 +56,6 @@ export default {
 
   methods: {
     scrollToBottom() {
-      console.log('scrollToBottom');
       this.$vuetify.goTo('#notify-list-bottom', {
         container: '.notify-container',
       });
