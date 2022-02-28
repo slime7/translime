@@ -51,6 +51,7 @@ export default {
 @import "./assets/fonts/robot/robot.css";
 @import "./assets/fonts/noto sans sc/noto_sans_sc.css";
 @import "./assets/fonts/source code pro/source_code_pro.css";
+@import "./assets/fonts/material icons/material_icons.css";
 
 html {
   overflow-y: auto !important;

@@ -15,13 +15,23 @@
       <navi-link
         :to="{ name: 'Plugins' }"
         tooltip="插件"
+        icon="extension"
       >
         插件
       </navi-link>
 
       <navi-link
+        :to="{ name: 'Setting' }"
+        tooltip="设置"
+        icon="settings"
+      >
+        设置
+      </navi-link>
+
+      <navi-link
         :to="{ name: 'About' }"
         tooltip="关于"
+        icon="support"
       >
         关于
       </navi-link>

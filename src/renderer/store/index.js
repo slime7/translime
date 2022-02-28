@@ -16,6 +16,7 @@ export default new Vuex.Store({
     versions: null,
     appSetting: {
       openAtLogin: false,
+      registry: '',
     },
     plugins: [],
   },
@@ -29,15 +30,17 @@ export default new Vuex.Store({
     setAppOpenAtLogin(state, open) {
       state.appSetting.openAtLogin = open;
     },
+    setAppRegistry(state, registry) {
+      state.appSetting.registry = registry;
+    },
     setPlugins(state, plugins) {
       state.plugins = plugins;
     },
   },
   actions: {
     async initAppConfig({ commit }) {
-      if (await appConfigStore('has', 'setting.openAtLogin')) {
-        commit('setAppOpenAtLogin', await appConfigStore('get', 'setting.openAtLogin'));
-      }
+      commit('setAppOpenAtLogin', await appConfigStore('get', 'setting.openAtLogin', false));
+      commit('setAppRegistry', await appConfigStore('get', 'setting.registry', 'https://registry.npmmirror.com/'));
     },
   },
   modules: {

@@ -13,8 +13,6 @@ global.mainProcessLock = null;
 global.tray = null;
 
 ipcMain.handle('appConfigStore', (event, method, ...rest) => {
-  if (!rest.length) {
-    return appConfigStore[method];
-  }
-  return appConfigStore[method](...rest);
+  const data = appConfigStore[method](...rest);
+  return Promise.resolve({ data, err: null });
 });

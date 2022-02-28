@@ -26,6 +26,11 @@ const routes = [
         component: () => import('@/views/plugins/Plugins.vue'),
       },
       {
+        path: '/setting',
+        name: 'Setting',
+        component: () => import('@/views/Setting.vue'),
+      },
+      {
         path: '/plugins/:packageName',
         name: 'PluginPage',
         component: () => import('@/views/plugins/PluginPage.vue'),

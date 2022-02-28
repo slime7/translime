@@ -72,7 +72,7 @@ const readPlugin = (pluginPath) => {
 const execNpmCommand = (cmd, module, options = {}) => {
   const internalOptions = {
     ...{
-      registry: global.store.get('pluginManager.registry', 'https://registry.npmmirror.com/'),
+      registry: global.store.get('setting.registry', 'https://registry.npmmirror.com/'),
     },
     ...options,
   };

@@ -6,22 +6,23 @@
       <div class="d-flex align-center">
         <v-text-field
           v-model="search"
-          label="搜索"
+          placeholder="输入插件包名"
           append-icon="search"
-          dense
           solo
+          prefix="translime-plugin-"
           @keyup.enter="installPlugins"
-        />
-
-        <v-btn
-          class="mb-7 ml-2"
-          color="primary"
-          :disabled="!search || loading.install"
-          :loading="loading.install"
-          @click="installPlugins"
         >
-          安装插件
-        </v-btn>
+          <template slot="append">
+            <v-btn
+              color="primary"
+              :disabled="!search || loading.install"
+              :loading="loading.install"
+              @click="installPlugins"
+            >
+              安装插件
+            </v-btn>
+          </template>
+        </v-text-field>
       </div>
     </div>
 
@@ -94,7 +95,10 @@ export default {
       }
       this.loading.install = true;
       try {
-        const result = await ipc.invoke(ipcType.INSTALL_PLUGIN, this.search);
+        const packageName = this.search.startsWith('translime-plugin-')
+          ? this.search
+          : `translime-plugin-${this.search}`;
+        const result = await ipc.invoke(ipcType.INSTALL_PLUGIN, packageName);
         console.log(result);
       } catch (err) {
         this.alert(err.message, 'error');
@@ -166,6 +170,3 @@ export default {
   },
 };
 </script>
-
-<style scoped lang="scss">
-</style>

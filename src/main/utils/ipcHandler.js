@@ -250,6 +250,14 @@ const ipcHandler = (ipc) => ({
     const isSupported = Notification.isSupported();
     return Promise.resolve(isSupported);
   },
+  [ipcType.OPEN_AT_LOGIN]({ open }) {
+    app.setLoginItemSettings({
+      openAtLogin: open,
+      openAsHidden: false,
+      name: 'translime.app',
+    });
+    global.store.set('setting.openAtLogin', open);
+  },
   ping() {
     global.console.log('pong', new Date());
   },
