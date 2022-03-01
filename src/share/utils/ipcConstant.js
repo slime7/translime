@@ -30,6 +30,7 @@ export const DIALOG_SHOW_SAVE_DIALOG = 'dialog-show-save-dialog';
 export const SHOW_NOTIFICATION = 'show-notification';
 export const IS_NOTIFICATION_SUPPORTED = 'is-notification-supported';
 export const OPEN_AT_LOGIN = 'open-at-login';
+export const SHOW_TEXT_EDIT_CONTEXT = 'show-text-edit-context';
 
 export default {
   DEVTOOLS,
@@ -64,4 +65,5 @@ export default {
   SHOW_NOTIFICATION,
   IS_NOTIFICATION_SUPPORTED,
   OPEN_AT_LOGIN,
+  SHOW_TEXT_EDIT_CONTEXT,
 };

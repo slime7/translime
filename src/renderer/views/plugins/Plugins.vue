@@ -1,6 +1,6 @@
 <template>
   <v-container fluid class="plugins">
-    <h2>搜索</h2>
+    <h2>插件</h2>
 
     <div class="mt-4">
       <div class="d-flex align-center">
@@ -11,6 +11,7 @@
           solo
           prefix="translime-plugin-"
           @keyup.enter="installPlugins"
+          @click.right="showTextEditContextMenu"
         >
           <template slot="append">
             <v-btn
@@ -26,7 +27,7 @@
       </div>
     </div>
 
-    <h2>已安装</h2>
+    <h3>已安装</h3>
 
     <div class="mt-4">
       <v-row class="plugin-list">

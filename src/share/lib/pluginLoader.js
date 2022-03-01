@@ -11,7 +11,9 @@ const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
 const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
 const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
-const NPM_EXEC_PATH = path.join(global.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+const NPM_EXEC_PATH = import.meta.env.DEV
+  ? path.join(global.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
+  : path.join(global.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
 const resolvePluginPath = (pluginName) => path.join(PLUGIN_MODULES_PATH, pluginName);
 

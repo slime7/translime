@@ -1,4 +1,8 @@
+import * as ipcType from '@pkg/share/utils/ipcConstant';
+import { useIpc } from '@/hooks/electron';
 import store from '../store';
+
+const ipc = useIpc();
 
 const mixins = {
   data: () => ({
@@ -85,6 +89,9 @@ const mixins = {
         }
         resolve(result);
       });
+    },
+    showTextEditContextMenu() {
+      ipc.send(ipcType.SHOW_TEXT_EDIT_CONTEXT);
     },
   },
 };

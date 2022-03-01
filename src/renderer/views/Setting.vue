@@ -49,10 +49,11 @@
             <v-text-field
               v-model="customRegistryItem.link"
               placeholder="https://registry.npmjs.org"
+              @click.right="showTextEditContextMenu"
               :rules="[
                 v => v.length > 0,
                 v => /^https?:\/\/.*$/.test(v)
-               ]"
+              ]"
             />
           </v-card-text>
 

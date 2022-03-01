@@ -1,6 +1,7 @@
 import {
   app,
   dialog,
+  Menu,
   Notification,
   shell,
 } from 'electron';
@@ -257,6 +258,43 @@ const ipcHandler = (ipc) => ({
       name: 'translime.app',
     });
     global.store.set('setting.openAtLogin', open);
+  },
+  [ipcType.SHOW_TEXT_EDIT_CONTEXT]() {
+    const contextMenuItems = [
+      {
+        role: 'undo',
+        label: '撤销',
+        registerAccelerator: false,
+        accelerator: 'CommandOrControl+Z',
+      },
+      {
+        role: 'redo',
+        label: '重做',
+        registerAccelerator: false,
+        accelerator: 'CommandOrControl+Y',
+      },
+      { type: 'separator' },
+      {
+        role: 'cut',
+        label: '剪切',
+        registerAccelerator: false,
+        accelerator: 'CommandOrControl+X',
+      },
+      {
+        role: 'copy',
+        label: '复制',
+        registerAccelerator: false,
+        accelerator: 'CommandOrControl+C',
+      },
+      {
+        role: 'paste',
+        label: '粘贴',
+        registerAccelerator: false,
+        accelerator: 'CommandOrControl+V',
+      },
+    ];
+    const menu = Menu.buildFromTemplate(contextMenuItems);
+    menu.popup();
   },
   ping() {
     global.console.log('pong', new Date());
