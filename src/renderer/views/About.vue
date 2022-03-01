@@ -32,8 +32,10 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { getUuiD } from '@pkg/share/utils';
 import mixins from '@/mixins';
 import { useIpc } from '@/hooks/electron';
+import useDialog from '@/hooks/useDialog';
 
 const ipc = useIpc();
+const { confirm } = useDialog();
 
 export default {
   name: 'About',
@@ -50,7 +52,8 @@ export default {
       this.alert('测试 alert');
     },
     async testConfirm() {
-      const result = await this.confirm('测试 confirm');
+      // const result = await this.confirm('测试 confirm');
+      const result = await confirm('测试 confirm');
       console.log('confirm result: ', result);
     },
     reloadApp() {

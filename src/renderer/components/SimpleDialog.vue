@@ -77,27 +77,36 @@
 </template>
 
 <script>
-import { mapState } from 'vuex';
+import useDialogStore from '@/store/dialogStore';
 
 export default {
   name: 'SimpleDialog',
 
-  computed: {
-    ...mapState('dialog', [
-      'dialogs',
-      'titleClass',
-      'loader',
-      'confirm',
-    ]),
-  },
+  setup() {
+    const dialogStore = useDialogStore();
+    const {
+      dialogs,
+      titleClass,
+      loader,
+      confirm,
+    } = dialogStore;
 
-  methods: {
-    close() {
-      this.$store.dispatch('dialog/close');
-    },
-    hideLoader() {
-      this.$store.dispatch('dialog/hideLoader');
-    },
+    const close = () => {
+      dialogStore.pop();
+    };
+
+    const hideLoader = () => {
+      dialogStore.loader = false;
+    };
+
+    return {
+      dialogs,
+      titleClass,
+      loader,
+      confirm,
+      close,
+      hideLoader,
+    };
   },
 };
 </script>

@@ -48,7 +48,7 @@
               icon
               height="40px"
               width="40px"
-              @click="uninstallConfirm"
+              @click="uninstall"
             >
               <v-icon>delete</v-icon>
             </v-btn>
@@ -85,13 +85,11 @@
 </template>
 
 <script>
-import * as ipcType from '@pkg/share/utils/ipcConstant';
-import mixins from '@/mixins';
-import { useIpc } from '@/hooks/electron';
+import { toRefs } from '@vue/composition-api';
 import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
-
-const ipc = useIpc();
+import usePluginSettingPanel from './hooks/usePluginSettingPanel';
+import usePluginActions from './hooks/usePluginActions';
 
 export default {
   name: 'PluginCard',
@@ -100,8 +98,6 @@ export default {
     PluginSettingPanel,
   },
 
-  mixins: [mixins],
-
   props: {
     plugin: {
       type: Object,
@@ -109,52 +105,29 @@ export default {
     },
   },
 
-  data: () => ({
-    defaultIcon,
-    uninstallConfirmVisible: false,
-    settingPanelVisible: false,
-  }),
+  setup(props, { emit }) {
+    const { plugin } = toRefs(props);
+    const pluginId = plugin.value.packageName;
 
-  methods: {
-    async uninstallConfirm() {
-      const confirmResult = await this.confirm(`确定要卸载插件”${this.plugin.title}“吗？`, '卸载确认');
-      if (confirmResult.confirm) {
-        this.uninstall();
-      }
-    },
-    uninstall() {
-      this.$emit('uninstall', this.plugin.packageName);
-    },
-    disable() {
-      this.$emit('disable', this.plugin.packageName);
-    },
-    enable() {
-      this.$emit('enable', this.plugin.packageName);
-    },
-    showContextMenu() {
-      ipc.send(ipcType.OPEN_PLUGIN_CONTEXT_MENU, this.plugin.packageName);
-    },
-    showSettingPanel() {
-      this.settingPanelVisible = true;
-    },
-    onShowSettingPanel() {
-      ipc.on(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`, ({ packageName }) => {
-        if (packageName === this.plugin.packageName) {
-          this.showSettingPanel();
-        }
-      });
-    },
-    offShowSettingPanel() {
-      ipc.detach(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${this.plugin.packageName}`);
-    },
-  },
+    // 设置面板
+    const { settingPanelVisible } = usePluginSettingPanel(pluginId);
 
-  mounted() {
-    this.onShowSettingPanel();
-  },
+    // 插件操作
+    const {
+      enable,
+      disable,
+      uninstall,
+      showContextMenu,
+    } = usePluginActions(plugin.value, emit);
 
-  destroyed() {
-    this.offShowSettingPanel();
+    return {
+      defaultIcon,
+      settingPanelVisible,
+      enable,
+      disable,
+      uninstall,
+      showContextMenu,
+    };
   },
 };
 </script>
