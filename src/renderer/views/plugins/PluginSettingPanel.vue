@@ -116,15 +116,14 @@
 
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import mixins from '@/mixins';
 import { useIpc } from '@/hooks/electron';
+import useToast from '@/hooks/useToast';
 
 const ipc = useIpc();
+const toast = useToast();
 
 export default {
   name: 'PluginSettingPanel',
-
-  mixins: [mixins],
 
   props: {
     value: {
@@ -246,7 +245,7 @@ export default {
       this.loading.setSettings = true;
       await ipc.invoke(ipcType.SET_PLUGIN_SETTING, packageName, this.settings);
       this.loading.setSettings = false;
-      this.toast('设置已保存');
+      toast.show('设置已保存');
     },
   },
 

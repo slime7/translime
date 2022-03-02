@@ -1,11 +1,12 @@
 <template>
   <v-navigation-drawer
-    v-model="drawerVisible"
+    :value="drawerVisible"
     class="notify-drawer"
     absolute
     clipped
     right
     width="560"
+    @input="onDrawerVisibleChange"
   >
     <div class="notify-container pa-4 fill-height d-flex flex-column" v-scroll.self="onAlertContainerScroll">
       <v-spacer />
@@ -31,48 +32,15 @@
 </template>
 
 <script>
+import {
+  ref,
+  watch,
+} from '@vue/composition-api';
 import { myDate } from '@pkg/share/utils';
+import useAlert from '@/hooks/useAlert';
 
 export default {
   name: 'LayoutNotification',
-
-  data: () => ({
-    keepBottom: true,
-  }),
-
-  computed: {
-    drawerVisible: {
-      get() {
-        return this.$store.state.alert.drawerVisible;
-      },
-      set(value) {
-        this.$store.commit('alert/setDrawerVisible', value);
-      },
-    },
-    alertList() {
-      return this.$store.state.alert.contents;
-    },
-  },
-
-  methods: {
-    scrollToBottom() {
-      this.$vuetify.goTo('#notify-list-bottom', {
-        container: '.notify-container',
-      });
-    },
-    onAlertContainerScroll(ev) {
-      console.log(ev.target.scrollTop, ev.target.clientHeight, ev.target.scrollHeight, ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight);
-      this.keepBottom = ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight;
-    },
-  },
-
-  watch: {
-    drawerVisible(value) {
-      if (value && this.keepBottom) {
-        this.scrollToBottom();
-      }
-    },
-  },
 
   filters: {
     alertTime(time) {
@@ -82,6 +50,42 @@ export default {
         showSecond: true,
       });
     },
+  },
+
+  setup(props, { root }) {
+    const alert = useAlert();
+
+    const keepBottom = ref(true);
+    const scrollToBottom = () => {
+      root.$vuetify.goTo('#notify-list-bottom', {
+        container: '.notify-container',
+      });
+    };
+    const onAlertContainerScroll = (ev) => {
+      keepBottom.value = ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight;
+    };
+    const alertList = alert.list;
+    const onDrawerVisibleChange = (value) => {
+      if (value) {
+        alert.showDrawer();
+      } else {
+        alert.hideDrawer();
+      }
+    };
+    watch(alert.drawerVisible, (value) => {
+      console.log('watch drawerVisible', value);
+      if (value && keepBottom.value) {
+        scrollToBottom();
+      }
+    });
+
+    return {
+      keepBottom,
+      alertList,
+      drawerVisible: alert.drawerVisible,
+      onAlertContainerScroll,
+      onDrawerVisibleChange,
+    };
   },
 };
 </script>

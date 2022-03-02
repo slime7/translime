@@ -28,53 +28,62 @@
 </template>
 
 <script>
+import { ref, onMounted } from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { getUuiD } from '@pkg/share/utils';
-import mixins from '@/mixins';
 import { useIpc } from '@/hooks/electron';
 import useDialog from '@/hooks/useDialog';
-
-const ipc = useIpc();
-const { confirm } = useDialog();
+import useAlert from '@/hooks/useAlert';
 
 export default {
   name: 'About',
 
-  mixins: [mixins],
+  setup() {
+    const ipc = useIpc();
+    const dialog = useDialog();
+    const alert = useAlert();
 
-  data: () => ({
-    versions: {},
-    versionsIpcId: `${ipcType.APP_VERSIONS}-${getUuiD()}`,
-  }),
-
-  methods: {
-    testAlert() {
-      this.alert('测试 alert');
-    },
-    async testConfirm() {
-      // const result = await this.confirm('测试 confirm');
-      const result = await confirm('测试 confirm');
-      console.log('confirm result: ', result);
-    },
-    reloadApp() {
-      ipc.send(ipcType.RELOAD);
-    },
-    appDir() {
-      ipc.send(ipcType.OPEN_APP_PATH);
-    },
-    getVersions() {
-      ipc.send(ipcType.APP_VERSIONS, this.versionsIpcId);
-    },
-    onGetVersions() {
-      ipc.on(this.versionsIpcId, (versions) => {
-        this.versions = versions;
+    // 版本
+    const versions = ref({});
+    const versionsIpcId = ref(`${ipcType.APP_VERSIONS}-${getUuiD()}`);
+    const getVersions = () => {
+      ipc.send(ipcType.APP_VERSIONS, versionsIpcId.value);
+    };
+    const onGetVersions = () => {
+      ipc.on(versionsIpcId.value, (v) => {
+        versions.value = v;
       });
-    },
-  },
+    };
 
-  mounted() {
-    this.onGetVersions();
-    this.getVersions();
+    // 测试方法
+    const testAlert = () => {
+      alert.show('测试 alert');
+    };
+    const testConfirm = async () => {
+      // const result = await this.confirm('测试 confirm');
+      const result = await dialog.showConfirm('测试 confirm');
+      console.log('confirm result: ', result);
+    };
+    const reloadApp = () => {
+      ipc.send(ipcType.RELOAD);
+    };
+    const appDir = () => {
+      ipc.send(ipcType.OPEN_APP_PATH);
+    };
+
+    onMounted(() => {
+      onGetVersions();
+      getVersions();
+    });
+
+    return {
+      isDev: process.env.NODE_ENV === 'development',
+      versions,
+      testAlert,
+      testConfirm,
+      reloadApp,
+      appDir,
+    };
   },
 };
 </script>

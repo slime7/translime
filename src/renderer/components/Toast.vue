@@ -1,6 +1,6 @@
 <template>
   <v-snackbar
-    :value="show"
+    :value="visible"
     bottom
     timeout="-1"
   >
@@ -9,16 +9,18 @@
 </template>
 
 <script>
-import { mapState } from 'vuex';
+import useToastStore from '@/store/toastStore';
 
 export default {
   name: 'Toast',
 
-  computed: {
-    ...mapState('toast', [
-      'msg',
-      'show',
-    ]),
+  setup() {
+    const toastStore = useToastStore();
+
+    return {
+      msg: toastStore.msg,
+      visible: toastStore.visible,
+    };
   },
 };
 </script>

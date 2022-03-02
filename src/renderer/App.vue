@@ -3,46 +3,48 @@
 </template>
 
 <script>
+import { onMounted } from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import mixins from '@/mixins';
 import { useIpc } from '@/hooks/electron';
-
-const ipc = useIpc();
-const ipcRaw = useIpc(false);
+import useAlert from '@/hooks/useAlert';
+import globalStore from '@/store/globalStore';
 
 export default {
-  name: 'app',
+  name: 'App',
 
-  mixins: [mixins],
+  setup(props, context) {
+    console.log('setup args: ', props, context, context.root.$vuetify);
+    const ipc = useIpc();
+    const ipcRaw = useIpc(false);
+    const store = globalStore();
+    const alert = useAlert();
 
-  methods: {
-    initAppConfig() {
-      this.$store.dispatch('initAppConfig');
-    },
-    remoteConsoleListener() {
+    const initAppConfig = () => {
+      store.initAppConfig();
+    };
+    const remoteConsoleListener = () => {
       ipc.on('console', ({ type, args }) => {
         // eslint-disable-next-line no-console
         console[type](...args);
       });
-    },
-    async getPlugins() {
+    };
+    const getPlugins = async () => {
       try {
         const plugins = await ipc.invoke(ipcType.GET_PLUGINS);
-        this.$store.commit('setPlugins', plugins);
+        store.setPlugins(plugins);
       } catch (err) {
-        this.alert(err.message, 'error');
+        alert.show(err.message, 'error');
       }
-    },
-  },
+    };
 
-  created() {
-    this.remoteConsoleListener();
-    this.initAppConfig();
-  },
+    // created
+    remoteConsoleListener();
+    initAppConfig();
 
-  mounted() {
-    ipcRaw.send('main-renderer-ready');
-    this.getPlugins();
+    onMounted(() => {
+      ipcRaw.send('main-renderer-ready');
+      getPlugins();
+    });
   },
 };
 </script>

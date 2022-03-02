@@ -3,7 +3,7 @@ import useDialogStore from '@/store/dialogStore';
 const useDialog = () => {
   const dialogStore = useDialogStore();
 
-  const confirm = (content, title = null) => {
+  const showConfirm = (content, title = null) => {
     const payload = {
       content,
     };
@@ -45,8 +45,13 @@ const useDialog = () => {
   };
 
   return {
-    confirm,
+    dialogs: dialogStore.dialogs,
+    titleClass: dialogStore.titleClass,
+    loader: dialogStore.loader,
+    confirm: dialogStore.confirm,
+    showConfirm,
     show,
+    pop: dialogStore.pop,
     showLoader,
     hideLoader,
   };

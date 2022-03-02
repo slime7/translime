@@ -5,7 +5,7 @@
     class="alert-group"
   >
     <v-alert
-      v-for="alertItem in activeAlerts"
+      v-for="alertItem in activeList"
       :key="alertItem.uuid"
       :type="alertItem.type"
       border="left"
@@ -23,26 +23,20 @@
 </template>
 
 <script>
-import mixins from '@/mixins';
+import useAlert from '@/hooks/useAlert';
 
 export default {
   name: 'AlertGroup',
 
-  mixins: [mixins],
+  setup() {
+    const alert = useAlert();
+    const { list, activeList, dismiss } = alert;
 
-  computed: {
-    alerts() {
-      return this.$store.state.alert.contents;
-    },
-    activeAlerts() {
-      return this.alerts.filter((a) => a.visible);
-    },
-  },
-
-  methods: {
-    dismiss(uuid) {
-      this.hideAlert(uuid);
-    },
+    return {
+      list,
+      activeList,
+      dismiss,
+    };
   },
 };
 </script>

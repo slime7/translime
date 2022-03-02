@@ -31,13 +31,13 @@
 </template>
 
 <script>
+import { ref, onMounted, onUnmounted } from '@vue/composition-api';
 import WindowControls from '@/components/WindowControls.vue';
 import MainFooter from '@/components/MainFooter.vue';
 import Navigation from '@/views/Layout/components/Navigation.vue';
 import Notification from '@/views/Layout/components/Notification.vue';
 import { useIpc } from '@/hooks/electron';
-
-const ipc = useIpc();
+import useAlert from '@/hooks/useAlert';
 
 export default {
   name: 'Base',
@@ -49,33 +49,32 @@ export default {
     WindowControls,
   },
 
-  data: () => ({
-    isMaximize: false,
-  }),
+  setup() {
+    const ipc = useIpc();
+    const alert = useAlert();
 
-  methods: {
-    onMaximizeStatusChange() {
+    const isMaximize = ref(false);
+    const onMaximizeStatusChange = () => {
       ipc.on('set-maximize-status', (maximize) => {
-        this.isMaximize = maximize;
+        isMaximize.value = maximize;
       });
-    },
-    onMounted() {
-      this.onMaximizeStatusChange();
-    },
-    onUnmounted() {
+    };
+    const showNotification = () => {
+      alert.showDrawer();
+    };
+
+    onMounted(() => {
+      onMaximizeStatusChange();
+    });
+
+    onUnmounted(() => {
       ipc.detach('set-maximize-status');
-    },
-    showNotification() {
-      this.$store.commit('alert/setDrawerVisible', true);
-    },
-  },
+    });
 
-  mounted() {
-    this.onMounted();
-  },
-
-  destroyed() {
-    this.onUnmounted();
+    return {
+      isMaximize,
+      showNotification,
+    };
   },
 };
 </script>

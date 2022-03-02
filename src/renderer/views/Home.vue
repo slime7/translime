@@ -35,7 +35,6 @@
 </template>
 
 <script>
-import mixins from '@/mixins';
 import HelloWorld from '../components/HelloWorld.vue';
 
 export default {
@@ -45,6 +44,10 @@ export default {
     HelloWorld,
   },
 
-  mixins: [mixins],
+  setup() {
+    return {
+      isDev: process.env.NODE_ENV === 'development',
+    };
+  },
 };
 </script>

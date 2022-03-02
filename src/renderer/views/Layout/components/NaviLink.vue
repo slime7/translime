@@ -63,8 +63,7 @@
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
-
-const ipc = useIpc();
+import useGlobalStore from '@/store/globalStore';
 
 export default {
   name: 'NaviLink',
@@ -94,21 +93,28 @@ export default {
     },
   },
 
-  methods: {
-    openPluginWindow() {
-      const plugin = this.$store.getters.plugin(this.open.id);
+  setup(props) {
+    const store = useGlobalStore();
+    const ipc = useIpc();
+
+    const openPluginWindow = () => {
+      const plugin = store.plugin(props.open.id);
       ipc.send(ipcType.OPEN_NEW_WINDOW, {
-        name: `plugin-window-${this.open.id}`,
+        name: `plugin-window-${props.open.id}`,
         options: {
           // windowUrl: `file://${this.open.windowUrl}`,
-          windowUrl: `plugin-index.html?pluginId=${this.open.id}`,
+          windowUrl: `plugin-index.html?pluginId=${props.open.id}`,
           appMenu: null,
           frame: false,
           titleBarStyle: 'hidden',
           title: plugin.title,
         },
       });
-    },
+    };
+
+    return {
+      openPluginWindow,
+    };
   },
 };
 </script>

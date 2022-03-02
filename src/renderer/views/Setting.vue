@@ -84,8 +84,8 @@
 
 <script>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import mixins from '@/mixins';
 import { useIpc } from '@/hooks/electron';
+import useGlobalStore from '@/store/globalStore';
 
 const ipc = useIpc();
 const ipcRaw = useIpc(false);
@@ -93,8 +93,6 @@ const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', meth
 
 export default {
   name: 'Setting',
-
-  mixins: [mixins],
 
   data: () => ({
     registryList: [
@@ -120,14 +118,6 @@ export default {
   }),
 
   computed: {
-    settings() {
-      const { openAtLogin } = this.$store.state.appSetting;
-      const { registry } = this.$store.state.appSetting;
-      return {
-        openAtLogin,
-        registry,
-      };
-    },
     customRegistryItem() {
       return this.registryList.find((item) => item.id === 'custom');
     },
@@ -146,7 +136,7 @@ export default {
           open: false,
         });
       }
-      this.$store.commit('setAppOpenAtLogin', value);
+      this.setAppOpenAtLogin(value);
     },
     initRegistryLink() {
       if (!this.registryList.find((r) => r.link === this.settings.registry)) {
@@ -156,7 +146,7 @@ export default {
     async onSelectRegistry(registry, setType) {
       if (setType !== 'custom') {
         appConfigStore('set', 'setting.registry', registry);
-        this.$store.commit('setAppRegistry', registry);
+        this.setAppRegistry(registry);
       } else {
         const customRegistryResult = await new Promise((resolve) => {
           this.customRegistryPromoteResolve = resolve;
@@ -164,7 +154,7 @@ export default {
         });
         if (customRegistryResult) {
           appConfigStore('set', 'setting.registry', this.customRegistryItem.link);
-          this.$store.commit('setAppRegistry', this.customRegistryItem.link);
+          this.setAppRegistry(this.customRegistryItem.link);
         }
       }
     },
@@ -183,6 +173,22 @@ export default {
 
   mounted() {
     this.initRegistryLink();
+  },
+
+  setup() {
+    const store = useGlobalStore();
+    const setAppOpenAtLogin = (value) => {
+      store.setAppOpenAtLogin(value);
+    };
+    const setAppRegistry = (value) => {
+      store.setAppRegistry(value);
+    };
+
+    return {
+      settings: store.appSetting,
+      setAppOpenAtLogin,
+      setAppRegistry,
+    };
   },
 };
 </script>

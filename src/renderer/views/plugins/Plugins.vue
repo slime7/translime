@@ -51,123 +51,120 @@
 </template>
 
 <script>
+import { ref, onMounted, onUnmounted } from '@vue/composition-api';
+import { storeToRefs } from 'pinia';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import mixins from '@/mixins';
 import PluginCard from './PluginCard.vue';
 import { useIpc } from '@/hooks/electron';
-
-const ipc = useIpc();
+import useAlert from '@/hooks/useAlert';
+import useDialog from '@/hooks/useDialog';
+import useGlobalStore from '@/store/globalStore';
 
 export default {
   name: 'Plugins',
-
-  mixins: [mixins],
 
   components: {
     PluginCard,
   },
 
-  data: () => ({
-    loading: {
+  setup() {
+    const ipc = useIpc();
+    const store = useGlobalStore();
+    const alert = useAlert();
+    const dialog = useDialog();
+    const loading = ref({
       install: false,
       uninstall: false,
-    },
-    search: '',
-  }),
+    });
+    const search = ref('');
 
-  computed: {
-    plugins: {
-      get() {
-        return this.$store.state.plugins;
-      },
-      set(plugins) {
-        this.$store.commit('setPlugins', plugins);
-      },
-    },
-  },
-
-  methods: {
-    async installPlugins() {
-      if (!this.search) {
-        return;
-      }
-      if (this.loading.install) {
-        return;
-      }
-      this.loading.install = true;
+    const { plugins } = storeToRefs(store);
+    const getPlugins = async () => {
       try {
-        const packageName = this.search.startsWith('translime-plugin-')
-          ? this.search
-          : `translime-plugin-${this.search}`;
+        store.setPlugins(await ipc.invoke(ipcType.GET_PLUGINS));
+      } catch (err) {
+        alert.show(err.message, 'error');
+      }
+    };
+    const installPlugins = async () => {
+      if (!search.value) {
+        return;
+      }
+      if (loading.value.install) {
+        return;
+      }
+      loading.value.install = true;
+      try {
+        const packageName = search.value.startsWith('translime-plugin-')
+          ? search.value
+          : `translime-plugin-${search.value}`;
         const result = await ipc.invoke(ipcType.INSTALL_PLUGIN, packageName);
         console.log(result);
       } catch (err) {
-        this.alert(err.message, 'error');
+        alert.show(err.message, 'error');
       } finally {
-        this.loading.install = false;
-        this.getPlugins();
+        loading.value.install = false;
+        getPlugins();
       }
-    },
-    async uninstallPlugins(packageName) {
+    };
+    const uninstallPlugins = async (packageName) => {
       if (!packageName) {
         return;
       }
-      if (this.loading.uninstall) {
+      if (loading.value.install) {
         return;
       }
-      this.loading.uninstall = true;
-      this.showLoader();
+      loading.value.install = true;
+      dialog.showLoader();
       try {
         await ipc.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
       } catch (err) {
-        this.alert(err.message, 'error');
+        alert.show(err.message, 'error');
       } finally {
-        this.loading.uninstall = false;
-        this.hideLoader();
-        this.getPlugins();
+        loading.value.install = false;
+        dialog.hideLoader();
+        getPlugins();
       }
-    },
-    async getPlugins() {
-      try {
-        this.plugins = await ipc.invoke(ipcType.GET_PLUGINS);
-      } catch (err) {
-        this.alert(err.message, 'error');
-      }
-    },
-    async disablePlugin(packageName) {
-      try {
-        await ipc.invoke(ipcType.DISABLE_PLUGIN, packageName);
-      } catch (err) {
-        this.alert(err.message, 'error');
-      } finally {
-        this.getPlugins();
-      }
-    },
-    async enablePlugin(packageName) {
+    };
+    const enablePlugin = async (packageName) => {
       try {
         await ipc.invoke(ipcType.ENABLE_PLUGIN, packageName);
       } catch (err) {
-        this.alert(err.message, 'error');
+        alert.show(err.message, 'error');
       } finally {
-        this.getPlugins();
+        getPlugins();
       }
-    },
-    onPluginsChanged() {
+    };
+    const disablePlugin = async (packageName) => {
+      try {
+        await ipc.invoke(ipcType.DISABLE_PLUGIN, packageName);
+      } catch (err) {
+        alert.show(err.message, 'error');
+      } finally {
+        getPlugins();
+      }
+    };
+
+    onMounted(() => {
       ipc.on(ipcType.PLUGINS_CHANGED, () => {
-        this.getPlugins();
+        getPlugins();
       });
-    },
-    offPluginChanged() {
+    });
+
+    onUnmounted(() => {
       ipc.detach(ipcType.PLUGINS_CHANGED);
-    },
-  },
+    });
 
-  mounted() {
-    this.onPluginsChanged();
-  },
-
-  destroyed() {
-    this.offPluginChanged();
+    return {
+      plugins,
+      getPlugins,
+      installPlugins,
+      uninstallPlugins,
+      enablePlugin,
+      disablePlugin,
+      search,
+      loading,
+    };
   },
 };
 </script>

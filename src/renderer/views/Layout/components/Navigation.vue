@@ -57,7 +57,9 @@
 </template>
 
 <script>
+import { computed } from '@vue/composition-api';
 import NaviLink from '@/views/Layout/components/NaviLink.vue';
+import useGlobalStore from '@/store/globalStore';
 
 export default {
   name: 'LayoutNavigation',
@@ -66,10 +68,14 @@ export default {
     NaviLink,
   },
 
-  computed: {
-    pluginPages() {
-      return this.$store.state.plugins.filter((p) => p.enabled && !(!p.ui && !p.windowUrl));
-    },
+  setup() {
+    const store = useGlobalStore();
+
+    const pluginPages = computed(() => store.plugins.filter((p) => p.enabled && !(!p.ui && !p.windowUrl)));
+
+    return {
+      pluginPages,
+    };
   },
 };
 </script>

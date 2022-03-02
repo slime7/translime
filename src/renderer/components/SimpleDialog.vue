@@ -77,26 +77,22 @@
 </template>
 
 <script>
-import useDialogStore from '@/store/dialogStore';
+import useDialog from '@/hooks/useDialog';
 
 export default {
   name: 'SimpleDialog',
 
   setup() {
-    const dialogStore = useDialogStore();
+    const dialog = useDialog();
     const {
       dialogs,
       titleClass,
       loader,
       confirm,
-    } = dialogStore;
+    } = dialog;
 
     const close = () => {
-      dialogStore.pop();
-    };
-
-    const hideLoader = () => {
-      dialogStore.loader = false;
+      dialog.pop();
     };
 
     return {
@@ -105,7 +101,6 @@ export default {
       loader,
       confirm,
       close,
-      hideLoader,
     };
   },
 };
