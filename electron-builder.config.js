@@ -4,7 +4,7 @@
  */
 const config = {
   appId: 'translime.app',
-  asar: true,
+  asar: false,
   directories: {
     output: 'dist_electron',
     buildResources: 'buildResources',
