@@ -1,4 +1,4 @@
-import { storeToRefs } from 'pinia';
+import { toRef } from '@vue/composition-api';
 import useAlertStore from '@/store/alertStore';
 
 const useAlert = () => {
@@ -20,14 +20,15 @@ const useAlert = () => {
     alertStore.setDrawerVisible(false);
   };
 
-  const { contents, activeAlerts, drawerVisible } = storeToRefs(alertStore);
-  console.log(storeToRefs(alertStore));
+  const list = alertStore.contents;
+  const activeList = alertStore.activeAlerts;
+  const drawerVisible = toRef(alertStore, 'drawerVisible');
 
   return {
     show,
     hide,
-    list: contents,
-    activeList: activeAlerts,
+    list,
+    activeList,
     showDrawer,
     hideDrawer,
     drawerVisible,

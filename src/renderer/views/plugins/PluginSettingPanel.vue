@@ -31,7 +31,7 @@
       </v-toolbar>
 
       <v-card-text>
-        <v-form v-if="!loading.getSettings" class="mt-4" ref="plugin-setting">
+        <v-form v-if="!loading.getSettings" class="mt-4" ref="settingForm">
           <v-container fluid>
             <v-row
               v-for="(menuItem, index) in settingMenu"
@@ -115,12 +115,16 @@
 </template>
 
 <script>
+import {
+  ref,
+  computed,
+  reactive,
+  onMounted,
+  toRaw,
+} from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useToast from '@/hooks/useToast';
-
-const ipc = useIpc();
-const toast = useToast();
 
 export default {
   name: 'PluginSettingPanel',
@@ -136,43 +140,40 @@ export default {
     },
   },
 
-  data: () => ({
-    loading: {
-      getSettings: false,
-      setSettings: false,
-    },
-    settings: {},
-    requiredRule: [(v) => !!v || '此项必填'],
-  }),
+  setup(props, { emit }) {
+    const ipc = useIpc();
+    const toast = useToast();
 
-  computed: {
-    internalValue: {
+    const internalValue = computed({
       get() {
-        return this.value;
+        return props.value;
       },
       set(value) {
-        this.$emit('input', value);
+        emit('input', value);
       },
-    },
-    settingMenu() {
-      return this.plugin.settingMenu ? this.parseMenuItem(this.plugin.settingMenu) : [];
-    },
-  },
+    });
+    const requiredRule = [(v) => !!v || '此项必填'];
 
-  methods: {
-    init() {
-      this.initSettings();
-    },
-    async initSettings() {
-      const { packageName } = this.plugin;
-      this.loading.getSettings = true;
-      const settings = await ipc.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
-      if (typeof settings === 'object') {
-        this.settings = settings;
+    const loading = reactive({
+      getSettings: false,
+      setSettings: false,
+    });
+    const settings = reactive({});
+    const initSettings = async () => {
+      const { packageName } = props.plugin;
+      loading.getSettings = true;
+      const settingsSaved = await ipc.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
+      if (typeof settingsSaved === 'object') {
+        Object.keys(settingsSaved).forEach((key) => {
+          settings[key] = settingsSaved[key];
+        });
       }
-      this.loading.getSettings = false;
-    },
-    parseMenuItem(settingMenu) {
+      loading.getSettings = false;
+    };
+    onMounted(() => {
+      initSettings();
+    });
+    const parseMenuItem = (settingMenu) => {
       const parsedSettingMenu = [];
       settingMenu.forEach((menu) => {
         let parsed;
@@ -214,7 +215,7 @@ export default {
             break;
         }
         parsedSettingMenu.push(parsed);
-        if (!this.settings[parsed.key]) {
+        if (!settings[parsed.key]) {
           let defaultValue = '';
           if (parsed.type === 'switch') {
             defaultValue = false;
@@ -228,29 +229,38 @@ export default {
           if (parsed.type === 'list') {
             defaultValue = null;
           }
-          this.$set(this.settings, parsed.key, defaultValue);
+          settings[parsed.key] = defaultValue;
         }
       });
       return parsedSettingMenu;
-    },
-    async saveSettings() {
-      if (this.loading.setSettings) {
+    };
+    const settingMenu = computed(() => (props.plugin.settingMenu ? parseMenuItem(props.plugin.settingMenu) : []));
+
+    const settingForm = ref(null);
+    const saveSettings = async () => {
+      if (loading.setSettings) {
         return;
       }
-      const isValid = this.$refs['plugin-setting'].validate();
+      const isValid = settingForm.value.validate();
       if (!isValid) {
         return;
       }
-      const { packageName } = this.plugin;
-      this.loading.setSettings = true;
-      await ipc.invoke(ipcType.SET_PLUGIN_SETTING, packageName, this.settings);
-      this.loading.setSettings = false;
+      const { packageName } = props.plugin;
+      loading.setSettings = true;
+      await ipc.invoke(ipcType.SET_PLUGIN_SETTING, packageName, toRaw(settings));
+      loading.setSettings = false;
       toast.show('设置已保存');
-    },
-  },
+    };
 
-  mounted() {
-    this.init();
+    return {
+      internalValue,
+      requiredRule,
+      settingMenu,
+      settingForm,
+      loading,
+      settings,
+      saveSettings,
+    };
   },
 };
 </script>

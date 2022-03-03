@@ -9,17 +9,26 @@
 </template>
 
 <script>
-import useToastStore from '@/store/toastStore';
+import { computed } from '@vue/composition-api';
+import useToast from '@/hooks/useToast';
 
 export default {
   name: 'Toast',
 
   setup() {
-    const toastStore = useToastStore();
+    const toast = useToast();
+    const visible = computed({
+      get() {
+        return toast.visible.value;
+      },
+      set(value) {
+        toast.setVisibleState(value);
+      },
+    });
 
     return {
-      msg: toastStore.msg,
-      visible: toastStore.visible,
+      msg: toast.msg,
+      visible,
     };
   },
 };

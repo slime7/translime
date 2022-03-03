@@ -1,12 +1,11 @@
 <template>
   <v-navigation-drawer
-    :value="drawerVisible"
+    v-model="drawerVisible"
     class="notify-drawer"
     absolute
     clipped
     right
     width="560"
-    @input="onDrawerVisibleChange"
   >
     <div class="notify-container pa-4 fill-height d-flex flex-column" v-scroll.self="onAlertContainerScroll">
       <v-spacer />
@@ -35,6 +34,7 @@
 import {
   ref,
   watch,
+  computed,
 } from '@vue/composition-api';
 import { myDate } from '@pkg/share/utils';
 import useAlert from '@/hooks/useAlert';
@@ -72,19 +72,28 @@ export default {
         alert.hideDrawer();
       }
     };
-    watch(alert.drawerVisible, (value) => {
-      console.log('watch drawerVisible', value);
-      if (value && keepBottom.value) {
-        scrollToBottom();
-      }
+    const drawerVisible = computed({
+      get() {
+        return alert.drawerVisible.value;
+      },
+      set(value) {
+        onDrawerVisibleChange(value);
+      },
     });
+    watch(
+      () => alert.drawerVisible.value,
+      (value) => {
+        if (value && keepBottom.value) {
+          scrollToBottom();
+        }
+      },
+    );
 
     return {
       keepBottom,
       alertList,
-      drawerVisible: alert.drawerVisible,
+      drawerVisible,
       onAlertContainerScroll,
-      onDrawerVisibleChange,
     };
   },
 };

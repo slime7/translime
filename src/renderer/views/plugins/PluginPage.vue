@@ -5,10 +5,12 @@
 </template>
 
 <script>
+import { computed, onMounted, watch } from '@vue/composition-api';
 import * as components from 'vuetify/lib/components';
 import * as directives from 'vuetify/lib/directives';
-import mixins from '@/mixins';
-import pluginUi from '@/mixins/pluginUi';
+import useGlobalStore from '@/store/globalStore';
+import useAlert from '@/hooks/useAlert';
+import usePluginUi from './hooks/usePluginUi';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
@@ -20,8 +22,6 @@ if (!window.vuetify$) {
 export default {
   name: 'PluginPage',
 
-  mixins: [mixins, pluginUi],
-
   props: {
     packageName: {
       default: '',
@@ -29,33 +29,38 @@ export default {
     },
   },
 
-  computed: {
-    plugin() {
-      return this.packageName ? this.$store.state.plugins[this.$store.state.plugins.findIndex((p) => p.packageName === this.packageName)] : null;
-    },
-    containerId() {
-      return `plugin-container-${this.plugin.packageName}`;
-    },
-  },
+  setup(props) {
+    const store = useGlobalStore();
+    const pluginUi = usePluginUi();
+    const alert = useAlert();
 
-  watch: {
-    'plugin.enabled': function (v, prevV) {
-      if (!prevV && v) {
-        this.loadUi(this.plugin.ui, this.packageName);
+    const plugin = computed(() => (props.packageName ? store.plugins[store.plugins.findIndex((p) => p.packageName === props.packageName)] : null));
+
+    watch(
+      () => plugin.value.enabled,
+      async (v, prevV) => {
+        if (!prevV && v) {
+          const result = await pluginUi.loadUi(plugin.value.ui, props.packageName);
+          if (!result) {
+            alert.show('加载插件页面失败', 'error');
+          }
+        }
+      },
+    );
+
+    onMounted(async () => {
+      console.log('mounted', plugin.value);
+      if (plugin.value && plugin.value.ui) {
+        const result = await pluginUi.loadUi(plugin.value.ui, props.packageName);
+        if (!result) {
+          alert.show('加载插件页面失败', 'error');
+        }
       }
-    },
-  },
+    });
 
-  methods: {
-    onMounted() {
-      if (this.plugin && this.plugin.ui) {
-        this.loadUi(this.plugin.ui, this.packageName);
-      }
-    },
-  },
-
-  mounted() {
-    this.onMounted();
+    return {
+      ui: pluginUi.ui,
+    };
   },
 };
 </script>

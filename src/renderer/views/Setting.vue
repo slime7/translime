@@ -83,19 +83,22 @@
 </template>
 
 <script>
+import { ref, computed, onMounted } from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
-
-const ipc = useIpc();
-const ipcRaw = useIpc(false);
-const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
+import { showTextEditContextMenu } from '@/utils';
 
 export default {
   name: 'Setting',
 
-  data: () => ({
-    registryList: [
+  setup() {
+    const ipc = useIpc();
+    const ipcRaw = useIpc(false);
+    const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
+    const store = useGlobalStore();
+
+    const registryList = [
       {
         id: 'taobao',
         name: '淘宝镜像',
@@ -111,20 +114,45 @@ export default {
         name: '自定义',
         link: '',
       },
-    ],
-    customRegistryPanelVisible: false,
-    customRegistryPromoteResolve: () => {
-    },
-  }),
+    ];
+    const customRegistryItem = computed(() => registryList.find((item) => item.id === 'custom'));
 
-  computed: {
-    customRegistryItem() {
-      return this.registryList.find((item) => item.id === 'custom');
-    },
-  },
+    const customRegistryPanelVisible = ref(false);
+    const customRegistryPromoteResolve = ref(() => {});
+    const setAppRegistry = (value) => {
+      store.setAppRegistry(value);
+    };
+    const onSelectRegistry = async (registry, setType) => {
+      if (setType !== 'custom') {
+        appConfigStore('set', 'setting.registry', registry);
+        setAppRegistry(registry);
+      } else {
+        const customRegistryResult = await new Promise((resolve) => {
+          customRegistryPromoteResolve.value = resolve;
+          customRegistryPanelVisible.value = true;
+        });
+        if (customRegistryResult) {
+          appConfigStore('set', 'setting.registry', customRegistryItem.value.link);
+          setAppRegistry(customRegistryItem.value.link);
+        }
+      }
+    };
+    const setCustomRegistryCancel = () => {
+      customRegistryPromoteResolve.value(false);
+      customRegistryPanelVisible.value = false;
+      customRegistryPromoteResolve.value = () => {};
+      customRegistryItem.value.link = '';
+    };
+    const setCustomRegistryConfirm = () => {
+      customRegistryPromoteResolve.value(true);
+      customRegistryPanelVisible.value = false;
+      customRegistryPromoteResolve.value = () => {};
+    };
 
-  methods: {
-    onOpenAtLogin(value) {
+    const setAppOpenAtLogin = (value) => {
+      store.setAppOpenAtLogin(value);
+    };
+    const onOpenAtLogin = (value) => {
       if (value) {
         // 设置开启开机启动
         ipc.send(ipcType.OPEN_AT_LOGIN, {
@@ -136,58 +164,30 @@ export default {
           open: false,
         });
       }
-      this.setAppOpenAtLogin(value);
-    },
-    initRegistryLink() {
-      if (!this.registryList.find((r) => r.link === this.settings.registry)) {
-        this.customRegistryItem.link = this.settings.registry;
-      }
-    },
-    async onSelectRegistry(registry, setType) {
-      if (setType !== 'custom') {
-        appConfigStore('set', 'setting.registry', registry);
-        this.setAppRegistry(registry);
-      } else {
-        const customRegistryResult = await new Promise((resolve) => {
-          this.customRegistryPromoteResolve = resolve;
-          this.customRegistryPanelVisible = true;
-        });
-        if (customRegistryResult) {
-          appConfigStore('set', 'setting.registry', this.customRegistryItem.link);
-          this.setAppRegistry(this.customRegistryItem.link);
-        }
-      }
-    },
-    setCustomRegistryCancel() {
-      this.customRegistryPromoteResolve(false);
-      this.customRegistryPanelVisible = false;
-      this.customRegistryPromoteResolve = () => {};
-      this.customRegistryItem.link = '';
-    },
-    setCustomRegistryConfirm() {
-      this.customRegistryPromoteResolve(true);
-      this.customRegistryPanelVisible = false;
-      this.customRegistryPromoteResolve = () => {};
-    },
-  },
-
-  mounted() {
-    this.initRegistryLink();
-  },
-
-  setup() {
-    const store = useGlobalStore();
-    const setAppOpenAtLogin = (value) => {
-      store.setAppOpenAtLogin(value);
+      setAppOpenAtLogin(value);
     };
-    const setAppRegistry = (value) => {
-      store.setAppRegistry(value);
+
+    const initRegistryLink = () => {
+      if (!registryList.find((r) => r.link === store.appSetting.registry)) {
+        customRegistryItem.value.link = store.appSetting.registry;
+      }
     };
+
+    onMounted(() => {
+      initRegistryLink();
+    });
 
     return {
       settings: store.appSetting,
-      setAppOpenAtLogin,
-      setAppRegistry,
+      registryList,
+      customRegistryItem,
+      customRegistryPanelVisible,
+      customRegistryPromoteResolve,
+      onSelectRegistry,
+      setCustomRegistryCancel,
+      setCustomRegistryConfirm,
+      onOpenAtLogin,
+      showTextEditContextMenu,
     };
   },
 };

@@ -12,8 +12,7 @@ import globalStore from '@/store/globalStore';
 export default {
   name: 'App',
 
-  setup(props, context) {
-    console.log('setup args: ', props, context, context.root.$vuetify);
+  setup() {
     const ipc = useIpc();
     const ipcRaw = useIpc(false);
     const store = globalStore();

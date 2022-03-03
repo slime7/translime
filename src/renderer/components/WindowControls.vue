@@ -41,6 +41,7 @@
 </template>
 
 <script>
+import { toRefs } from '@vue/composition-api';
 import {
   APP_MINIMIZE,
   APP_MAXIMIZE,
@@ -48,8 +49,6 @@ import {
   APP_CLOSE,
 } from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
-
-const ipc = useIpc();
 
 export default {
   name: 'WindowControls',
@@ -65,32 +64,41 @@ export default {
     },
   },
 
-  data: () => ({
-    icon: {
+  setup(props, { emit }) {
+    const ipc = useIpc();
+
+    const { win } = toRefs(props);
+    const icon = {
       minimize: 'M11 4.399V5.5H0V4.399h11z',
       unmaximize: 'M11 8.798H8.798V11H0V2.202h2.202V0H11v8.798zm-3.298-5.5h-6.6v6.6h6.6v-6.6zM9.9 1.1H3.298v1.101h5.5v5.5h1.1v-6.6z',
       maximize: 'M11 0v11H0V0h11zM9.899 1.101H1.1V9.9h8.8V1.1z',
       close: 'M6.279 5.5L11 10.221l-.779.779L5.5 6.279.779 11 0 10.221 4.721 5.5 0 .779.779 0 5.5 4.721 10.221 0 11 .779 6.279 5.5z',
-    },
-  }),
+    };
 
-  methods: {
-    appMinimize() {
-      ipc.send(APP_MINIMIZE, this.win);
-      this.$emit('windowMinimize');
-    },
-    appUnmaximize() {
-      ipc.send(APP_UNMAXIMIZE, this.win);
-      this.$emit('windowUnmaximize');
-    },
-    appMaximize() {
-      ipc.send(APP_MAXIMIZE, this.win);
-      this.$emit('windowMaximize');
-    },
-    appClose() {
-      ipc.send(APP_CLOSE, this.win);
-      this.$emit('windowClose');
-    },
+    const appMinimize = () => {
+      ipc.send(APP_MINIMIZE, win.value);
+      emit('windowMinimize');
+    };
+    const appUnmaximize = () => {
+      ipc.send(APP_UNMAXIMIZE, win.value);
+      emit('windowUnmaximize');
+    };
+    const appMaximize = () => {
+      ipc.send(APP_MAXIMIZE, win.value);
+      emit('windowMaximize');
+    };
+    const appClose = () => {
+      ipc.send(APP_CLOSE, win.value);
+      emit('windowClose');
+    };
+
+    return {
+      icon,
+      appMinimize,
+      appUnmaximize,
+      appMaximize,
+      appClose,
+    };
   },
 };
 </script>

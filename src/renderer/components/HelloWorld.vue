@@ -35,38 +35,41 @@
 </template>
 
 <script>
+import { ref, onMounted } from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
-
-const ipc = useIpc();
 
 export default {
   props: {
     msg: String,
   },
 
-  data() {
-    return {
-      count: 0,
-    };
-  },
+  setup() {
+    const ipc = useIpc();
 
-  methods: {
-    openChildWindow() {
+    const count = ref(0);
+
+    const openChildWindow = () => {
       ipc.send(ipcType.OPEN_NEW_WINDOW, { name: 'childWinTest' });
-    },
-    getVersions() {
+    };
+    const getVersions = () => {
       ipc.send(ipcType.APP_VERSIONS);
-    },
-    onGetVersions() {
+    };
+    const onGetVersions = () => {
       ipc.on(ipcType.APP_VERSIONS, (versions) => {
         console.log(versions);
       });
-    },
-  },
+    };
 
-  mounted() {
-    this.onGetVersions();
+    onMounted(() => {
+      onGetVersions();
+    });
+
+    return {
+      count,
+      openChildWindow,
+      getVersions,
+    };
   },
 };
 </script>

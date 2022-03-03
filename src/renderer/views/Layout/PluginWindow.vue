@@ -27,14 +27,14 @@
 </template>
 
 <script>
+import { ref, onMounted, onUnmounted } from '@vue/composition-api';
 import * as components from 'vuetify/lib/components';
 import * as directives from 'vuetify/lib/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
-import pluginUi from '@/mixins/pluginUi';
 import { useIpc } from '@/hooks/electron';
+import usePluginUi from '@/views/plugins/hooks/usePluginUi';
 
-const ipc = useIpc();
 if (!window.vuetify$) {
   window.vuetify$ = {
     components,
@@ -49,54 +49,54 @@ export default {
     WindowControls,
   },
 
-  mixins: [pluginUi],
+  setup() {
+    const pluginId = ref('');
+    const isMaximize = ref(false);
+    const plugin = ref(null);
+    const ipc = useIpc();
+    const pluginUi = usePluginUi();
 
-  data: () => ({
-    isMaximize: false,
-    plugin: null,
-    pluginId: '',
-  }),
-
-  methods: {
-    async getIsMaximize() {
-      this.isMaximize = await ipc.invoke(ipcType.APP_IS_MAXIMIZE, `plugin-window-${this.pluginId}`);
-    },
-    onMaximizeStatusChange() {
-      ipc.on(`set-maximize-status:plugin-window-${this.pluginId}`, (maximize) => {
-        this.isMaximize = maximize;
+    const getPluginId = () => {
+      const params = new URLSearchParams(window.location.search);
+      pluginId.value = params.get('pluginId');
+    };
+    const onMaximizeStatusChange = () => {
+      ipc.on(`set-maximize-status:plugin-window-${pluginId.value}`, (maximize) => {
+        isMaximize.value = maximize;
       });
-    },
-    async onMounted() {
-      this.getPluginId();
-      this.onMaximizeStatusChange();
-      await this.getIsMaximize();
-      await this.getPlugin();
-      if (this.plugin && this.plugin.ui) {
-        await this.loadUi(this.plugin.ui, this.pluginId);
-      }
-    },
-    onUnmounted() {
-      ipc.detach(`set-maximize-status:plugin-window-${this.pluginId}`);
-    },
-    async getPlugin() {
+    };
+    const getIsMaximize = async () => {
+      isMaximize.value = await ipc.invoke(ipcType.APP_IS_MAXIMIZE, `plugin-window-${pluginId.value}`);
+    };
+    const getPlugin = async () => {
       try {
-        this.plugin = await ipc.invoke(ipcType.GET_PLUGINS, this.pluginId);
+        plugin.value = await ipc.invoke(ipcType.GET_PLUGINS, pluginId.value);
       } catch (err) {
         //
       }
-    },
-    getPluginId() {
-      const params = new URLSearchParams(window.location.search);
-      this.pluginId = params.get('pluginId');
-    },
-  },
+    };
 
-  mounted() {
-    this.onMounted();
-  },
+    onMounted(async () => {
+      getPluginId();
+      onMaximizeStatusChange();
+      await getIsMaximize();
+      await getPlugin();
+      if (plugin.value && plugin.value.ui) {
+        await pluginUi.loadUi(plugin.value.ui, pluginId.value);
+      }
+    });
 
-  destroyed() {
-    this.onUnmounted();
+    onUnmounted(() => {
+      ipc.detach(`set-maximize-status:plugin-window-${pluginId.value}`);
+    });
+
+    return {
+      pluginId,
+      isMaximize,
+      plugin,
+      ui: pluginUi.ui,
+      getIsMaximize,
+    };
   },
 };
 </script>

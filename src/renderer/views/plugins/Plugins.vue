@@ -51,14 +51,20 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from '@vue/composition-api';
+import {
+  ref,
+  reactive,
+  onMounted,
+  onUnmounted,
+} from '@vue/composition-api';
 import { storeToRefs } from 'pinia';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import PluginCard from './PluginCard.vue';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
 import useGlobalStore from '@/store/globalStore';
+import { showTextEditContextMenu } from '@/utils';
+import PluginCard from './PluginCard.vue';
 
 export default {
   name: 'Plugins',
@@ -72,7 +78,7 @@ export default {
     const store = useGlobalStore();
     const alert = useAlert();
     const dialog = useDialog();
-    const loading = ref({
+    const loading = reactive({
       install: false,
       uninstall: false,
     });
@@ -90,10 +96,10 @@ export default {
       if (!search.value) {
         return;
       }
-      if (loading.value.install) {
+      if (loading.install) {
         return;
       }
-      loading.value.install = true;
+      loading.install = true;
       try {
         const packageName = search.value.startsWith('translime-plugin-')
           ? search.value
@@ -103,7 +109,7 @@ export default {
       } catch (err) {
         alert.show(err.message, 'error');
       } finally {
-        loading.value.install = false;
+        loading.install = false;
         getPlugins();
       }
     };
@@ -111,17 +117,17 @@ export default {
       if (!packageName) {
         return;
       }
-      if (loading.value.install) {
+      if (loading.install) {
         return;
       }
-      loading.value.install = true;
+      loading.install = true;
       dialog.showLoader();
       try {
         await ipc.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
       } catch (err) {
         alert.show(err.message, 'error');
       } finally {
-        loading.value.install = false;
+        loading.install = false;
         dialog.hideLoader();
         getPlugins();
       }
@@ -164,6 +170,7 @@ export default {
       disablePlugin,
       search,
       loading,
+      showTextEditContextMenu,
     };
   },
 };
