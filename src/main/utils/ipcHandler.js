@@ -4,6 +4,7 @@ import {
   Menu,
   Notification,
   shell,
+  clipboard,
 } from 'electron';
 import pkg from '@pkg/../package.json';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
@@ -259,7 +260,8 @@ const ipcHandler = (ipc) => ({
     });
     global.store.set('setting.openAtLogin', open);
   },
-  [ipcType.SHOW_TEXT_EDIT_CONTEXT]() {
+  [ipcType.SHOW_TEXT_EDIT_CONTEXT]({ selectedText = '' }) {
+    const clipboardText = clipboard.readText();
     const contextMenuItems = [
       {
         role: 'undo',
@@ -279,18 +281,21 @@ const ipcHandler = (ipc) => ({
         label: '剪切',
         registerAccelerator: false,
         accelerator: 'CommandOrControl+X',
+        enabled: selectedText,
       },
       {
         role: 'copy',
         label: '复制',
         registerAccelerator: false,
         accelerator: 'CommandOrControl+C',
+        enabled: selectedText,
       },
       {
         role: 'paste',
         label: '粘贴',
         registerAccelerator: false,
         accelerator: 'CommandOrControl+V',
+        enabled: clipboardText,
       },
     ];
     const menu = Menu.buildFromTemplate(contextMenuItems);

@@ -14,9 +14,13 @@
       >Vue 2 Documentation</a>
     </p>
 
-    <v-btn @click="count++" color="primary">
+    <v-btn @click="countIncrease" color="primary">
       <v-icon>favorite</v-icon>
       <span>count is: {{ count }}</span>
+    </v-btn>
+
+    <v-btn @click="resetCount" class="ml-4" color="primary">
+      <span>reset count</span>
     </v-btn>
 
     <v-btn @click="openChildWindow" class="ml-4" color="primary">
@@ -35,9 +39,10 @@
 </template>
 
 <script>
-import { ref, onMounted } from '@vue/composition-api';
+import { onMounted } from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
+import { useState } from '@/utils';
 
 export default {
   props: {
@@ -47,7 +52,20 @@ export default {
   setup() {
     const ipc = useIpc();
 
-    const count = ref(0);
+    // react 风格的 state
+    const [count, setCount] = useState(0);
+    const countIncrease = () => setCount((c) => c + 1);
+    const resetCount = () => setCount(0);
+    // 测试数组
+    const [arr, setArr] = useState([]);
+    console.log('arr', JSON.stringify(arr));
+    setArr((a) => a.push(1));
+    console.log('arr', JSON.stringify(arr));
+    // 测试 object
+    const [obj, setObj] = useState({ foo: 'bar' });
+    console.log('obj', JSON.stringify(obj));
+    setObj({ a: 'xxx' });
+    console.log('obj', JSON.stringify(obj));
 
     const openChildWindow = () => {
       ipc.send(ipcType.OPEN_NEW_WINDOW, { name: 'childWinTest' });
@@ -67,6 +85,8 @@ export default {
 
     return {
       count,
+      countIncrease,
+      resetCount,
       openChildWindow,
       getVersions,
     };

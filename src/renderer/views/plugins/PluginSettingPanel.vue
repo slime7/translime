@@ -47,6 +47,7 @@
                 :rules="menuItem.required ? requiredRule : []"
                 :required="menuItem.required"
                 outlined
+                @click.right="showTextEditContextMenu"
               />
 
               <v-select
@@ -125,6 +126,7 @@ import {
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useToast from '@/hooks/useToast';
+import { showTextEditContextMenu } from '@/utils';
 
 export default {
   name: 'PluginSettingPanel',
@@ -260,6 +262,7 @@ export default {
       loading,
       settings,
       saveSettings,
+      showTextEditContextMenu,
     };
   },
 };
