@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { app, Menu } from 'electron';
 import EventEmitter from 'events';
-import spawn from 'cross-spawn';
+import childProcess from 'child_process';
 import { createRequire } from 'module';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 
@@ -104,8 +104,9 @@ const execNpmCommand = (cmd, module, options = {}) => {
     args.push(`--proxy=${internalOptions.proxy}`);
   }
   return new Promise((resolve) => {
-    const npm = spawn(NPM_EXEC_PATH, args, {
+    const npm = childProcess.fork(NPM_EXEC_PATH, args, {
       cwd: PLUGIN_DIR,
+      silent: true,
     });
 
     let output = '';
@@ -120,6 +121,8 @@ const execNpmCommand = (cmd, module, options = {}) => {
     npm.on('close', (code) => {
       if (!code) {
         resolve({ code: 0, data: output });
+      } else if (code && output.indexOf('code E404') > -1) {
+        resolve({ code, data: `插件"${module}"不存在` });
       } else {
         resolve({ code, data: output });
       }

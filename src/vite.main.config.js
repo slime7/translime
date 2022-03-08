@@ -1,5 +1,6 @@
 import { join } from 'path';
 import { builtinModules } from 'module';
+import { external } from '../package.json';
 
 const PACKAGE_ROOT = join(__dirname, 'main');
 
@@ -29,7 +30,7 @@ const config = {
     outDir: join(PACKAGE_ROOT, '../../dist/main'),
     assetsDir: '.',
     minify: process.env.MODE === 'development' ? false : 'terser',
-    terserOptions: {
+    terserOptions: process.env.MODE === 'development' ? undefined : {
       ecma: 2020,
       compress: {
         passes: 2,
@@ -45,6 +46,7 @@ const config = {
         'electron',
         'electron-devtools-installer',
         ...builtinModules,
+        ...external,
       ],
       output: {
         entryFileNames: '[name].js',

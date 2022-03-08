@@ -29,7 +29,7 @@ const config = {
     outDir: join(PACKAGE_ROOT, '../../dist/preload'),
     assetsDir: '.',
     minify: process.env.MODE === 'development' ? false : 'terser',
-    terserOptions: {
+    terserOptions: process.env.MODE === 'development' ? undefined : {
       ecma: 2020,
       compress: {
         passes: 2,

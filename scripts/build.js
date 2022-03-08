@@ -57,7 +57,7 @@ function build() {
     .then(() => {
       delete pkg.devDependencies;
       delete pkg.scripts;
-      const externals = pkg.nodeExternals;
+      const externals = pkg.external;
       Object.keys(pkg.dependencies || {}).forEach((dependency) => {
         if (!externals.includes(dependency)) {
           delete pkg.dependencies[dependency];
