@@ -30,4 +30,18 @@ export default class Ipc {
       data,
     }, clientWin);
   }
+
+  appendHandler(type, handlerFa) {
+    if (!this.handlerList[type]) {
+      this.handlerList[type] = handlerFa({ sendToClient: this.sendToClient.bind(this) });
+      return true;
+    }
+    return false;
+  }
+
+  removeHandler(type) {
+    if (this.handlerList[type]) {
+      delete this.handlerList[type];
+    }
+  }
 }

@@ -78,3 +78,14 @@ export const pluginMenu = [
     },
   },
 ];
+
+// ipc 定义
+export const ipcHandlers = [
+  {
+    type: 'test-ipc', // 调用时需加上`@${id}`，此处为 'test-ipc@translime-plugin-example'
+    handler: ({ sendToClient }) => (arg1, arg2) => {
+      console.log('test-ipc', 'test ipc from plugin: ', arg1, arg2);
+      sendToClient(`test-ipc-reply@${id}`, 'test ipc reply from plugin');
+    },
+  },
+];

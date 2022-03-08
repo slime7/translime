@@ -227,6 +227,11 @@ class PluginLoader extends EventEmitter {
       console.log('plugin enable error: ', err);
     }
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
+    if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
+      mergedPlugin.ipcHandlers.forEach((handler) => {
+        global.ipc.appendHandler(`${handler.type}@${mergedPlugin.packageName}`, handler.handler);
+      });
+    }
     if (mergedPlugin.windowUrl) {
       mergedPlugin.windowMode = true;
     } else if (typeof mergedPlugin.windowMode === 'undefined') {
@@ -242,9 +247,17 @@ class PluginLoader extends EventEmitter {
     Object.assign(plugin, {
       enabled: false,
     });
+    // 移除 ipc
+    if (plugin.ipcHandlers && plugin.ipcHandlers.length) {
+      plugin.ipcHandlers.forEach((handler) => {
+        global.ipc.removeHandler(`${handler.type}@${plugin.packageName}`);
+      });
+    }
+    // 调用插件卸载方法
     if (typeof plugin.pluginWillUnload === 'function') {
       plugin.pluginWillUnload();
     }
+    // 关闭插件窗口
     if (global.childWins[`plugin-window-${packageName}`]) {
       global.childWins[`plugin-window-${packageName}`].close();
     }
