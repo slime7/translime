@@ -341,7 +341,7 @@ class PluginLoader extends EventEmitter {
       {
         id: 'open-plugin-setting-panel',
         label: '设置',
-        visible: plugin.enabled && plugin.settingMenu && plugin.settingMenu.length,
+        visible: (plugin.enabled && !!plugin.settingMenu && !!plugin.settingMenu.length),
         click() {
           ipcEv.sendToClient(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${packageName}`, {
             packageName,
@@ -353,7 +353,7 @@ class PluginLoader extends EventEmitter {
         label: '新窗口打开插件',
         type: 'checkbox',
         checked: plugin.windowMode,
-        visible: plugin.ui && plugin.windowUrl,
+        visible: (!!plugin.ui || !!plugin.windowUrl),
         click() {
           plugin.windowMode = !plugin.windowMode;
           global.store.set(`plugin.${packageName}.windowMode`, plugin.windowMode);

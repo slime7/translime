@@ -34,7 +34,7 @@ export default {
 
   methods: {
     async readSetting() {
-      this.setting = await window.getPluginSetting('translime-plugin-example');
+      this.setting = await window.ts.getPluginSetting('translime-plugin-example');
     },
     showThis() {
       console.log(this);

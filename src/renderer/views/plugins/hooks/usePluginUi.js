@@ -14,7 +14,7 @@ const usePluginUi = () => {
     target.parentNode.insertBefore(script, target);
   });
   const loadUi = async (uiPath, pluginId) => {
-    const uiBlob = window.loadPluginUi(uiPath);
+    const uiBlob = window.ts.loadPluginUi(uiPath);
     const uiUrl = URL.createObjectURL(uiBlob);
     try {
       await loadScript(uiUrl);

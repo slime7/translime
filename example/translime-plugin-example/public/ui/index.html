@@ -32,13 +32,13 @@
 
   data.pre.innerHTML = `${JSON.stringify(data.versions, null, 2)}\n\n${data.root}`;
   data.btnDev.addEventListener('click', () => {
-    window.windowControl.devtools('plugin-window-translime-plugin-example');
+    window.ts.windowControl.devtools('plugin-window-translime-plugin-example');
   });
   data.btnMaximize.addEventListener('click', () => {
-    window.windowControl.maximize('plugin-window-translime-plugin-example');
+    window.ts.windowControl.maximize('plugin-window-translime-plugin-example');
   });
   data.btnClose.addEventListener('click', () => {
-    window.windowControl.close('plugin-window-translime-plugin-example');
+    window.ts.windowControl.close('plugin-window-translime-plugin-example');
   });
 })();
 </script>

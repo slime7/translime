@@ -98,14 +98,15 @@ const api = {
  *
  * @see https://www.electronjs.org/docs/api/context-bridge
  */
-contextBridge.exposeInMainWorld(apiKey, api);
 ipcRenderer.invoke('ipc-fn', {
   type: 'get-path',
   args: ['userData'],
 }).then((result) => {
-  contextBridge.exposeInMainWorld('APPDATA_PATH', result.data);
+  api.APPDATA_PATH = result.data;
+  contextBridge.exposeInMainWorld(apiKey, api);
 });
 
+const translime = {};
 // 快捷接口
 // 获取插件设置
 const getPluginSetting = async (...args) => {
@@ -118,7 +119,7 @@ const getPluginSetting = async (...args) => {
   }
   return Promise.reject(new Error(result.err));
 };
-contextBridge.exposeInMainWorld('getPluginSetting', getPluginSetting);
+translime.getPluginSetting = getPluginSetting;
 
 // 设置插件设置
 const setPluginSetting = async (...args) => {
@@ -131,7 +132,7 @@ const setPluginSetting = async (...args) => {
   }
   return Promise.reject(new Error(result.err));
 };
-contextBridge.exposeInMainWorld('setPluginSetting', setPluginSetting);
+translime.setPluginSetting = setPluginSetting;
 
 // 窗口控制
 const windowControl = {
@@ -156,11 +157,11 @@ const windowControl = {
     data: win,
   }),
 };
-contextBridge.exposeInMainWorld('windowControl', windowControl);
+translime.windowControl = windowControl;
 
-// eslint-disable-next-line global-require,import/no-dynamic-require
 const loadPluginUi = (pluginPath) => {
   const ui = fs.readFileSync(pluginPath, 'utf8');
   return new Blob([ui], { type: 'text/javascript' });
 };
-contextBridge.exposeInMainWorld('loadPluginUi', loadPluginUi);
+translime.loadPluginUi = loadPluginUi;
+contextBridge.exposeInMainWorld('ts', translime);
