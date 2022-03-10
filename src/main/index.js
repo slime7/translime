@@ -51,6 +51,10 @@ app.on('activate', () => {
   }
 });
 
+app.on('will-quit', () => {
+  global.plugin.appClose();
+});
+
 app.whenReady()
   .then(() => {
     createLaunchWindow();

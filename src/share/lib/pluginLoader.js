@@ -374,6 +374,14 @@ class PluginLoader extends EventEmitter {
     const menu = Menu.buildFromTemplate(contextMenuItems);
     menu.popup();
   }
+
+  appClose() {
+    this.plugins.forEach((plugin) => {
+      if (typeof plugin.pluginWillUnload === 'function') {
+        plugin.pluginWillUnload();
+      }
+    });
+  }
 }
 
 const pluginLoader = new PluginLoader();
