@@ -1,5 +1,6 @@
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, nativeTheme } from 'electron';
 import path from 'path';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import appConfigStore from './appConfigStore';
 
 global.ROOT = path.join(__dirname, '..');
@@ -15,4 +16,13 @@ global.tray = null;
 ipcMain.handle('appConfigStore', (event, method, ...rest) => {
   const data = appConfigStore[method](...rest);
   return Promise.resolve({ data, err: null });
+});
+
+nativeTheme.on('updated', () => {
+  if (global.ipc) {
+    global.ipc.sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors });
+    Object.keys(global.childWins).forEach((windowKey) => {
+      global.ipc.sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors }, global.childWins[windowKey].webContents);
+    });
+  }
 });

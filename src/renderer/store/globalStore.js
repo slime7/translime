@@ -10,8 +10,10 @@ const useGlobalStore = defineStore('globalStore', {
     appSetting: {
       openAtLogin: false,
       registry: '',
+      theme: 'system',
     },
     plugins: [],
+    dark: false,
   }),
   getters: {
     plugin: (state) => (pluginId) => state.plugins.find((plugin) => plugin.packageName === pluginId),
@@ -26,6 +28,7 @@ const useGlobalStore = defineStore('globalStore', {
         const registry = await appConfigStore('get', 'setting.registry', 'https://registry.npmmirror.com/');
         state.appSetting.openAtLogin = openAtLogin;
         state.appSetting.registry = registry;
+        state.appSetting.theme = await appConfigStore('get', 'setting.theme', 'system');
       });
     },
     setAppOpenAtLogin(open) {
@@ -33,6 +36,9 @@ const useGlobalStore = defineStore('globalStore', {
     },
     setAppRegistry(registry) {
       this.appSetting.registry = registry;
+    },
+    setAppTheme(theme) {
+      this.appSetting.theme = theme;
     },
   },
 });

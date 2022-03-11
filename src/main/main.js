@@ -6,7 +6,6 @@ import {
 } from 'electron';
 import Store from 'electron-store';
 import { join } from 'path';
-import '@pkg/main/utils/global';
 import createProtocol from './utils/createProtocol';
 import Ipc from './Ipc';
 

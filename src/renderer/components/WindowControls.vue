@@ -6,7 +6,7 @@
              xmlns='http://www.w3.org/2000/svg'>
           <path
             :d='icon.minimize'
-            fill='#000'/>
+            fill='currentColor'/>
         </svg>
       </div>
 
@@ -15,7 +15,7 @@
              xmlns='http://www.w3.org/2000/svg'>
           <path
             :d='icon.unmaximize'
-            fill='#000'/>
+            fill='currentColor'/>
         </svg>
       </div>
 
@@ -24,7 +24,7 @@
              xmlns='http://www.w3.org/2000/svg'>
           <path
             :d='icon.maximize'
-            fill='#000'/>
+            fill='currentColor'/>
         </svg>
       </div>
 
@@ -33,7 +33,7 @@
              xmlns='http://www.w3.org/2000/svg'>
           <path
             :d='icon.close'
-            fill='#000'/>
+            fill='currentColor'/>
         </svg>
       </div>
     </div>
@@ -111,12 +111,15 @@ export default {
   -webkit-app-region: no-drag;
 }
 
-.window-control-btn:hover {
-  background-color: #eee;
+#app.theme--dark .window-control-btn:hover {
+  background-color: rgba(255, 255, 255, .3);
+}
+#app.theme--light .window-control-btn:hover {
+  background-color: rgba(0, 0, 0, .2);
 }
 
 .window-control-btn.close:hover {
-  background-color: rgba(232, 17, 35, 0.9);
+  background-color: rgba(232, 17, 35, 0.9) !important;
 }
 
 .window-control-btn.close:hover path {

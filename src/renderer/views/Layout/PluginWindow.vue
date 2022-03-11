@@ -27,7 +27,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from '@vue/composition-api';
+import { onMounted, onUnmounted, ref } from '@vue/composition-api';
 import * as components from 'vuetify/lib/components';
 import * as directives from 'vuetify/lib/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
@@ -49,7 +49,7 @@ export default {
     WindowControls,
   },
 
-  setup() {
+  setup(props, { root }) {
     const pluginId = ref('');
     const isMaximize = ref(false);
     const plugin = ref(null);
@@ -75,10 +75,24 @@ export default {
         //
       }
     };
+    const getDarkMode = () => {
+      const params = new URLSearchParams(window.location.search);
+      const darkParam = params.get('dark');
+      // eslint-disable-next-line no-param-reassign
+      root.$vuetify.theme.dark = !!darkParam && darkParam !== 'false' && darkParam !== '0';
+    };
+    const themeUpdated = () => {
+      ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
+        // eslint-disable-next-line no-param-reassign
+        root.$vuetify.theme.dark = dark;
+      });
+    };
 
     onMounted(async () => {
       getPluginId();
+      getDarkMode();
       onMaximizeStatusChange();
+      themeUpdated();
       await getIsMaximize();
       await getPlugin();
       if (plugin.value && plugin.value.ui) {

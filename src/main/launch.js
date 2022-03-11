@@ -1,7 +1,6 @@
 import {
   screen,
 } from 'electron';
-import '@pkg/main/utils/global';
 import createWindow from './utils/createWindow';
 
 export default () => {

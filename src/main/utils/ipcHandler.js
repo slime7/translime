@@ -5,11 +5,13 @@ import {
   Notification,
   shell,
   clipboard,
+  nativeTheme,
 } from 'electron';
 import pkg from '@pkg/../package.json';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '@pkg/main/utils/createWindow';
 import { join } from 'path';
+import { GET_NATIVE_THEME } from '@pkg/share/utils/ipcConstant';
 
 const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {
@@ -300,6 +302,14 @@ const ipcHandler = (ipc) => ({
     ];
     const menu = Menu.buildFromTemplate(contextMenuItems);
     menu.popup();
+  },
+  [ipcType.GET_NATIVE_THEME]() {
+    return Promise.resolve({
+      shouldUseDarkColors: nativeTheme.shouldUseDarkColors,
+    });
+  },
+  [ipcType.SET_NATIVE_THEME]({ theme }) {
+    nativeTheme.themeSource = theme;
   },
   ping() {
     global.console.log('pong', new Date());

@@ -18,6 +18,9 @@ export default new Vuetify({
       light: {
         primary: colors.lightBlue.darken1,
       },
+      dark: {
+        primary: colors.lightBlue.darken1,
+      },
     },
   },
 });

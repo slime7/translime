@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="setting">
+  <v-container class="setting">
     <h2>设置</h2>
 
     <h3 class="mt-4">通用</h3>
@@ -9,33 +9,53 @@
         v-model="settings.openAtLogin"
         label="开机自动启动"
         @change="onOpenAtLogin"
+        hide-details
       />
     </div>
 
-    <v-divider />
+    <h5 class="mt-2">主题</h5>
+
+    <div>
+      <card-radio
+        :value="settings.theme === 'light'"
+        class="mt-2"
+        @click="changeTheme('light')"
+      >
+        明亮
+      </card-radio>
+      <card-radio
+        :value="settings.theme === 'dark'"
+        class="mt-2"
+        @click="changeTheme('dark')"
+      >
+        暗黑
+      </card-radio>
+      <card-radio
+        :value="settings.theme === 'system'"
+        class="mt-2"
+        @click="changeTheme('system')"
+      >
+        系统
+      </card-radio>
+    </div>
+
+    <v-divider class="mt-4" />
 
     <h3 class="mt-4">插件</h3>
 
     <h5 class="mt-2">npm 服务器</h5>
 
     <div>
-      <v-sheet
+      <card-radio
         v-for="registry in registryList"
         :key="registry.id"
-        class="overflow-hidden rounded mt-2"
+        :value="settings.registry === registry.link"
+        class="mt-2"
+        @click="onSelectRegistry(registry.link, registry.id)"
       >
-        <v-list-item link @click="onSelectRegistry(registry.link, registry.id)">
-          <v-list-item-action>
-            <v-icon v-if="settings.registry !== registry.link">radio_button_unchecked</v-icon>
-            <v-icon color="primary" v-else>radio_button_checked</v-icon>
-          </v-list-item-action>
-
-          <v-list-item-content>
-            <v-list-item-title>{{ registry.name }}</v-list-item-title>
-            <v-list-item-subtitle>{{ registry.link }}</v-list-item-subtitle>
-          </v-list-item-content>
-        </v-list-item>
-      </v-sheet>
+        {{ registry.name }}
+        <template slot="subtitle">{{ registry.link }}</template>
+      </card-radio>
 
       <v-dialog
         v-model="customRegistryPanelVisible"
@@ -85,15 +105,22 @@
 <script>
 import { ref, computed, onMounted } from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { showTextEditContextMenu } from '@/utils';
+import CardRadio from '@/components/CardRadio.vue';
 
 export default {
   name: 'Setting',
 
-  setup() {
+  components: {
+    CardRadio,
+  },
+
+  setup(props, { root }) {
     const ipc = useIpc();
+    const theme = useTheme(root);
     const ipcRaw = useIpc(false);
     const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
     const store = useGlobalStore();
@@ -188,7 +215,14 @@ export default {
       setCustomRegistryConfirm,
       onOpenAtLogin,
       showTextEditContextMenu,
+      changeTheme: theme.setTheme,
     };
   },
 };
 </script>
+
+<style scoped lang="scss">
+.setting {
+  max-width: 800px;
+}
+</style>

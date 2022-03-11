@@ -103,7 +103,7 @@ export default {
         name: `plugin-window-${props.open.id}`,
         options: {
           // windowUrl: `file://${this.open.windowUrl}`,
-          windowUrl: `plugin-index.html?pluginId=${props.open.id}`,
+          windowUrl: `plugin-index.html?pluginId=${props.open.id}&dark=${store.dark}`,
           appMenu: null,
           frame: false,
           titleBarStyle: 'hidden',
