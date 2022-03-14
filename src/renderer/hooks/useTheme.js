@@ -17,15 +17,13 @@ const useTheme = (vm) => {
   };
 
   const setTheme = (theme) => {
+    if (!['dark', 'light', 'system'].includes(theme)) {
+      // eslint-disable-next-line no-param-reassign
+      theme = 'system';
+    }
     ipc.send(ipcType.SET_NATIVE_THEME, {
       theme,
     });
-    if (theme === 'light') {
-      // setDark(false);
-    }
-    if (theme === 'dark') {
-      // setDark(true);
-    }
     appConfigStore('set', 'setting.theme', theme);
     store.setAppTheme(theme);
   };

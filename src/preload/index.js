@@ -21,6 +21,7 @@ const ipcWhiteList = {
     'ipc-fn',
   ],
 };
+const callbackCache = [];
 /**
  * @see https://github.com/electron/electron/issues/21437#issuecomment-573522360
  */
@@ -57,6 +58,51 @@ const api = {
       return Promise.reject(new Error('ipc invoke: 信号不在白名单'));
     },
   },
+  useIpc: (wrapped = true) => {
+    // 返回未包装的 ipcRenderer
+    if (!wrapped) {
+      return api.ipcRenderer;
+    }
+
+    const send = (msgType, msgData) => {
+      api.ipcRenderer.send('ipc-msg', {
+        type: msgType,
+        data: msgData,
+      });
+    };
+
+    const on = (type, callback) => {
+      if (callbackCache.find((cache) => cache.type === type)) {
+        return;
+      }
+      callbackCache.push({
+        type,
+        callback,
+      });
+    };
+
+    const invoke = (fnType, ...fnArgs) => api.ipcRenderer.invoke('ipc-fn', {
+      type: fnType,
+      args: fnArgs,
+    });
+
+    const detach = (type) => {
+      const idx = callbackCache.findIndex((v) => v.type === type);
+      if (idx > -1) {
+        callbackCache.splice(idx, 1);
+      } else {
+        console.error(`error type ${type}`);
+      }
+    };
+
+    return {
+      send,
+      on,
+      invoke,
+      detach,
+      callbackCache,
+    };
+  },
   clipboard,
   dialog: {
     showOpenDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
@@ -91,6 +137,14 @@ const api = {
   },
   APP_ROOT: path.resolve(__dirname, '../'),
 };
+api.ipcRenderer.receive('ipc-reply', (msg) => {
+  console.log(`ipc-reply by ${msg.type}`, msg);
+  callbackCache.forEach((cache) => {
+    if (cache.type === msg.type && cache.callback) {
+      cache.callback(msg.data);
+    }
+  });
+});
 
 /**
  * The "Main World" is the JavaScript context that your main renderer code runs in.
