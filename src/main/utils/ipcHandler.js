@@ -11,7 +11,6 @@ import pkg from '@pkg/../package.json';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '@pkg/main/utils/createWindow';
 import { join } from 'path';
-import { GET_NATIVE_THEME } from '@pkg/share/utils/ipcConstant';
 
 const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {
@@ -96,12 +95,18 @@ const ipcHandler = (ipc) => ({
       global.childWins[name].focus();
     } else {
       const mainWinBound = global.win.getBounds();
+      const winBound = global.store.get(`plugin.${name.replace('plugin-window-', '')}.window`, {
+        x: mainWinBound.x + 10,
+        y: mainWinBound.y + 10,
+        width: mainWinBound.width,
+        height: mainWinBound.height,
+      });
       const indexPage = options.windowUrl || 'child-window.html';
       global.childWins[name] = createWindow(indexPage, {
-        x: options.x ? options.x : mainWinBound.x + 10,
-        y: options.y ? options.y : mainWinBound.y + 10,
-        width: options.width ? options.width : mainWinBound.width,
-        height: options.height ? options.height : mainWinBound.height,
+        x: winBound.x,
+        y: winBound.y,
+        width: winBound.width,
+        height: winBound.height,
         frame: typeof options.frame !== 'undefined' ? options.frame : false,
         titleBarStyle: options.titleBarStyle || 'default',
         title: options.title || 'translime',
@@ -118,6 +123,22 @@ const ipcHandler = (ipc) => ({
 
       global.childWins[name].on('unmaximize', () => {
         ipc.sendToClient(`set-maximize-status:${name}`, false, global.childWins[name].webContents);
+      });
+
+      global.childWins[name].on('close', () => {
+        const isPluginWindow = global.store.has(`plugin.${name.replace('plugin-window-', '')}`);
+        if (isPluginWindow && !global.childWins[name].isMaximized()) {
+          const pos = global.childWins[name].getPosition();
+          const size = global.childWins[name].getSize();
+          const [x, y, width, height] = [...pos, ...size];
+          const windowProps = {
+            x,
+            y,
+            width,
+            height,
+          };
+          global.store.set(`plugin.${name.replace('plugin-window-', '')}.window`, windowProps);
+        }
       });
 
       global.childWins[name].on('closed', () => {

@@ -68,7 +68,10 @@ export default {
     console.log('obj', JSON.stringify(obj));
 
     const openChildWindow = () => {
-      ipc.send(ipcType.OPEN_NEW_WINDOW, { name: 'childWinTest' });
+      ipc.send(ipcType.OPEN_NEW_WINDOW, {
+        name: 'childWinTest',
+        options: { frame: true },
+      });
     };
     const getVersions = () => {
       ipc.send(ipcType.APP_VERSIONS);
