@@ -10,10 +10,13 @@
         <div>
           <v-card-title
             class="text-h5"
-            v-text="plugin.title"
+            v-text="cardTitle"
           />
 
-          <v-card-subtitle v-text="plugin.version" />
+          <v-card-subtitle>
+            <span v-if="!plugin.link">{{ cardSubTitle }}</span>
+            <a v-else @click="authLink">{{ cardSubTitle }}</a>
+          </v-card-subtitle>
 
           <v-card-text v-text="plugin.description" />
 
@@ -86,6 +89,8 @@
 
 <script>
 import { toRefs } from '@vue/composition-api';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
+import { useIpc } from '@/hooks/electron';
 import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
@@ -108,6 +113,13 @@ export default {
   setup(props, { emit }) {
     const { plugin } = toRefs(props);
     const pluginId = plugin.value.packageName;
+    const ipc = useIpc();
+
+    const cardTitle = plugin.value.author ? `${plugin.value.title}@${plugin.value.version}` : plugin.value.title;
+    const cardSubTitle = plugin.value.author ? plugin.value.author : plugin.value.version;
+    const authLink = () => {
+      ipc.send(ipcType.OPEN_LINK, { url: String(plugin.value.link) });
+    };
 
     // 设置面板
     const { settingPanelVisible } = usePluginSettingPanel(pluginId);
@@ -127,6 +139,9 @@ export default {
       disable,
       uninstall,
       showContextMenu,
+      cardTitle,
+      cardSubTitle,
+      authLink,
     };
   },
 };

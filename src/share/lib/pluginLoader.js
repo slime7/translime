@@ -25,7 +25,7 @@ const readPlugin = (pluginPath) => {
     plugin.title = pluginPkg.name;
   }
   if (!plugin.author) {
-    plugin.author = pluginPkg.author || 'unknown';
+    plugin.author = pluginPkg.author || '';
   }
   if (!plugin.link) {
     plugin.link = pluginPkg.link || '';
