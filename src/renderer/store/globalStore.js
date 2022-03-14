@@ -1,8 +1,5 @@
 import { defineStore, acceptHMRUpdate } from 'pinia';
-import { useIpc } from '@/hooks/electron';
-
-const ipcRaw = useIpc(false);
-const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
+import { appConfigStore } from '@/utils';
 
 const useGlobalStore = defineStore('globalStore', {
   state: () => ({
@@ -24,11 +21,11 @@ const useGlobalStore = defineStore('globalStore', {
     },
     async initAppConfig() {
       this.$patch(async (state) => {
-        const openAtLogin = await appConfigStore('get', 'setting.openAtLogin', false);
-        const registry = await appConfigStore('get', 'setting.registry', 'https://registry.npmmirror.com/');
+        const openAtLogin = await appConfigStore.get('setting.openAtLogin', false);
+        const registry = await appConfigStore.get('setting.registry', 'https://registry.npmmirror.com/');
         state.appSetting.openAtLogin = openAtLogin;
         state.appSetting.registry = registry;
-        state.appSetting.theme = await appConfigStore('get', 'setting.theme', 'system');
+        state.appSetting.theme = await appConfigStore.get('setting.theme', 'system');
       });
     },
     setAppOpenAtLogin(open) {

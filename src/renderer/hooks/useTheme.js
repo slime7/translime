@@ -1,11 +1,10 @@
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
+import { appConfigStore } from '@/utils';
 
 const useTheme = (vm) => {
   const ipc = useIpc();
-  const ipcRaw = useIpc(false);
-  const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
   const store = useGlobalStore();
 
   const getNativeTheme = () => ipc.invoke(ipcType.GET_NATIVE_THEME);
@@ -24,7 +23,7 @@ const useTheme = (vm) => {
     ipc.send(ipcType.SET_NATIVE_THEME, {
       theme,
     });
-    appConfigStore('set', 'setting.theme', theme);
+    appConfigStore.set('setting.theme', theme);
     store.setAppTheme(theme);
   };
 

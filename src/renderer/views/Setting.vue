@@ -108,7 +108,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
-import { showTextEditContextMenu } from '@/utils';
+import { showTextEditContextMenu, appConfigStore } from '@/utils';
 import CardRadio from '@/components/CardRadio.vue';
 
 export default {
@@ -121,8 +121,6 @@ export default {
   setup(props, { root }) {
     const ipc = useIpc();
     const theme = useTheme(root);
-    const ipcRaw = useIpc(false);
-    const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
     const store = useGlobalStore();
 
     const registryList = [
@@ -151,7 +149,7 @@ export default {
     };
     const onSelectRegistry = async (registry, setType) => {
       if (setType !== 'custom') {
-        appConfigStore('set', 'setting.registry', registry);
+        appConfigStore.set('setting.registry', registry);
         setAppRegistry(registry);
       } else {
         const customRegistryResult = await new Promise((resolve) => {
@@ -159,7 +157,7 @@ export default {
           customRegistryPanelVisible.value = true;
         });
         if (customRegistryResult) {
-          appConfigStore('set', 'setting.registry', customRegistryItem.value.link);
+          appConfigStore.set('setting.registry', customRegistryItem.value.link);
           setAppRegistry(customRegistryItem.value.link);
         }
       }

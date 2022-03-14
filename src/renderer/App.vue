@@ -9,6 +9,7 @@ import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import globalStore from '@/store/globalStore';
+import { appConfigStore } from '@/utils';
 
 export default {
   name: 'App',
@@ -19,7 +20,6 @@ export default {
     const store = globalStore();
     const theme = useTheme(root);
     const alert = useAlert();
-    const appConfigStore = (method, ...args) => ipcRaw.invoke('appConfigStore', method, ...args);
 
     const initAppConfig = () => {
       store.initAppConfig();
@@ -39,7 +39,7 @@ export default {
       }
     };
     const getTheme = async () => {
-      theme.setTheme(await appConfigStore('get', 'setting.theme', 'system'));
+      theme.setTheme(await appConfigStore.get('setting.theme', 'system'));
       const { shouldUseDarkColors: dark } = await theme.getNativeTheme();
       theme.setDark(dark);
     };

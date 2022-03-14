@@ -3,6 +3,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 
 const ipc = useIpc();
+const ipcRaw = useIpc(false);
 
 export const showTextEditContextMenu = () => {
   const selectedText = window.getSelection().toString();
@@ -33,3 +34,9 @@ export const useState = (initialValue) => {
   };
   return [state, setValue];
 };
+
+export const appConfigStore = new Proxy({}, {
+  get(t, prop) {
+    return (...args) => ipcRaw.invoke('appConfigStore', prop, ...args);
+  },
+});
