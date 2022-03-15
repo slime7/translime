@@ -94,11 +94,12 @@ const ipcHandler = (ipc) => ({
       }
       global.childWins[name].focus();
     } else {
+      const minWidth = options.minWidth || 700;
       const mainWinBound = global.win.getBounds();
       const winBound = global.store.get(`plugin.${name.replace('plugin-window-', '')}.window`, {
         x: mainWinBound.x + 10,
         y: mainWinBound.y + 10,
-        width: mainWinBound.width,
+        width: Math.max(mainWinBound.width, minWidth),
         height: mainWinBound.height,
       });
       const indexPage = options.windowUrl || 'child-window.html';
@@ -107,6 +108,7 @@ const ipcHandler = (ipc) => ({
         y: winBound.y,
         width: winBound.width,
         height: winBound.height,
+        minWidth,
         frame: typeof options.frame !== 'undefined' ? options.frame : false,
         titleBarStyle: options.titleBarStyle || 'default',
         title: options.title || 'translime',

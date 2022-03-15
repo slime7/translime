@@ -4,7 +4,7 @@ import useDialog from '@/hooks/useDialog';
 
 export default function usePluginActions(plugin, emit) {
   const ipc = useIpc();
-  const { confirm } = useDialog();
+  const { showConfirm } = useDialog();
   const pluginId = plugin.packageName;
 
   const enable = () => {
@@ -17,7 +17,7 @@ export default function usePluginActions(plugin, emit) {
     emit('uninstall', pluginId);
   };
   const uninstall = async () => {
-    const confirmResult = await confirm(`确定要卸载插件”${plugin.title}“吗？`, '卸载确认');
+    const confirmResult = await showConfirm(`确定要卸载插件”${plugin.title}“吗？`, '卸载确认');
     if (confirmResult) {
       reallyUninstall();
     }

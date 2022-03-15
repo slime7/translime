@@ -58,7 +58,7 @@ const readPlugin = (pluginPath) => {
   if (plugin.ui) {
     plugin.ui = path.resolve(pluginPath, plugin.ui);
   }
-  plugin.exports = pluginPkg.main;
+  plugin.exports = pluginPkg.main ? pluginPkg.main : null;
   if (pluginPkg.exports) {
     if (pluginPkg.exports['.'] && pluginPkg.exports['.'].require) {
       plugin.exports = pluginPkg.exports['.'].require;
@@ -216,16 +216,18 @@ class PluginLoader extends EventEmitter {
       plugin = readPlugin(pluginPath);
       console.log('reload plugin: ', { ...plugin });
     }
-    let pluginMain;
-    try {
-      const pluginExports = path.join(plugin.pluginPath, plugin.exports);
-      pluginMain = requireFresh(`${pluginExports}`);
-      pluginMain.enabled = true;
-      global.store.set(`plugin.${plugin.packageName}.enabled`, true);
-    } catch (err) {
-      // todo: handle error
-      console.log('plugin enable error: ', err);
+    let pluginMain = {};
+    if (plugin.exports) {
+      try {
+        const pluginExports = path.join(plugin.pluginPath, plugin.exports);
+        pluginMain = requireFresh(`${pluginExports}`);
+      } catch (err) {
+        // todo: handle error
+        console.log('plugin enable error: ', err);
+      }
     }
+    pluginMain.enabled = true;
+    global.store.set(`plugin.${plugin.packageName}.enabled`, true);
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
       mergedPlugin.ipcHandlers.forEach((handler) => {
@@ -262,7 +264,9 @@ class PluginLoader extends EventEmitter {
       global.childWins[`plugin-window-${packageName}`].close();
     }
     // 删除 require 缓存
-    delete requireFresh.cache[path.join(plugin.pluginPath, plugin.exports)];
+    if (plugin.exports) {
+      delete requireFresh.cache[path.join(plugin.pluginPath, plugin.exports)];
+    }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
       const p = readPlugin(resolvePluginPath(packageName));
