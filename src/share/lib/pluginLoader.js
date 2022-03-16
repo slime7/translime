@@ -131,8 +131,6 @@ const execNpmCommand = (cmd, module, options = {}) => {
 };
 
 const processPlugin = (plugin) => {
-  console.log(plugin);
-
   // 运行插件加载方法
   if (typeof plugin.pluginDidLoad === 'function') {
     plugin.pluginDidLoad();
@@ -204,12 +202,18 @@ class PluginLoader extends EventEmitter {
       this.plugins.push(plugin);
       if (plugin.enabled) {
         // eslint-disable-next-line no-await-in-loop
-        this.enablePlugin(plugin.packageName);
+        this.enablePlugin(plugin.packageName, true);
       }
     }
+    this.emit('init', this.plugins);
+    this.plugins.forEach((plugin) => {
+      if (plugin.enabled) {
+        processPlugin(plugin);
+      }
+    });
   }
 
-  enablePlugin(packageName) {
+  enablePlugin(packageName, init = false) {
     let plugin = this.getPlugin(packageName);
     const pluginPath = resolvePluginPath(packageName);
     if (!plugin) {
@@ -239,7 +243,9 @@ class PluginLoader extends EventEmitter {
     } else if (typeof mergedPlugin.windowMode === 'undefined') {
       mergedPlugin.windowMode = global.store.get(`plugin.${plugin.packageName}.windowMode`, false);
     }
-    processPlugin(mergedPlugin);
+    if (!init) {
+      processPlugin(mergedPlugin);
+    }
 
     return mergedPlugin;
   }
@@ -281,6 +287,7 @@ class PluginLoader extends EventEmitter {
       return Promise.reject(new Error('该包不是这个软件的插件'));
     }
     const module = version ? `${packageName}@${version}` : packageName;
+    // todo: 如果插件已安装则更新
     return new Promise(async (resolve, reject) => {
       const result = await execNpmCommand('install', module);
       if (result.code) {
@@ -288,7 +295,7 @@ class PluginLoader extends EventEmitter {
       }
       try {
         // 启用新插件并加入到 this.plugins
-        const plugin = await this.enablePlugin(packageName);
+        const plugin = this.enablePlugin(packageName);
         this.plugins.push(plugin);
       } catch (err) {
         reject(err);
@@ -385,6 +392,11 @@ class PluginLoader extends EventEmitter {
         plugin.pluginWillUnload();
       }
     });
+  }
+
+  access(pluginId) {
+    const plugin = this.getPlugin(pluginId);
+    return plugin.lib;
   }
 }
 
