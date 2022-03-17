@@ -5,7 +5,11 @@
 </template>
 
 <script>
-import { computed, onMounted, watch } from '@vue/composition-api';
+import {
+  computed,
+  onMounted,
+  watch,
+} from '@vue/composition-api';
 import * as components from 'vuetify/lib/components';
 import * as directives from 'vuetify/lib/directives';
 import useGlobalStore from '@/store/globalStore';
@@ -37,9 +41,9 @@ export default {
     const plugin = computed(() => (props.packageName ? store.plugins[store.plugins.findIndex((p) => p.packageName === props.packageName)] : null));
 
     watch(
-      () => plugin.value.enabled,
+      () => plugin.value,
       async (v, prevV) => {
-        if (!prevV && v) {
+        if ((!prevV || !prevV.enabled) && v.enabled) {
           const result = await pluginUi.loadUi(plugin.value.ui, props.packageName);
           if (!result) {
             alert.show('加载插件页面失败', 'error');
@@ -49,7 +53,6 @@ export default {
     );
 
     onMounted(async () => {
-      console.log('mounted', plugin.value);
       if (plugin.value && plugin.value.ui) {
         const result = await pluginUi.loadUi(plugin.value.ui, props.packageName);
         if (!result) {

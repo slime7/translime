@@ -224,7 +224,15 @@ class PluginLoader extends EventEmitter {
     if (plugin.exports) {
       try {
         const pluginExports = path.join(plugin.pluginPath, plugin.exports);
-        pluginMain = requireFresh(`${pluginExports}`);
+        const pluginImport = requireFresh(`${pluginExports}`);
+        pluginMain = {
+          pluginDidLoad: pluginImport.pluginDidLoad,
+          pluginWillUnload: pluginImport.pluginWillUnload,
+          settingMenu: pluginImport.settingMenu,
+          pluginMenu: pluginImport.pluginMenu,
+          ipcHandlers: pluginImport.ipcHandlers,
+          libs: pluginImport.libs,
+        };
       } catch (err) {
         // todo: handle error
         console.log('plugin enable error: ', err);
@@ -282,12 +290,19 @@ class PluginLoader extends EventEmitter {
     }
   }
 
-  installPlugin(packageName, version) {
+  async installPlugin(packageName, version) {
     if (!/^translime-plugin-/.test(packageName)) {
       return Promise.reject(new Error('该包不是这个软件的插件'));
     }
+    const prevPlugin = this.getPlugin(packageName);
     const module = version ? `${packageName}@${version}` : packageName;
-    // todo: 如果插件已安装则更新
+    if (prevPlugin) {
+      try {
+        await this.uninstallPlugin(packageName);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
     return new Promise(async (resolve, reject) => {
       const result = await execNpmCommand('install', module);
       if (result.code) {

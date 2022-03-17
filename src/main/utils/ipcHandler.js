@@ -168,11 +168,12 @@ const ipcHandler = (ipc) => ({
       }
     });
   },
-  [ipcType.INSTALL_PLUGIN](packageName) {
+  [ipcType.INSTALL_PLUGIN](packageString) {
     return new Promise(async (resolve, reject) => {
       if (global.plugin) {
         try {
-          const result = await global.plugin.installPlugin(packageName);
+          const [packageName, version] = packageString.split('@');
+          const result = await global.plugin.installPlugin(packageName, version);
           resolve(result);
         } catch (err) {
           reject(new Error(`插件安装出错: ${err.message}`));

@@ -5,6 +5,7 @@
     <v-card
       class="plugin-item-card ease-animation"
       :elevation="hover ? 10 : 2"
+      :disabled="disabled"
     >
       <div class="d-flex flex-no-wrap justify-space-between">
         <div>
@@ -88,7 +89,7 @@
 </template>
 
 <script>
-import { toRefs } from '@vue/composition-api';
+import { toRefs, computed } from '@vue/composition-api';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import defaultIcon from '../../assets/plugin-default-image.png';
@@ -108,6 +109,10 @@ export default {
       type: Object,
       required: true,
     },
+    disabled: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   setup(props, { emit }) {
@@ -115,8 +120,8 @@ export default {
     const pluginId = plugin.value.packageName;
     const ipc = useIpc();
 
-    const cardTitle = plugin.value.author ? `${plugin.value.title}@${plugin.value.version}` : plugin.value.title;
-    const cardSubTitle = plugin.value.author ? plugin.value.author : plugin.value.version;
+    const cardTitle = computed(() => (plugin.value.author ? `${plugin.value.title}@${plugin.value.version}` : plugin.value.title));
+    const cardSubTitle = computed(() => (plugin.value.author ? plugin.value.author : plugin.value.version));
     const authLink = () => {
       ipc.send(ipcType.OPEN_LINK, { url: String(plugin.value.link) });
     };

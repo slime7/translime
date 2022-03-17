@@ -40,6 +40,7 @@
         >
           <plugin-card
             :plugin="pluginItem"
+            :disabled="!!loading.uninstall"
             @uninstall="uninstallPlugins"
             @disable="disablePlugin"
             @enable="enablePlugin"
@@ -117,17 +118,17 @@ export default {
       if (!packageName) {
         return;
       }
-      if (loading.install) {
+      if (loading.uninstall) {
         return;
       }
-      loading.install = true;
+      loading.uninstall = packageName;
       dialog.showLoader();
       try {
         await ipc.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
       } catch (err) {
         alert.show(err.message, 'error');
       } finally {
-        loading.install = false;
+        loading.uninstall = false;
         dialog.hideLoader();
         getPlugins();
       }

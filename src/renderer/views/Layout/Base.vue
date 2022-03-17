@@ -19,7 +19,6 @@
         <div class="scroll-content flex">
           <v-scroll-y-transition mode="out-in">
             <keep-alive>
-              <!-- todo: 卸载插件前 exclude 插件页面缓存 -->
               <router-view :key="$route.fullPath" />
             </keep-alive>
           </v-scroll-y-transition>
