@@ -1,0 +1,40 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ main, dev ]
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-latest]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v2
+
+      - name: Install Node.js, NPM and Yarn
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+
+      - name: Install dependencies & build
+        run: |
+          yarn --frozen-lockfile
+          yarn build
+
+      - name: clean up
+        run: |
+          npx rimraf "dist_electron/!(*.exe|*.dmg)"
+
+      - name: upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.os }}
+          path: dist_electron

@@ -3,7 +3,10 @@
     <h2>插件</h2>
 
     <div class="mt-4">
-      <div class="d-flex align-center">
+      <div>
+        <a @click="openPluginList">查找插件</a>
+      </div>
+      <div class="mt-2 d-flex align-center">
         <v-text-field
           v-model="search"
           placeholder="输入插件包名"
@@ -152,6 +155,10 @@ export default {
       }
     };
 
+    const openPluginList = () => {
+      ipc.invoke(ipcType.OPEN_LINK, { url: 'https://www.npmjs.com/search?q=translime-plugin' });
+    };
+
     onMounted(() => {
       ipc.on(ipcType.PLUGINS_CHANGED, () => {
         getPlugins();
@@ -172,6 +179,7 @@ export default {
       search,
       loading,
       showTextEditContextMenu,
+      openPluginList,
     };
   },
 };
