@@ -60,6 +60,9 @@ app.whenReady()
     createLaunchWindow();
     createMainWindow();
     createTray();
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('translime');
+    }
   });
 if (isDevelopment) {
   app.whenReady()
