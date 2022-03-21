@@ -18,7 +18,7 @@ export default function usePluginActions(plugin, emit) {
   };
   const uninstall = async () => {
     const confirmResult = await showConfirm(`确定要卸载插件”${plugin.title}“吗？`, '卸载确认');
-    if (confirmResult) {
+    if (confirmResult.confirm) {
       reallyUninstall();
     }
   };

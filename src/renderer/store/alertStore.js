@@ -31,7 +31,11 @@ const useAlertStore = defineStore('alertStore', {
         this.contents.shift();
       }
     },
-    async push({ msg, type = 'info', timeout = 6000 }) {
+    async push({
+      msg,
+      type = 'info',
+      timeout = 6000,
+    }) {
       const notifyTypes = {
         info: '提示',
         error: '出错',
@@ -62,7 +66,6 @@ const useAlertStore = defineStore('alertStore', {
           await notify.show({
             title: notifyTypes[type],
             body: msg,
-            timeoutType: 'never',
           }, timeout);
         }
       } else {
