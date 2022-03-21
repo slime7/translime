@@ -108,8 +108,8 @@ export default {
         const packageName = search.value.startsWith('translime-plugin-')
           ? search.value
           : `translime-plugin-${search.value}`;
-        const result = await ipc.invoke(ipcType.INSTALL_PLUGIN, packageName);
-        console.log(result);
+        await ipc.invoke(ipcType.INSTALL_PLUGIN, packageName);
+        alert.show(`插件 ${packageName} 已安装`);
       } catch (err) {
         alert.show(err.message, 'error');
       } finally {
@@ -128,6 +128,7 @@ export default {
       dialog.showLoader();
       try {
         await ipc.invoke(ipcType.UNINSTALL_PLUGIN, packageName);
+        alert.show(`插件 ${packageName} 已卸载`);
       } catch (err) {
         alert.show(err.message, 'error');
       } finally {
