@@ -232,6 +232,7 @@ class PluginLoader extends EventEmitter {
           pluginMenu: pluginImport.pluginMenu,
           ipcHandlers: pluginImport.ipcHandlers,
           libs: pluginImport.libs,
+          windowOptions: pluginImport.windowOptions,
         };
       } catch (err) {
         // todo: handle error
@@ -246,8 +247,10 @@ class PluginLoader extends EventEmitter {
         global.ipc.appendHandler(`${handler.type}@${mergedPlugin.packageName}`, handler.handler);
       });
     }
+    mergedPlugin.windowOptions = {};
     if (mergedPlugin.windowUrl) {
       mergedPlugin.windowMode = true;
+      mergedPlugin.windowOptions = pluginMain.windowOptions || {};
     } else if (typeof mergedPlugin.windowMode === 'undefined') {
       mergedPlugin.windowMode = global.store.get(`plugin.${plugin.packageName}.windowMode`, false);
     }
@@ -379,7 +382,7 @@ class PluginLoader extends EventEmitter {
         label: '新窗口打开插件',
         type: 'checkbox',
         checked: plugin.windowMode,
-        visible: (!!plugin.ui || !!plugin.windowUrl),
+        visible: (!!plugin.ui && !plugin.windowUrl),
         click() {
           plugin.windowMode = !plugin.windowMode;
           global.store.set(`plugin.${packageName}.windowMode`, plugin.windowMode);

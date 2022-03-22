@@ -45,8 +45,8 @@
           v-for="plugin in pluginPages"
           :key="plugin.packageName"
           :to="plugin.windowMode ? null : { name: 'PluginPage', params: { packageName: plugin.packageName } }"
-          :open="plugin.windowMode ? { id: plugin.packageName, windowUrl: plugin.windowUrl } : null"
-          :image="plugin.icon"
+          :open="plugin.windowMode ? { id: plugin.packageName, windowUrl: plugin.windowUrl, options: plugin.windowOptions } : null"
+          :image="plugin.icon ? plugin.icon : defaultIcon"
           :tooltip="plugin.title"
         >
           {{ plugin.title }}
@@ -60,6 +60,7 @@
 import { computed } from '@vue/composition-api';
 import NaviLink from '@/views/Layout/components/NaviLink.vue';
 import useGlobalStore from '@/store/globalStore';
+import defaultIcon from '../../../assets/plugin-default-image.png';
 
 export default {
   name: 'LayoutNavigation',
@@ -75,6 +76,7 @@ export default {
 
     return {
       pluginPages,
+      defaultIcon,
     };
   },
 };

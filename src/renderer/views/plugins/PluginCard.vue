@@ -3,7 +3,7 @@
     v-slot="{ hover }"
   >
     <v-card
-      class="plugin-item-card ease-animation"
+      class="plugin-item-card ease-animation fill-height"
       :elevation="hover ? 10 : 2"
       :disabled="disabled"
     >

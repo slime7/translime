@@ -99,15 +99,24 @@ export default {
 
     const openPluginWindow = () => {
       const plugin = store.plugin(props.open.id);
+      const url = props.open.windowUrl
+        ? `file://${props.open.windowUrl}`
+        : `plugin-index.html?pluginId=${props.open.id}&dark=${store.dark}`;
+      const options = JSON.parse(JSON.stringify(props.open.options));
+      delete options.windowUrl;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('plugin window url: ', url);
+        console.log('plugin window options: ', options);
+      }
       ipc.send(ipcType.OPEN_NEW_WINDOW, {
         name: `plugin-window-${props.open.id}`,
         options: {
-          // windowUrl: `file://${this.open.windowUrl}`,
-          windowUrl: `plugin-index.html?pluginId=${props.open.id}&dark=${store.dark}`,
+          windowUrl: url,
           appMenu: null,
           frame: false,
           titleBarStyle: 'hidden',
           title: plugin.title,
+          ...options,
         },
       });
     };
