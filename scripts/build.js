@@ -69,7 +69,7 @@ function build() {
         `${outputDir}/package.json`,
         JSON.stringify(pkg, null, 2),
       );
-      builder.build({ config: builderConfig, dir: false });
+      builder.build({ config: builderConfig, dir: false, publish: 'never' });
     })
     .catch((err) => {
       console.error(err);
