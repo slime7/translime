@@ -53,7 +53,9 @@ const readPlugin = (pluginPath) => {
     plugin.icon = null;
   }
   if (plugin.windowUrl) {
-    plugin.windowUrl = path.resolve(pluginPath, plugin.windowUrl);
+    plugin.windowUrl = (/^https?:\/\//i.test(plugin.windowUrl))
+      ? plugin.windowUrl
+      : `file://${path.resolve(pluginPath, plugin.windowUrl)}`;
   }
   if (plugin.ui) {
     plugin.ui = path.resolve(pluginPath, plugin.ui);

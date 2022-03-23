@@ -99,8 +99,9 @@ export default {
 
     const openPluginWindow = () => {
       const plugin = store.plugin(props.open.id);
+      // eslint-disable-next-line no-nested-ternary
       const url = props.open.windowUrl
-        ? `file://${props.open.windowUrl}`
+        ? props.open.windowUrl
         : `plugin-index.html?pluginId=${props.open.id}&dark=${store.dark}`;
       const options = JSON.parse(JSON.stringify(props.open.options));
       delete options.windowUrl;

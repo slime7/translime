@@ -99,8 +99,8 @@ const ipcHandler = (ipc) => ({
       const winBound = global.store.get(`plugin.${name.replace('plugin-window-', '')}.window`, {
         x: mainWinBound.x + 10,
         y: mainWinBound.y + 10,
-        width: Math.max(mainWinBound.width, minWidth),
-        height: mainWinBound.height,
+        width: options.width ? options.width : minWidth,
+        height: options.height ? options.height : mainWinBound.height,
       });
       const indexPage = options.windowUrl || 'child-window.html';
       global.childWins[name] = createWindow(indexPage, {
@@ -109,9 +109,17 @@ const ipcHandler = (ipc) => ({
         width: winBound.width,
         height: winBound.height,
         minWidth,
+        useContentSize: typeof options.useContentSize !== 'undefined' ? options.useContentSize : false,
         frame: typeof options.frame !== 'undefined' ? options.frame : false,
         titleBarStyle: options.titleBarStyle || 'default',
+        titleBarOverlay: typeof options.titleBarOverlay !== 'undefined' ? options.titleBarOverlay : false,
         title: options.title || 'translime',
+        resizable: typeof options.resizable !== 'undefined' ? options.resizable : true,
+        transparent: typeof options.transparent !== 'undefined' ? options.transparent : false,
+        autoHideMenuBar: typeof options.autoHideMenuBar !== 'undefined' ? options.autoHideMenuBar : false,
+        opacity: typeof options.opacity !== 'undefined' ? options.opacity : 1,
+        skipTaskbar: typeof options.skipTaskbar !== 'undefined' ? options.skipTaskbar : false,
+        focusable: typeof options.focusable !== 'undefined' ? options.focusable : true,
         webPreferences: {
           preload: join(__dirname, '../preload/index.js'),
           nodeIntegration: false,

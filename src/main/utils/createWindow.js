@@ -17,7 +17,7 @@ export default (fileUrl, browserWindowOptions, menu = false) => {
     ...browserWindowOptions,
   });
 
-  if (fileUrl.startsWith('file://')) {
+  if (fileUrl.startsWith('file://') || /^https?:\/\//i.test(fileUrl)) {
     window.loadURL(fileUrl);
   } else if (import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
     // Load the url of the dev server if in development mode
