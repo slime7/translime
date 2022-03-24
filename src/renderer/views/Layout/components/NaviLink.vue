@@ -99,7 +99,6 @@ export default {
 
     const openPluginWindow = () => {
       const plugin = store.plugin(props.open.id);
-      // eslint-disable-next-line no-nested-ternary
       const url = props.open.windowUrl
         ? props.open.windowUrl
         : `plugin-index.html?pluginId=${props.open.id}&dark=${store.dark}`;
