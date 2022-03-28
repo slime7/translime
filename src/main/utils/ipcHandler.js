@@ -68,7 +68,7 @@ const ipcHandler = (ipc) => ({
   [ipcType.OPEN_LINK]({ url }) {
     shell.openExternal(url);
   },
-  [ipcType.OPEN_DIR](ev, { dirPath }) {
+  [ipcType.OPEN_DIR]({ dirPath }) {
     shell.openPath(dirPath)
       .catch((err) => {
         global.console.error(err);

@@ -31,6 +31,8 @@
       </v-toolbar>
 
       <v-card-text>
+        <div class="mt-4">有些设置可能需要重启插件生效</div>
+
         <v-form v-if="!loading.getSettings" class="mt-4" ref="settingForm">
           <v-container fluid>
             <v-row
