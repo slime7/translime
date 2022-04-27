@@ -7,18 +7,25 @@
       v-slot="{ isExactActive, href }"
     >
       <a class="text-decoration-none d-block ease-animation" :href="href" ref="link">
-        <v-avatar
-          class="ease-animation"
-          size="56"
-          :color="hover || isExactActive ? color : 'grey darken-2'"
-          :rounded="hover || isExactActive ? 'xl' : 'circle'"
+        <v-badge
+          :value="isDev"
+          content="D"
+          bottom
+          overlap
         >
-          <v-icon v-if="icon" :color="hover || isExactActive ? 'white' : color">{{ icon }}</v-icon>
-          <img v-else-if="image" :src="image" alt="" />
-          <div v-else :class="hover || isExactActive ? 'white--text' : textColor">
-            <slot></slot>
-          </div>
-        </v-avatar>
+          <v-avatar
+            class="ease-animation"
+            size="56"
+            :color="hover || isExactActive ? color : 'grey darken-2'"
+            :rounded="hover || isExactActive ? 'xl' : 'circle'"
+          >
+            <v-icon v-if="icon" :color="hover || isExactActive ? 'white' : color">{{ icon }}</v-icon>
+            <img v-else-if="image" :src="image" alt="" />
+            <div v-else :class="hover || isExactActive ? 'white--text' : textColor">
+              <slot></slot>
+            </div>
+          </v-avatar>
+        </v-badge>
 
         <v-tooltip
           v-if="tooltip"
@@ -36,18 +43,25 @@
       ref="open"
       @click="openPluginWindow"
     >
-      <v-avatar
-        class="ease-animation"
-        size="56"
-        :color="hover ? color : 'grey darken-2'"
-        :rounded="hover ? 'xl' : 'circle'"
+      <v-badge
+        :value="isDev"
+        content="D"
+        bottom
+        overlap
       >
-        <v-icon v-if="icon" :color="hover ? 'white' : color">{{ icon }}</v-icon>
-        <img v-else-if="image" :src="image" alt="" />
-        <div v-else :class="hover ? 'white--text' : textColor">
-          <slot></slot>
-        </div>
-      </v-avatar>
+        <v-avatar
+          class="ease-animation"
+          size="56"
+          :color="hover ? color : 'grey darken-2'"
+          :rounded="hover ? 'xl' : 'circle'"
+        >
+          <v-icon v-if="icon" :color="hover ? 'white' : color">{{ icon }}</v-icon>
+          <img v-else-if="image" :src="image" alt="" />
+          <div v-else :class="hover ? 'white--text' : textColor">
+            <slot></slot>
+          </div>
+        </v-avatar>
+      </v-badge>
 
       <v-tooltip
         v-if="tooltip"
@@ -90,6 +104,10 @@ export default {
     tooltip: {
       default: '',
       type: String,
+    },
+    isDev: {
+      default: false,
+      type: Boolean,
     },
   },
 

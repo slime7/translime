@@ -48,6 +48,7 @@
           :open="plugin.windowMode ? { id: plugin.packageName, windowUrl: plugin.windowUrl, options: plugin.windowOptions } : null"
           :image="plugin.icon ? plugin.icon : defaultIcon"
           :tooltip="plugin.title"
+          :isDev="plugin.dev"
         >
           {{ plugin.title }}
         </navi-link>

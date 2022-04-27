@@ -1,6 +1,7 @@
 import { builtinModules } from 'module';
 import { createVuePlugin } from 'vite-plugin-vue2';
 
+console.log(process.env.NODE_ENV, import.meta.env);
 /**
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
@@ -23,7 +24,7 @@ const config = {
     },
     lib: {
       entry: 'ui.vue',
-      name: 'translime-plugin-example', // 需要指定一个唯一 id
+      name: `translime-plugin-example${process.env.NODE_ENV === 'production' ? '' : '@dev'}`, // 需要指定一个唯一 id
       fileName: (format) => `ui.${format}.js`,
     },
     cssCodeSplit: true,

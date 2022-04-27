@@ -9,17 +9,22 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 const requireFresh = createRequire(import.meta.url);
 const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
+const PLUGIN_DIR_DEV = path.join(APPDATA_PATH, 'plugins_dev');
 const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
 const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
+const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
 const NPM_EXEC_PATH = import.meta.env.DEV
   ? path.join(global.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
   : path.join(global.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
-const resolvePluginPath = (pluginName) => path.join(PLUGIN_MODULES_PATH, pluginName);
+const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
 
-const readPlugin = (pluginPath) => {
+const readPlugin = (pluginPath, isDevPlugin = false) => {
   const pluginPkg = JSON.parse(fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'));
   const plugin = pluginPkg.plugin || {};
+  if (isDevPlugin) {
+    pluginPkg.name = `${pluginPkg.name}@dev`;
+  }
   plugin.packageName = pluginPkg.name;
   if (!plugin.title) {
     plugin.title = pluginPkg.name;
@@ -69,6 +74,9 @@ const readPlugin = (pluginPath) => {
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
   plugin.enabled = global.store.get(`plugin.${plugin.packageName}.enabled`, true);
+  if (isDevPlugin) {
+    plugin.dev = true;
+  }
 
   return plugin;
 };
@@ -158,6 +166,12 @@ class PluginLoader extends EventEmitter {
         fs.writeFileSync(PLUGIN_JSON_PATH, JSON.stringify(pkg, null, 2), 'utf8');
       }
     });
+
+    try {
+      fs.accessSync(PLUGIN_DIR_DEV);
+    } catch (dErr) {
+      fs.mkdirSync(PLUGIN_DIR_DEV);
+    }
   }
 
   getPlugins() {
@@ -178,8 +192,9 @@ class PluginLoader extends EventEmitter {
   readPlugins() {
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
-    // 读取插件
-    const modules = deps.filter((name) => {
+    const devDeps = fs.readdirSync(PLUGIN_MODULES_PATH_DEV);
+    console.log(devDeps);
+    const filterFn = (name) => {
       if (!/^translime-plugin-/.test(name)) {
         return false;
       }
@@ -190,11 +205,15 @@ class PluginLoader extends EventEmitter {
       } catch (err) {
         return false;
       }
-    })
+    };
+    // 读取插件
+    const modules = deps.filter(filterFn)
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath)));
+    const devModules = devDeps.filter(filterFn)
+      .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true), true));
 
     // 将插件列表保存到 this.plugins 中，并启用在设置在设置为 enabled 的插件
-    this.enablePlugins(modules);
+    this.enablePlugins([...modules, ...devModules]);
     return this.plugins;
   }
 
