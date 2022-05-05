@@ -1,7 +1,6 @@
 import { builtinModules } from 'module';
 import { createVuePlugin } from 'vite-plugin-vue2';
 
-console.log(process.env.NODE_ENV, import.meta.env);
 /**
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
