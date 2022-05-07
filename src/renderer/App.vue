@@ -48,12 +48,20 @@ export default {
         theme.setDark(dark);
       });
     };
+    const handleKeyEvent = () => {
+      window.addEventListener('keyup', (ev) => {
+        if (ev.key === 'F12') {
+          ipc.send(ipcType.DEVTOOLS);
+        }
+      });
+    };
 
     // created
     remoteConsoleListener();
     initAppConfig();
     themeUpdated();
     getTheme();
+    handleKeyEvent();
 
     onMounted(() => {
       ipcRaw.send('main-renderer-ready');

@@ -11,8 +11,16 @@
         <div>
           <v-card-title
             class="text-h5"
-            v-text="cardTitle"
-          />
+          >
+            <v-chip
+              v-if="plugin.dev"
+              small
+              label
+            >
+              DEV
+            </v-chip>
+            <span>{{ cardTitle }}</span>
+          </v-card-title>
 
           <v-card-subtitle>
             <span v-if="!plugin.link">{{ cardSubTitle }}</span>

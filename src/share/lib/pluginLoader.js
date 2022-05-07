@@ -190,10 +190,10 @@ class PluginLoader extends EventEmitter {
   }
 
   readPlugins() {
+    const showDevPlugin = global.store.get('setting.showDevPlugin', false);
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
-    const devDeps = fs.readdirSync(PLUGIN_MODULES_PATH_DEV);
-    console.log(devDeps);
+    const devDeps = showDevPlugin ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV) : [];
     const filterFn = (name) => {
       if (!/^translime-plugin-/.test(name)) {
         return false;

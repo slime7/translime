@@ -8,6 +8,7 @@ const useGlobalStore = defineStore('globalStore', {
       openAtLogin: false,
       registry: '',
       theme: 'system',
+      showDevPlugin: false,
     },
     plugins: [],
     dark: false,
@@ -26,6 +27,7 @@ const useGlobalStore = defineStore('globalStore', {
         state.appSetting.openAtLogin = openAtLogin;
         state.appSetting.registry = registry;
         state.appSetting.theme = await appConfigStore.get('setting.theme', 'system');
+        state.appSetting.showDevPlugin = await appConfigStore.get('setting.showDevPlugin', false);
       });
     },
     setAppOpenAtLogin(open) {
@@ -36,6 +38,9 @@ const useGlobalStore = defineStore('globalStore', {
     },
     setAppTheme(theme) {
       this.appSetting.theme = theme;
+    },
+    setShowDevPlugin(isShow) {
+      this.appSetting.showDevPlugin = isShow;
     },
   },
 });

@@ -294,6 +294,9 @@ const ipcHandler = (ipc) => ({
     });
     global.store.set('setting.openAtLogin', open);
   },
+  [ipcType.SHOW_DEV_PLUGIN]({ isShow }) {
+    global.store.set('setting.showDevPlugin', isShow);
+  },
   [ipcType.SHOW_TEXT_EDIT_CONTEXT]({ selectedText = '' }) {
     const clipboardText = clipboard.readText();
     const contextMenuItems = [

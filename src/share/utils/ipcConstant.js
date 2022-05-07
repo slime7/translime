@@ -30,6 +30,7 @@ export const DIALOG_SHOW_SAVE_DIALOG = 'dialog-show-save-dialog';
 export const SHOW_NOTIFICATION = 'show-notification';
 export const IS_NOTIFICATION_SUPPORTED = 'is-notification-supported';
 export const OPEN_AT_LOGIN = 'open-at-login';
+export const SHOW_DEV_PLUGIN = 'show-dev-plugin';
 export const SHOW_TEXT_EDIT_CONTEXT = 'show-text-edit-context';
 export const THEME_UPDATED = 'theme-updated';
 export const GET_NATIVE_THEME = 'get-native-theme';
@@ -72,4 +73,5 @@ export default {
   THEME_UPDATED,
   GET_NATIVE_THEME,
   SET_NATIVE_THEME,
+  SHOW_DEV_PLUGIN,
 };

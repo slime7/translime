@@ -4,8 +4,9 @@
 
     <h3 class="mt-4">通用</h3>
 
-    <div class="mt-4">
+    <div>
       <v-checkbox
+        class="mt-2"
         v-model="settings.openAtLogin"
         label="开机自动启动"
         @change="onOpenAtLogin"
@@ -98,6 +99,23 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+    </div>
+
+    <h5 class="mt-4">开发</h5>
+
+    <div>
+      <v-switch
+        class="mt-2"
+        v-model="settings.showDevPlugin"
+        label="显示开发中插件(重启后生效)"
+        inset
+        hide-details
+        @change="onShowDevPlugin"
+      />
+    </div>
+
+    <div class="mt-4">
+      <v-btn @click="showDevtools">打开 devtools(F12)</v-btn>
     </div>
   </v-container>
 </template>
@@ -192,6 +210,16 @@ export default {
       setAppOpenAtLogin(value);
     };
 
+    const onShowDevPlugin = (isShow) => {
+      ipc.send(ipcType.SHOW_DEV_PLUGIN, {
+        isShow: !!isShow,
+      });
+      store.setShowDevPlugin(!!isShow);
+    };
+    const showDevtools = () => {
+      ipc.send(ipcType.DEVTOOLS);
+    };
+
     const initRegistryLink = () => {
       if (!registryList.find((r) => r.link === store.appSetting.registry)) {
         customRegistryItem.value.link = store.appSetting.registry;
@@ -214,6 +242,8 @@ export default {
       onOpenAtLogin,
       showTextEditContextMenu,
       changeTheme: theme.setTheme,
+      onShowDevPlugin,
+      showDevtools,
     };
   },
 };
