@@ -194,11 +194,11 @@ class PluginLoader extends EventEmitter {
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
     const devDeps = showDevPlugin ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV) : [];
-    const filterFn = (name) => {
+    const filterFn = (isDev = false) => (name) => {
       if (!/^translime-plugin-/.test(name)) {
         return false;
       }
-      const pluginPath = resolvePluginPath(name);
+      const pluginPath = resolvePluginPath(name, isDev);
       try {
         fs.accessSync(pluginPath);
         return true;
@@ -207,9 +207,9 @@ class PluginLoader extends EventEmitter {
       }
     };
     // 读取插件
-    const modules = deps.filter(filterFn)
+    const modules = deps.filter(filterFn())
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath)));
-    const devModules = devDeps.filter(filterFn)
+    const devModules = devDeps.filter(filterFn(true))
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true), true));
 
     // 将插件列表保存到 this.plugins 中，并启用在设置在设置为 enabled 的插件
