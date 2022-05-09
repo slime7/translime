@@ -3,8 +3,10 @@
  * @see https://www.electron.build/configuration/configuration
  */
 const config = {
+  productName: 'translime',
   appId: 'translime.app',
   asar: true,
+  compression: 'maximum',
   directories: {
     output: 'dist_electron',
     buildResources: 'buildResources',
