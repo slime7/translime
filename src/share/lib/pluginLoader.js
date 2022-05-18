@@ -19,13 +19,14 @@ const NPM_EXEC_PATH = import.meta.env.DEV
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
 
-const readPlugin = (pluginPath, isDevPlugin = false) => {
+const readPlugin = (pluginPath, devPlugins = null) => {
   const pluginPkg = JSON.parse(fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'));
   const plugin = pluginPkg.plugin || {};
-  if (isDevPlugin) {
-    pluginPkg.name = `${pluginPkg.name}@dev`;
-  }
   plugin.packageName = pluginPkg.name;
+  if (devPlugins && devPlugins.some((p) => p.packageName === plugin.packageName)) {
+    // 有限加载 dev 插件
+    return false;
+  }
   if (!plugin.title) {
     plugin.title = pluginPkg.name;
   }
@@ -74,7 +75,7 @@ const readPlugin = (pluginPath, isDevPlugin = false) => {
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
   plugin.enabled = global.store.get(`plugin.${plugin.packageName}.enabled`, true);
-  if (isDevPlugin) {
+  if (!devPlugins) {
     plugin.dev = true;
   }
 
@@ -207,10 +208,11 @@ class PluginLoader extends EventEmitter {
       }
     };
     // 读取插件
-    const modules = deps.filter(filterFn())
-      .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath)));
     const devModules = devDeps.filter(filterFn(true))
-      .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true), true));
+      .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true)));
+    const modules = deps.filter(filterFn())
+      .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath), devModules))
+      .filter((plugin) => plugin);
 
     // 将插件列表保存到 this.plugins 中，并启用在设置在设置为 enabled 的插件
     this.enablePlugins([...modules, ...devModules]);

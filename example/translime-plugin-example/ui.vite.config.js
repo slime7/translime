@@ -23,7 +23,7 @@ const config = {
     },
     lib: {
       entry: 'ui.vue',
-      name: `translime-plugin-example${process.env.NODE_ENV === 'production' ? '' : '@dev'}`, // 需要指定一个唯一 id
+      name: 'translime-plugin-example', // 需要指定一个唯一 id
       fileName: (format) => `ui.${format}.js`,
     },
     cssCodeSplit: true,
