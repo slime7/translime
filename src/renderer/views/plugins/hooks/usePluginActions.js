@@ -1,6 +1,10 @@
+import axios from 'axios';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useDialog from '@/hooks/useDialog';
+
+// 使用 node 提供的 http 作为 axios 的 adapter
+axios.defaults.adapter = window.electron.axiosHttpAdapter;
 
 export default function usePluginActions(plugin, emit) {
   const ipc = useIpc();

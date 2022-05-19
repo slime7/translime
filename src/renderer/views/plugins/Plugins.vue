@@ -62,7 +62,9 @@ import {
   onUnmounted,
 } from '@vue/composition-api';
 import { storeToRefs } from 'pinia';
+import axios from 'axios';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import { apiError } from '@pkg/share/utils';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
@@ -160,10 +162,40 @@ export default {
       ipc.invoke(ipcType.OPEN_LINK, { url: 'https://www.npmjs.com/search?q=translime-plugin' });
     };
 
+    const searchRequest = (q = '') => new Promise(async (resolve, reject) => {
+      try {
+        // page size: 20
+        const { data, headers, status } = await axios('https://registry.npmjs.com/-/v1/search', {
+          method: 'get',
+          params: { text: q ? `translime-plugin-${q}` : 'translime-plugin' },
+        });
+        if (process.env.NODE_ENV !== 'production') {
+          /* eslint-disable no-console */
+          console.group(
+            `%c response: ${new Date()} `,
+            'background: rgb(70, 70, 70); color: rgb(240, 235, 200); width:100%;',
+          );
+          console.log('data: ', data);
+          console.log('headers: ', headers);
+          console.log('status: ', status);
+          console.groupEnd();
+          /* eslint-enable no-console */
+        }
+        resolve(data);
+      } catch (err) {
+        reject(apiError(err));
+      }
+    });
+
     onMounted(() => {
       ipc.on(ipcType.PLUGINS_CHANGED, () => {
         getPlugins();
       });
+      try {
+        searchRequest();
+      } catch (err) {
+        console.error(err);
+      }
     });
 
     onUnmounted(() => {
