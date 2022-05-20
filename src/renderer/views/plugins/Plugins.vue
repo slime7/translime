@@ -3,9 +3,6 @@
     <h2>插件</h2>
 
     <div class="mt-4">
-      <div>
-        <a @click="openPluginList">查找插件</a>
-      </div>
       <div class="mt-2 d-flex align-center">
         <v-text-field
           v-model="search"
@@ -13,22 +10,66 @@
           append-icon="search"
           solo
           prefix="translime-plugin-"
-          @keyup.enter="installPlugins"
+          @keyup.enter="searchAction"
           @click.right="showTextEditContextMenu"
         >
-          <template slot="append">
+          <template v-slot:append>
             <v-btn
               color="primary"
-              :disabled="!search || loading.install"
+              :disabled="loading.install"
               :loading="loading.install"
-              @click="installPlugins"
+              @click="searchAction"
             >
-              安装插件
+              {{ !search ? '查看插件' : '搜索插件' }}
             </v-btn>
           </template>
         </v-text-field>
       </div>
     </div>
+
+    <template v-if="searchResult.list.length">
+      <h3>搜索结果</h3>
+
+      <div class="my-4">
+        <v-row class="plugin-list">
+          <v-col
+            sm="12"
+            md="6"
+            lg="4"
+            v-for="pluginItem in searchResult.list"
+            :key="pluginItem.name"
+          >
+            <plugin-card
+              :plugin="pluginItem"
+              :disabled="!!loading.uninstall"
+              @install="installPlugins"
+            />
+          </v-col>
+        </v-row>
+
+        <v-row justify="center">
+          <v-col sm="auto">
+            <v-btn
+              color="primary"
+              :disabled="loading.search"
+              @click="searchMore"
+              v-if="searchResult.total > searchResult.list.length"
+            >
+              加载更多
+            </v-btn>
+          </v-col>
+
+          <v-col sm="auto">
+            <v-btn
+              :disabled="loading.search"
+              @click="clearSearchResult"
+            >
+              清除搜索结果
+            </v-btn>
+          </v-col>
+        </v-row>
+      </div>
+    </template>
 
     <h3>已安装</h3>
 
@@ -62,12 +103,11 @@ import {
   onUnmounted,
 } from '@vue/composition-api';
 import { storeToRefs } from 'pinia';
-import axios from 'axios';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { apiError } from '@pkg/share/utils';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
+import axios from '@/hooks/useAxios';
 import useGlobalStore from '@/store/globalStore';
 import { showTextEditContextMenu } from '@/utils';
 import PluginCard from './PluginCard.vue';
@@ -87,6 +127,7 @@ export default {
     const loading = reactive({
       install: false,
       uninstall: false,
+      search: false,
     });
     const search = ref('');
 
@@ -98,18 +139,72 @@ export default {
         alert.show(err.message, 'error');
       }
     };
-    const installPlugins = async () => {
-      if (!search.value) {
+
+    const searchResult = reactive({
+      list: [],
+      total: 0,
+    });
+    const searchPage = ref(0);
+    const parseSearchResult = (item) => ({
+      packageName: item.name,
+      title: item.name,
+      description: item.description,
+      author: item.author ? item.author.name : item.publisher.username,
+      icon: null,
+      version: item.version,
+      enabled: false,
+      searchResultItem: true,
+    });
+    const searchRequest = async (q = '', page = 0) => {
+      if (loading.search) {
         return;
       }
+      loading.search = true;
+      try {
+        // doc: https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md#get-v1search
+        const { data } = await axios('https://registry.npmjs.com/-/v1/search', {
+          method: 'get',
+          params: {
+            text: q ? `translime-plugin-${q}` : 'translime-plugin',
+            size: 8,
+            from: page,
+          },
+        });
+        searchResult.list.push(...data.objects.map((item) => parseSearchResult(item.package)));
+        searchResult.total = +data.total;
+        searchPage.value = page;
+      } catch (err) {
+        alert.show(err.message, 'error');
+      } finally {
+        loading.search = false;
+      }
+    };
+    const searchAction = () => {
+      if (loading.search) {
+        return;
+      }
+      searchResult.list = [];
+      searchRequest(search.value, 0);
+    };
+    const searchMore = () => {
+      if (loading.search) {
+        return;
+      }
+      searchRequest(search.value, searchPage.value + 1);
+    };
+    const clearSearchResult = () => {
+      search.value = '';
+      searchResult.list = [];
+      searchResult.total = 0;
+      searchPage.value = 0;
+    };
+    const installPlugins = async (certainPackageName = null) => {
       if (loading.install) {
         return;
       }
       loading.install = true;
       try {
-        const packageName = search.value.startsWith('translime-plugin-')
-          ? search.value
-          : `translime-plugin-${search.value}`;
+        const packageName = certainPackageName || (search.value.startsWith('translime-plugin-') ? search.value : `translime-plugin-${search.value}`);
         await ipc.invoke(ipcType.INSTALL_PLUGIN, packageName);
         alert.show(`插件 ${packageName} 已安装`);
       } catch (err) {
@@ -158,44 +253,10 @@ export default {
       }
     };
 
-    const openPluginList = () => {
-      ipc.invoke(ipcType.OPEN_LINK, { url: 'https://www.npmjs.com/search?q=translime-plugin' });
-    };
-
-    const searchRequest = (q = '') => new Promise(async (resolve, reject) => {
-      try {
-        // page size: 20
-        const { data, headers, status } = await axios('https://registry.npmjs.com/-/v1/search', {
-          method: 'get',
-          params: { text: q ? `translime-plugin-${q}` : 'translime-plugin' },
-        });
-        if (process.env.NODE_ENV !== 'production') {
-          /* eslint-disable no-console */
-          console.group(
-            `%c response: ${new Date()} `,
-            'background: rgb(70, 70, 70); color: rgb(240, 235, 200); width:100%;',
-          );
-          console.log('data: ', data);
-          console.log('headers: ', headers);
-          console.log('status: ', status);
-          console.groupEnd();
-          /* eslint-enable no-console */
-        }
-        resolve(data);
-      } catch (err) {
-        reject(apiError(err));
-      }
-    });
-
     onMounted(() => {
       ipc.on(ipcType.PLUGINS_CHANGED, () => {
         getPlugins();
       });
-      try {
-        searchRequest();
-      } catch (err) {
-        console.error(err);
-      }
     });
 
     onUnmounted(() => {
@@ -210,9 +271,12 @@ export default {
       enablePlugin,
       disablePlugin,
       search,
+      searchAction,
+      searchMore,
+      searchResult,
+      clearSearchResult,
       loading,
       showTextEditContextMenu,
-      openPluginList,
     };
   },
 };

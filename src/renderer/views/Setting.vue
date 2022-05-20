@@ -55,7 +55,7 @@
         @click="onSelectRegistry(registry.link, registry.id)"
       >
         {{ registry.name }}
-        <template slot="subtitle">{{ registry.link }}</template>
+        <template v-slot:subtitle>{{ registry.link }}</template>
       </card-radio>
 
       <v-dialog

@@ -31,7 +31,7 @@ const readPlugin = (pluginPath, devPlugins = null) => {
     plugin.title = pluginPkg.name;
   }
   if (!plugin.author) {
-    plugin.author = pluginPkg.author || '';
+    plugin.author = pluginPkg.author ? pluginPkg.author.name : '';
   }
   if (!plugin.link) {
     plugin.link = pluginPkg.link || '';
@@ -240,7 +240,7 @@ class PluginLoader extends EventEmitter {
     let plugin = this.getPlugin(packageName);
     const pluginPath = resolvePluginPath(packageName);
     if (!plugin) {
-      plugin = readPlugin(pluginPath);
+      plugin = readPlugin(pluginPath, this.getPlugins().filter((p) => p.dev));
       console.log('reload plugin: ', { ...plugin });
     }
     let pluginMain = {};
