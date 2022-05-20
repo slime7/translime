@@ -45,6 +45,22 @@
               @install="installPlugins"
             />
           </v-col>
+
+          <template v-if="loading.search">
+            <v-col
+              sm="12"
+              md="6"
+              lg="4"
+              v-for="loadingSkeleton in 4"
+              :key="loadingSkeleton"
+            >
+              <v-skeleton-loader
+                elevation="2"
+                type="article, actions"
+              >
+              </v-skeleton-loader>
+            </v-col>
+          </template>
         </v-row>
 
         <v-row justify="center">
@@ -168,6 +184,7 @@ export default {
             text: q ? `translime-plugin-${q}` : 'translime-plugin',
             size: 8,
             from: page,
+            x: Math.random(),
           },
         });
         searchResult.list.push(...data.objects.map((item) => parseSearchResult(item.package)));
