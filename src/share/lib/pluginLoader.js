@@ -24,7 +24,7 @@ const readPlugin = (pluginPath, devPlugins = null) => {
   const plugin = pluginPkg.plugin || {};
   plugin.packageName = pluginPkg.name;
   if (devPlugins && devPlugins.some((p) => p.packageName === plugin.packageName)) {
-    // 有限加载 dev 插件
+    // 优先加载 dev 插件
     return false;
   }
   if (!plugin.title) {
@@ -309,7 +309,7 @@ class PluginLoader extends EventEmitter {
     }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
-      const p = readPlugin(resolvePluginPath(packageName));
+      const p = readPlugin(plugin.pluginPath, [packageName]);
       p.enabled = false;
       this.plugins.push(p);
       global.store.set(`plugin.${plugin.packageName}.enabled`, false);
