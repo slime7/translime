@@ -191,6 +191,11 @@ class PluginLoader extends EventEmitter {
   }
 
   readPlugins() {
+    try {
+      fs.accessSync(PLUGIN_MODULES_PATH_DEV);
+    } catch (dErr) {
+      fs.mkdirSync(PLUGIN_MODULES_PATH_DEV);
+    }
     const showDevPlugin = global.store.get('setting.showDevPlugin', false);
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
