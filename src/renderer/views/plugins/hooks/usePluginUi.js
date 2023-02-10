@@ -1,5 +1,4 @@
-import { ref } from '@vue/composition-api';
-import Vue from 'vue';
+import Vue, { ref } from 'vue';
 
 const usePluginUi = () => {
   const ui = ref(null);

@@ -3,18 +3,19 @@
     <h2>插件</h2>
 
     <div class="mt-4">
-      <div class="mt-2 d-flex align-center">
+      <div class="mt-2">
         <v-text-field
           v-model="search"
           placeholder="输入插件包名"
-          append-icon="search"
-          solo
+          variant="solo"
+          density="compact"
           prefix="translime-plugin-"
           @keyup.enter="searchAction"
           @click.right="showTextEditContextMenu"
         >
           <template v-slot:append>
             <v-btn
+              class="mt-n2"
               color="primary"
               :disabled="loading.install"
               :loading="loading.install"
@@ -117,7 +118,7 @@ import {
   reactive,
   onMounted,
   onUnmounted,
-} from '@vue/composition-api';
+} from 'vue';
 import { storeToRefs } from 'pinia';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';

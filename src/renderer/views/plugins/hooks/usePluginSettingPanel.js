@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, ref } from '@vue/composition-api';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 

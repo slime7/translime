@@ -7,10 +7,11 @@
     <div>
       <v-checkbox
         class="mt-2"
-        v-model="settings.openAtLogin"
+        :model-value="settings.openAtLogin"
         label="开机自动启动"
-        @change="onOpenAtLogin"
         hide-details
+        color="primary"
+        @update:modelValue="onOpenAtLogin"
       />
     </div>
 
@@ -51,6 +52,7 @@
         v-for="registry in registryList"
         :key="registry.id"
         :value="settings.registry === registry.link"
+        :lines="registry.link ? 'two' : 'one'"
         class="mt-2"
         @click="onSelectRegistry(registry.link, registry.id)"
       >
@@ -106,11 +108,12 @@
     <div>
       <v-switch
         class="mt-2"
-        v-model="settings.showDevPlugin"
+        :model-value="settings.showDevPlugin"
         label="显示开发中插件(重启后生效)"
         inset
         hide-details
-        @change="onShowDevPlugin"
+        color="primary"
+        @update:modelValue="onShowDevPlugin"
       />
     </div>
 
@@ -121,7 +124,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from '@vue/composition-api';
+import { ref, computed, onMounted } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
@@ -130,15 +133,15 @@ import { showTextEditContextMenu, appConfigStore } from '@/utils';
 import CardRadio from '@/components/CardRadio.vue';
 
 export default {
-  name: 'Setting',
+  name: 'AppSetting',
 
   components: {
     CardRadio,
   },
 
-  setup(props, { root }) {
+  setup() {
     const ipc = useIpc();
-    const theme = useTheme(root);
+    const theme = useTheme();
     const store = useGlobalStore();
 
     const registryList = [

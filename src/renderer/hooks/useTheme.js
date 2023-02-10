@@ -1,18 +1,19 @@
+import { useTheme as useVTheme } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { appConfigStore } from '@/utils';
 
-const useTheme = (vm) => {
+const useTheme = () => {
   const ipc = useIpc();
   const store = useGlobalStore();
+  const vTheme = useVTheme();
 
   const getNativeTheme = () => ipc.invoke(ipcType.GET_NATIVE_THEME);
 
   const setDark = (dark) => {
     store.dark = dark;
-    // eslint-disable-next-line no-param-reassign
-    vm.$vuetify.theme.dark = dark;
+    vTheme.global.name.value = dark ? 'dark' : 'light';
   };
 
   const setTheme = (theme) => {

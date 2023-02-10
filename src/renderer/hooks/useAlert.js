@@ -1,4 +1,4 @@
-import { toRef } from '@vue/composition-api';
+import { toRef } from 'vue';
 import useAlertStore from '@/store/alertStore';
 
 const useAlert = () => {

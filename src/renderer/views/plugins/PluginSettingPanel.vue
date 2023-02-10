@@ -124,7 +124,7 @@ import {
   reactive,
   onMounted,
   toRaw,
-} from '@vue/composition-api';
+} from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useToast from '@/hooks/useToast';

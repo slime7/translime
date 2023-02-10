@@ -27,9 +27,9 @@
 </template>
 
 <script>
-import { onMounted, onUnmounted, ref } from '@vue/composition-api';
-import * as components from 'vuetify/lib/components';
-import * as directives from 'vuetify/lib/directives';
+import { onMounted, onUnmounted, ref } from 'vue';
+import * as components from 'vuetify/components';
+import * as directives from 'vuetify/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
 import { useIpc } from '@/hooks/electron';

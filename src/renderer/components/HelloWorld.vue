@@ -39,7 +39,7 @@
 </template>
 
 <script>
-import { onMounted } from '@vue/composition-api';
+import { onMounted } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import { useState } from '@/utils';

@@ -43,6 +43,7 @@ export default async () => {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       webviewTag: true,
     },
   });

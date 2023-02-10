@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { onMounted } from '@vue/composition-api';
+import { onMounted } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
@@ -14,11 +14,11 @@ import { appConfigStore } from '@/utils';
 export default {
   name: 'App',
 
-  setup(props, { root }) {
+  setup() {
     const ipc = useIpc();
     const ipcRaw = useIpc(false);
     const store = globalStore();
-    const theme = useTheme(root);
+    const theme = useTheme();
     const alert = useAlert();
 
     const initAppConfig = () => {

@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar app class="system-bar pa-0">
+    <v-system-bar class="system-bar pa-0">
       <div class="px-4">translime</div>
 
       <v-spacer />
@@ -12,16 +12,18 @@
 
     <navigation />
 
-    <v-main class="fill-height">
+    <v-main class="h-screen">
       <notification />
 
       <div class="d-flex flex-column fill-height" id="app-main-container">
         <div class="scroll-content flex">
-          <v-scroll-y-transition mode="out-in">
-            <keep-alive>
-              <router-view :key="$route.fullPath" />
-            </keep-alive>
-          </v-scroll-y-transition>
+          <router-view v-slot="{ Component }" :key="$route.fullPath">
+            <v-scroll-y-transition mode="out-in">
+              <keep-alive>
+                <component :is="Component" />
+              </keep-alive>
+            </v-scroll-y-transition>
+          </router-view>
         </div>
       </div>
     </v-main>
@@ -31,7 +33,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from '@vue/composition-api';
+import { ref, onMounted, onUnmounted } from 'vue';
 import WindowControls from '@/components/WindowControls.vue';
 import MainFooter from '@/components/MainFooter.vue';
 import Navigation from '@/views/Layout/components/Navigation.vue';
@@ -40,7 +42,7 @@ import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 
 export default {
-  name: 'Base',
+  name: 'LayoutBase',
 
   components: {
     Navigation,

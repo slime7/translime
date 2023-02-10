@@ -9,9 +9,9 @@ import {
   computed,
   onMounted,
   watch,
-} from '@vue/composition-api';
-import * as components from 'vuetify/lib/components';
-import * as directives from 'vuetify/lib/directives';
+} from 'vue';
+import * as components from 'vuetify/components';
+import * as directives from 'vuetify/directives';
 import useGlobalStore from '@/store/globalStore';
 import useAlert from '@/hooks/useAlert';
 import usePluginUi from './hooks/usePluginUi';

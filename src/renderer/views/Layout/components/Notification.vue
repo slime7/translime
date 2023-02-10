@@ -4,7 +4,7 @@
     class="notify-drawer"
     absolute
     clipped
-    right
+    location="right"
     width="560"
   >
     <div class="notify-container pa-4 fill-height d-flex flex-column" v-scroll.self="onAlertContainerScroll">
@@ -35,7 +35,7 @@ import {
   ref,
   watch,
   computed,
-} from '@vue/composition-api';
+} from 'vue';
 import { myDate } from '@pkg/share/utils';
 import useAlert from '@/hooks/useAlert';
 
@@ -52,14 +52,17 @@ export default {
     },
   },
 
-  setup(props, { root }) {
+  setup() {
     const alert = useAlert();
 
     const keepBottom = ref(true);
     const scrollToBottom = () => {
+      /*
+       * go to fun
       root.$vuetify.goTo('#notify-list-bottom', {
         container: '.notify-container',
       });
+      */
     };
     const onAlertContainerScroll = (ev) => {
       keepBottom.value = ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight;

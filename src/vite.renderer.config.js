@@ -2,10 +2,8 @@
 
 import { join } from 'path';
 import { builtinModules } from 'module';
-import { createVuePlugin } from 'vite-plugin-vue2';
-import viteComponents, {
-  VuetifyResolver,
-} from 'vite-plugin-components';
+import vue from '@vitejs/plugin-vue';
+import vuetify from 'vite-plugin-vuetify';
 
 const RENDERER_ROOT = join(__dirname, 'renderer');
 
@@ -29,12 +27,8 @@ const config = {
     ],
   },
   plugins: [
-    createVuePlugin(),
-    viteComponents({
-      customComponentResolvers: [
-        VuetifyResolver(),
-      ],
-    }),
+    vue(),
+    vuetify(),
   ],
   base: '',
   server: {

@@ -1,5 +1,5 @@
 <template>
-  <div class="window-controls">
+  <div class="window-controls fill-height">
     <div class="d-flex fill-height">
       <div class="window-control-btn d-flex align-center justify-center fill-height" @click="appMinimize">
         <svg width='11' height='11' viewBox='0 0 11 11' fill='none'
@@ -41,7 +41,7 @@
 </template>
 
 <script>
-import { toRefs } from '@vue/composition-api';
+import { toRefs } from 'vue';
 import {
   APP_MINIMIZE,
   APP_MAXIMIZE,

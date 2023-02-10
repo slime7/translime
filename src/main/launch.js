@@ -35,6 +35,7 @@ export default () => {
       // See https://github.com/nklayman/vue-cli-plugin-electron-builder/blob/v2/docs/guide/configuration.md#node-integration for more info
       nodeIntegration: false,
       contextIsolation: false,
+      sandbox: false,
     },
   });
 };

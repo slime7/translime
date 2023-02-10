@@ -122,7 +122,7 @@
 
 <script>
 import { storeToRefs } from 'pinia';
-import { toRefs, computed } from '@vue/composition-api';
+import { toRefs, computed } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
