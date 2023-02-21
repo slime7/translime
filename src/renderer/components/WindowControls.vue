@@ -111,11 +111,13 @@ export default {
   -webkit-app-region: no-drag;
 }
 
-#app.theme--dark .window-control-btn:hover {
-  background-color: rgba(255, 255, 255, .3);
-}
-#app.theme--light .window-control-btn:hover {
+.window-control-btn:hover {
   background-color: rgba(0, 0, 0, .2);
+}
+@media (prefers-color-scheme: dark) {
+  .window-control-btn:hover {
+    background-color: rgba(255, 255, 255, .3);
+  }
 }
 
 .window-control-btn.close:hover {

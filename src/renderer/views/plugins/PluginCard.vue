@@ -8,26 +8,31 @@
       :disabled="disabled"
     >
       <div class="d-flex flex-no-wrap justify-space-between">
-        <div>
-          <v-card-title
-            class="text-h5"
-          >
-            <v-chip
-              v-if="plugin.dev"
-              small
-              label
-            >
-              DEV
-            </v-chip>
-            <span>{{ cardTitle }}</span>
-          </v-card-title>
+        <div class="min-w-0">
+          <v-tooltip :text="cardTitle" location="top">
+            <template v-slot:activator="{ props }">
+              <v-card-title
+                class="text-h5"
+                v-bind="props"
+              >
+                <v-chip
+                  v-if="plugin.dev"
+                  small
+                  label
+                >
+                  DEV
+                </v-chip>
+                <span>{{ cardTitle }}</span>
+              </v-card-title>
+            </template>
+          </v-tooltip>
 
           <v-card-subtitle>
             <span v-if="!plugin.link">{{ cardSubTitle }}</span>
             <a v-else @click="authLink">{{ cardSubTitle }}</a>
           </v-card-subtitle>
 
-          <v-card-text v-text="plugin.description" />
+          <v-card-text>{{ plugin.description }}</v-card-text>
 
           <v-card-actions>
             <template v-if="!plugin.searchResultItem">
@@ -149,6 +154,8 @@ export default {
     },
   },
 
+  emits: ['install', 'uninstall', 'disable', 'enable'],
+
   setup(props, { emit }) {
     const { plugin } = toRefs(props);
     const pluginId = plugin.value.packageName;
@@ -191,3 +198,9 @@ export default {
   },
 };
 </script>
+
+<style scoped lang="scss">
+.min-w-0 {
+  min-width: 0;
+}
+</style>

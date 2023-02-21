@@ -17,8 +17,8 @@
             <v-btn
               class="mt-n2"
               color="primary"
-              :disabled="loading.install"
-              :loading="loading.install"
+              :disabled="loading.install || loading.search"
+              :loading="loading.install || loading.search"
               @click="searchAction"
             >
               {{ !search ? '查看插件' : '搜索插件' }}
@@ -48,19 +48,7 @@
           </v-col>
 
           <template v-if="loading.search">
-            <v-col
-              sm="12"
-              md="6"
-              lg="4"
-              v-for="loadingSkeleton in 4"
-              :key="loadingSkeleton"
-            >
-              <v-skeleton-loader
-                elevation="2"
-                type="article, actions"
-              >
-              </v-skeleton-loader>
-            </v-col>
+            <v-progress-circular color="primary" indeterminate></v-progress-circular>
           </template>
         </v-row>
 

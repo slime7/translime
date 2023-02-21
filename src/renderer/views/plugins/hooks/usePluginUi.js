@@ -1,4 +1,4 @@
-import Vue, { ref } from 'vue';
+import { createApp, ref } from 'vue';
 
 const usePluginUi = () => {
   const ui = ref(null);
@@ -17,7 +17,9 @@ const usePluginUi = () => {
     const uiUrl = URL.createObjectURL(uiBlob);
     try {
       await loadScript(uiUrl);
-      ui.value = Vue.extend(window[pluginId]);
+      ui.value = createApp(window[pluginId]);
+      // todo
+      // ui.value = extend(window[pluginId]);
       return true;
     } catch (err) {
       return false;

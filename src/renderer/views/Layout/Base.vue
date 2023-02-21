@@ -17,10 +17,10 @@
 
       <div class="d-flex flex-column fill-height" id="app-main-container">
         <div class="scroll-content flex">
-          <router-view v-slot="{ Component }" :key="$route.fullPath">
+          <router-view v-slot="{ Component, route }">
             <v-scroll-y-transition mode="out-in">
               <keep-alive>
-                <component :is="Component" />
+                <component :is="Component" :key="route.fullPath" />
               </keep-alive>
             </v-scroll-y-transition>
           </router-view>
