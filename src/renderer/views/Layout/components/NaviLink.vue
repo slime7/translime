@@ -154,6 +154,6 @@ export default {
 
 <style lang="scss" scoped>
 .transition-radius {
-  transition-property: border;
+  transition-property: border-radius;
 }
 </style>

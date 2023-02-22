@@ -48,7 +48,9 @@
           </v-col>
 
           <template v-if="loading.search">
-            <v-progress-circular color="primary" indeterminate></v-progress-circular>
+            <div class="w-100 my-2 d-flex justify-center">
+              <v-progress-circular color="primary" indeterminate></v-progress-circular>
+            </div>
           </template>
         </v-row>
 
