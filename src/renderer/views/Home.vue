@@ -21,7 +21,7 @@
         </v-col>
       </v-row>
 
-      <HelloWorld v-if="isDev" msg="Hello Vue 2 + Vite" />
+      <HelloWorld v-if="isDev" msg="Hello Vue 3 + Vite" />
     </div>
   </v-container>
 </template>

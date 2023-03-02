@@ -19,9 +19,9 @@
           v-for="alertItem in alertList"
           :key="alertItem.uuid"
           :type="alertItem.type"
-          border="left"
+          border="start"
         >
-          <div>{{ alertItem.time | alertTime }}</div>
+          <div>{{ parseAlertTime(alertItem.time) }}</div>
           <div>{{ alertItem.msg }}</div>
         </v-alert>
       </div>
@@ -92,11 +92,18 @@ export default {
       },
     );
 
+    const parseAlertTime = (time) => myDate(Math.round(time / 1000), {
+      format: '-',
+      showTime: true,
+      showSecond: true,
+    });
+
     return {
       keepBottom,
       alertList,
       drawerVisible,
       onAlertContainerScroll,
+      parseAlertTime,
     };
   },
 };

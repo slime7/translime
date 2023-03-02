@@ -5125,9 +5125,9 @@ vue@^3.2.0:
     "@vue/shared" "3.2.47"
 
 vuetify@^3.0.0:
-  version "3.1.4"
-  resolved "https://registry.npmmirror.com/vuetify/-/vuetify-3.1.4.tgz#ce4a3ba5fa35184c3d92147b9603ac56158243e1"
-  integrity sha512-6ERm2a0bJyMLjmRKTifN501o3MsCVp9agtoZsORw1b3X29ycTdXOJdRMEADaDSv59dBWwUVv3WqHcWzCG4Gwfw==
+  version "3.1.7"
+  resolved "https://registry.npmmirror.com/vuetify/-/vuetify-3.1.7.tgz#e4b73b906a4bda8bc7a119fb0736c6a602556c00"
+  integrity sha512-1hDQ4ISszEKP9S9nOhUNsv3rZ4Zr1UYn4+G4PIlcS9b16Jy4/VS2KDrLyTG8Shnv9enizg31iF5iVnlj96OEeA==
 
 wait-on@^6.0.0:
   version "6.0.0"
