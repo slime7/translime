@@ -1,20 +1,20 @@
 <template>
   <div class="plugin-container">
-    <component v-if="ui" :is="ui" />
+    <plugin-ui-loader v-if="loaderVisible" :plugin-path="pluginPath" :plugin-id="pluginId" />
   </div>
 </template>
 
 <script>
 import {
   computed,
+  ref,
   onMounted,
   watch,
 } from 'vue';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import useGlobalStore from '@/store/globalStore';
-import useAlert from '@/hooks/useAlert';
-import usePluginUi from './hooks/usePluginUi';
+import PluginUiLoader from './PluginUiLoader.vue';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
@@ -33,36 +33,31 @@ export default {
     },
   },
 
+  components: {
+    PluginUiLoader,
+  },
+
   setup(props) {
     const store = useGlobalStore();
-    const pluginUi = usePluginUi();
-    const alert = useAlert();
 
     const plugin = computed(() => (props.packageName ? store.plugins[store.plugins.findIndex((p) => p.packageName === props.packageName)] : null));
+    const loaderVisible = ref(false);
 
     watch(
       () => plugin.value,
-      async (v, prevV) => {
-        if ((!prevV || !prevV.enabled) && v.enabled) {
-          const result = await pluginUi.loadUi(plugin.value.ui, props.packageName);
-          if (!result) {
-            alert.show('加载插件页面失败', 'error');
-          }
-        }
+      (v, prevV) => {
+        loaderVisible.value = (!prevV || !prevV.enabled) && v.enabled;
       },
     );
 
-    onMounted(async () => {
-      if (plugin.value && plugin.value.ui) {
-        const result = await pluginUi.loadUi(plugin.value.ui, props.packageName);
-        if (!result) {
-          alert.show('加载插件页面失败', 'error');
-        }
-      }
+    onMounted(() => {
+      loaderVisible.value = plugin.value && plugin.value.ui;
     });
 
     return {
-      ui: pluginUi.ui,
+      pluginId: plugin.value.packageName,
+      pluginPath: plugin.value.ui,
+      loaderVisible,
     };
   },
 };

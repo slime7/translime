@@ -156,4 +156,8 @@ export default {
 .transition-radius {
   transition-property: border-radius;
 }
+
+.navi-btn {
+  cursor: pointer;
+}
 </style>
