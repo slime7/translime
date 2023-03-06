@@ -9,7 +9,6 @@
       <a
         class="navi-btn text-decoration-none d-block ease-animation"
         :href="href"
-        ref="link"
         v-bind="props"
       >
         <v-badge
@@ -34,8 +33,8 @@
 
         <v-tooltip
           v-if="tooltip"
-          right
-          :activator="$refs.link"
+          location="right"
+          activator="parent"
         >
           <span>{{ tooltip }}</span>
         </v-tooltip>
@@ -45,7 +44,6 @@
     <a
       class="navi-btn text-decoration-none d-block ease-animation"
       v-else
-      ref="open"
       v-bind="props"
       @click="openPluginWindow"
     >
@@ -71,8 +69,8 @@
 
       <v-tooltip
         v-if="tooltip"
-        right
-        :activator="$refs.open"
+        location="right"
+        activator="parent"
       >
         <span>{{ tooltip }}</span>
       </v-tooltip>
