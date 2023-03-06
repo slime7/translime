@@ -28,7 +28,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from '@vue/composition-api';
+import { ref, onMounted } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { getUuiD } from '@pkg/share/utils';
 import { useIpc } from '@/hooks/electron';
@@ -36,7 +36,7 @@ import useDialog from '@/hooks/useDialog';
 import useAlert from '@/hooks/useAlert';
 
 export default {
-  name: 'About',
+  name: 'AppAbout',
 
   setup() {
     const ipc = useIpc();

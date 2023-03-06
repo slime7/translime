@@ -9,7 +9,7 @@
 </template>
 
 <script>
-import { computed } from '@vue/composition-api';
+import { computed } from 'vue';
 import useToast from '@/hooks/useToast';
 
 export default {

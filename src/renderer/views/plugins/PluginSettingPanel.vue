@@ -1,6 +1,7 @@
 <template>
   <v-dialog
     v-model="internalValue"
+    :scrim="false"
     persistent
     scrollable
     max-width="560"
@@ -43,24 +44,26 @@
               <v-text-field
                 v-if="menuItem.type === 'input' || menuItem.type === 'password'"
                 v-model="settings[menuItem.key]"
+                class="mt-2"
                 :label="menuItem.name"
                 :type="menuItem.type || 'input'"
                 :placeholder="menuItem.placeholder"
                 :rules="menuItem.required ? requiredRule : []"
                 :required="menuItem.required"
-                outlined
+                variant="outlined"
                 @click.right="showTextEditContextMenu"
               />
 
               <v-select
                 v-if="menuItem.type === 'list'"
                 v-model="settings[menuItem.key]"
+                class="mt-2"
                 :items="menuItem.choices"
                 :label="menuItem.name"
-                item-text="name"
+                item-title="name"
                 :rules="menuItem.required ? requiredRule : []"
                 :required="menuItem.required"
-                outlined
+                variant="outlined"
               />
 
               <template
@@ -71,40 +74,51 @@
                   class="flex-grow-1"
                   :for="`switch-${menuItem.key}`"
                 />
+
                 <v-switch
                   v-model="settings[menuItem.key]"
+                  class="flex-grow-0 flex-shrink-0"
                   :id="`switch-${menuItem.key}`"
+                  color="primary"
+                  hide-details
                 />
               </template>
 
               <template
                 v-if="menuItem.type === 'checkbox'"
               >
-                <div class="mr-2" v-text="menuItem.name" />
+                <label class="mr-2" v-text="menuItem.name" />
                 <v-checkbox
                   v-model="settings[menuItem.key]"
                   v-for="(menuCheckboxItem, index) in menuItem.choices"
                   :key="index"
                   :label="menuCheckboxItem.name"
                   :value="menuCheckboxItem.value"
-                  class="mr-2"
+                  class="mr-2 flex-grow-0"
+                  color="primary"
+                  hide-details
                 />
               </template>
 
-              <v-radio-group
-                v-if="menuItem.type === 'radio'"
-                v-model="settings[menuItem.key]"
-                :label="menuItem.name"
-                mandatory
-                row
-              >
-                <v-radio
-                  v-for="(menuRadioItem, index) in menuItem.choices"
-                  :key="index"
-                  :label="menuRadioItem.name"
-                  :value="menuRadioItem.value"
-                />
-              </v-radio-group>
+              <template v-if="menuItem.type === 'radio'">
+                <label class="mr-2" v-text="menuItem.name" />
+
+                <v-radio-group
+                  v-if="menuItem.type === 'radio'"
+                  v-model="settings[menuItem.key]"
+                  mandatory
+                  inline
+                  hide-details
+                >
+                  <v-radio
+                    v-for="(menuRadioItem, index) in menuItem.choices"
+                    :key="index"
+                    :label="menuRadioItem.name"
+                    :value="menuRadioItem.value"
+                    color="primary"
+                  />
+                </v-radio-group>
+              </template>
             </v-row>
           </v-container>
         </v-form>
@@ -124,7 +138,7 @@ import {
   reactive,
   onMounted,
   toRaw,
-} from '@vue/composition-api';
+} from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useToast from '@/hooks/useToast';
@@ -134,7 +148,7 @@ export default {
   name: 'PluginSettingPanel',
 
   props: {
-    value: {
+    modelValue: {
       type: Boolean,
       default: false,
     },
@@ -150,10 +164,10 @@ export default {
 
     const internalValue = computed({
       get() {
-        return props.value;
+        return props.modelValue;
       },
       set(value) {
-        emit('input', value);
+        emit('update:modelValue', value);
       },
     });
     const requiredRule = [(v) => !!v || '此项必填'];

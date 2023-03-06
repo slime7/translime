@@ -3,17 +3,6 @@
 
     <h1>{{ msg }}</h1>
 
-    <p>
-      <a
-        href="https://vitejs.dev/guide/features.html"
-        target="_blank"
-      >Vite Documentation</a> |
-      <a
-        href="https://vuejs.org/v2/guide/"
-        target="_blank"
-      >Vue 2 Documentation</a>
-    </p>
-
     <v-btn @click="countIncrease" color="primary">
       <v-icon>favorite</v-icon>
       <span>count is: {{ count }}</span>
@@ -39,7 +28,7 @@
 </template>
 
 <script>
-import { onMounted } from '@vue/composition-api';
+import { onMounted } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import { useState } from '@/utils';

@@ -61,16 +61,17 @@ app.whenReady()
     createMainWindow();
     createTray();
     if (process.platform === 'win32') {
-      app.setAppUserModelId('translime');
+      app.setAppUserModelId(isDevelopment ? 'translime-dev' : 'translime');
     }
   });
+
 if (isDevelopment) {
   app.whenReady()
     .then(() => import('electron-devtools-installer'))
     .then(({
       default: installExtension,
       VUEJS_DEVTOOLS,
-    }) => installExtension(VUEJS_DEVTOOLS, {
+    }) => installExtension.default(VUEJS_DEVTOOLS, {
       loadExtensionOptions: {
         allowFileAccess: true,
       },

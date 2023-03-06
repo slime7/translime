@@ -1,4 +1,4 @@
-import { toRef } from '@vue/composition-api';
+import { toRef } from 'vue';
 import useToastStore from '@/store/toastStore';
 
 const useToast = () => {

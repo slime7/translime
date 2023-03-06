@@ -1,4 +1,4 @@
-import { ref, reactive } from '@vue/composition-api';
+import { ref, reactive } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 

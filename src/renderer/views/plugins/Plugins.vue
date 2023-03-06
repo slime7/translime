@@ -3,21 +3,22 @@
     <h2>插件</h2>
 
     <div class="mt-4">
-      <div class="mt-2 d-flex align-center">
+      <div class="mt-2">
         <v-text-field
           v-model="search"
           placeholder="输入插件包名"
-          append-icon="search"
-          solo
+          variant="solo"
+          density="compact"
           prefix="translime-plugin-"
           @keyup.enter="searchAction"
           @click.right="showTextEditContextMenu"
         >
           <template v-slot:append>
             <v-btn
+              class="mt-n2"
               color="primary"
-              :disabled="loading.install"
-              :loading="loading.install"
+              :disabled="loading.install || loading.search"
+              :loading="loading.install || loading.search"
               @click="searchAction"
             >
               {{ !search ? '查看插件' : '搜索插件' }}
@@ -47,19 +48,9 @@
           </v-col>
 
           <template v-if="loading.search">
-            <v-col
-              sm="12"
-              md="6"
-              lg="4"
-              v-for="loadingSkeleton in 4"
-              :key="loadingSkeleton"
-            >
-              <v-skeleton-loader
-                elevation="2"
-                type="article, actions"
-              >
-              </v-skeleton-loader>
-            </v-col>
+            <div class="w-100 my-2 d-flex justify-center">
+              <v-progress-circular color="primary" indeterminate></v-progress-circular>
+            </div>
           </template>
         </v-row>
 
@@ -117,7 +108,7 @@ import {
   reactive,
   onMounted,
   onUnmounted,
-} from '@vue/composition-api';
+} from 'vue';
 import { storeToRefs } from 'pinia';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';

@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <div class="plugin-main">plugin content {{ msg }}</div>
+  <div class="plugin-main">
+    <div class="red">plugin content {{ msg }} {{ input }}</div>
 
     <div>
       <input v-model="input" />
@@ -8,47 +8,40 @@
 
     <pre>{{ setting }}</pre>
 
-    <div>
-      <button @click="showThis">this</button>
-    </div>
-
-    <v-btn color="primary">vuetify component</v-btn>
+    <v-btn color="primary" @click="showVuetify">vuetify component</v-btn>
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, onMounted } from 'vue';
+
 const { VBtn } = window.vuetify$.components;
 
-export default {
-  name: 'ui',
+const setting = ref({});
+const msg = ref('hello');
+const showVuetify = () => {
+  console.log(window.vuetify$);
+};
 
-  components: {
-    VBtn,
-  },
+onMounted(async () => {
+  setting.value = await window.ts.getPluginSetting('translime-plugin-example');
+});
+</script>
+
+<script>
+export default {
+  name: 'plugin-ui',
 
   data: () => ({
-    msg: 'hello',
     input: '',
-    setting: null,
   }),
-
-  methods: {
-    async readSetting() {
-      this.setting = await window.ts.getPluginSetting('translime-plugin-example');
-    },
-    showThis() {
-      console.log(this);
-    },
-  },
-
-  mounted() {
-    this.readSetting();
-  },
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .plugin-main {
-  color: red;
+  .red {
+    color: red;
+  }
 }
 </style>

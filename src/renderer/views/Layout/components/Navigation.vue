@@ -1,9 +1,8 @@
 <template>
   <v-navigation-drawer
     class="navi-drawer"
-    app
     permanent
-    width="72px"
+    width="73"
   >
     <div class="navi-panel pa-2">
       <navi-link
@@ -58,7 +57,7 @@
 </template>
 
 <script>
-import { computed } from '@vue/composition-api';
+import { computed } from 'vue';
 import NaviLink from '@/views/Layout/components/NaviLink.vue';
 import useGlobalStore from '@/store/globalStore';
 import defaultIcon from '../../../assets/plugin-default-image.png';
@@ -90,7 +89,12 @@ export default {
 </style>
 
 <style scoped lang="scss">
-.navi-panel > * + * {
-  margin-top: 8px;
+.navi-panel {
+  :deep(.navi-btn) {
+    height: 56px;
+    & + .navi-btn {
+      margin-top: 8px;
+    }
+  }
 }
 </style>

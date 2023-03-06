@@ -18,7 +18,7 @@
       <div class="d-flex flex-column fill-height" id="app-main-container">
         <div class="scroll-content flex">
           <div class="plugin-container">
-            <component v-if="ui" :is="ui" />
+            <plugin-ui-loader v-if="loaderVisible" :plugin-path="plugin.ui" :plugin-id="plugin.packageName" />
           </div>
         </div>
       </div>
@@ -27,13 +27,14 @@
 </template>
 
 <script>
-import { onMounted, onUnmounted, ref } from '@vue/composition-api';
-import * as components from 'vuetify/lib/components';
-import * as directives from 'vuetify/lib/directives';
+import { onMounted, onUnmounted, ref } from 'vue';
+import { useTheme as useVTheme } from 'vuetify';
+import * as components from 'vuetify/components';
+import * as directives from 'vuetify/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
 import { useIpc } from '@/hooks/electron';
-import usePluginUi from '@/views/plugins/hooks/usePluginUi';
+import PluginUiLoader from '@/views/plugins/PluginUiLoader.vue';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
@@ -47,14 +48,16 @@ export default {
 
   components: {
     WindowControls,
+    PluginUiLoader,
   },
 
-  setup(props, { root }) {
+  setup() {
     const pluginId = ref('');
     const isMaximize = ref(false);
     const plugin = ref(null);
+    const loaderVisible = ref(false);
     const ipc = useIpc();
-    const pluginUi = usePluginUi();
+    const vTheme = useVTheme();
 
     const getPluginId = () => {
       const params = new URLSearchParams(window.location.search);
@@ -78,13 +81,11 @@ export default {
     const getDarkMode = () => {
       const params = new URLSearchParams(window.location.search);
       const darkParam = params.get('dark');
-      // eslint-disable-next-line no-param-reassign
-      root.$vuetify.theme.dark = !!darkParam && darkParam !== 'false' && darkParam !== '0';
+      vTheme.global.name.value = !!darkParam && darkParam !== 'false' && darkParam !== '0' ? 'dark' : 'light';
     };
     const themeUpdated = () => {
       ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
-        // eslint-disable-next-line no-param-reassign
-        root.$vuetify.theme.dark = dark;
+        vTheme.global.name.value = dark ? 'dark' : 'light';
       });
     };
 
@@ -95,9 +96,7 @@ export default {
       themeUpdated();
       await getIsMaximize();
       await getPlugin();
-      if (plugin.value && plugin.value.ui) {
-        await pluginUi.loadUi(plugin.value.ui, pluginId.value);
-      }
+      loaderVisible.value = plugin.value && plugin.value.ui;
     });
 
     onUnmounted(() => {
@@ -108,8 +107,8 @@ export default {
       pluginId,
       isMaximize,
       plugin,
-      ui: pluginUi.ui,
       getIsMaximize,
+      loaderVisible,
     };
   },
 };

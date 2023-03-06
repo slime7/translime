@@ -1,5 +1,5 @@
 <template>
-  <div class="window-controls">
+  <div class="window-controls fill-height">
     <div class="d-flex fill-height">
       <div class="window-control-btn d-flex align-center justify-center fill-height" @click="appMinimize">
         <svg width='11' height='11' viewBox='0 0 11 11' fill='none'
@@ -41,7 +41,7 @@
 </template>
 
 <script>
-import { toRefs } from '@vue/composition-api';
+import { toRefs } from 'vue';
 import {
   APP_MINIMIZE,
   APP_MAXIMIZE,
@@ -111,11 +111,13 @@ export default {
   -webkit-app-region: no-drag;
 }
 
-#app.theme--dark .window-control-btn:hover {
-  background-color: rgba(255, 255, 255, .3);
-}
-#app.theme--light .window-control-btn:hover {
+.window-control-btn:hover {
   background-color: rgba(0, 0, 0, .2);
+}
+@media (prefers-color-scheme: dark) {
+  .window-control-btn:hover {
+    background-color: rgba(255, 255, 255, .3);
+  }
 }
 
 .window-control-btn.close:hover {

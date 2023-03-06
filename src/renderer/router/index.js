@@ -1,48 +1,52 @@
-import Vue from 'vue';
-import VueRouter from 'vue-router';
-import Base from '../views/Layout/Base.vue';
-
-Vue.use(VueRouter);
+import { createRouter, createWebHashHistory } from 'vue-router';
+import LayoutBase from '../views/Layout/Base.vue';
+import AppHome from '../views/Home.vue';
+import AppAbout from '../views/About.vue';
+import AppPlugins from '../views/plugins/Plugins.vue';
+import AppSetting from '../views/Setting.vue';
+import AppPluginPage from '../views/plugins/PluginPage.vue';
 
 const routes = [
   {
-    path: '',
-    component: Base,
-    meta: { requiresAuth: true },
+    path: '/',
+    component: LayoutBase,
+    meta: {
+      requiresAuth: true,
+      keepAlive: true,
+    },
     children: [
       {
-        path: '/',
+        path: '',
         name: 'Home',
-        component: () => import('@/views/Home.vue'),
+        component: AppHome,
       },
       {
         path: '/about',
         name: 'About',
-        component: () => import('@/views/About.vue'),
+        component: AppAbout,
       },
       {
         path: '/plugins',
         name: 'Plugins',
-        component: () => import('@/views/plugins/Plugins.vue'),
+        component: AppPlugins,
       },
       {
         path: '/setting',
         name: 'Setting',
-        component: () => import('@/views/Setting.vue'),
+        component: AppSetting,
       },
       {
         path: '/plugins/:packageName',
         name: 'PluginPage',
-        component: () => import('@/views/plugins/PluginPage.vue'),
+        component: AppPluginPage,
         props: true,
       },
     ],
   },
 ];
 
-const router = new VueRouter({
-  mode: 'hash',
-  base: import.meta.env.Base,
+const router = createRouter({
+  history: createWebHashHistory(import.meta.env.Base),
   routes,
 });
 

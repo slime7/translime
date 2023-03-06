@@ -1,27 +1,31 @@
 <template>
-  <v-hover v-slot="{ hover }">
+  <v-hover v-slot="{ isHovering, props }">
     <router-link
       v-if="to"
       :to="to"
       custom
       v-slot="{ isExactActive, href }"
     >
-      <a class="text-decoration-none d-block ease-animation" :href="href" ref="link">
+      <a
+        class="navi-btn text-decoration-none d-block ease-animation"
+        :href="href"
+        v-bind="props"
+      >
         <v-badge
-          :value="isDev"
+          :model-value="isDev"
           content="D"
-          bottom
-          overlap
+          location="bottom end"
+          color="primary"
         >
           <v-avatar
-            class="ease-animation"
+            class="transition-radius"
             size="56"
-            :color="hover || isExactActive ? color : 'grey darken-2'"
-            :rounded="hover || isExactActive ? 'xl' : 'circle'"
+            :color="isHovering || isExactActive ? color : 'grey-darken-2'"
+            :rounded="isHovering || isExactActive ? 'xl' : 'circle'"
           >
-            <v-icon v-if="icon" :color="hover || isExactActive ? 'white' : color">{{ icon }}</v-icon>
-            <img v-else-if="image" :src="image" alt="" />
-            <div v-else :class="hover || isExactActive ? 'white--text' : textColor">
+            <v-icon v-if="icon" :color="isHovering || isExactActive ? 'white' : color">{{ icon }}</v-icon>
+            <img v-else-if="image" :src="image" alt="" width="56" />
+            <div v-else :class="isHovering || isExactActive ? 'white--text' : textColor">
               <slot></slot>
             </div>
           </v-avatar>
@@ -29,8 +33,8 @@
 
         <v-tooltip
           v-if="tooltip"
-          right
-          :activator="$refs.link"
+          location="right"
+          activator="parent"
         >
           <span>{{ tooltip }}</span>
         </v-tooltip>
@@ -38,26 +42,26 @@
     </router-link>
 
     <a
-      class="text-decoration-none d-block ease-animation"
+      class="navi-btn text-decoration-none d-block ease-animation"
       v-else
-      ref="open"
+      v-bind="props"
       @click="openPluginWindow"
     >
       <v-badge
-        :value="isDev"
+        :model-value="isDev"
         content="D"
-        bottom
-        overlap
+        location="bottom end"
+        color="primary"
       >
         <v-avatar
-          class="ease-animation"
+          class="transition-radius"
           size="56"
-          :color="hover ? color : 'grey darken-2'"
-          :rounded="hover ? 'xl' : 'circle'"
+          :color="isHovering ? color : 'grey-darken-2'"
+          :rounded="isHovering ? 'xl' : 'circle'"
         >
-          <v-icon v-if="icon" :color="hover ? 'white' : color">{{ icon }}</v-icon>
-          <img v-else-if="image" :src="image" alt="" />
-          <div v-else :class="hover ? 'white--text' : textColor">
+          <v-icon v-if="icon" :color="isHovering ? 'white' : color">{{ icon }}</v-icon>
+          <img v-else-if="image" :src="image" alt="" width="56" />
+          <div v-else :class="isHovering ? 'white--text' : textColor">
             <slot></slot>
           </div>
         </v-avatar>
@@ -65,8 +69,8 @@
 
       <v-tooltip
         v-if="tooltip"
-        right
-        :activator="$refs.open"
+        location="right"
+        activator="parent"
       >
         <span>{{ tooltip }}</span>
       </v-tooltip>
@@ -145,3 +149,13 @@ export default {
   },
 };
 </script>
+
+<style lang="scss" scoped>
+.transition-radius {
+  transition-property: border-radius;
+}
+
+.navi-btn {
+  cursor: pointer;
+}
+</style>

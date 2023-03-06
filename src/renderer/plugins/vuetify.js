@@ -1,26 +1,36 @@
-import Vue from 'vue';
-import Vuetify from 'vuetify';
-import zhHans from 'vuetify/es5/locale/zh-Hans';
-import colors from 'vuetify/lib/util/colors';
+// eslint-disable-next-line import/extensions
+import 'vuetify/styles';
+import { createVuetify } from 'vuetify';
+import { zhHans } from 'vuetify/locale';
+import { aliases, md } from 'vuetify/iconsets/md';
 
-Vue.use(Vuetify);
-
-export default new Vuetify({
-  lang: {
-    locales: { zhHans },
-    current: 'zhHans',
+const vuetify = createVuetify({
+  locale: {
+    locale: 'zhHans',
+    messages: { zhHans },
   },
   icons: {
-    iconfont: 'md',
+    defaultSet: 'md',
+    aliases,
+    sets: {
+      md,
+    },
   },
   theme: {
+    defaultTheme: 'light',
     themes: {
       light: {
-        primary: colors.lightBlue.darken1,
+        colors: {
+          primary: '#039BE5', // light-blue-darken-1
+        },
       },
       dark: {
-        primary: colors.lightBlue.darken1,
+        colors: {
+          primary: '#039BE5',
+        },
       },
     },
   },
 });
+
+export default vuetify;

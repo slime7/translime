@@ -215,9 +215,12 @@ const windowControl = {
 };
 translime.windowControl = windowControl;
 
-const loadPluginUi = (pluginPath) => {
+const loadPluginUi = (pluginPath, type = 'text/javascript') => {
   const ui = fs.readFileSync(pluginPath, 'utf8');
-  return new Blob([ui], { type: 'text/javascript' });
+  if (!type || type === true) {
+    return ui;
+  }
+  return new Blob([ui], { type });
 };
 translime.loadPluginUi = loadPluginUi;
 contextBridge.exposeInMainWorld('ts', translime);
