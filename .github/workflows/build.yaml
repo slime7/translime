@@ -37,7 +37,7 @@ jobs:
       - name: release
         uses: softprops/action-gh-release@v1
         with:
-          files: "dist_electron/**"
+          files: "dist_electron/*.exe"
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
