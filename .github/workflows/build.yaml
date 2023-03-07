@@ -28,16 +28,11 @@ jobs:
           yarn --frozen-lockfile
           yarn build
 
-      - name: clean up windows
-        if: ${{ matrix.os }} == windows-latest
-        run: |
-          npx rimraf "dist_electron/!(*.exe)"
-
       - name: upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}
-          path: dist_electron
+          path: dist_electron/*.exe
 
       - name: release
         uses: softprops/action-gh-release@v1
