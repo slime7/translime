@@ -120,7 +120,7 @@ import { showTextEditContextMenu } from '@/utils';
 import PluginCard from './PluginCard.vue';
 
 export default {
-  name: 'Plugins',
+  name: 'PluginsMain',
 
   components: {
     PluginCard,
