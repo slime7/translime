@@ -4,9 +4,9 @@ import {
   ipcRenderer,
 } from 'electron';
 import path from 'path';
-import * as ipcType from '@pkg/share/utils/ipcConstant';
 import fs from 'fs';
-// import axiosHttpAdapter from 'axios/lib/adapters/http';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
+import axiosHttpAdapter from 'axios/lib/adapters/http';
 
 const apiKey = 'electron';
 const ipcWhiteList = {
@@ -137,7 +137,7 @@ const api = {
     }),
   },
   APP_ROOT: path.resolve(__dirname, '../'),
-  // axiosHttpAdapter,
+  axiosHttpAdapter,
 };
 api.ipcRenderer.receive('ipc-reply', (msg) => {
   console.log(`ipc-reply by ${msg.type}`, msg);

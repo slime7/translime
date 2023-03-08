@@ -20,6 +20,7 @@
           :key="alertItem.uuid"
           :type="alertItem.type"
           border="start"
+          class="my-2"
         >
           <div>{{ parseAlertTime(alertItem.time) }}</div>
           <div>{{ alertItem.msg }}</div>

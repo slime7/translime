@@ -1,5 +1,5 @@
-import { join } from 'path';
-import { builtinModules } from 'module';
+import { join } from 'node:path';
+import { builtinModules } from 'node:module';
 import { external } from '../package.json';
 
 const PACKAGE_ROOT = join(__dirname, 'main');
@@ -15,12 +15,12 @@ const config = {
   resolve: {
     alias: [
       {
-        find: '@pkg/',
-        replacement: `${join(PACKAGE_ROOT, '..')}/`,
+        find: /^@pkg\/(.*)/,
+        replacement: `${join(PACKAGE_ROOT, '..')}/$1`,
       },
       {
-        find: '@/',
-        replacement: `${join(PACKAGE_ROOT, '../renderer')}/`,
+        find: /^@\/(.*)/,
+        replacement: `${join(PACKAGE_ROOT, '../renderer')}/$1`,
       },
     ],
   },

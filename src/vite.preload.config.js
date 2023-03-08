@@ -1,7 +1,8 @@
-import { join } from 'path';
-import { builtinModules } from 'module';
+import { join } from 'node:path';
+import { builtinModules } from 'node:module';
 
 const PACKAGE_ROOT = join(__dirname, 'preload');
+const MODULES_ROOT = join(__dirname, '../node_modules');
 
 /**
  * @type {import('vite').UserConfig}
@@ -14,12 +15,19 @@ const config = {
   resolve: {
     alias: [
       {
-        find: '@pkg/',
-        replacement: `${join(PACKAGE_ROOT, '..')}/`,
+        find: /^@pkg\/(.*)/,
+        replacement: `${join(PACKAGE_ROOT, '..')}/$1`,
       },
       {
-        find: '@/',
-        replacement: `${join(PACKAGE_ROOT, '../renderer')}/`,
+        find: /^@\/(.*)/,
+        replacement: `${join(PACKAGE_ROOT, '../renderer')}/$1`,
+      },
+      /* axios 在 1.x 版本中的 `package.json` 使用了 exports 字段，使 lib 目录无法正常引入
+       * https://github.com/axios/axios/issues/5000
+       */
+      {
+        find: /^axios\/lib\/(.*)/,
+        replacement: `${join(MODULES_ROOT, 'axios/lib')}/$1`,
       },
     ],
   },
@@ -30,7 +38,7 @@ const config = {
     assetsDir: '.',
     minify: process.env.MODE === 'development' ? false : 'terser',
     terserOptions: process.env.MODE === 'development' ? undefined : {
-      ecma: 2020,
+      ecma: 2021,
       compress: {
         passes: 2,
       },
