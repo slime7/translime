@@ -1,4 +1,5 @@
 $body-font-family: "Roboto", "Noto Sans SC", "Microsoft YaHei", "微软雅黑", sans-serif;
-$material-light: (
-        'background': #f2f2f2,
+
+@use 'vuetify/settings' with (
+  $body-font-family: $body-font-family,
 );
