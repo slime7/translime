@@ -6,7 +6,6 @@ axios.defaults.adapter = window.electron.axiosHttpAdapter;
 const axiosWithHttp = axios.create();
 axiosWithHttp.interceptors.response.use(
   (response) => {
-    console.log(response);
     const {
       request,
       config,

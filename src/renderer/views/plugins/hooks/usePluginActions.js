@@ -7,8 +7,8 @@ export default function usePluginActions(plugin, emit) {
   const { showConfirm } = useDialog();
   const pluginId = plugin.packageName;
 
-  const install = () => {
-    emit('install', pluginId);
+  const install = (version) => {
+    emit('install', version ? `${pluginId}@${version}` : pluginId);
   };
   const enable = () => {
     emit('enable', pluginId);

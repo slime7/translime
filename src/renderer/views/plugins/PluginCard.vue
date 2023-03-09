@@ -1,11 +1,13 @@
 <template>
   <v-hover
-    v-slot="{ hover }"
+    v-slot:default="{ isHovering, props }"
   >
     <v-card
       class="plugin-item-card ease-animation fill-height"
-      :elevation="hover ? 10 : 2"
+      v-bind="props"
+      :elevation="isHovering ? 10 : 2"
       :disabled="disabled"
+      rounded="xl"
     >
       <div class="d-flex flex-no-wrap justify-space-between">
         <div class="min-w-0">
@@ -17,7 +19,7 @@
               >
                 <v-chip
                   v-if="plugin.dev"
-                  small
+                  size="small"
                   label
                 >
                   DEV
@@ -85,9 +87,9 @@
             <template v-else>
               <v-btn
                 class="ml-2"
-                height="40px"
-                width="40px"
-                @click="install"
+                variant="elevated"
+                color="primary"
+                @click="install(selectedVersion)"
                 v-if="!isInstalled"
               >
                 安装
@@ -95,13 +97,34 @@
 
               <v-btn
                 class="ml-2"
-                height="40px"
-                width="40px"
-                disabled
-                v-if="isInstalled"
+                variant="elevated"
+                color="success"
+                @click="install(selectedVersion)"
+                v-if="canUpdated"
               >
-                已安装
+                升级
               </v-btn>
+
+              <v-btn
+                class="ml-2"
+                variant="elevated"
+                @click="install(selectedVersion)"
+                v-if="isInstalled && !canUpdated"
+              >
+                重新安装
+              </v-btn>
+
+              <v-select
+                v-model="selectedVersion"
+                class="version-selector ml-2"
+                :items="versionList"
+                label="版本"
+                variant="outlined"
+                hide-details
+                density="compact"
+                :loading="getVersionLoading"
+                @update:menu="getVersions"
+              />
             </template>
           </v-card-actions>
         </div>
@@ -127,10 +150,17 @@
 
 <script>
 import { storeToRefs } from 'pinia';
-import { toRefs, computed } from 'vue';
+import {
+  ref,
+  reactive,
+  toRefs,
+  computed,
+} from 'vue';
+import verCompare from 'semver-compare';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
+import axios from '@/hooks/useAxios';
 import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
@@ -164,6 +194,13 @@ export default {
 
     const { plugins } = storeToRefs(store);
     const isInstalled = computed(() => plugins.value.some((p) => p.packageName === plugin.value.packageName));
+    const canUpdated = computed(() => {
+      if (!isInstalled.value) {
+        return false;
+      }
+      const installedPlugin = plugins.value.find((p) => p.packageName === plugin.value.packageName);
+      return verCompare(plugin.value.version, installedPlugin.version) > 0;
+    });
     const cardTitle = computed(() => (plugin.value.author ? `${plugin.value.title}@${plugin.value.version}` : plugin.value.title));
     const cardSubTitle = computed(() => (plugin.value.author ? plugin.value.author : plugin.value.version));
     const authLink = () => {
@@ -182,6 +219,44 @@ export default {
       showContextMenu,
     } = usePluginActions(plugin.value, emit);
 
+    // 面板版本选择
+    const selectedVersion = ref('');
+    const versionList = reactive([
+      {
+        value: '',
+        title: '@latest',
+      },
+    ]);
+    const getVersionLoading = ref(false);
+    const versionLoaded = ref(false);
+    const getVersions = async () => {
+      if (versionLoaded.value) {
+        return;
+      }
+      if (getVersionLoading.value) {
+        return;
+      }
+      getVersionLoading.value = true;
+      try {
+        const { data } = await axios(`https://registry.npmjs.com/${pluginId}`, {
+          method: 'get',
+          params: {
+            x: Math.random(),
+          },
+        });
+        versionLoaded.value = true;
+        const versions = Object.keys(data.versions).map((version) => ({
+          value: version,
+          title: `@${version}`,
+        })).reverse();
+        versionList.push(...versions);
+      } catch (err) {
+        alert.show(err.message, 'error');
+      } finally {
+        getVersionLoading.value = false;
+      }
+    };
+
     return {
       defaultIcon,
       settingPanelVisible,
@@ -194,6 +269,11 @@ export default {
       cardSubTitle,
       authLink,
       isInstalled,
+      canUpdated,
+      selectedVersion,
+      versionList,
+      getVersionLoading,
+      getVersions,
     };
   },
 };
@@ -202,5 +282,9 @@ export default {
 <style scoped lang="scss">
 .min-w-0 {
   min-width: 0;
+}
+
+.version-selector {
+  max-width: 135px;
 }
 </style>
