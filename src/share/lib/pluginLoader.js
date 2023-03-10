@@ -98,7 +98,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
     args.push(...[
       '--no-progress',
       '--no-prune',
-      '--global-style',
+      '--install-strategy=shallow',
       '--ignore-scripts',
       '--legacy-peer-deps',
     ]);

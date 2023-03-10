@@ -155,6 +155,7 @@ import {
   reactive,
   toRefs,
   computed,
+  watch,
 } from 'vue';
 import verCompare from 'semver-compare';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
@@ -256,6 +257,9 @@ export default {
         getVersionLoading.value = false;
       }
     };
+    watch([isInstalled, canUpdated], () => {
+      selectedVersion.value = '';
+    });
 
     return {
       defaultIcon,
