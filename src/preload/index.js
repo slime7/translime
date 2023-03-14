@@ -6,6 +6,7 @@ import {
 import path from 'path';
 import fs from 'fs';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+// eslint-disable-next-line import/extensions,import/no-unresolved
 import axiosHttpAdapter from 'axios/lib/adapters/http';
 
 const apiKey = 'electron';

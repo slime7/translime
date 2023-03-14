@@ -28,7 +28,8 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, version as vueVersion } from 'vue';
+import { version as vuetifyVersion } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { getUuiD } from '@pkg/share/utils';
 import { useIpc } from '@/hooks/electron';
@@ -52,6 +53,8 @@ export default {
     const onGetVersions = () => {
       ipc.on(versionsIpcId.value, (v) => {
         versions.value = v;
+        versions.value.vue = vueVersion;
+        versions.value.vuetify = vuetifyVersion;
       });
     };
 
