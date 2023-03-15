@@ -62,9 +62,9 @@ export default async () => {
   });
 
   if (import.meta.env.VITE_DEV_SERVER_URL !== undefined && import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
+    if (!process.env.IS_TEST) global.win.webContents.openDevTools({ mode: 'undocked' });
     // Load the url of the dev server if in development mode
     await global.win.loadURL(import.meta.env.VITE_DEV_SERVER_URL);
-    if (!process.env.IS_TEST) global.win.webContents.openDevTools({ mode: 'undocked' });
   } else {
     createProtocol('app');
     // Load the index.html when not in development
