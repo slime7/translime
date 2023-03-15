@@ -106,6 +106,10 @@ const execNpmCommand = (cmd, module, options = {}) => {
   if (cmd === 'uninstall') {
     args.push(...[
       '--no-progress',
+      '--no-prune',
+      '--install-strategy=shallow',
+      '--ignore-scripts',
+      '--legacy-peer-deps',
     ]);
   }
   if (internalOptions.registry) {
