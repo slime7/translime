@@ -6,6 +6,8 @@
       <div class="mt-4">
         <v-btn class="ma-2" color="primary" @click="testAlert">发送 alert</v-btn>
 
+        <v-btn class="ma-2" color="primary" @click="testToast">发送 toast</v-btn>
+
         <v-btn class="ma-2" color="primary" @click="testConfirm">发送 confirm</v-btn>
 
         <v-btn class="ma-2" color="primary" @click="appDir">打开 app 目录</v-btn>
@@ -35,6 +37,7 @@ import { getUuiD } from '@pkg/share/utils';
 import { useIpc } from '@/hooks/electron';
 import useDialog from '@/hooks/useDialog';
 import useAlert from '@/hooks/useAlert';
+import useToast from '@/hooks/useToast';
 
 export default {
   name: 'AppAbout',
@@ -43,6 +46,7 @@ export default {
     const ipc = useIpc();
     const dialog = useDialog();
     const alert = useAlert();
+    const toast = useToast();
 
     // 版本
     const versions = ref({});
@@ -61,6 +65,9 @@ export default {
     // 测试方法
     const testAlert = () => {
       alert.show('测试 alert');
+    };
+    const testToast = () => {
+      toast.show('测试 toast');
     };
     const testConfirm = async () => {
       // const result = await this.confirm('测试 confirm');
@@ -83,6 +90,7 @@ export default {
       isDev: process.env.NODE_ENV === 'development',
       versions,
       testAlert,
+      testToast,
       testConfirm,
       reloadApp,
       appDir,

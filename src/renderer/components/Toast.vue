@@ -1,10 +1,10 @@
 <template>
   <v-snackbar
-    :value="visible"
-    bottom
+    :model-value="visible"
+    location="bottom"
     timeout="-1"
   >
-    {{msg}}
+    {{ msg }}
   </v-snackbar>
 </template>
 
