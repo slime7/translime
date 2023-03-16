@@ -2,8 +2,7 @@
   <v-navigation-drawer
     v-model="drawerVisible"
     class="notify-drawer"
-    absolute
-    clipped
+    temporary
     location="right"
     width="560"
   >
