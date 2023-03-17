@@ -22,12 +22,12 @@ const vuetify = createVuetify({
       light: {
         colors: {
           background: '#f2f2f2',
-          primary: '#039BE5', // light-blue-darken-1
+          primary: '#039be5', // light-blue-darken-1
         },
       },
       dark: {
         colors: {
-          primary: '#039BE5',
+          primary: '#039be5',
         },
       },
     },

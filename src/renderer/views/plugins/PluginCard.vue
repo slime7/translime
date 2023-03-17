@@ -161,7 +161,7 @@ import verCompare from 'semver-compare';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
-import axios from '@/hooks/useAxios';
+import useAxios from '@/hooks/useAxios';
 import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
@@ -192,6 +192,7 @@ export default {
     const pluginId = plugin.value.packageName;
     const ipc = useIpc();
     const store = useGlobalStore();
+    const axios = useAxios();
 
     const { plugins } = storeToRefs(store);
     const isInstalled = computed(() => plugins.value.some((p) => p.packageName === plugin.value.packageName));

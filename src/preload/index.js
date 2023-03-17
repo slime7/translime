@@ -8,7 +8,9 @@ import fs from 'fs';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 // eslint-disable-next-line import/extensions,import/no-unresolved
 import axiosHttpAdapter from 'axios/lib/adapters/http';
+import useAxios from '@/hooks/useAxios';
 
+const axios = useAxios(axiosHttpAdapter);
 const apiKey = 'electron';
 const ipcWhiteList = {
   send: [
@@ -139,6 +141,7 @@ const api = {
   },
   APP_ROOT: path.resolve(__dirname, '../'),
   axiosHttpAdapter,
+  axios: { ...axios },
 };
 api.ipcRenderer.receive('ipc-reply', (msg) => {
   console.log(`ipc-reply by ${msg.type}`, msg);

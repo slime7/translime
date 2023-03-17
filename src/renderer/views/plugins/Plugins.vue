@@ -114,7 +114,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
-import axios from '@/hooks/useAxios';
+import useAxios from '@/hooks/useAxios';
 import useGlobalStore from '@/store/globalStore';
 import { showTextEditContextMenu } from '@/utils';
 import PluginCard from './PluginCard.vue';
@@ -131,6 +131,7 @@ export default {
     const store = useGlobalStore();
     const alert = useAlert();
     const dialog = useDialog();
+    const axios = useAxios();
     const loading = reactive({
       install: false,
       uninstall: false,

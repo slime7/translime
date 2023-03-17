@@ -55,8 +55,8 @@ export default {
     });
 
     return {
-      pluginId: plugin.value.packageName,
-      pluginPath: plugin.value.ui,
+      pluginId: computed(() => (plugin.value ? plugin.value.packageName : undefined)),
+      pluginPath: computed(() => (plugin.value ? plugin.value.ui : undefined)),
       loaderVisible,
     };
   },

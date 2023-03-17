@@ -35,12 +35,6 @@ const config = {
     ],
   },
   plugins: [
-    vue(),
-    vuetify({
-      styles: {
-        configFile: 'plugins/variables.scss',
-      },
-    }),
     /* 使插件和本体都能使用同一个 vue 实例，将 vue 在构建后放入根目录为两者提供引用 */
     viteStaticCopy({
       targets: [
@@ -50,6 +44,12 @@ const config = {
           rename: 'vue.esm-browser.js',
         },
       ],
+    }),
+    vue(),
+    vuetify({
+      styles: {
+        configFile: 'plugins/variables.scss',
+      },
     }),
   ],
   base: '',
