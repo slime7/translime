@@ -94,7 +94,7 @@ const ipcHandler = (ipc) => ({
       }
       global.childWins[name].focus();
     } else {
-      const minWidth = options.minWidth || 700;
+      const minWidth = options.minWidth || 540;
       const mainWinBound = global.win.getBounds();
       const winBound = global.store.get(`plugin.${name.replace('plugin-window-', '')}.window`, {
         x: mainWinBound.x + 10,
