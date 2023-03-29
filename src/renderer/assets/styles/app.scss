@@ -11,10 +11,6 @@ html {
   height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  & > .v-dialog__content {
-    top: 24px;
-  }
 }
 
 #app pre,
@@ -52,4 +48,23 @@ a {
 
 .ease-animation {
   transition: all .25s cubic-bezier(.4, 0, .2, 1);
+}
+
+.v-overlay-container .v-dialog {
+  top: 24px;
+
+  .v-overlay__scrim {
+    top: 24px;
+  }
+}
+
+/* fix vTextField prefix text opacity */
+#app {
+  .v-text-field__prefix {
+    opacity: 1;
+  }
+
+  .v-field--active .v-text-field__prefix {
+    color: var(--v-theme-primary);
+  }
 }
