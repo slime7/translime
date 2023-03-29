@@ -313,8 +313,10 @@ class PluginLoader extends EventEmitter {
       global.childWins[`plugin-window-${packageName}`].close();
     }
     // 删除 require 缓存
-    if (plugin.exports) {
-      delete requireFresh.cache[path.join(plugin.pluginPath, plugin.exports)];
+    const findCacheIndex = Object.keys(requireFresh.cache).findIndex((k) => k.includes(`\\${plugin.packageName}\\`));
+    const cacheKey = findCacheIndex > -1 ? Object.keys(requireFresh.cache)[findCacheIndex] : null;
+    if (cacheKey) {
+      delete requireFresh.cache[cacheKey];
     }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
