@@ -10,13 +10,12 @@ transform 和 slime 的组合词，意为像史莱姆一样拟态。即每个插
 
 [插件示例](./example/translime-plugin-example/readme.md)
 
-
-### LICENSE
-
-查看 [LICENSE](./blob/dev/LICENSE)
-
-### Thanks
+### 致谢
 
 Thanks to [JetBrains](https://www.jetbrains.com/) for supporting us free open source licenses.
 
-[![JetBrains](https://account.jetbrains.com/static/images/jetbrains-logo-inv.svg)](https://www.jetbrains.com/)
+[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="200" alt="JetBrains" />](https://www.jetbrains.com/)
+
+### 许可证
+
+查看 [LICENSE](./LICENSE)
