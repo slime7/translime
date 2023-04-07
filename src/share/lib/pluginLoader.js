@@ -1,9 +1,11 @@
 import path from 'path';
 import fs from 'fs';
+import zlib from 'zlib';
 import { app, Menu } from 'electron';
 import EventEmitter from 'events';
 import childProcess from 'child_process';
 import { createRequire } from 'module';
+import tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 
 const requireFresh = createRequire(import.meta.url);
@@ -13,11 +15,52 @@ const PLUGIN_DIR_DEV = path.join(APPDATA_PATH, 'plugins_dev');
 const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
 const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
 const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
+const PLUGIN_PACKAGE_DIR = path.join(PLUGIN_DIR, 'package');
 const NPM_EXEC_PATH = import.meta.env.DEV
   ? path.join(global.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
   : path.join(global.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
+
+async function readPackageJsonFromTgz(filePath) {
+  // 创建一个可读流
+  const readStream = fs.createReadStream(filePath);
+
+  // 创建一个解压缩流
+  const gunzipStream = zlib.createGunzip();
+
+  // 创建一个解压tar包的流
+  const extractStream = tar.extract();
+
+  // 定义一个promise，用于等待解压完成
+  const promise = new Promise((resolve, reject) => {
+    let packageJson = '';
+    extractStream.on('entry', (entry) => {
+      // 如果entry是package.json，就将其内容读入packageJson变量
+      if (entry.path === 'package/package.json') {
+        entry.on('data', (data) => {
+          packageJson += data.toString();
+        });
+      }
+    });
+
+    // 解压完成后，resolve promise并返回package.json内容
+    extractStream.on('finish', () => {
+      resolve(packageJson);
+    });
+
+    // 如果出现错误，reject promise并输出错误信息
+    extractStream.on('error', (error) => {
+      reject(error);
+    });
+  });
+
+  // 将可读流连接到解压缩流和解压tar包的流
+  readStream.pipe(gunzipStream).pipe(extractStream);
+
+  // 等待解压完成，并返回package.json内容
+  return promise;
+}
 
 const readPlugin = (pluginPath, devPlugins = null) => {
   const pluginPkg = JSON.parse(fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'));
@@ -167,6 +210,11 @@ class PluginLoader extends EventEmitter {
           fs.accessSync(PLUGIN_DIR);
         } catch (aErr) {
           fs.mkdirSync(PLUGIN_DIR);
+        }
+        try {
+          fs.accessSync(PLUGIN_PACKAGE_DIR);
+        } catch (aErr) {
+          fs.mkdirSync(PLUGIN_PACKAGE_DIR);
         }
         fs.writeFileSync(PLUGIN_JSON_PATH, JSON.stringify(pkg, null, 2), 'utf8');
       }
@@ -354,6 +402,20 @@ class PluginLoader extends EventEmitter {
       }
       resolve(result.data);
     });
+  }
+
+  async installLocalPlugin(file) {
+    // file 复制到 package 目录内，然后进行安装
+    const fileParsed = path.parse(file);
+    const pluginPackagePath = path.join(PLUGIN_PACKAGE_DIR, fileParsed.base);
+    try {
+      await fs.copyFileSync(file, pluginPackagePath);
+    } catch (err) {
+      return Promise.reject(err);
+    }
+
+    const pluginPackage = readPackageJsonFromTgz(pluginPackagePath);
+    return Promise.resolve(pluginPackage);
   }
 
   uninstallPlugin(packageName) {

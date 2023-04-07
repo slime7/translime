@@ -28,6 +28,10 @@
       </div>
     </div>
 
+    <div class="mt-4">
+      <v-btn @click="installLocalPlugins">测试本地插件</v-btn>
+    </div>
+
     <template v-if="searchResult.list.length">
       <h3>搜索结果</h3>
 
@@ -223,6 +227,22 @@ export default {
         getPlugins();
       }
     };
+    const installLocalPlugins = async () => {
+      if (loading.install) {
+        return;
+      }
+      loading.install = true;
+      try {
+        const result = await ipc.invoke(ipcType.INSTALL_LOCAL_PLUGIN, 'F:\\private\\translime-plugin-zs-corp-navi\\translime-plugin-zs-corp-navi-1.0.0.tgz');
+        console.log(result);
+        alert.show('本地插件已安装');
+      } catch (err) {
+        alert.show(err.message, 'error');
+      } finally {
+        loading.install = false;
+        getPlugins();
+      }
+    };
     const uninstallPlugins = async (packageName) => {
       if (!packageName) {
         return;
@@ -276,6 +296,7 @@ export default {
       plugins,
       getPlugins,
       installPlugins,
+      installLocalPlugins,
       uninstallPlugins,
       enablePlugin,
       disablePlugin,
