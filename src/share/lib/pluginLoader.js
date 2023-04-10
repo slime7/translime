@@ -22,44 +22,43 @@ const NPM_EXEC_PATH = import.meta.env.DEV
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
 
-async function readPackageJsonFromTgz(filePath) {
-  // 创建一个可读流
-  const readStream = fs.createReadStream(filePath);
+async function readPluginPackageInfo(filePath) {
+  return new Promise((resolve, reject) => {
+    const fileStream = fs.createReadStream(filePath);
+    const unzipStream = fileStream.pipe(zlib.createGunzip()); // 使用zlib库中的createGunzip方法将压缩包解压缩
+    const extractStream = unzipStream.pipe(tar.extract({ cwd: global.TEMP_DIR })); // 使用tar库中的extract方法解压缩后提取文件
 
-  // 创建一个解压缩流
-  const gunzipStream = zlib.createGunzip();
+    let found = false; // 添加一个标志来记录是否找到目标文件
 
-  // 创建一个解压tar包的流
-  const extractStream = tar.extract();
-
-  // 定义一个promise，用于等待解压完成
-  const promise = new Promise((resolve, reject) => {
-    let packageJson = '';
     extractStream.on('entry', (entry) => {
-      // 如果entry是package.json，就将其内容读入packageJson变量
-      if (entry.path === 'package/package.json') {
-        entry.on('data', (data) => {
-          packageJson += data.toString();
+      if (entry.path === 'package/package.json') { // 如果找到目标文件，则读取并返回其内容
+        found = true; // 找到目标文件，将标志设置为true
+        let content = '';
+        entry.on('data', (chunk) => {
+          content += chunk.toString();
         });
+        entry.on('end', () => {
+          try {
+            resolve(JSON.parse(content));
+          } catch (err) {
+            reject(new Error('无法读取插件信息'));
+          }
+        });
+      } else {
+        entry.resume(); // 跳过非目标文件
       }
     });
 
-    // 解压完成后，resolve promise并返回package.json内容
-    extractStream.on('finish', () => {
-      resolve(packageJson);
+    extractStream.on('end', () => {
+      if (!found) { // 如果未找到目标文件，则Promise被拒绝
+        reject(new Error('无法识别这个插件包'));
+      }
     });
 
-    // 如果出现错误，reject promise并输出错误信息
     extractStream.on('error', (error) => {
       reject(error);
     });
   });
-
-  // 将可读流连接到解压缩流和解压tar包的流
-  readStream.pipe(gunzipStream).pipe(extractStream);
-
-  // 等待解压完成，并返回package.json内容
-  return promise;
 }
 
 const readPlugin = (pluginPath, devPlugins = null) => {
@@ -414,8 +413,8 @@ class PluginLoader extends EventEmitter {
       return Promise.reject(err);
     }
 
-    const pluginPackage = readPackageJsonFromTgz(pluginPackagePath);
-    return Promise.resolve(pluginPackage);
+    const pluginPackageInfo = await readPluginPackageInfo(pluginPackagePath);
+    return Promise.resolve(pluginPackageInfo);
   }
 
   uninstallPlugin(packageName) {
