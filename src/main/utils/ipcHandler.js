@@ -192,6 +192,20 @@ const ipcHandler = (ipc) => ({
       }
     });
   },
+  [ipcType.INSTALL_LOCAL_PLUGIN](packagePath) {
+    return new Promise(async (resolve, reject) => {
+      if (global.plugin) {
+        try {
+          const result = await global.plugin.installLocalPlugin(packagePath);
+          resolve(result);
+        } catch (err) {
+          reject(new Error(`插件安装出错: ${err.message}`));
+        }
+      } else {
+        reject(new Error('插件未初始化'));
+      }
+    });
+  },
   [ipcType.UNINSTALL_PLUGIN](packageName) {
     return new Promise(async (resolve, reject) => {
       if (global.plugin) {

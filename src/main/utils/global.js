@@ -5,6 +5,7 @@ import appConfigStore from './appConfigStore';
 
 global.ROOT = path.join(__dirname, '..');
 global.APPDATA_PATH = app.getPath('userData');
+global.TEMP_DIR = app.getPath('temp');
 global.launchWin = null;
 global.win = null;
 global.childWins = {};

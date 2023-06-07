@@ -1,9 +1,11 @@
 import path from 'path';
 import fs from 'fs';
+import zlib from 'zlib';
 import { app, Menu } from 'electron';
 import EventEmitter from 'events';
 import childProcess from 'child_process';
 import { createRequire } from 'module';
+import tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 
 const requireFresh = createRequire(import.meta.url);
@@ -13,11 +15,51 @@ const PLUGIN_DIR_DEV = path.join(APPDATA_PATH, 'plugins_dev');
 const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
 const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
 const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
+const PLUGIN_PACKAGE_DIR = path.join(PLUGIN_DIR, 'package');
 const NPM_EXEC_PATH = import.meta.env.DEV
   ? path.join(global.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
   : path.join(global.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
+
+async function readPluginPackageInfo(filePath) {
+  return new Promise((resolve, reject) => {
+    const fileStream = fs.createReadStream(filePath);
+    const unzipStream = fileStream.pipe(zlib.createGunzip()); // 使用zlib库中的createGunzip方法将压缩包解压缩
+    const extractStream = unzipStream.pipe(tar.extract({ cwd: global.TEMP_DIR })); // 使用tar库中的extract方法解压缩后提取文件
+
+    let found = false; // 添加一个标志来记录是否找到目标文件
+
+    extractStream.on('entry', (entry) => {
+      if (entry.path === 'package/package.json') { // 如果找到目标文件，则读取并返回其内容
+        found = true; // 找到目标文件，将标志设置为true
+        let content = '';
+        entry.on('data', (chunk) => {
+          content += chunk.toString();
+        });
+        entry.on('end', () => {
+          try {
+            resolve(JSON.parse(content));
+          } catch (err) {
+            reject(new Error('无法读取插件信息'));
+          }
+        });
+      } else {
+        entry.resume(); // 跳过非目标文件
+      }
+    });
+
+    extractStream.on('end', () => {
+      if (!found) { // 如果未找到目标文件，则Promise被拒绝
+        reject(new Error('无法识别这个插件包'));
+      }
+    });
+
+    extractStream.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
 
 const readPlugin = (pluginPath, devPlugins = null) => {
   const pluginPkg = JSON.parse(fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'));
@@ -167,6 +209,11 @@ class PluginLoader extends EventEmitter {
           fs.accessSync(PLUGIN_DIR);
         } catch (aErr) {
           fs.mkdirSync(PLUGIN_DIR);
+        }
+        try {
+          fs.accessSync(PLUGIN_PACKAGE_DIR);
+        } catch (aErr) {
+          fs.mkdirSync(PLUGIN_PACKAGE_DIR);
         }
         fs.writeFileSync(PLUGIN_JSON_PATH, JSON.stringify(pkg, null, 2), 'utf8');
       }
@@ -327,19 +374,7 @@ class PluginLoader extends EventEmitter {
     }
   }
 
-  async installPlugin(packageName, version) {
-    if (!/^translime-plugin-/.test(packageName)) {
-      return Promise.reject(new Error('该包不是这个软件的插件'));
-    }
-    const prevPlugin = this.getPlugin(packageName);
-    const module = version ? `${packageName}@${version}` : packageName;
-    if (prevPlugin) {
-      try {
-        await this.uninstallPlugin(packageName);
-      } catch (err) {
-        return Promise.reject(err);
-      }
-    }
+  doInstallCommand(packageName, module) {
     return new Promise(async (resolve, reject) => {
       const result = await execNpmCommand('install', module);
       if (result.code) {
@@ -354,6 +389,52 @@ class PluginLoader extends EventEmitter {
       }
       resolve(result.data);
     });
+  }
+
+  async installPlugin(packageName, version) {
+    if (!/^translime-plugin-/.test(packageName)) {
+      return Promise.reject(new Error('该包不是这个软件的插件'));
+    }
+    const prevPlugin = this.getPlugin(packageName);
+    const module = version ? `${packageName}@${version}` : packageName;
+    if (prevPlugin) {
+      try {
+        await this.uninstallPlugin(packageName);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+    return this.doInstallCommand(packageName, module);
+  }
+
+  async installLocalPlugin(file) {
+    // file 复制到 package 目录内，然后进行安装
+    const fileParsed = path.parse(file);
+    const pluginPackagePath = path.join(PLUGIN_PACKAGE_DIR, fileParsed.base);
+    try {
+      await fs.copyFileSync(file, pluginPackagePath);
+    } catch (err) {
+      return Promise.reject(err);
+    }
+
+    const pluginPackageInfo = await readPluginPackageInfo(pluginPackagePath);
+
+    const packageName = pluginPackageInfo.name;
+    if (!/^translime-plugin-/.test(packageName)) {
+      return Promise.reject(new Error('该包不是这个软件的插件'));
+    }
+    const prevPlugin = this.getPlugin(packageName);
+    const module = pluginPackagePath;
+    if (prevPlugin) {
+      try {
+        await this.uninstallPlugin(packageName);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+
+    // return Promise.resolve(pluginPackageInfo);
+    return this.doInstallCommand(packageName, module);
   }
 
   uninstallPlugin(packageName) {

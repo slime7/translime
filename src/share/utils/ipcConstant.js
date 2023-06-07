@@ -14,6 +14,7 @@ export const OPEN_NEW_WINDOW = 'open-new-window';
 export const GET_PATH = 'get-path';
 export const GET_PLUGINS = 'get-plugins';
 export const INSTALL_PLUGIN = 'install-plugin';
+export const INSTALL_LOCAL_PLUGIN = 'install-local-plugin';
 export const UNINSTALL_PLUGIN = 'uninstall-plugin';
 export const DISABLE_PLUGIN = 'disable-plugin';
 export const ENABLE_PLUGIN = 'enable-plugin';
