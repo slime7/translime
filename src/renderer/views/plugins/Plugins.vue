@@ -300,6 +300,7 @@ export default {
       loading.install = true;
       try {
         await ipc.invoke(ipcType.INSTALL_LOCAL_PLUGIN, installLocalPluginDialog.value.filepath);
+        installLocalPluginDialog.value.filepath = '';
         alert.show('本地插件已安装');
       } catch (err) {
         alert.show(err.message, 'error');
