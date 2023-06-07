@@ -15,7 +15,6 @@
         >
           <template v-slot:append>
             <v-btn
-              class="mt-n2"
               color="primary"
               :disabled="loading.install || loading.search"
               :loading="loading.install || loading.search"
@@ -23,13 +22,16 @@
             >
               {{ !search ? '查看插件' : '搜索插件' }}
             </v-btn>
+
+            <v-btn
+              class="ml-2"
+              density="comfortable"
+              icon="folder_zip"
+              @click="installLocalPluginDialog.open()"
+            ></v-btn>
           </template>
         </v-text-field>
       </div>
-    </div>
-
-    <div class="mt-4">
-      <v-btn @click="installLocalPlugins">测试本地插件</v-btn>
     </div>
 
     <template v-if="searchResult.list.length">
@@ -103,6 +105,34 @@
         </v-col>
       </v-row>
     </div>
+
+    <v-dialog
+      v-model="installLocalPluginDialog.visible"
+      max-width="600"
+    >
+      <v-card>
+        <v-card-text>
+          <v-textarea
+            :value="installLocalPluginDialog.filepath"
+            placeholder="选择本地的插件包文件"
+            :readonly="true"
+            auto-grow
+            @click:control="selectPluginFile()"
+          ></v-textarea>
+
+          <div class="mt-2 d-flex justify-center">
+            <v-btn
+              color="primary"
+              rounded
+              :disabled="!installLocalPluginDialog.filepath"
+              @click="installLocalPlugins"
+            >
+              安装这个插件
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -227,14 +257,49 @@ export default {
         getPlugins();
       }
     };
+
+    const installLocalPluginDialog = ref({
+      visible: false,
+      filepath: '',
+      errorMsg: '',
+      open: () => {
+        installLocalPluginDialog.value.visible = true;
+      },
+      close: () => {
+        installLocalPluginDialog.value.visible = false;
+      },
+    });
+    const windowOpenDialogShow = ref(false);
+    const selectPluginFile = async () => {
+      if (windowOpenDialogShow.value) {
+        return;
+      }
+      installLocalPluginDialog.value.errorMsg = '';
+      windowOpenDialogShow.value = true;
+      const result = await window.electron.dialog.showOpenDialog({
+        filters: [
+          { name: '插件包', extensions: ['tgz', 'tar.gz'] },
+        ],
+        properties: ['openFile', 'dontAddToRecent'],
+      });
+      windowOpenDialogShow.value = false;
+      if (result.err) {
+        installLocalPluginDialog.value.errorMsg = '读取文件出错';
+      } else if (!result.data.canceled) {
+        [installLocalPluginDialog.value.filepath] = result.data.filePaths;
+      }
+    };
     const installLocalPlugins = async () => {
       if (loading.install) {
         return;
       }
+      if (!installLocalPluginDialog.value.filepath) {
+        return;
+      }
+      installLocalPluginDialog.value.close();
       loading.install = true;
       try {
-        const result = await ipc.invoke(ipcType.INSTALL_LOCAL_PLUGIN, 'F:\\private\\translime-plugin-zs-corp-navi\\translime-plugin-zs-corp-navi-1.0.0.tgz');
-        console.log(result);
+        await ipc.invoke(ipcType.INSTALL_LOCAL_PLUGIN, installLocalPluginDialog.value.filepath);
         alert.show('本地插件已安装');
       } catch (err) {
         alert.show(err.message, 'error');
@@ -296,6 +361,8 @@ export default {
       plugins,
       getPlugins,
       installPlugins,
+      installLocalPluginDialog,
+      selectPluginFile,
       installLocalPlugins,
       uninstallPlugins,
       enablePlugin,

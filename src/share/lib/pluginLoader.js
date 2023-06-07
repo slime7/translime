@@ -374,19 +374,7 @@ class PluginLoader extends EventEmitter {
     }
   }
 
-  async installPlugin(packageName, version) {
-    if (!/^translime-plugin-/.test(packageName)) {
-      return Promise.reject(new Error('该包不是这个软件的插件'));
-    }
-    const prevPlugin = this.getPlugin(packageName);
-    const module = version ? `${packageName}@${version}` : packageName;
-    if (prevPlugin) {
-      try {
-        await this.uninstallPlugin(packageName);
-      } catch (err) {
-        return Promise.reject(err);
-      }
-    }
+  doInstallCommand(packageName, module) {
     return new Promise(async (resolve, reject) => {
       const result = await execNpmCommand('install', module);
       if (result.code) {
@@ -403,6 +391,22 @@ class PluginLoader extends EventEmitter {
     });
   }
 
+  async installPlugin(packageName, version) {
+    if (!/^translime-plugin-/.test(packageName)) {
+      return Promise.reject(new Error('该包不是这个软件的插件'));
+    }
+    const prevPlugin = this.getPlugin(packageName);
+    const module = version ? `${packageName}@${version}` : packageName;
+    if (prevPlugin) {
+      try {
+        await this.uninstallPlugin(packageName);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+    return this.doInstallCommand(packageName, module);
+  }
+
   async installLocalPlugin(file) {
     // file 复制到 package 目录内，然后进行安装
     const fileParsed = path.parse(file);
@@ -414,7 +418,23 @@ class PluginLoader extends EventEmitter {
     }
 
     const pluginPackageInfo = await readPluginPackageInfo(pluginPackagePath);
-    return Promise.resolve(pluginPackageInfo);
+
+    const packageName = pluginPackageInfo.name;
+    if (!/^translime-plugin-/.test(packageName)) {
+      return Promise.reject(new Error('该包不是这个软件的插件'));
+    }
+    const prevPlugin = this.getPlugin(packageName);
+    const module = pluginPackagePath;
+    if (prevPlugin) {
+      try {
+        await this.uninstallPlugin(packageName);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+
+    // return Promise.resolve(pluginPackageInfo);
+    return this.doInstallCommand(packageName, module);
   }
 
   uninstallPlugin(packageName) {
