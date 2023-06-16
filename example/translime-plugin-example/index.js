@@ -12,6 +12,11 @@ const pluginWillUnload = () => {
   console.log('plugin unloaded');
 };
 
+// 设置保存时执行
+const pluginSettingSaved = () => {
+  console.log('plugin setting saved');
+};
+
 // 插件设置表单
 const settingMenu = [
   // 文本框
@@ -65,6 +70,23 @@ const settingMenu = [
     required: true,
     choices: ['foo', 'bar'],
   },
+  // 文件选择
+  {
+    key: 'file-1',
+    type: 'file',
+    name: '文件选择1',
+    required: false, // 是否必填
+    placeholder: '输入提示',
+    // 选项属性 https://www.electronjs.org/zh/docs/latest/api/dialog#dialogshowopendialogbrowserwindow-options
+    dialogOptions: {
+      filters: [
+        { name: '图片', extensions: ['jpg', 'png', 'gif'] },
+        { name: '视频', extensions: ['mkv', 'avi', 'mp4'] },
+        { name: '所有文件', extensions: ['*'] },
+      ],
+      properties: ['openFile', 'multiSelections', 'dontAddToRecent'],
+    },
+  },
 ];
 
 // 插件上下文菜单
@@ -93,6 +115,7 @@ const ipcHandlers = [
 module.exports = {
   pluginDidLoad,
   pluginWillUnload,
+  pluginSettingSaved,
   settingMenu,
   pluginMenu,
   ipcHandlers,

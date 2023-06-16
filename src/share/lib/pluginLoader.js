@@ -307,6 +307,7 @@ class PluginLoader extends EventEmitter {
         pluginMain = {
           pluginDidLoad: pluginImport.pluginDidLoad,
           pluginWillUnload: pluginImport.pluginWillUnload,
+          pluginSettingSaved: pluginImport.pluginSettingSaved,
           settingMenu: pluginImport.settingMenu,
           pluginMenu: pluginImport.pluginMenu,
           ipcHandlers: pluginImport.ipcHandlers,
@@ -530,6 +531,13 @@ class PluginLoader extends EventEmitter {
   access(pluginId) {
     const plugin = this.getPlugin(pluginId);
     return plugin.lib;
+  }
+
+  onPluginSettingSave(pluginId) {
+    const plugin = this.getPlugin(pluginId);
+    if (plugin && typeof plugin.pluginSettingSaved === 'function') {
+      plugin.pluginSettingSaved();
+    }
   }
 }
 

@@ -261,6 +261,7 @@ const ipcHandler = (ipc) => ({
       } else {
         global.store.set(`plugin.${packageName}.settings.${key}`, settings);
       }
+      global?.plugin.onPluginSettingSave(packageName);
       resolve(true);
     });
   },
@@ -269,20 +270,32 @@ const ipcHandler = (ipc) => ({
       global.plugin.popPluginMenu(packageName, ipc);
     }
   },
-  [ipcType.DIALOG_SHOW_OPEN_DIALOG](options) {
-    return dialog.showOpenDialog(options);
+  [ipcType.DIALOG_SHOW_OPEN_DIALOG](winOrOptions, options) {
+    if (winOrOptions && typeof winOrOptions === 'string') {
+      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+    }
+    return dialog.showOpenDialog(winOrOptions);
   },
-  [ipcType.DIALOG_SHOW_SAVE_DIALOG](options) {
-    return dialog.showSaveDialog(options);
+  [ipcType.DIALOG_SHOW_SAVE_DIALOG](winOrOptions, options) {
+    if (winOrOptions && typeof winOrOptions === 'string') {
+      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+    }
+    return dialog.showSaveDialog(winOrOptions);
   },
-  [ipcType.DIALOG_SHOW_MESSAGE_BOX](options) {
-    return dialog.showMessageBox(options);
+  [ipcType.DIALOG_SHOW_MESSAGE_BOX](winOrOptions, options) {
+    if (winOrOptions && typeof winOrOptions === 'string') {
+      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+    }
+    return dialog.showMessageBox(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_ERROR_BOX](title, content) {
     return dialog.showErrorBox(title, content);
   },
-  [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](options) {
-    return dialog.showCertificateTrustDialog(options);
+  [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](winOrOptions, options) {
+    if (winOrOptions && typeof winOrOptions === 'string') {
+      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+    }
+    return dialog.showCertificateTrustDialog(winOrOptions);
   },
   [ipcType.SHOW_NOTIFICATION](options, timeout = 0) {
     if (Notification.isSupported()) {
