@@ -1,7 +1,7 @@
+@import "@material-design-icons/font/filled.css";
 @import "../fonts/robot/robot.css";
 @import "../fonts/noto sans sc/noto_sans_sc.css";
 @import "../fonts/source code pro/source_code_pro.css";
-@import "../fonts/material icons/material_icons.css";
 
 html {
   overflow-y: auto !important;
@@ -64,6 +64,8 @@ a {
 
 /* fix vTextField prefix text opacity */
 #app {
+  font-family: "Roboto", "Noto Sans SC", "Microsoft YaHei", "微软雅黑", sans-serif;
+
   .v-text-field__prefix {
     opacity: 1;
   }

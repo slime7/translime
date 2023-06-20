@@ -272,19 +272,19 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.DIALOG_SHOW_OPEN_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+      return dialog.showOpenDialog(global.childWins[winOrOptions] ? global.childWins[winOrOptions] : global.win, options);
     }
     return dialog.showOpenDialog(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_SAVE_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+      return dialog.showOpenDialog(global.childWins[winOrOptions] ? global.childWins[winOrOptions] : global.win, options);
     }
     return dialog.showSaveDialog(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_MESSAGE_BOX](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+      return dialog.showOpenDialog(global.childWins[winOrOptions] ? global.childWins[winOrOptions] : global.win, options);
     }
     return dialog.showMessageBox(winOrOptions);
   },
@@ -293,7 +293,7 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(winOrOptions === 'app' ? global.win : global.childWins[winOrOptions], options);
+      return dialog.showOpenDialog(global.childWins[winOrOptions] ? global.childWins[winOrOptions] : global.win, options);
     }
     return dialog.showCertificateTrustDialog(winOrOptions);
   },

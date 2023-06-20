@@ -46,11 +46,14 @@ const config = {
       ],
     }),
     vue(),
+    /* 使用自定义 sass 变量导致 dev 启动出问题
     vuetify({
       styles: {
         configFile: 'plugins/variables.scss',
       },
     }),
+    */
+    vuetify(),
   ],
   base: '',
   server: {
