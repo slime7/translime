@@ -12,13 +12,17 @@ import {
   watch,
 } from 'vue';
 import * as components from 'vuetify/components';
+import * as labsComponents from 'vuetify/labs/components';
 import * as directives from 'vuetify/directives';
 import useGlobalStore from '@/store/globalStore';
 import PluginUiLoader from './PluginUiLoader.vue';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
-    components,
+    components: {
+      ...components,
+      ...labsComponents,
+    },
     directives,
   };
 }

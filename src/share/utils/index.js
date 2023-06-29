@@ -7,13 +7,15 @@
  * @param showSecond 是否显示秒
  * @returns {string}
  */
-export const myDate = (targetTime = null,
+export const myDate = (
+  targetTime = null,
   {
     format = '',
     showTime = false,
     showYear = true,
     showSecond = false,
-  } = {}) => {
+  } = {},
+) => {
   let time;
   const date = [
     '0', // 年
@@ -86,4 +88,4 @@ export const randomNumber = (start, end = null) => {
   return Math.round(Math.random() * range + 0.5 + base);
 };
 
-export const getUuiD = (randomLength = 8) => Number(Math.random().toString().substr(2, randomLength) + +Date.now()).toString(36);
+export const getUuiD = (randomLength = 8) => Number(Math.random().toString().substring(2, 2 + randomLength) + +Date.now()).toString(36);
