@@ -112,13 +112,20 @@
     >
       <v-card>
         <v-card-text>
-          <v-textarea
-            :value="installLocalPluginDialog.filepath"
-            placeholder="选择本地的插件包文件"
-            :readonly="true"
-            auto-grow
-            @click:control="selectPluginFile()"
-          ></v-textarea>
+          <v-tooltip
+            :text="installLocalPluginDialog.filepath || '未选择'"
+            location="bottom"
+          >
+            <template v-slot:activator="{ props }">
+              <v-text-field
+                v-bind="props"
+                :value="installLocalPluginDialog.filepath"
+                placeholder="选择本地的插件包文件"
+                :readonly="true"
+                @click:control="selectPluginFile()"
+              />
+            </template>
+          </v-tooltip>
 
           <div class="mt-2 d-flex justify-center">
             <v-btn
@@ -150,7 +157,7 @@ import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
 import useAxios from '@/hooks/useAxios';
 import useGlobalStore from '@/store/globalStore';
-import { showTextEditContextMenu } from '@/utils';
+import { showTextEditContextMenu, selectFileDialog } from '@/utils';
 import PluginCard from './PluginCard.vue';
 
 export default {
@@ -276,7 +283,7 @@ export default {
       }
       installLocalPluginDialog.value.errorMsg = '';
       windowOpenDialogShow.value = true;
-      const result = await window.electron.dialog.showOpenDialog({
+      const result = await selectFileDialog('app', {
         filters: [
           { name: '插件包', extensions: ['tgz', 'tar.gz'] },
         ],

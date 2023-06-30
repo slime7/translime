@@ -30,6 +30,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useTheme as useVTheme } from 'vuetify';
 import * as components from 'vuetify/components';
+import * as labsComponents from 'vuetify/labs/components';
 import * as directives from 'vuetify/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
@@ -38,7 +39,10 @@ import PluginUiLoader from '@/views/plugins/PluginUiLoader.vue';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
-    components,
+    components: {
+      ...components,
+      ...labsComponents,
+    },
     directives,
   };
 }

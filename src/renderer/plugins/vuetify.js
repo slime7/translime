@@ -32,6 +32,13 @@ const vuetify = createVuetify({
       },
     },
   },
+  defaults: {
+    global: {
+      style: [{
+        fontFamily: '"Roboto", "Noto Sans SC", "Microsoft YaHei", "微软雅黑", sans-serif',
+      }],
+    },
+  },
 });
 
 export default vuetify;

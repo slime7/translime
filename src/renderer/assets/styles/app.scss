@@ -1,9 +1,10 @@
+@import "../fonts/material icons/material_icons.css";
 @import "../fonts/robot/robot.css";
 @import "../fonts/noto sans sc/noto_sans_sc.css";
 @import "../fonts/source code pro/source_code_pro.css";
-@import "../fonts/material icons/material_icons.css";
 
 html {
+  font-family: "Roboto", "Noto Sans SC", "Microsoft YaHei", "微软雅黑", sans-serif;
   overflow-y: auto !important;
 }
 
@@ -60,6 +61,10 @@ a {
   &.v-overlay--absolute .v-overlay__scrim {
     top: 0;
   }
+}
+
+.v-radio .material-icons {
+  --md-icons-fill: 'FILL' 0;
 }
 
 /* fix vTextField prefix text opacity */

@@ -307,6 +307,7 @@ class PluginLoader extends EventEmitter {
         pluginMain = {
           pluginDidLoad: pluginImport.pluginDidLoad,
           pluginWillUnload: pluginImport.pluginWillUnload,
+          pluginSettingSaved: pluginImport.pluginSettingSaved,
           settingMenu: pluginImport.settingMenu,
           pluginMenu: pluginImport.pluginMenu,
           ipcHandlers: pluginImport.ipcHandlers,
@@ -360,10 +361,13 @@ class PluginLoader extends EventEmitter {
       global.childWins[`plugin-window-${packageName}`].close();
     }
     // 删除 require 缓存
-    const findCacheIndex = Object.keys(requireFresh.cache).findIndex((k) => k.includes(`\\${plugin.packageName}\\`));
+    const findCacheIndex = Object.keys(requireFresh.cache).findIndex((k) => k.includes(`${path.sep}${plugin.packageName}${path.sep}`));
     const cacheKey = findCacheIndex > -1 ? Object.keys(requireFresh.cache)[findCacheIndex] : null;
     if (cacheKey) {
       delete requireFresh.cache[cacheKey];
+    } else {
+      console.log('target:', `${path.sep}${plugin.packageName}${path.sep}`);
+      console.log('all:', Object.keys(requireFresh.cache));
     }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
@@ -530,6 +534,13 @@ class PluginLoader extends EventEmitter {
   access(pluginId) {
     const plugin = this.getPlugin(pluginId);
     return plugin.lib;
+  }
+
+  onPluginSettingSave(pluginId) {
+    const plugin = this.getPlugin(pluginId);
+    if (plugin && typeof plugin.pluginSettingSaved === 'function') {
+      plugin.pluginSettingSaved();
+    }
   }
 }
 

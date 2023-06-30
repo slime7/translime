@@ -1,7 +1,6 @@
 <template>
   <v-dialog
     v-model="internalValue"
-    :scrim="false"
     persistent
     scrollable
     max-width="560"
@@ -23,7 +22,7 @@
         <v-toolbar-items>
           <v-btn
             dark
-            text
+            variant="text"
             @click="saveSettings"
           >
             保存
@@ -53,6 +52,27 @@
                 variant="outlined"
                 @click.right="showTextEditContextMenu"
               />
+
+              <v-tooltip
+                v-if="menuItem.type === 'file'"
+                :text="settings[menuItem.key] && settings[menuItem.key].length ? settings[menuItem.key].join(',') : '未选择'"
+                location="bottom"
+              >
+                <template v-slot:activator="{ props }">
+                  <v-text-field
+                    v-bind="props"
+                    :model-value="settings[menuItem.key] && settings[menuItem.key].length ? settings[menuItem.key].join(',') : ''"
+                    class="mt-2"
+                    :label="menuItem.name"
+                    :placeholder="menuItem.placeholder"
+                    :rules="menuItem.required ? requiredRule : []"
+                    :required="menuItem.required"
+                    variant="outlined"
+                    readonly
+                    @click:control="selectFile.open(menuItem)"
+                  />
+                </template>
+              </v-tooltip>
 
               <v-select
                 v-if="menuItem.type === 'list'"
@@ -142,7 +162,7 @@ import {
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useToast from '@/hooks/useToast';
-import { showTextEditContextMenu } from '@/utils';
+import { showTextEditContextMenu, selectFileDialog } from '@/utils';
 
 export default {
   name: 'PluginSettingPanel',
@@ -199,6 +219,7 @@ export default {
           case 'input':
           case 'password':
           case 'switch':
+          case 'file':
             parsed = {
               ...menu,
               name: menu.name || '',
@@ -270,6 +291,38 @@ export default {
       toast.show('设置已保存');
     };
 
+    const useSelectFile = () => {
+      const isOpen = ref(false);
+      const filePath = ref([]);
+      const error = ref('');
+      const open = async (menuItem) => {
+        if (isOpen.value) {
+          return;
+        }
+
+        isOpen.value = true;
+        const result = await selectFileDialog('app', toRaw(menuItem.dialogOptions));
+        isOpen.value = false;
+        if (result.err) {
+          error.value = '读取文件出错';
+        } else if (!result.data.canceled) {
+          /**
+           * 数组
+           * @type {string[]}
+           */
+          filePath.value = result.data.filePaths;
+          settings[menuItem.key] = filePath.value;
+        }
+      };
+
+      return {
+        isOpen,
+        filePath,
+        open,
+      };
+    };
+    const selectFile = useSelectFile();
+
     return {
       internalValue,
       requiredRule,
@@ -279,6 +332,7 @@ export default {
       settings,
       saveSettings,
       showTextEditContextMenu,
+      selectFile,
     };
   },
 };

@@ -1,6 +1,6 @@
 import { ref, reactive } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { useIpc } from '@/hooks/electron';
+import { useIpc, useDialog } from '@/hooks/electron';
 
 const ipc = useIpc();
 const ipcRaw = useIpc(false);
@@ -40,3 +40,11 @@ export const appConfigStore = new Proxy({}, {
     return (...args) => ipcRaw.invoke('appConfigStore', prop, ...args);
   },
 });
+
+export const selectFileDialog = (win, options = {}) => {
+  const dialog = useDialog();
+  return dialog.showOpenDialog(win, {
+    properties: ['openFile', 'dontAddToRecent'],
+    ...options,
+  });
+};
