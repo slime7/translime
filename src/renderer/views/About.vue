@@ -26,6 +26,14 @@
         <strong>{{ lib }}</strong>: v{{ version }}
       </div>
     </div>
+
+    <h2 class="mt-2">链接</h2>
+
+    <div class="mt-4">
+      <div>
+        github: <a href="javascript:;" @click="githubLink">https://github.com/slime7/translime <v-icon size="16">open_in_new</v-icon></a>
+      </div>
+    </div>
   </v-container>
 </template>
 
@@ -70,7 +78,6 @@ export default {
       toast.show('测试 toast');
     };
     const testConfirm = async () => {
-      // const result = await this.confirm('测试 confirm');
       const result = await dialog.showConfirm('测试 confirm');
       console.log('confirm result: ', result);
     };
@@ -79,6 +86,12 @@ export default {
     };
     const appDir = () => {
       ipc.send(ipcType.OPEN_APP_PATH);
+    };
+    const openLink = (url) => {
+      ipc.send(ipcType.OPEN_LINK, { url });
+    };
+    const githubLink = () => {
+      openLink('https://github.com/slime7/translime');
     };
 
     onMounted(() => {
@@ -94,6 +107,7 @@ export default {
       testConfirm,
       reloadApp,
       appDir,
+      githubLink,
     };
   },
 };
