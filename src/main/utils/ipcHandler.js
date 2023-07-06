@@ -300,6 +300,9 @@ const ipcHandler = (ipc) => ({
   [ipcType.SHOW_NOTIFICATION](options, timeout = 0) {
     if (Notification.isSupported()) {
       const notification = new Notification(options);
+      notification.on('click', () => {
+        notification.close();
+      });
       notification.show();
       if (timeout > 0) {
         setTimeout(() => {

@@ -9,7 +9,7 @@ import createMainWindow from './main';
 import createLaunchWindow from './launch';
 import createTray from './tray';
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
+const isDevelopment = process.env.NODE_ENV === 'development';
 global.mainProcessLock = app.requestSingleInstanceLock();
 if (!global.mainProcessLock) {
   app.quit();
@@ -60,8 +60,9 @@ app.whenReady()
     createLaunchWindow();
     createMainWindow();
     createTray();
+    console.log(process.execPath);
     if (process.platform === 'win32') {
-      app.setAppUserModelId(isDevelopment ? 'translime-dev' : 'translime');
+      app.setAppUserModelId(isDevelopment ? process.execPath : 'translime.app');
     }
   });
 
