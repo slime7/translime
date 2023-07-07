@@ -83,6 +83,12 @@ const ipcHandler = (ipc) => ({
   [ipcType.RELOAD]() {
     global.win.reload();
   },
+  [ipcType.RELAUNCH]() {
+    app.relaunch({
+      args: ['--relaunch'],
+    });
+    app.quit();
+  },
   async [ipcType.SHOW_OPEN_DIALOG]({ electronOptions } = {}) {
     const result = await dialog.showSaveDialog(...electronOptions);
     ipc.sendToClient(ipcType.SHOW_OPEN_DIALOG, result);
@@ -377,8 +383,11 @@ const ipcHandler = (ipc) => ({
   [ipcType.SET_NATIVE_THEME]({ theme }) {
     nativeTheme.themeSource = theme;
   },
+  [ipcType.GET_LAUNCH_ARGV]() {
+    ipc.sendToClient(ipcType.GET_LAUNCH_ARGV, process.argv);
+  },
   ping() {
-    global.console.log('pong', new Date());
+    console.log('pong', new Date());
   },
   ping2(foo, bar) {
     return new Promise((resolve) => {

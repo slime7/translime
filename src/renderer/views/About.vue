@@ -14,6 +14,8 @@
 
         <v-btn class="ma-2" color="primary" @click="reloadApp">重载</v-btn>
       </div>
+
+      <p>启动命令：{{ appArgv.join(' ') }}</p>
     </template>
 
     <h2>版本</h2>
@@ -31,7 +33,7 @@
 
     <div class="mt-4">
       <div>
-        github: <a href="javascript:;" @click="githubLink">https://github.com/slime7/translime <v-icon size="16">open_in_new</v-icon></a>
+        <strong>github</strong>: <a href="javascript:;" @click="githubLink">https://github.com/slime7/translime <v-icon size="16">open_in_new</v-icon></a>
       </div>
     </div>
   </v-container>
@@ -43,6 +45,7 @@ import { version as vuetifyVersion } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { getUuiD } from '@pkg/share/utils';
 import { useIpc } from '@/hooks/electron';
+import globalStore from '@/store/globalStore';
 import useDialog from '@/hooks/useDialog';
 import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
@@ -52,6 +55,7 @@ export default {
 
   setup() {
     const ipc = useIpc();
+    const store = globalStore();
     const dialog = useDialog();
     const alert = useAlert();
     const toast = useToast();
@@ -108,6 +112,7 @@ export default {
       reloadApp,
       appDir,
       githubLink,
+      appArgv: store.appArgv,
     };
   },
 };

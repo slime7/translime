@@ -55,6 +55,12 @@ export default {
         }
       });
     };
+    const handleAppArgv = () => {
+      ipc.send(ipcType.GET_LAUNCH_ARGV);
+      ipc.on(ipcType.GET_LAUNCH_ARGV, (argv) => {
+        store.setAppArgv(argv);
+      });
+    };
 
     // created
     remoteConsoleListener();
@@ -62,6 +68,7 @@ export default {
     themeUpdated();
     getTheme();
     handleKeyEvent();
+    handleAppArgv();
 
     onMounted(() => {
       ipcRaw.send('main-renderer-ready');

@@ -119,6 +119,8 @@
 
     <div class="mt-4">
       <v-btn @click="showDevtools">打开 devtools(F12)</v-btn>
+
+      <v-btn class="ml-4" @click="relaunch">重新启动</v-btn>
     </div>
   </v-container>
 </template>
@@ -222,6 +224,9 @@ export default {
     const showDevtools = () => {
       ipc.send(ipcType.DEVTOOLS);
     };
+    const relaunch = () => {
+      ipc.send(ipcType.RELAUNCH);
+    };
 
     const initRegistryLink = () => {
       if (!registryList.find((r) => r.link === store.appSetting.registry)) {
@@ -247,6 +252,7 @@ export default {
       changeTheme: theme.setTheme,
       onShowDevPlugin,
       showDevtools,
+      relaunch,
     };
   },
 };

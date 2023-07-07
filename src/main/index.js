@@ -60,7 +60,6 @@ app.whenReady()
     createLaunchWindow();
     createMainWindow();
     createTray();
-    console.log(process.execPath);
     if (process.platform === 'win32') {
       app.setAppUserModelId(isDevelopment ? process.execPath : 'translime.app');
     }
