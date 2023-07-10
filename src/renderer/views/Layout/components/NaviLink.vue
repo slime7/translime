@@ -43,7 +43,7 @@
 
     <a
       class="navi-btn text-decoration-none d-block ease-animation"
-      v-else
+      v-else-if="open"
       v-bind="props"
       @click="openPluginWindow"
     >

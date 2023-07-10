@@ -5,7 +5,7 @@
 
       <v-spacer />
 
-      <v-icon class="action-btn" @click="showNotification">notifications</v-icon>
+      <div class="plugin-controls fill-height"></div>
 
       <window-controls :is-maximize="isMaximize"></window-controls>
     </v-system-bar>
@@ -20,7 +20,7 @@
           <router-view v-slot="{ Component, route }">
             <v-scroll-y-transition mode="out-in">
               <keep-alive>
-                <component :is="Component" :key="route.fullPath" />
+                <component :is="Component" :key="route.path" />
               </keep-alive>
             </v-scroll-y-transition>
           </router-view>
@@ -33,13 +33,19 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue';
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  computed,
+} from 'vue';
+import { useRoute } from 'vue-router';
 import WindowControls from '@/components/WindowControls.vue';
 import MainFooter from '@/components/MainFooter.vue';
 import Navigation from '@/views/Layout/components/Navigation.vue';
 import Notification from '@/views/Layout/components/Notification.vue';
+import useGlobalStore from '@/store/globalStore';
 import { useIpc } from '@/hooks/electron';
-import useAlert from '@/hooks/useAlert';
 
 export default {
   name: 'LayoutBase',
@@ -52,8 +58,9 @@ export default {
   },
 
   setup() {
+    const store = useGlobalStore();
     const ipc = useIpc();
-    const alert = useAlert();
+    const route = useRoute();
 
     const isMaximize = ref(false);
     const onMaximizeStatusChange = () => {
@@ -61,9 +68,12 @@ export default {
         isMaximize.value = maximize;
       });
     };
-    const showNotification = () => {
-      alert.showDrawer();
-    };
+    const plugin = computed(() => {
+      if (route.params.packageName) {
+        return store.plugin(route.params.packageName);
+      }
+      return null;
+    });
 
     onMounted(() => {
       onMaximizeStatusChange();
@@ -75,7 +85,7 @@ export default {
 
     return {
       isMaximize,
-      showNotification,
+      plugin,
     };
   },
 };
@@ -86,7 +96,7 @@ export default {
   -webkit-app-region: drag;
   z-index: 300;
 
-  .action-btn {
+  .plugin-controls {
     -webkit-app-region: no-drag;
   }
 }

@@ -187,7 +187,7 @@ export default {
 
   emits: ['install', 'uninstall', 'disable', 'enable'],
 
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const { plugin } = toRefs(props);
     const pluginId = plugin.value.packageName;
     const ipc = useIpc();
@@ -211,6 +211,9 @@ export default {
 
     // 设置面板
     const { settingPanelVisible } = usePluginSettingPanel(pluginId);
+    const openSettingPanel = () => {
+      settingPanelVisible.value = true;
+    };
 
     // 插件操作
     const {
@@ -260,6 +263,11 @@ export default {
     };
     watch([isInstalled, canUpdated], () => {
       selectedVersion.value = '';
+    });
+
+    expose({
+      openSettingPanel,
+      pluginId,
     });
 
     return {

@@ -98,6 +98,7 @@
           <plugin-card
             :plugin="pluginItem"
             :disabled="!!loading.uninstall"
+            ref="pluginCardRefs"
             @uninstall="uninstallPlugins"
             @disable="disablePlugin"
             @enable="enablePlugin"
@@ -149,7 +150,9 @@ import {
   reactive,
   onMounted,
   onUnmounted,
+  onActivated,
 } from 'vue';
+import { useRoute } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
@@ -173,6 +176,7 @@ export default {
     const alert = useAlert();
     const dialog = useDialog();
     const axios = useAxios();
+    const route = useRoute();
     const loading = reactive({
       install: false,
       uninstall: false,
@@ -355,6 +359,8 @@ export default {
       }
     };
 
+    const pluginCardRefs = ref(null);
+
     onMounted(() => {
       ipc.on(ipcType.PLUGINS_CHANGED, () => {
         getPlugins();
@@ -363,6 +369,16 @@ export default {
 
     onUnmounted(() => {
       ipc.detach(ipcType.PLUGINS_CHANGED);
+    });
+
+    onActivated(() => {
+      const settingPluginId = route.query.setting;
+      if (settingPluginId && pluginCardRefs.value && pluginCardRefs.value.length) {
+        const findPluginRef = pluginCardRefs.value.find((r) => r.pluginId === settingPluginId);
+        if (findPluginRef) {
+          findPluginRef.openSettingPanel();
+        }
+      }
     });
 
     return {
@@ -382,6 +398,7 @@ export default {
       clearSearchResult,
       loading,
       showTextEditContextMenu,
+      pluginCardRefs,
     };
   },
 };

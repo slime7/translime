@@ -75,10 +75,15 @@ const api = {
       });
     };
 
-    const on = (type, callback) => {
-      if (callbackCache.find((cache) => cache.type === type)) {
-        return;
+    const detach = (type) => {
+      const idx = callbackCache.findIndex((v) => v.type === type);
+      if (idx > -1) {
+        callbackCache.splice(idx, 1);
       }
+    };
+
+    const on = (type, callback) => {
+      detach(type);
       callbackCache.push({
         type,
         callback,
@@ -89,15 +94,6 @@ const api = {
       type: fnType,
       args: fnArgs,
     });
-
-    const detach = (type) => {
-      const idx = callbackCache.findIndex((v) => v.type === type);
-      if (idx > -1) {
-        callbackCache.splice(idx, 1);
-      } else {
-        console.error(`error type ${type}`);
-      }
-    };
 
     return {
       send,
