@@ -13,6 +13,7 @@ const useGlobalStore = defineStore('globalStore', {
     plugins: [],
     dark: false,
     appArgv: [],
+    pageTransitionActive: true,
   }),
   getters: {
     plugin: (state) => (pluginId) => state.plugins.find((plugin) => plugin.packageName === pluginId),

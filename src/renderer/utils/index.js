@@ -48,3 +48,26 @@ export const selectFileDialog = (win, options = {}) => {
     ...options,
   });
 };
+
+export const openPluginWindow = (plugin, dark = false) => {
+  const url = plugin.windowUrl
+    ? plugin.windowUrl
+    : `plugin-index.html?pluginId=${plugin.packageName}&dark=${dark}`;
+  const options = JSON.parse(JSON.stringify(plugin.windowOptions));
+  delete options.windowUrl;
+  if (process.env.NODE_ENV === 'development') {
+    console.log('plugin window url: ', url);
+    console.log('plugin window options: ', options);
+  }
+  ipc.send(ipcType.OPEN_NEW_WINDOW, {
+    name: `plugin-window-${plugin.packageName}`,
+    options: {
+      windowUrl: url,
+      appMenu: null,
+      frame: false,
+      titleBarStyle: 'hidden',
+      title: plugin.title,
+      ...options,
+    },
+  });
+};

@@ -210,10 +210,7 @@ export default {
     };
 
     // 设置面板
-    const { settingPanelVisible } = usePluginSettingPanel(pluginId);
-    const openSettingPanel = () => {
-      settingPanelVisible.value = true;
-    };
+    const { settingPanelVisible, showSettingPanel } = usePluginSettingPanel(pluginId);
 
     // 插件操作
     const {
@@ -266,7 +263,7 @@ export default {
     });
 
     expose({
-      openSettingPanel,
+      showSettingPanel,
       pluginId,
     });
 

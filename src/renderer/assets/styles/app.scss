@@ -21,12 +21,7 @@ html {
   user-select: text;
 }
 
-#app.theme--light ::-webkit-scrollbar {
-  width: 16px;
-  background-color: #fff;
-}
-
-#app.theme--dark ::-webkit-scrollbar {
+::-webkit-scrollbar {
   width: 16px;
   background-color: #1e1e1e;
 }
@@ -41,6 +36,14 @@ html {
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: #606060cc;
+}
+
+.v-theme--light ::-webkit-scrollbar {
+  background-color: #fff;
+}
+
+.v-theme--dark ::-webkit-scrollbar {
+  background-color: #1e1e1e;
 }
 
 a {

@@ -70,7 +70,7 @@
           v-for="plugin in pluginPages"
           :key="plugin.packageName"
           :to="plugin.windowMode ? null : { name: 'PluginPage', params: { packageName: plugin.packageName } }"
-          :open="plugin.windowMode ? { id: plugin.packageName, windowUrl: plugin.windowUrl, options: plugin.windowOptions } : null"
+          :open="plugin.windowMode ? plugin.packageName : null"
           :image="plugin.icon ? plugin.icon : defaultIcon"
           :tooltip="plugin.title"
           :isDev="plugin.dev"

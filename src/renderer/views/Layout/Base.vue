@@ -5,8 +5,6 @@
 
       <v-spacer />
 
-      <div class="plugin-controls fill-height"></div>
-
       <window-controls :is-maximize="isMaximize"></window-controls>
     </v-system-bar>
 
@@ -18,11 +16,15 @@
       <div class="d-flex flex-column fill-height" id="app-main-container">
         <div class="scroll-content flex">
           <router-view v-slot="{ Component, route }">
-            <v-scroll-y-transition mode="out-in">
+            <v-fade-transition
+              mode="out-in"
+              @after-enter="onEnter"
+              @before-leave="onLeave"
+            >
               <keep-alive>
                 <component :is="Component" :key="route.path" />
               </keep-alive>
-            </v-scroll-y-transition>
+            </v-fade-transition>
           </router-view>
         </div>
       </div>
@@ -34,6 +36,7 @@
 
 <script>
 import {
+  nextTick,
   ref,
   onMounted,
   onUnmounted,
@@ -74,6 +77,14 @@ export default {
       }
       return null;
     });
+    const onEnter = () => {
+      nextTick(() => {
+        store.pageTransitionActive = false;
+      });
+    };
+    const onLeave = () => {
+      store.pageTransitionActive = true;
+    };
 
     onMounted(() => {
       onMaximizeStatusChange();
@@ -86,6 +97,8 @@ export default {
     return {
       isMaximize,
       plugin,
+      onEnter,
+      onLeave,
     };
   },
 };
@@ -95,10 +108,6 @@ export default {
 .system-bar {
   -webkit-app-region: drag;
   z-index: 300;
-
-  .plugin-controls {
-    -webkit-app-region: no-drag;
-  }
 }
 
 #app-main-container > .scroll-content {

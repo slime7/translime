@@ -491,7 +491,7 @@ class PluginLoader extends EventEmitter {
         label: '设置',
         visible: (plugin.enabled && !!plugin.settingMenu && !!plugin.settingMenu.length),
         click() {
-          ipcEv.sendToClient(`${ipcType.OPEN_PLUGIN_SETTING_PANEL}:${packageName}`, {
+          ipcEv.sendToClient(ipcType.OPEN_PLUGIN_SETTING_PANEL, {
             packageName,
           });
         },
