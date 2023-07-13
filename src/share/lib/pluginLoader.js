@@ -7,6 +7,7 @@ import childProcess from 'child_process';
 import { createRequire } from 'module';
 import tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import mainStore from '@pkg/main/utils/useMainStore';
 
 const requireFresh = createRequire(import.meta.url);
 const APPDATA_PATH = app.getPath('userData');
@@ -17,8 +18,8 @@ const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
 const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
 const PLUGIN_PACKAGE_DIR = path.join(PLUGIN_DIR, 'package');
 const NPM_EXEC_PATH = import.meta.env.DEV
-  ? path.join(global.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
-  : path.join(global.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  ? path.join(mainStore.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
+  : path.join(mainStore.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
 
@@ -26,7 +27,7 @@ async function readPluginPackageInfo(filePath) {
   return new Promise((resolve, reject) => {
     const fileStream = fs.createReadStream(filePath);
     const unzipStream = fileStream.pipe(zlib.createGunzip()); // 使用zlib库中的createGunzip方法将压缩包解压缩
-    const extractStream = unzipStream.pipe(tar.extract({ cwd: global.TEMP_DIR })); // 使用tar库中的extract方法解压缩后提取文件
+    const extractStream = unzipStream.pipe(tar.extract({ cwd: mainStore.TEMP_DIR })); // 使用tar库中的extract方法解压缩后提取文件
 
     let found = false; // 添加一个标志来记录是否找到目标文件
 
@@ -116,7 +117,7 @@ const readPlugin = (pluginPath, devPlugins = null) => {
   }
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
-  plugin.enabled = global.store.get(`plugin.${plugin.packageName}.enabled`, true);
+  plugin.enabled = mainStore.config.get(`plugin.${plugin.packageName}.enabled`, true);
   if (!devPlugins) {
     plugin.dev = true;
   }
@@ -127,7 +128,7 @@ const readPlugin = (pluginPath, devPlugins = null) => {
 const execNpmCommand = (cmd, module, options = {}) => {
   const internalOptions = {
     ...{
-      registry: global.store.get('setting.registry', 'https://registry.npmmirror.com/'),
+      registry: mainStore.config.get('setting.registry', 'https://registry.npmmirror.com/'),
     },
     ...options,
   };
@@ -247,7 +248,7 @@ class PluginLoader extends EventEmitter {
     } catch (dErr) {
       fs.mkdirSync(PLUGIN_MODULES_PATH_DEV);
     }
-    const showDevPlugin = global.store.get('setting.showDevPlugin', false);
+    const showDevPlugin = mainStore.config.get('setting.showDevPlugin', false);
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
     const devDeps = showDevPlugin ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV) : [];
@@ -320,11 +321,11 @@ class PluginLoader extends EventEmitter {
       }
     }
     pluginMain.enabled = true;
-    global.store.set(`plugin.${plugin.packageName}.enabled`, true);
+    mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
       mergedPlugin.ipcHandlers.forEach((handler) => {
-        global.ipc.appendHandler(`${handler.type}@${mergedPlugin.packageName}`, handler.handler);
+        mainStore.ipc().appendHandler(`${handler.type}@${mergedPlugin.packageName}`, handler.handler);
       });
     }
     mergedPlugin.windowOptions = {};
@@ -332,7 +333,7 @@ class PluginLoader extends EventEmitter {
       mergedPlugin.windowMode = true;
       mergedPlugin.windowOptions = pluginMain.windowOptions || {};
     } else if (typeof mergedPlugin.windowMode === 'undefined') {
-      mergedPlugin.windowMode = global.store.get(`plugin.${plugin.packageName}.windowMode`, false);
+      mergedPlugin.windowMode = mainStore.config.get(`plugin.${plugin.packageName}.windowMode`, false);
     }
     if (!init) {
       processPlugin(mergedPlugin);
@@ -349,7 +350,7 @@ class PluginLoader extends EventEmitter {
     // 移除 ipc
     if (plugin.ipcHandlers && plugin.ipcHandlers.length) {
       plugin.ipcHandlers.forEach((handler) => {
-        global.ipc.removeHandler(`${handler.type}@${plugin.packageName}`);
+        mainStore.ipc().removeHandler(`${handler.type}@${plugin.packageName}`);
       });
     }
     // 调用插件卸载方法
@@ -357,8 +358,8 @@ class PluginLoader extends EventEmitter {
       plugin.pluginWillUnload();
     }
     // 关闭插件窗口
-    if (global.childWins[`plugin-window-${packageName}`]) {
-      global.childWins[`plugin-window-${packageName}`].close();
+    if (mainStore.getChildWin(`plugin-window-${packageName}`)) {
+      mainStore.getChildWin(`plugin-window-${packageName}`).close();
     }
     // 删除 require 缓存
     const findCacheIndex = Object.keys(requireFresh.cache).findIndex((k) => k.includes(`${path.sep}${plugin.packageName}${path.sep}`));
@@ -374,7 +375,7 @@ class PluginLoader extends EventEmitter {
       const p = readPlugin(plugin.pluginPath, [packageName]);
       p.enabled = false;
       this.plugins.push(p);
-      global.store.set(`plugin.${plugin.packageName}.enabled`, false);
+      mainStore.config.set(`plugin.${plugin.packageName}.enabled`, false);
     }
   }
 
@@ -504,9 +505,9 @@ class PluginLoader extends EventEmitter {
         visible: (!!plugin.ui && !plugin.windowUrl),
         click() {
           plugin.windowMode = !plugin.windowMode;
-          global.store.set(`plugin.${packageName}.windowMode`, plugin.windowMode);
-          if (!plugin.windowMode && global.childWins[`plugin-window-${packageName}`]) {
-            global.childWins[`plugin-window-${packageName}`].close();
+          mainStore.config.set(`plugin.${packageName}.windowMode`, plugin.windowMode);
+          if (!plugin.windowMode && mainStore.getChildWin(`plugin-window-${packageName}`)) {
+            mainStore.getChildWin(`plugin-window-${packageName}`).close();
           }
           ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
         },

@@ -2,11 +2,14 @@ import {
   app,
   BrowserWindow,
   ipcMain,
+  nativeTheme,
   screen,
 } from 'electron';
 import Store from 'electron-store';
 import { join } from 'path';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createProtocol from './utils/createProtocol';
+import mainStore from './utils/useMainStore';
 import Ipc from './Ipc';
 
 export default async () => {
@@ -27,10 +30,10 @@ export default async () => {
     width,
     height,
     maximize,
-  } = global.store.get('window', defaultWin);
+  } = mainStore.config.get('window', defaultWin);
   maximize = false;
   // Create the browser window.
-  global.win = new BrowserWindow({
+  const win = new BrowserWindow({
     x,
     y,
     width,
@@ -47,37 +50,52 @@ export default async () => {
       webviewTag: true,
     },
   });
+  mainStore.set('win', win);
   Store.initRenderer();
-  const ipc = new Ipc(ipcMain, global.win.webContents);
-  global.ipc = ipc;
+  const ipc = new Ipc(ipcMain, mainStore.getWin().webContents);
+  mainStore.set('ipc', ipc);
 
-  global.win.on('maximize', () => {
+  mainStore.getWin().on('maximize', () => {
     maximize = true;
     ipc.sendToClient('set-maximize-status', true);
   });
 
-  global.win.on('unmaximize', () => {
+  mainStore.getWin().on('unmaximize', () => {
     maximize = false;
     ipc.sendToClient('set-maximize-status', false);
   });
 
+  ipcMain.handle('appConfigStore', (event, method, ...rest) => {
+    const data = mainStore.config[method](...rest);
+    return Promise.resolve({ data, err: null });
+  });
+
+  nativeTheme.on('updated', () => {
+    if (mainStore.ipc()) {
+      mainStore.ipc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors });
+      Object.keys(mainStore.getChildWin()).forEach((windowKey) => {
+        mainStore.ipc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors }, mainStore.getChildWin(windowKey).webContents);
+      });
+    }
+  });
+
   if (import.meta.env.VITE_DEV_SERVER_URL !== undefined && import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
     // Load the url of the dev server if in development mode
-    await global.win.loadURL(import.meta.env.VITE_DEV_SERVER_URL);
-    if (!process.env.IS_TEST) global.win.webContents.openDevTools({ mode: 'undocked' });
+    await mainStore.getWin().loadURL(import.meta.env.VITE_DEV_SERVER_URL);
+    if (!process.env.IS_TEST) mainStore.getWin().webContents.openDevTools({ mode: 'undocked' });
   } else {
     createProtocol('app');
     // Load the index.html when not in development
-    global.win.loadURL('app://./index.html');
+    mainStore.getWin().loadURL('app://./index.html');
   }
 
-  global.win.on('close', () => {
+  mainStore.getWin().on('close', () => {
     if (!maximize) {
-      const pos = global.win.getPosition();
-      const size = global.win.getSize();
+      const pos = mainStore.getWin().getPosition();
+      const size = mainStore.getWin().getSize();
       [x, y, width, height] = [...pos, ...size];
     }
-    global.store.set('window', {
+    mainStore.config.set('window', {
       x,
       y,
       width,
@@ -86,8 +104,8 @@ export default async () => {
     });
   });
 
-  global.win.on('closed', () => {
-    global.win = null;
+  mainStore.getWin().on('closed', () => {
+    mainStore.set('win', null);
     app.quit();
   });
 };

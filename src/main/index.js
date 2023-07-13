@@ -3,24 +3,24 @@ import {
   ipcMain,
   protocol,
 } from 'electron';
-import '@pkg/main/utils/global';
+import mainStore from '@pkg/main/utils/useMainStore';
 import pluginLoader from '@pkg/share/lib/pluginLoader';
 import createMainWindow from './main';
 import createLaunchWindow from './launch';
 import createTray from './tray';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
-global.mainProcessLock = app.requestSingleInstanceLock();
-if (!global.mainProcessLock) {
+mainStore.set('mainProcessLock', app.requestSingleInstanceLock());
+if (!mainStore.get('mainProcessLock')) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // 当运行第二个实例时,将会聚焦到 global.win 这个窗口
-    if (global.win) {
-      if (global.win.isMinimized()) {
-        global.win.restore();
+    // 当运行第二个实例时,将会聚焦到 win 这个窗口
+    if (mainStore.getWin()) {
+      if (mainStore.getWin().isMinimized()) {
+        mainStore.getWin().restore();
       }
-      global.win.focus();
+      mainStore.getWin().focus();
     }
   });
 }
@@ -46,13 +46,13 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   // On macOS it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
-  if (global.win === null) {
+  if (mainStore.getWin() === null) {
     createMainWindow();
   }
 });
 
 app.on('will-quit', () => {
-  global.plugin.appClose();
+  mainStore.get('pluginLoader').appClose();
 });
 
 app.whenReady()
@@ -80,15 +80,15 @@ if (isDevelopment) {
 }
 
 ipcMain.on('main-renderer-ready', () => {
-  if (global.launchWin) {
-    global.launchWin.close();
-    global.launchWin = null;
+  if (mainStore.get('launchWin')) {
+    mainStore.get('launchWin').close();
+    mainStore.set('launchWin', null);
   }
-  global.win.show();
+  mainStore.getWin().show();
 
   // 开始加载插件
-  global.plugin = pluginLoader;
-  pluginLoader.getPlugins();
+  mainStore.set('pluginLoader', pluginLoader);
+  mainStore.get('pluginLoader').getPlugins();
 });
 
 // Exit cleanly on request from parent process in development mode.
