@@ -133,10 +133,9 @@
           class="ma-3"
           size="125"
           tile
-          v-if="!plugin.searchResultItem"
+          v-if="!plugin.searchResultItem && plugin.icon"
         >
-          <v-img v-if="plugin.icon" :src="plugin.icon" />
-          <v-img v-else :src="defaultIcon" />
+          <v-img :src="plugin.icon" />
         </v-avatar>
       </div>
 
@@ -162,7 +161,6 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import useAxios from '@/hooks/useAxios';
-import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
 import usePluginActions from './hooks/usePluginActions';
@@ -268,7 +266,6 @@ export default {
     });
 
     return {
-      defaultIcon,
       settingPanelVisible,
       install,
       enable,

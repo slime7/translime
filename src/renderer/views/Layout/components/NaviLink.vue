@@ -25,7 +25,7 @@
           >
             <v-icon v-if="icon" :color="isHovering || isExactActive ? 'white' : color">{{ icon }}</v-icon>
             <img v-else-if="image" :src="image" alt="" width="56" />
-            <div v-else :class="isHovering || isExactActive ? 'white--text' : textColor">
+            <div v-else class="text-no-wrap text-truncate" :class="isHovering || isExactActive ? 'white--text' : textColor">
               <slot></slot>
             </div>
           </v-avatar>
@@ -61,7 +61,7 @@
         >
           <v-icon v-if="icon" :color="isHovering ? 'white' : color">{{ icon }}</v-icon>
           <img v-else-if="image" :src="image" alt="" width="56" />
-          <div v-else :class="isHovering ? 'white--text' : textColor">
+          <div v-else class="text-no-wrap text-truncate" :class="isHovering ? 'white--text' : textColor">
             <slot></slot>
           </div>
         </v-avatar>

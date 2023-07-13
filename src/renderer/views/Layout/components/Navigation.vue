@@ -71,7 +71,7 @@
           :key="plugin.packageName"
           :to="plugin.windowMode ? null : { name: 'PluginPage', params: { packageName: plugin.packageName } }"
           :open="plugin.windowMode ? plugin.packageName : null"
-          :image="plugin.icon ? plugin.icon : defaultIcon"
+          :image="plugin.icon ? plugin.icon : null"
           :tooltip="plugin.title"
           :isDev="plugin.dev"
         >
@@ -87,7 +87,6 @@ import { computed } from 'vue';
 import NaviLink from '@/views/Layout/components/NaviLink.vue';
 import useGlobalStore from '@/store/globalStore';
 import useAlert from '@/hooks/useAlert';
-import defaultIcon from '../../../assets/plugin-default-image.png';
 
 export default {
   name: 'LayoutNavigation',
@@ -107,7 +106,6 @@ export default {
 
     return {
       pluginPages,
-      defaultIcon,
       showNotification,
     };
   },
