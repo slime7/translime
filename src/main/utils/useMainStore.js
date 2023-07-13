@@ -1,8 +1,10 @@
 import path from 'path';
 import { app } from 'electron';
+import pkg from '@pkg/../package.json';
 import appConfigStore from './appConfigStore';
 
 const useMainStore = () => {
+  const APP_VERSION = pkg.version;
   const ROOT = path.join(__dirname, '..');
   const APPDATA_PATH = app.getPath('userData');
   const TEMP_DIR = app.getPath('temp');
@@ -31,6 +33,7 @@ const useMainStore = () => {
   };
 
   return {
+    APP_VERSION,
     ROOT,
     APPDATA_PATH,
     TEMP_DIR,

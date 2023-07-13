@@ -8,7 +8,6 @@ import {
   nativeTheme,
 } from 'electron';
 import { join } from 'path';
-import pkg from '@pkg/../package.json';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '@pkg/main/utils/createWindow';
 import mainStore from '@pkg/main/utils/useMainStore';
@@ -58,7 +57,7 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.APP_VERSIONS](ipcId) {
     const versions = {
-      app: pkg.version,
+      app: mainStore.APP_VERSION,
       electron: process.versions.electron,
       chrome: process.versions.chrome,
       v8: process.versions.v8,
