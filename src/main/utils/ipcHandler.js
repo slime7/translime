@@ -269,7 +269,7 @@ const ipcHandler = (ipc) => ({
       } else {
         mainStore.config.set(`plugin.${packageName}.settings.${key}`, settings);
       }
-      global?.plugin.onPluginSettingSave(packageName);
+      mainStore.get('pluginLoader')?.onPluginSettingSave(packageName);
       resolve(true);
     });
   },

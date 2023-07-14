@@ -7,6 +7,13 @@ const createTray = () => {
 
   const items = [
     {
+      label: 'translime',
+      enabled: false,
+    },
+    {
+      type: 'separator',
+    },
+    {
       label: '退出',
       click() {
         if (mainStore.getWin()) {
@@ -17,7 +24,7 @@ const createTray = () => {
   ];
   const menu = Menu.buildFromTemplate(items);
 
-  mainStore.get('tray').setToolTip('translime');
+  mainStore.get('tray').setToolTip(`translime ${mainStore.APP_VERSION}`);
   mainStore.get('tray').setContextMenu(menu);
   mainStore.get('tray').on('double-click', () => {
     if (mainStore.getWin()) {
