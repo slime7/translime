@@ -7,7 +7,7 @@ import {
   clipboard,
   nativeTheme,
 } from 'electron';
-import { join } from 'path';
+import { join, sep } from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '@pkg/main/utils/createWindow';
 import mainStore from '@pkg/main/utils/useMainStore';
@@ -69,7 +69,8 @@ const ipcHandler = (ipc) => ({
     shell.openExternal(url);
   },
   [ipcType.OPEN_DIR]({ dirPath }) {
-    shell.openPath(dirPath)
+    const sysDirPath = dirPath.replaceAll('/', sep);
+    shell.openPath(sysDirPath)
       .catch((err) => {
         console.error(err);
       });
