@@ -25,7 +25,7 @@
           >
             <v-icon v-if="icon" :color="isHovering || isExactActive ? 'white' : color">{{ icon }}</v-icon>
             <img v-else-if="image" :src="image" alt="" width="56" />
-            <div v-else :class="isHovering || isExactActive ? 'white--text' : textColor">
+            <div v-else class="text-no-wrap text-truncate" :class="isHovering || isExactActive ? 'white--text' : textColor">
               <slot></slot>
             </div>
           </v-avatar>
@@ -43,7 +43,7 @@
 
     <a
       class="navi-btn text-decoration-none d-block ease-animation"
-      v-else
+      v-else-if="open"
       v-bind="props"
       @click="openPluginWindow"
     >
@@ -61,7 +61,7 @@
         >
           <v-icon v-if="icon" :color="isHovering ? 'white' : color">{{ icon }}</v-icon>
           <img v-else-if="image" :src="image" alt="" width="56" />
-          <div v-else :class="isHovering ? 'white--text' : textColor">
+          <div v-else class="text-no-wrap text-truncate" :class="isHovering ? 'white--text' : textColor">
             <slot></slot>
           </div>
         </v-avatar>
@@ -79,16 +79,15 @@
 </template>
 
 <script>
-import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
+import { openPluginWindow } from '@/utils';
 
 export default {
   name: 'NaviLink',
 
   props: {
     to: [Object, String, null, undefined],
-    open: [Object, null, undefined],
+    open: [String, null, undefined],
     color: {
       default: 'primary',
       type: String,
@@ -117,34 +116,12 @@ export default {
 
   setup(props) {
     const store = useGlobalStore();
-    const ipc = useIpc();
-
-    const openPluginWindow = () => {
-      const plugin = store.plugin(props.open.id);
-      const url = props.open.windowUrl
-        ? props.open.windowUrl
-        : `plugin-index.html?pluginId=${props.open.id}&dark=${store.dark}`;
-      const options = JSON.parse(JSON.stringify(props.open.options));
-      delete options.windowUrl;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('plugin window url: ', url);
-        console.log('plugin window options: ', options);
-      }
-      ipc.send(ipcType.OPEN_NEW_WINDOW, {
-        name: `plugin-window-${props.open.id}`,
-        options: {
-          windowUrl: url,
-          appMenu: null,
-          frame: false,
-          titleBarStyle: 'hidden',
-          title: plugin.title,
-          ...options,
-        },
-      });
-    };
 
     return {
-      openPluginWindow,
+      openPluginWindow: () => {
+        const plugin = store.plugin(props.open);
+        openPluginWindow(plugin, store.dark);
+      },
     };
   },
 };

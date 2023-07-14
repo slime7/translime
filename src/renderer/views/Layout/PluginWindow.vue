@@ -18,6 +18,8 @@
       <div class="d-flex flex-column fill-height" id="app-main-container">
         <div class="scroll-content flex">
           <div class="plugin-container">
+            <plugin-title-bar :plugin="plugin" :visible="appBarVisible" v-if="plugin" />
+
             <plugin-ui-loader v-if="loaderVisible" :plugin-path="plugin.ui" :plugin-id="plugin.packageName" />
           </div>
         </div>
@@ -36,6 +38,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
 import { useIpc } from '@/hooks/electron';
 import PluginUiLoader from '@/views/plugins/PluginUiLoader.vue';
+import PluginTitleBar from '@/views/Layout/components/PluginTitleBar.vue';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
@@ -51,16 +54,18 @@ export default {
   name: 'LayoutPluginWindow',
 
   components: {
+    PluginTitleBar,
     WindowControls,
     PluginUiLoader,
   },
 
   setup() {
+    const ipc = useIpc();
     const pluginId = ref('');
     const isMaximize = ref(false);
     const plugin = ref(null);
     const loaderVisible = ref(false);
-    const ipc = useIpc();
+    const appBarVisible = ref(false);
     const vTheme = useVTheme();
 
     const getPluginId = () => {
@@ -101,6 +106,7 @@ export default {
       await getIsMaximize();
       await getPlugin();
       loaderVisible.value = plugin.value && plugin.value.ui;
+      appBarVisible.value = true;
     });
 
     onUnmounted(() => {
@@ -113,6 +119,7 @@ export default {
       plugin,
       getIsMaximize,
       loaderVisible,
+      appBarVisible,
     };
   },
 };

@@ -9,6 +9,7 @@ export const OPEN_LINK = 'open-link';
 export const OPEN_DIR = 'open-dir';
 export const OPEN_APP_PATH = 'open-app-path';
 export const RELOAD = 'reload';
+export const RELAUNCH = 'relaunch';
 export const SHOW_OPEN_DIALOG = 'show-open-dialog';
 export const OPEN_NEW_WINDOW = 'open-new-window';
 export const GET_PATH = 'get-path';
@@ -36,6 +37,7 @@ export const SHOW_TEXT_EDIT_CONTEXT = 'show-text-edit-context';
 export const THEME_UPDATED = 'theme-updated';
 export const GET_NATIVE_THEME = 'get-native-theme';
 export const SET_NATIVE_THEME = 'set-native-theme';
+export const GET_LAUNCH_ARGV = 'get-launch-argv';
 
 export default {
   DEVTOOLS,
@@ -49,6 +51,7 @@ export default {
   OPEN_DIR,
   OPEN_APP_PATH,
   RELOAD,
+  RELAUNCH,
   SHOW_OPEN_DIALOG,
   OPEN_NEW_WINDOW,
   GET_PATH,
@@ -75,4 +78,5 @@ export default {
   GET_NATIVE_THEME,
   SET_NATIVE_THEME,
   SHOW_DEV_PLUGIN,
+  GET_LAUNCH_ARGV,
 };

@@ -34,6 +34,32 @@
       >
         关于
       </navi-link>
+
+      <v-hover v-slot="{ isHovering, props }">
+        <a
+          href="javascript:;"
+          class="navi-btn text-decoration-none d-block ease-animation"
+          v-bind="props"
+          @click="showNotification"
+        >
+
+          <v-avatar
+            class="transition-radius"
+            size="56"
+            :color="isHovering ? 'primary' : 'grey-darken-2'"
+            :rounded="isHovering ? 'xl' : 'circle'"
+          >
+            <v-icon :color="isHovering ? 'white' : 'primary'">notifications</v-icon>
+          </v-avatar>
+
+          <v-tooltip
+            location="right"
+            activator="parent"
+          >
+            <span>通知栏</span>
+          </v-tooltip>
+        </a>
+      </v-hover>
     </div>
 
     <template v-if="pluginPages.length">
@@ -44,8 +70,8 @@
           v-for="plugin in pluginPages"
           :key="plugin.packageName"
           :to="plugin.windowMode ? null : { name: 'PluginPage', params: { packageName: plugin.packageName } }"
-          :open="plugin.windowMode ? { id: plugin.packageName, windowUrl: plugin.windowUrl, options: plugin.windowOptions } : null"
-          :image="plugin.icon ? plugin.icon : defaultIcon"
+          :open="plugin.windowMode ? plugin.packageName : null"
+          :image="plugin.icon ? plugin.icon : null"
           :tooltip="plugin.title"
           :isDev="plugin.dev"
         >
@@ -60,7 +86,7 @@
 import { computed } from 'vue';
 import NaviLink from '@/views/Layout/components/NaviLink.vue';
 import useGlobalStore from '@/store/globalStore';
-import defaultIcon from '../../../assets/plugin-default-image.png';
+import useAlert from '@/hooks/useAlert';
 
 export default {
   name: 'LayoutNavigation',
@@ -71,12 +97,16 @@ export default {
 
   setup() {
     const store = useGlobalStore();
+    const alert = useAlert();
 
     const pluginPages = computed(() => store.plugins.filter((p) => p.enabled && !(!p.ui && !p.windowUrl)));
+    const showNotification = () => {
+      alert.showDrawer();
+    };
 
     return {
       pluginPages,
-      defaultIcon,
+      showNotification,
     };
   },
 };
@@ -89,6 +119,10 @@ export default {
 </style>
 
 <style scoped lang="scss">
+.transition-radius {
+  transition-property: border-radius;
+}
+
 .navi-panel {
   :deep(.navi-btn) {
     height: 56px;

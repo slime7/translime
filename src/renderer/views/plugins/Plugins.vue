@@ -98,6 +98,7 @@
           <plugin-card
             :plugin="pluginItem"
             :disabled="!!loading.uninstall"
+            ref="pluginCardRefs"
             @uninstall="uninstallPlugins"
             @disable="disablePlugin"
             @enable="enablePlugin"
@@ -147,9 +148,10 @@
 import {
   ref,
   reactive,
-  onMounted,
-  onUnmounted,
+  onActivated,
+  watch,
 } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
@@ -173,6 +175,8 @@ export default {
     const alert = useAlert();
     const dialog = useDialog();
     const axios = useAxios();
+    const route = useRoute();
+    const router = useRouter();
     const loading = reactive({
       install: false,
       uninstall: false,
@@ -355,14 +359,28 @@ export default {
       }
     };
 
-    onMounted(() => {
-      ipc.on(ipcType.PLUGINS_CHANGED, () => {
-        getPlugins();
-      });
-    });
+    const pluginCardRefs = ref(null);
 
-    onUnmounted(() => {
-      ipc.detach(ipcType.PLUGINS_CHANGED);
+    const openPluginSettingPanel = () => {
+      const query = { ...route.query };
+      const settingPluginId = query.setting;
+      if (settingPluginId && pluginCardRefs.value && pluginCardRefs.value.length) {
+        const findPluginRef = pluginCardRefs.value.find((r) => r.pluginId === settingPluginId);
+        if (findPluginRef) {
+          findPluginRef.showSettingPanel();
+          delete query.setting;
+          router.replace({
+            query,
+          });
+        }
+      }
+    };
+    watch(() => route.query.t, () => {
+      // 另一个打开设置面板指令
+      openPluginSettingPanel();
+    });
+    onActivated(() => {
+      openPluginSettingPanel();
     });
 
     return {
@@ -382,6 +400,7 @@ export default {
       clearSearchResult,
       loading,
       showTextEditContextMenu,
+      pluginCardRefs,
     };
   },
 };

@@ -34,7 +34,7 @@ const useAlertStore = defineStore('alertStore', {
     async push({
       msg,
       type = 'info',
-      timeout = 6000,
+      timeout = 0,
     }) {
       const notifyTypes = {
         info: '提示',
@@ -66,6 +66,7 @@ const useAlertStore = defineStore('alertStore', {
           await notify.show({
             title: notifyTypes[type],
             body: msg,
+            timeoutType: 'never',
           }, timeout);
         }
       } else {
@@ -78,7 +79,7 @@ const useAlertStore = defineStore('alertStore', {
         await notify.show({
           title: notifyTypes[type],
           body: msg,
-          timeoutType: 'never',
+          timeoutType: 'default',
         });
       }
     },

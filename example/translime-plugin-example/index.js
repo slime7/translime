@@ -3,7 +3,7 @@ const id = 'translime-plugin-example';
 // 加载时执行
 const pluginDidLoad = () => {
   console.log('plugin loaded');
-  const setting = global.store.get(`plugin.${id}.settings`, {});
+  const setting = global.mainStore.config.get(`plugin.${id}.settings`, {});
   console.log('settings: ', setting);
 };
 

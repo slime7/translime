@@ -133,10 +133,9 @@
           class="ma-3"
           size="125"
           tile
-          v-if="!plugin.searchResultItem"
+          v-if="!plugin.searchResultItem && plugin.icon"
         >
-          <v-img v-if="plugin.icon" :src="plugin.icon" />
-          <v-img v-else :src="defaultIcon" />
+          <v-img :src="plugin.icon" />
         </v-avatar>
       </div>
 
@@ -162,7 +161,6 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import useAxios from '@/hooks/useAxios';
-import defaultIcon from '../../assets/plugin-default-image.png';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
 import usePluginActions from './hooks/usePluginActions';
@@ -187,7 +185,7 @@ export default {
 
   emits: ['install', 'uninstall', 'disable', 'enable'],
 
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const { plugin } = toRefs(props);
     const pluginId = plugin.value.packageName;
     const ipc = useIpc();
@@ -210,7 +208,7 @@ export default {
     };
 
     // 设置面板
-    const { settingPanelVisible } = usePluginSettingPanel(pluginId);
+    const { settingPanelVisible, showSettingPanel } = usePluginSettingPanel(pluginId);
 
     // 插件操作
     const {
@@ -262,8 +260,12 @@ export default {
       selectedVersion.value = '';
     });
 
+    expose({
+      showSettingPanel,
+      pluginId,
+    });
+
     return {
-      defaultIcon,
       settingPanelVisible,
       install,
       enable,

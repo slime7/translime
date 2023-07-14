@@ -2,6 +2,7 @@ import {
   screen,
 } from 'electron';
 import createWindow from './utils/createWindow';
+import mainStore from './utils/useMainStore';
 
 export default () => {
   const { workArea } = screen.getPrimaryDisplay();
@@ -22,7 +23,7 @@ export default () => {
     height,
   } = defaultWin;
   // Create the browser window.
-  global.launchWin = createWindow('launch.html', {
+  const launchWin = createWindow('launch.html', {
     x,
     y,
     width,
@@ -38,4 +39,5 @@ export default () => {
       sandbox: false,
     },
   });
+  mainStore.set('launchWin', launchWin);
 };

@@ -1,26 +1,27 @@
 import { Menu, nativeImage, Tray } from 'electron';
 import icon from '@pkg/share/static/icon.png';
+import mainStore from '@pkg/main/utils/useMainStore';
 
 const createTray = () => {
-  global.tray = new Tray(nativeImage.createFromDataURL(icon));
+  mainStore.set('tray', new Tray(nativeImage.createFromDataURL(icon)));
 
   const items = [
     {
       label: '退出',
       click() {
-        if (global.win) {
-          global.win.close();
+        if (mainStore.getWin()) {
+          mainStore.getWin().close();
         }
       },
     },
   ];
   const menu = Menu.buildFromTemplate(items);
 
-  global.tray.setToolTip('translime');
-  global.tray.setContextMenu(menu);
-  global.tray.on('double-click', () => {
-    if (global.win) {
-      global.win.show();
+  mainStore.get('tray').setToolTip('translime');
+  mainStore.get('tray').setContextMenu(menu);
+  mainStore.get('tray').on('double-click', () => {
+    if (mainStore.getWin()) {
+      mainStore.getWin().show();
     }
   });
 };

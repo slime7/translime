@@ -3,7 +3,8 @@
 </template>
 
 <script>
-import { onMounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
@@ -20,6 +21,7 @@ export default {
     const store = globalStore();
     const theme = useTheme();
     const alert = useAlert();
+    const router = useRouter();
 
     const initAppConfig = () => {
       store.initAppConfig();
@@ -55,6 +57,31 @@ export default {
         }
       });
     };
+    const handleAppArgv = () => {
+      ipc.send(ipcType.GET_LAUNCH_ARGV);
+      ipc.on(ipcType.GET_LAUNCH_ARGV, (argv) => {
+        store.setAppArgv(argv);
+      });
+    };
+    const onShowSettingPanel = () => {
+      ipc.on(ipcType.OPEN_PLUGIN_SETTING_PANEL, ({ packageName }) => {
+        router.replace({
+          name: 'Plugins',
+          query: { setting: packageName, t: +(new Date()) },
+        });
+      });
+    };
+    const offShowSettingPanel = () => {
+      ipc.detach(ipcType.OPEN_PLUGIN_SETTING_PANEL);
+    };
+    const onUpdatePlugins = () => {
+      ipc.on(ipcType.PLUGINS_CHANGED, () => {
+        getPlugins();
+      });
+    };
+    const offUpdatePlugins = () => {
+      ipc.detach(ipcType.PLUGINS_CHANGED);
+    };
 
     // created
     remoteConsoleListener();
@@ -62,10 +89,18 @@ export default {
     themeUpdated();
     getTheme();
     handleKeyEvent();
+    handleAppArgv();
 
     onMounted(() => {
       ipcRaw.send('main-renderer-ready');
       getPlugins();
+      onUpdatePlugins();
+      onShowSettingPanel();
+    });
+
+    onUnmounted(() => {
+      offUpdatePlugins();
+      offShowSettingPanel();
     });
   },
 };
