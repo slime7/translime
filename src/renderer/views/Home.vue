@@ -7,14 +7,14 @@
 
       <v-row>
         <v-col cols="6">
-          <v-list-item border rounded lines="two" :to="{ name: 'Plugins' }">
+          <v-list-item border rounded lines="two" link v-navi="{ name: 'Plugins' }">
             <v-list-item-title>插件</v-list-item-title>
             <v-list-item-subtitle>安装、管理插件</v-list-item-subtitle>
           </v-list-item>
         </v-col>
 
         <v-col cols="6">
-          <v-list-item border rounded lines="two" :to="{ name: 'Setting' }">
+          <v-list-item border rounded lines="two" link v-navi="{ name: 'Setting' }">
             <v-list-item-title>设置</v-list-item-title>
             <v-list-item-subtitle>插件和用户设置</v-list-item-subtitle>
           </v-list-item>
