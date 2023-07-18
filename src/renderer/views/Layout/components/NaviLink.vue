@@ -4,11 +4,11 @@
       v-if="to"
       :to="to"
       custom
-      v-slot="{ isExactActive, href }"
+      v-slot="{ isExactActive }"
     >
-      <a
+      <div
         class="navi-btn text-decoration-none d-block ease-animation"
-        :href="href"
+        v-navi="to"
         v-bind="props"
       >
         <v-badge
@@ -38,10 +38,10 @@
         >
           <span>{{ tooltip }}</span>
         </v-tooltip>
-      </a>
+      </div>
     </router-link>
 
-    <a
+    <div
       class="navi-btn text-decoration-none d-block ease-animation"
       v-else-if="open"
       v-bind="props"
@@ -74,7 +74,7 @@
       >
         <span>{{ tooltip }}</span>
       </v-tooltip>
-    </a>
+    </div>
   </v-hover>
 </template>
 

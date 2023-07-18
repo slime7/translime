@@ -10,6 +10,7 @@ const pkg = require('../package.json');
 /** @type 'production' | 'development' | 'test' */
 // eslint-disable-next-line no-multi-assign
 const mode = process.env.MODE = process.env.MODE || 'production';
+const buildArgs = process.argv.slice(2);
 
 const packagesConfigs = [
   'src/vite.main.config.js',
@@ -69,7 +70,7 @@ function build() {
         `${outputDir}/package.json`,
         JSON.stringify(pkg, null, 2),
       );
-      builder.build({ config: builderConfig, dir: false, publish: 'never' });
+      builder.build({ config: builderConfig, dir: buildArgs.indexOf('--unpack') > -1, publish: 'never' });
     })
     .catch((err) => {
       console.error(err);
