@@ -156,8 +156,8 @@ import {
   ref,
   computed,
   reactive,
-  onMounted,
   toRaw,
+  watch,
 } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
@@ -198,6 +198,7 @@ export default {
     });
     const settings = reactive({});
     const initSettings = async () => {
+      console.log('init settings');
       const { packageName } = props.plugin;
       loading.getSettings = true;
       const settingsSaved = await ipc.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
@@ -208,8 +209,10 @@ export default {
       }
       loading.getSettings = false;
     };
-    onMounted(() => {
-      initSettings();
+    watch(() => props.modelValue, (v) => {
+      if (v) {
+        initSettings();
+      }
     });
     const parseMenuItem = (settingMenu) => {
       const parsedSettingMenu = [];
