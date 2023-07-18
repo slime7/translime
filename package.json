@@ -16,6 +16,7 @@
     "dev": "node scripts/watch.js",
     "serve": "node scripts/watch.js",
     "build": "rimraf dist && node scripts/build.js",
+    "build:unpack": "rimraf dist && node scripts/build.js --unpack",
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps",
     "lint": "eslint . --ext js,ts,vue"

@@ -19,7 +19,7 @@ const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
 const PLUGIN_PACKAGE_DIR = path.join(PLUGIN_DIR, 'package');
 const NPM_EXEC_PATH = import.meta.env.DEV
   ? path.join(mainStore.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
-  : path.join(mainStore.ROOT, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  : path.join(mainStore.ROOT, '..', 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
 
@@ -134,8 +134,6 @@ const execNpmCommand = (cmd, module, options = {}) => {
   };
   const args = [
     cmd,
-    module,
-    '--save',
   ];
   if (cmd === 'install') {
     args.push(...[
@@ -161,6 +159,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
   if (internalOptions.proxy) {
     args.push(`--proxy=${internalOptions.proxy}`);
   }
+  args.push(module);
   return new Promise((resolve) => {
     const npm = childProcess.fork(NPM_EXEC_PATH, args, {
       cwd: PLUGIN_DIR,
@@ -168,12 +167,12 @@ const execNpmCommand = (cmd, module, options = {}) => {
     });
 
     let output = '';
-    npm.stdout.on('data', (data) => {
-      output += data;
+    npm.stdout?.on('data', (data) => {
+      output += data.toString();
     }).pipe(process.stdout);
 
-    npm.stderr.on('data', (data) => {
-      output += data;
+    npm.stderr?.on('data', (data) => {
+      output += data.toString();
     }).pipe(process.stderr);
 
     npm.on('close', (code) => {
@@ -185,6 +184,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
         resolve({ code, data: output });
       }
     });
+    console.log('npm 执行参数', npm.spawnargs);
   });
 };
 
@@ -384,6 +384,7 @@ class PluginLoader extends EventEmitter {
       const result = await execNpmCommand('install', module);
       if (result.code) {
         reject(new Error(result.data));
+        return;
       }
       try {
         // 启用新插件并加入到 this.plugins
@@ -391,6 +392,7 @@ class PluginLoader extends EventEmitter {
         this.plugins.push(plugin);
       } catch (err) {
         reject(err);
+        return;
       }
       resolve(result.data);
     });

@@ -6,6 +6,9 @@ const config = {
   productName: 'translime',
   appId: 'translime.app',
   asar: true,
+  asarUnpack: [
+    'node_modules/npm',
+  ],
   compression: 'maximum',
   directories: {
     output: 'dist_electron',
