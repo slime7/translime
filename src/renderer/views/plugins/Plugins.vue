@@ -48,7 +48,7 @@
           >
             <plugin-card
               :plugin="pluginItem"
-              :disabled="!!loading.uninstall"
+              :disabled="!!loading.install"
               @install="installPlugins"
             />
           </v-col>
