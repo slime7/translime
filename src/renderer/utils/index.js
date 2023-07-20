@@ -49,10 +49,10 @@ export const selectFileDialog = (win, options = {}) => {
   });
 };
 
-export const openPluginWindow = (plugin, dark = false) => {
+export const openPluginWindow = (plugin, dark = false, appSetting = {}) => {
   const url = plugin.windowUrl
     ? plugin.windowUrl
-    : `plugin-index.html?pluginId=${plugin.packageName}&dark=${dark}`;
+    : `plugin-index.html?pluginId=${plugin.packageName}&dark=${dark}&app-setting=${btoa(JSON.stringify(appSetting))}`;
   const options = JSON.parse(JSON.stringify(plugin.windowOptions));
   delete options.windowUrl;
   if (process.env.NODE_ENV === 'development') {
@@ -64,8 +64,8 @@ export const openPluginWindow = (plugin, dark = false) => {
     options: {
       windowUrl: url,
       appMenu: null,
-      frame: false,
-      titleBarStyle: 'hidden',
+      frame: true,
+      titleBarStyle: appSetting?.useNativeTitleBar ? 'default' : 'hidden',
       title: plugin.title,
       ...options,
     },

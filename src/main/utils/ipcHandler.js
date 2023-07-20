@@ -117,7 +117,7 @@ const ipcHandler = (ipc) => ({
         height: winBound.height,
         minWidth,
         useContentSize: typeof options.useContentSize !== 'undefined' ? options.useContentSize : false,
-        frame: typeof options.frame !== 'undefined' ? options.frame : false,
+        frame: typeof options.frame !== 'undefined' ? options.frame : true,
         titleBarStyle: options.titleBarStyle || 'default',
         titleBarOverlay: typeof options.titleBarOverlay !== 'undefined' ? options.titleBarOverlay : false,
         title: options.title || 'translime',

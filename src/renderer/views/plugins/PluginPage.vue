@@ -62,7 +62,7 @@ export default {
         if (!prevV.windowMode && v.windowMode) {
           // 从嵌入模式转为窗口模式
           if (route.name === 'PluginPage' && route.params.packageName === pluginId.value) {
-            openPluginWindow(plugin.value, store.dark);
+            openPluginWindow(plugin.value, store.dark, store.appSetting);
             router.push({
               name: 'Home',
             });

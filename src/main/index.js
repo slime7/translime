@@ -65,26 +65,26 @@ app.whenReady()
     }
   });
 
-if (isDevelopment) {
-  app.whenReady()
-    .then(() => import('electron-devtools-installer'))
-    .then(({
-      default: installExtension,
-      VUEJS_DEVTOOLS,
-    }) => installExtension.default(VUEJS_DEVTOOLS, {
-      loadExtensionOptions: {
-        allowFileAccess: true,
-      },
-    }))
-    .catch((e) => console.error('Vue Devtools failed to install:', e.toString()));
-}
-
 ipcMain.on('main-renderer-ready', () => {
   if (mainStore.get('launchWin')) {
     mainStore.get('launchWin').close();
     mainStore.set('launchWin', null);
   }
   mainStore.getWin().show();
+
+  if (isDevelopment) {
+    app.whenReady()
+      .then(() => import('electron-devtools-installer'))
+      .then(({
+        default: installExtension,
+        VUEJS_DEVTOOLS,
+      }) => installExtension.default(VUEJS_DEVTOOLS, {
+        loadExtensionOptions: {
+          allowFileAccess: true,
+        },
+      }))
+      .catch((e) => console.error('Vue Devtools failed to install:', e.toString()));
+  }
 
   // 开始加载插件
   mainStore.set('pluginLoader', pluginLoader);

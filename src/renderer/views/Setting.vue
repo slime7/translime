@@ -41,6 +41,18 @@
       </card-radio>
     </div>
 
+    <div>
+      <v-switch
+        class="mt-2"
+        v-model="useNativeTitleBarNext"
+        label="使用系统标题栏(重启后生效)"
+        inset
+        hide-details
+        color="primary"
+        @update:modelValue="onUseNativeTitleBar"
+      />
+    </div>
+
     <v-divider class="mt-4" />
 
     <h3 class="mt-4">插件</h3>
@@ -126,7 +138,12 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import {
+  ref,
+  computed,
+  onMounted,
+  watch,
+} from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
@@ -234,6 +251,15 @@ export default {
       }
     };
 
+    // 原生标题栏设置
+    const useNativeTitleBarNext = ref(store.appSetting.useNativeTitleBar);
+    watch(() => store.appSetting.useNativeTitleBar, () => {
+      useNativeTitleBarNext.value = store.appSetting.useNativeTitleBar;
+    });
+    const onUseNativeTitleBar = (v) => {
+      appConfigStore.set('setting.useNativeTitleBar', !!v);
+    };
+
     onMounted(() => {
       initRegistryLink();
     });
@@ -253,6 +279,8 @@ export default {
       onShowDevPlugin,
       showDevtools,
       relaunch,
+      useNativeTitleBarNext,
+      onUseNativeTitleBar,
     };
   },
 };

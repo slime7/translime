@@ -13,6 +13,7 @@ import mainStore from './utils/useMainStore';
 import Ipc from './Ipc';
 
 export default async () => {
+  app.applicationMenu = null;
   const { workArea } = screen.getPrimaryDisplay();
   const defaultWin = {
     x: workArea.width / 2 - 200,
@@ -32,6 +33,7 @@ export default async () => {
     maximize,
   } = mainStore.config.get('window', defaultWin);
   maximize = false;
+  const useNativeTitleBar = mainStore.config.get('setting.useNativeTitleBar', false);
   // Create the browser window.
   const win = new BrowserWindow({
     x,
@@ -41,7 +43,7 @@ export default async () => {
     frame: true,
     show: false,
     minWidth: 700,
-    titleBarStyle: 'hidden',
+    titleBarStyle: useNativeTitleBar ? 'default' : 'hidden',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -80,9 +82,9 @@ export default async () => {
   });
 
   if (import.meta.env.VITE_DEV_SERVER_URL !== undefined && import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
+    if (!process.env.IS_TEST) mainStore.getWin().webContents.openDevTools({ mode: 'undocked' });
     // Load the url of the dev server if in development mode
     await mainStore.getWin().loadURL(import.meta.env.VITE_DEV_SERVER_URL);
-    if (!process.env.IS_TEST) mainStore.getWin().webContents.openDevTools({ mode: 'undocked' });
   } else {
     createProtocol('app');
     // Load the index.html when not in development

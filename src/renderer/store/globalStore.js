@@ -9,6 +9,7 @@ const useGlobalStore = defineStore('globalStore', {
       registry: '',
       theme: 'system',
       showDevPlugin: false,
+      useNativeTitleBar: true,
     },
     plugins: [],
     dark: false,
@@ -30,6 +31,7 @@ const useGlobalStore = defineStore('globalStore', {
         state.appSetting.registry = registry;
         state.appSetting.theme = await appConfigStore.get('setting.theme', 'system');
         state.appSetting.showDevPlugin = await appConfigStore.get('setting.showDevPlugin', false);
+        state.appSetting.useNativeTitleBar = await appConfigStore.get('setting.useNativeTitleBar', false);
       });
     },
     setAppOpenAtLogin(open) {
@@ -46,6 +48,9 @@ const useGlobalStore = defineStore('globalStore', {
     },
     setAppArgv(argv) {
       this.appArgv = argv;
+    },
+    setUseNativeTitleBar(v) {
+      this.appSetting.useNativeTitleBar = v;
     },
   },
 });

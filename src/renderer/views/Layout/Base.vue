@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar class="system-bar pa-0">
+    <v-system-bar class="system-bar pa-0" v-if="!useNativeTileBar">
       <div class="px-4">translime</div>
 
       <v-spacer />
@@ -41,6 +41,7 @@ import {
   onMounted,
   onUnmounted,
   computed,
+  watch,
 } from 'vue';
 import { useRoute } from 'vue-router';
 import WindowControls from '@/components/WindowControls.vue';
@@ -85,6 +86,14 @@ export default {
     const onLeave = () => {
       store.pageTransitionActive = true;
     };
+    const useNativeTileBar = computed(() => store.appSetting.useNativeTitleBar);
+    watch(() => store.appSetting.useNativeTitleBar, () => {
+      if (useNativeTileBar.value) {
+        document.body.className = '';
+      } else {
+        document.body.className = 'custom-title-bar';
+      }
+    });
 
     onMounted(() => {
       onMaximizeStatusChange();
@@ -99,6 +108,7 @@ export default {
       plugin,
       onEnter,
       onLeave,
+      useNativeTileBar,
     };
   },
 };
