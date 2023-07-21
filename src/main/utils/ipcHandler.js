@@ -16,7 +16,11 @@ const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {
     const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
     if (targetWin) {
-      targetWin.webContents.openDevTools();
+      if (targetWin.webContents.isDevToolsOpened()) {
+        targetWin.webContents.closeDevTools();
+      } else {
+        targetWin.webContents.openDevTools();
+      }
     }
   },
   [ipcType.APP_MAXIMIZE](win = 'app') {

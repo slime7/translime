@@ -12,8 +12,7 @@ import createProtocol from './utils/createProtocol';
 import mainStore from './utils/useMainStore';
 import Ipc from './Ipc';
 
-export default async () => {
-  app.applicationMenu = null;
+export default () => {
   const { workArea } = screen.getPrimaryDisplay();
   const defaultWin = {
     x: workArea.width / 2 - 200,
@@ -81,15 +80,18 @@ export default async () => {
     }
   });
 
-  if (import.meta.env.VITE_DEV_SERVER_URL !== undefined && import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
-    if (!process.env.IS_TEST) mainStore.getWin().webContents.openDevTools({ mode: 'undocked' });
+  if (import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
     // Load the url of the dev server if in development mode
-    await mainStore.getWin().loadURL(import.meta.env.VITE_DEV_SERVER_URL);
+    mainStore.getWin().loadURL(import.meta.env.VITE_DEV_SERVER_URL);
+    if (!process.env.IS_TEST) {
+      mainStore.getWin().webContents.openDevTools({ mode: 'undocked' });
+    }
   } else {
     createProtocol('app');
     // Load the index.html when not in development
     mainStore.getWin().loadURL('app://./index.html');
   }
+  mainStore.getWin().setMenu(null);
 
   mainStore.getWin().on('close', () => {
     if (!maximize) {

@@ -56,7 +56,19 @@ app.on('will-quit', () => {
 });
 
 app.whenReady()
-  .then(() => {
+  .then(async () => {
+    if (isDevelopment) {
+      try {
+        const { default: install, VUEJS_DEVTOOLS } = await import('electron-devtools-installer');
+        await install.default(VUEJS_DEVTOOLS, {
+          loadExtensionOptions: {
+            allowFileAccess: true,
+          },
+        });
+      } catch (err) {
+        console.error('Vue Devtools failed to install:', err.toString());
+      }
+    }
     createLaunchWindow();
     createMainWindow();
     createTray();
@@ -71,20 +83,6 @@ ipcMain.on('main-renderer-ready', () => {
     mainStore.set('launchWin', null);
   }
   mainStore.getWin().show();
-
-  if (isDevelopment) {
-    app.whenReady()
-      .then(() => import('electron-devtools-installer'))
-      .then(({
-        default: installExtension,
-        VUEJS_DEVTOOLS,
-      }) => installExtension.default(VUEJS_DEVTOOLS, {
-        loadExtensionOptions: {
-          allowFileAccess: true,
-        },
-      }))
-      .catch((e) => console.error('Vue Devtools failed to install:', e.toString()));
-  }
 
   // 开始加载插件
   mainStore.set('pluginLoader', pluginLoader);
