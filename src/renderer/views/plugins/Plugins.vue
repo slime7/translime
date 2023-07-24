@@ -97,8 +97,9 @@
         >
           <plugin-card
             :plugin="pluginItem"
-            :disabled="!!loading.uninstall"
+            :disabled="!!loading.uninstall || !!loading.install"
             ref="pluginCardRefs"
+            @install="installPlugins"
             @uninstall="uninstallPlugins"
             @disable="disablePlugin"
             @enable="enablePlugin"
@@ -149,6 +150,7 @@ import {
   ref,
   reactive,
   onActivated,
+  onMounted,
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -381,6 +383,17 @@ export default {
     });
     onActivated(() => {
       openPluginSettingPanel();
+    });
+    const checkUpdate = () => {
+      if (pluginCardRefs.value && pluginCardRefs.value.length) {
+        pluginCardRefs.value.forEach((plugin) => {
+          plugin.getVersions();
+        });
+      }
+    };
+
+    onMounted(() => {
+      checkUpdate();
     });
 
     return {

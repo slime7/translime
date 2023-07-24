@@ -45,6 +45,7 @@
                 icon
                 height="40px"
                 width="40px"
+                title="启用"
                 @click="enable"
               >
                 <v-icon>play_arrow</v-icon>
@@ -57,6 +58,7 @@
                 icon
                 height="40px"
                 width="40px"
+                title="禁用"
                 @click="disable"
               >
                 <v-icon>pause</v-icon>
@@ -68,9 +70,24 @@
                 icon
                 height="40px"
                 width="40px"
+                title="卸载"
                 @click="uninstall"
               >
                 <v-icon>delete</v-icon>
+              </v-btn>
+
+              <v-btn
+                v-if="hasNewVersion"
+                class="ml-2"
+                fab
+                icon
+                height="40px"
+                width="40px"
+                color="success"
+                title="升级"
+                @click="install()"
+              >
+                <v-icon>deployed_code_update</v-icon>
               </v-btn>
 
               <v-btn
@@ -227,6 +244,7 @@ export default {
         title: '@latest',
       },
     ]);
+    const hasNewVersion = computed(() => versionList.length > 1 && verCompare(versionList[1].value, plugin.value.version) > 0);
     const getVersionLoading = ref(false);
     const versionLoaded = ref(false);
     const getVersions = async () => {
@@ -251,7 +269,8 @@ export default {
         })).reverse();
         versionList.push(...versions);
       } catch (err) {
-        alert.show(err.message, 'error');
+        console.log(pluginId, err.message);
+        // alert.show(err.message, 'error');
       } finally {
         getVersionLoading.value = false;
       }
@@ -263,6 +282,7 @@ export default {
     expose({
       showSettingPanel,
       pluginId,
+      getVersions,
     });
 
     return {
@@ -281,6 +301,7 @@ export default {
       versionList,
       getVersionLoading,
       getVersions,
+      hasNewVersion,
     };
   },
 };
