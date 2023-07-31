@@ -16,7 +16,11 @@ const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {
     const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
     if (targetWin) {
-      targetWin.webContents.openDevTools();
+      if (targetWin.webContents.isDevToolsOpened()) {
+        targetWin.webContents.closeDevTools();
+      } else {
+        targetWin.webContents.openDevTools();
+      }
     }
   },
   [ipcType.APP_MAXIMIZE](win = 'app') {
@@ -117,7 +121,7 @@ const ipcHandler = (ipc) => ({
         height: winBound.height,
         minWidth,
         useContentSize: typeof options.useContentSize !== 'undefined' ? options.useContentSize : false,
-        frame: typeof options.frame !== 'undefined' ? options.frame : false,
+        frame: typeof options.frame !== 'undefined' ? options.frame : true,
         titleBarStyle: options.titleBarStyle || 'default',
         titleBarOverlay: typeof options.titleBarOverlay !== 'undefined' ? options.titleBarOverlay : false,
         title: options.title || 'translime',

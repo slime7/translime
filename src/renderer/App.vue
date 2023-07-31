@@ -52,7 +52,7 @@ export default {
     };
     const handleKeyEvent = () => {
       window.addEventListener('keyup', (ev) => {
-        if (ev.key === 'F12') {
+        if (ev.key === 'F12' || (ev.key === 'I' && !ev.altKey && ev.ctrlKey && ev.shiftKey)) {
           ipc.send(ipcType.DEVTOOLS);
         }
       });

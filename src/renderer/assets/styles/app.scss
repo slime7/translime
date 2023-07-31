@@ -54,7 +54,7 @@ a {
   transition: all .25s cubic-bezier(.4, 0, .2, 1);
 }
 
-.v-overlay-container .v-overlay {
+.custom-title-bar .v-overlay-container .v-overlay {
   top: 24px;
 
   .v-overlay__scrim {

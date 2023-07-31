@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>translime</title>
+  <style>
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  *, *:before, *:after {
+    box-sizing: border-box;
+  }
+
+  body {
+    min-height: 100vh;
+  }
+
+  .ts-open {
+    margin: 0 auto;
+    padding: 16px;
+    border-radius: 12px;
+    background-color: #fafafa;
+  }
+
+  .logo {
+    display: block;
+    margin: 0 auto;
+    width: 196px;
+    height: 196px;
+  }
+
+  .actions {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .actions .btn {
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: none;
+    color: #fff;
+    background-color: #039be5;
+    text-decoration: none;
+  }
+
+  .actions .btn:hover {
+    text-decoration: underline 4px #ffffffaa;
+  }
+
+  .actions .btn + .btn {
+    margin-left: 16px;
+  }
+  </style>
+</head>
+<body>
+  <div class="ts-open">
+    <img class="logo" src="../icon.png" alt="translime" />
+
+    <div class="actions">
+      <a class="btn download-btn" href="https://github.com/slime7/translime/releases" target="_blank">下载 translime</a>
+      <a class="btn open-btn" href="translime://action">打开 translime 并安装插件</a>
+    </div>
+  </div>
+<script>
+(function () {
+  const openBtnQuery = document.querySelector('.open-btn');
+  const url = new URL(window.location);
+  const installPluginId = url.searchParams.get('install');
+  if (installPluginId) {
+    openBtnQuery.href = `translime://action?install=${installPluginId}`;
+  }
+})();
+</script>
+</body>
+</html>

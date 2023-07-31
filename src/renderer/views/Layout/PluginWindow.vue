@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar app class="system-bar pa-0">
+    <v-system-bar app class="system-bar pa-0" v-if="!appSetting.useNativeTitleBar">
       <div v-if="!plugin" class="px-4">translime</div>
       <div v-else class="px-4">{{ plugin.title }} - translime</div>
 
@@ -87,10 +87,18 @@ export default {
         //
       }
     };
-    const getDarkMode = () => {
+    const appSetting = ref({});
+    const getAppSettings = () => {
       const params = new URLSearchParams(window.location.search);
       const darkParam = params.get('dark');
       vTheme.global.name.value = !!darkParam && darkParam !== 'false' && darkParam !== '0' ? 'dark' : 'light';
+
+      appSetting.value = JSON.parse(atob(params.get('app-setting')));
+      if (appSetting.value.useNativeTitleBar) {
+        document.body.className = '';
+      } else {
+        document.body.className = 'custom-title-bar';
+      }
     };
     const themeUpdated = () => {
       ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
@@ -100,7 +108,7 @@ export default {
 
     onMounted(async () => {
       getPluginId();
-      getDarkMode();
+      getAppSettings();
       onMaximizeStatusChange();
       themeUpdated();
       await getIsMaximize();
@@ -120,6 +128,7 @@ export default {
       getIsMaximize,
       loaderVisible,
       appBarVisible,
+      appSetting,
     };
   },
 };
