@@ -82,6 +82,20 @@ export default {
     const offUpdatePlugins = () => {
       ipc.detach(ipcType.PLUGINS_CHANGED);
     };
+    const onDeepLink = () => {
+      ipc.on(ipcType.DEEP_LINK_OPEN, (params) => {
+        if (params.install?.startsWith('translime-plugin-')) {
+          // 安装插件
+          router.replace({
+            name: 'Plugins',
+            query: { install: params.install, t: +(new Date()) },
+          });
+        }
+      });
+    };
+    const offDeepLink = () => {
+      ipc.detach(ipcType.DEEP_LINK_OPEN);
+    };
 
     // created
     remoteConsoleListener();
@@ -96,11 +110,13 @@ export default {
       getPlugins();
       onUpdatePlugins();
       onShowSettingPanel();
+      onDeepLink();
     });
 
     onUnmounted(() => {
       offUpdatePlugins();
       offShowSettingPanel();
+      offDeepLink();
     });
   },
 };

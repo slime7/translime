@@ -8,19 +8,21 @@ import pluginLoader from '@pkg/share/lib/pluginLoader';
 import createMainWindow from './main';
 import createLaunchWindow from './launch';
 import createTray from './tray';
+import setupDeepLink, { linkHandler } from './deepLink';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 mainStore.set('mainProcessLock', app.requestSingleInstanceLock());
 if (!mainStore.get('mainProcessLock')) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (ev, commandLine) => {
     // 当运行第二个实例时,将会聚焦到 win 这个窗口
     if (mainStore.getWin()) {
       if (mainStore.getWin().isMinimized()) {
         mainStore.getWin().restore();
       }
       mainStore.getWin().focus();
+      linkHandler(commandLine.pop());
     }
   });
 }
@@ -78,6 +80,7 @@ app.whenReady()
   });
 
 ipcMain.on('main-renderer-ready', () => {
+  setupDeepLink();
   if (mainStore.get('launchWin')) {
     mainStore.get('launchWin').close();
     mainStore.set('launchWin', null);

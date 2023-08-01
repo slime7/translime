@@ -377,12 +377,29 @@ export default {
         }
       }
     };
+    const installPluginConfirm = async () => {
+      // 处理来自 deep link 的插件安装请求
+      const query = { ...route.query };
+      const willInstallPluginId = query.install;
+      if (willInstallPluginId?.startsWith('translime-plugin-')) {
+        const result = await dialog.showConfirm(`确定要安装来自点击链接的插件"${willInstallPluginId}"吗`, '安装插件');
+        delete query.install;
+        router.replace({
+          query,
+        });
+        if (result.confirm) {
+          installPlugins(willInstallPluginId);
+        }
+      }
+    };
     watch(() => route.query.t, () => {
       // 另一个打开设置面板指令
       openPluginSettingPanel();
+      installPluginConfirm();
     });
     onActivated(() => {
       openPluginSettingPanel();
+      installPluginConfirm();
     });
     const checkUpdate = () => {
       if (pluginCardRefs.value && pluginCardRefs.value.length) {

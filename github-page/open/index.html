@@ -67,7 +67,7 @@
 
     <div class="actions">
       <a class="btn download-btn" href="https://github.com/slime7/translime/releases" target="_blank">下载 translime</a>
-      <a class="btn open-btn" href="translime://action">打开 translime 并安装插件</a>
+      <a class="btn open-btn" href="translime://open">打开 translime 并安装插件</a>
     </div>
   </div>
 <script>
@@ -76,7 +76,7 @@
   const url = new URL(window.location);
   const installPluginId = url.searchParams.get('install');
   if (installPluginId) {
-    openBtnQuery.href = `translime://action?install=${installPluginId}`;
+    openBtnQuery.href = `translime://open?install=${installPluginId}`;
   }
 })();
 </script>
