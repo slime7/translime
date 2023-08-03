@@ -8,6 +8,7 @@ import { createRequire } from 'module';
 import tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '@pkg/main/utils/useMainStore';
+import logger from '@pkg/main/logger';
 
 const requireFresh = createRequire(import.meta.url);
 const APPDATA_PATH = app.getPath('userData');
@@ -184,7 +185,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
         resolve({ code, data: output });
       }
     });
-    console.log('npm 执行参数', npm.spawnargs);
+    logger.debug('[plugin] npm 执行参数', { args: npm.spawnargs });
   });
 };
 
@@ -298,7 +299,7 @@ class PluginLoader extends EventEmitter {
     const pluginPath = resolvePluginPath(packageName);
     if (!plugin) {
       plugin = readPlugin(pluginPath, this.getPlugins().filter((p) => p.dev));
-      console.log('reload plugin: ', { ...plugin });
+      logger.debug('[plugin] reload plugin: ', { plugin });
     }
     let pluginMain = {};
     if (plugin.exports) {
@@ -317,7 +318,7 @@ class PluginLoader extends EventEmitter {
         };
       } catch (err) {
         // todo: handle error
-        console.log('plugin enable error: ', err);
+        logger.error('[plugin] enable error: ', err);
       }
     }
     pluginMain.enabled = true;
@@ -367,8 +368,8 @@ class PluginLoader extends EventEmitter {
     if (cacheKey) {
       delete requireFresh.cache[cacheKey];
     } else {
-      console.log('target:', `${path.sep}${plugin.packageName}${path.sep}`);
-      console.log('all:', Object.keys(requireFresh.cache));
+      logger.debug(`[plugin] require 目标缓存: ${path.sep}${plugin.packageName}${path.sep}`);
+      logger.debug('[plugin] require 全部缓存: ', { cache: Object.keys(requireFresh.cache) });
     }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {

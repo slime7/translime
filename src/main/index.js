@@ -5,12 +5,14 @@ import {
 } from 'electron';
 import mainStore from '@pkg/main/utils/useMainStore';
 import pluginLoader from '@pkg/share/lib/pluginLoader';
+import logger from '@pkg/main/logger';
 import createMainWindow from './main';
 import createLaunchWindow from './launch';
 import createTray from './tray';
 import setupDeepLink, { linkHandler } from './deepLink';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
+logger.info(`app 启动 | ${process.env.NODE_ENV}`);
 mainStore.set('mainProcessLock', app.requestSingleInstanceLock());
 if (!mainStore.get('mainProcessLock')) {
   app.quit();
@@ -55,6 +57,7 @@ app.on('activate', () => {
 
 app.on('will-quit', () => {
   mainStore.get('pluginLoader').appClose();
+  logger.info('app 关闭');
 });
 
 app.whenReady()
@@ -68,7 +71,7 @@ app.whenReady()
           },
         });
       } catch (err) {
-        console.error('Vue Devtools failed to install:', err.toString());
+        logger.error(`Vue Devtools failed to install: ${err.toString()}`);
       }
     }
     createLaunchWindow();

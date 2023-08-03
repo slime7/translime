@@ -39,6 +39,7 @@ export const GET_NATIVE_THEME = 'get-native-theme';
 export const SET_NATIVE_THEME = 'set-native-theme';
 export const GET_LAUNCH_ARGV = 'get-launch-argv';
 export const DEEP_LINK_OPEN = 'deep-link-open';
+export const LOGGER = 'logger';
 
 export default {
   DEVTOOLS,
@@ -81,4 +82,5 @@ export default {
   SHOW_DEV_PLUGIN,
   GET_LAUNCH_ARGV,
   DEEP_LINK_OPEN,
+  LOGGER,
 };

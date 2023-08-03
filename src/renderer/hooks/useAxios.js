@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const useAxios = (adapter) => {
 // 使用 node 提供的 http 作为 axios 的 adapter
-  axios.defaults.adapter = adapter || window.electron.axiosHttpAdapter;
+  axios.defaults.adapter = adapter || window.ts.axiosHttpAdapter;
 
   const axiosWithHttp = axios.create();
   axiosWithHttp.interceptors.response.use(

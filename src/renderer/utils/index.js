@@ -58,6 +58,8 @@ export const openPluginWindow = (plugin, dark = false, appSetting = {}) => {
   if (process.env.NODE_ENV === 'development') {
     console.log('plugin window url: ', url);
     console.log('plugin window options: ', options);
+    window.ts.logger.debug(`plugin window url: ${url}`);
+    window.ts.logger.debug('plugin window options: ', { options });
   }
   ipc.send(ipcType.OPEN_NEW_WINDOW, {
     name: `plugin-window-${plugin.packageName}`,

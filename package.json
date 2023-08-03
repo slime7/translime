@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "axios": "^1.3.4",
+    "dayjs": "^1.11.9",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.1.1",
     "npm": "^9.8.0",
@@ -31,7 +32,8 @@
     "tar": "^6.1.13",
     "vue": "^3.3.0",
     "vue-router": "^4.2.4",
-    "vuetify": "^3.3.7"
+    "vuetify": "^3.3.7",
+    "winston": "^3.10.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.2.3",
