@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import zlib from 'zlib';
-import { app, Menu } from 'electron';
+import { app, clipboard, Menu } from 'electron';
 import EventEmitter from 'events';
 import childProcess from 'child_process';
 import { createRequire } from 'module';
@@ -513,6 +513,14 @@ class PluginLoader extends EventEmitter {
             mainStore.getChildWin(`plugin-window-${packageName}`).close();
           }
           ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+        },
+      },
+      {
+        id: 'copy-plugin-link',
+        label: '复制分享链接',
+        click() {
+          clipboard.writeText(`https://slime7.github.io/translime/open/?install=${packageName}`);
+          ipcEv.sendToClient(ipcType.IPC_TOAST, ['链接已复制']);
         },
       },
     ];

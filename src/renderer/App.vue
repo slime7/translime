@@ -9,6 +9,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
+import useToast from '@/hooks/useToast';
 import globalStore from '@/store/globalStore';
 import { appConfigStore } from '@/utils';
 
@@ -21,6 +22,7 @@ export default {
     const store = globalStore();
     const theme = useTheme();
     const alert = useAlert();
+    const toast = useToast();
     const router = useRouter();
 
     const initAppConfig = () => {
@@ -96,6 +98,14 @@ export default {
     const offDeepLink = () => {
       ipc.detach(ipcType.DEEP_LINK_OPEN);
     };
+    const onIpcToast = () => {
+      ipc.on(ipcType.IPC_TOAST, (args) => {
+        toast.show(...args);
+      });
+    };
+    const offIpcToast = () => {
+      ipc.detach(ipcType.IPC_TOAST);
+    };
 
     // created
     remoteConsoleListener();
@@ -111,12 +121,14 @@ export default {
       onUpdatePlugins();
       onShowSettingPanel();
       onDeepLink();
+      onIpcToast();
     });
 
     onUnmounted(() => {
       offUpdatePlugins();
       offShowSettingPanel();
       offDeepLink();
+      offIpcToast();
     });
   },
 };
