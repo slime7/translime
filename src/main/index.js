@@ -2,7 +2,9 @@ import {
   app,
   ipcMain,
   protocol,
+  dialog,
 } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import mainStore from '@pkg/main/utils/useMainStore';
 import pluginLoader from '@pkg/share/lib/pluginLoader';
 import createMainWindow from './main';
@@ -77,6 +79,35 @@ app.whenReady()
     if (process.platform === 'win32') {
       app.setAppUserModelId(isDevelopment ? process.execPath : 'translime.app');
     }
+
+    // Check for updates and notify the user if a new version is available
+    autoUpdater.checkForUpdatesAndNotify();
+
+    autoUpdater.on('update-available', () => {
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Update available',
+        message: 'A new version of Translime is available. Do you want to update now?',
+        buttons: ['Yes', 'No']
+      }).then(result => {
+        if (result.response === 0) {
+          autoUpdater.downloadUpdate();
+        }
+      });
+    });
+
+    autoUpdater.on('update-downloaded', () => {
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Update ready',
+        message: 'Install and restart now?',
+        buttons: ['Yes', 'Later']
+      }).then(result => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      });
+    });
   });
 
 ipcMain.on('main-renderer-ready', () => {
