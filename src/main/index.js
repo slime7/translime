@@ -87,8 +87,8 @@ app.whenReady()
       dialog.showMessageBox({
         type: 'info',
         title: 'Update available',
-        message: 'A new version of Translime is available. Do you want to update now?',
-        buttons: ['Yes', 'No']
+        message: '有新版本的Translime可用。您现在要更新吗？',
+        buttons: ['是', '否']
       }).then(result => {
         if (result.response === 0) {
           autoUpdater.downloadUpdate();
@@ -100,8 +100,8 @@ app.whenReady()
       dialog.showMessageBox({
         type: 'info',
         title: 'Update ready',
-        message: 'Install and restart now?',
-        buttons: ['Yes', 'Later']
+        message: '安装并现在重启？',
+        buttons: ['是', '稍后']
       }).then(result => {
         if (result.response === 0) {
           autoUpdater.quitAndInstall();
