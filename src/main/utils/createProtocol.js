@@ -1,23 +1,21 @@
 import { protocol } from 'electron';
 import * as path from 'path';
-import { readFile } from 'fs';
+import { readFileSync } from 'fs';
 import { URL } from 'url';
 import logger from '@pkg/main/logger';
 
-export default (scheme, customProtocol) => {
-  (customProtocol || protocol).registerBufferProtocol(
+export default (scheme) => {
+  if (protocol.isProtocolHandled(scheme)) {
+    return;
+  }
+  protocol.handle(
     scheme,
-    (request, respond) => {
+    async (request) => {
       let pathName = new URL(request.url).pathname;
       pathName = decodeURI(pathName); // Needed in case URL contains spaces
 
-      readFile(path.join(__dirname, '../renderer', pathName), (error, data) => {
-        if (error) {
-          logger.error(
-            `Failed to read ${pathName} on ${scheme} protocol`,
-            error,
-          );
-        }
+      try {
+        const data = await readFileSync(path.join(__dirname, '../renderer', pathName));
         const extension = path.extname(pathName)
           .toLowerCase();
         let mimeType = '';
@@ -36,11 +34,20 @@ export default (scheme, customProtocol) => {
           mimeType = 'application/wasm';
         }
 
-        respond({
-          mimeType,
+        return new Response(
           data,
-        });
-      });
+          { headers: { 'content-type': mimeType } },
+        );
+      } catch (err) {
+        logger.error(
+          `Failed to read ${pathName} on ${scheme} protocol`,
+          err,
+        );
+        return new Response(
+          Buffer.from(`<h1>Protocol Handle Error</h1><p>Failed to read ${pathName} on ${scheme} protocol</p>`),
+          { headers: { 'content-type': 'text/html' } },
+        );
+      }
     },
   );
 };
