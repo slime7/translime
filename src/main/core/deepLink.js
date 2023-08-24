@@ -1,8 +1,8 @@
 import { app } from 'electron';
 import path from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { parseAppArgv, parseDeepLink } from './utils';
-import logger from '@pkg/main/logger';
+import logger from '../utils/logger';
+import { parseAppArgv, parseDeepLink } from '../utils';
 
 export const linkHandler = (url) => {
   logger.info('通过 depp link 启动', { url });

@@ -9,9 +9,9 @@ import {
 } from 'electron';
 import { join, sep } from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import createWindow from '@pkg/main/utils/createWindow';
-import mainStore from '@pkg/main/utils/useMainStore';
-import logger from '@pkg/main/logger';
+import createWindow from '../utils/createWindow';
+import mainStore from '../utils/useMainStore';
+import logger from '../utils/logger';
 
 const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {

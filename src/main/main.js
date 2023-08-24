@@ -10,7 +10,7 @@ import { join } from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createProtocol from './utils/createProtocol';
 import mainStore from './utils/useMainStore';
-import Ipc from './Ipc';
+import Ipc from './core/Ipc';
 
 export default () => {
   const { workArea } = screen.getPrimaryDisplay();

@@ -7,8 +7,8 @@ import childProcess from 'child_process';
 import { createRequire } from 'module';
 import tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import mainStore from '@pkg/main/utils/useMainStore';
-import logger from '@pkg/main/logger';
+import mainStore from '../utils/useMainStore';
+import logger from '../utils/logger';
 
 const requireFresh = createRequire(import.meta.url);
 const APPDATA_PATH = app.getPath('userData');

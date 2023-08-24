@@ -2,7 +2,7 @@ import { protocol } from 'electron';
 import * as path from 'path';
 import { readFileSync } from 'fs';
 import { URL } from 'url';
-import logger from '@pkg/main/logger';
+import logger from './logger';
 
 export default (scheme) => {
   if (protocol.isProtocolHandled(scheme)) {

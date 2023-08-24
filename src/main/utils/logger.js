@@ -1,7 +1,7 @@
 import path from 'path';
 import { createLogger, format, transports } from 'winston';
 import dayjs from 'dayjs';
-import mainStore from '@pkg/main/utils/useMainStore';
+import mainStore from './useMainStore';
 
 const create = () => {
   const date = dayjs().format('YYYY-MM-DD');
