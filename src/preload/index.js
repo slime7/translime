@@ -136,8 +136,6 @@ const api = {
     }),
   },
   APP_ROOT: path.resolve(__dirname, '../'),
-  axiosHttpAdapter,
-  axios: { ...axios },
 };
 api.ipcRenderer.receive('ipc-reply', (msg) => {
   console.log(`ipc-reply by ${msg.type}`, msg);
@@ -162,7 +160,34 @@ ipcRenderer.invoke('ipc-fn', {
   contextBridge.exposeInMainWorld(apiKey, api);
 });
 
-const translime = {};
+const translime = {
+  // axios
+  axiosHttpAdapter,
+  axios: { ...axios },
+  // winston logger
+  logger: {
+    log: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.LOGGER,
+      args: ['log', args],
+    }),
+    error: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.LOGGER,
+      args: ['error', args],
+    }),
+    warn: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.LOGGER,
+      args: ['warn', args],
+    }),
+    info: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.LOGGER,
+      args: ['info', args],
+    }),
+    debug: (...args) => ipcRenderer.invoke('ipc-fn', {
+      type: ipcType.LOGGER,
+      args: ['debug', args],
+    }),
+  },
+};
 // 快捷接口
 // 获取插件设置
 const getPluginSetting = async (...args) => {

@@ -1,6 +1,6 @@
 import { Menu, nativeImage, Tray } from 'electron';
 import icon from '@pkg/share/static/icon.png';
-import mainStore from '@pkg/main/utils/useMainStore';
+import mainStore from '../utils/useMainStore';
 
 const createTray = () => {
   mainStore.set('tray', new Tray(nativeImage.createFromDataURL(icon)));

@@ -7,6 +7,7 @@
   html, body {
     margin: 0;
     padding: 0;
+    font-size: 16px;
   }
 
   body {
@@ -25,7 +26,7 @@
 
   .ts-open {
     margin: 0 auto;
-    padding: 16px;
+    padding: 1rem;
     border-radius: 12px;
     background-color: #fafafa;
   }
@@ -35,16 +36,29 @@
     margin: 0 auto;
     width: 196px;
     height: 196px;
+    object-fit: contain;
+  }
+
+  .plugin-info .plugin-title {
+    margin-top: .825rem;
+    font-size: 1.5rem;
+    color: #222;
+  }
+
+  .plugin-info .plugin-desc {
+    margin-top: .825rem;
+    font-size: 1rem;
+    color: #9e9e9e;
   }
 
   .actions {
-    margin-top: 24px;
+    margin-top: 1.5rem;
     display: flex;
     justify-content: center;
   }
 
   .actions .btn {
-    padding: 8px 16px;
+    padding: .5rem 1rem;
     border-radius: 999px;
     border: none;
     color: #fff;
@@ -53,17 +67,19 @@
   }
 
   .actions .btn:hover {
-    text-decoration: underline 4px #ffffffaa;
+    text-decoration: underline .25rem #ffffffaa;
   }
 
   .actions .btn + .btn {
-    margin-left: 16px;
+    margin-left: 1rem;
   }
   </style>
 </head>
 <body>
   <div class="ts-open">
     <img class="logo" src="../icon.png" alt="translime" />
+
+    <div class="plugin-info"></div>
 
     <div class="actions">
       <a class="btn download-btn" href="https://github.com/slime7/translime/releases" target="_blank">下载 translime</a>
@@ -76,7 +92,37 @@
   const url = new URL(window.location);
   const installPluginId = url.searchParams.get('install');
   if (installPluginId) {
-    openBtnQuery.href = `translime://open?install=${installPluginId}`;
+    // 获取插件详情
+    fetch(`https://registry.npmjs.com/${installPluginId}`)
+      .then((response) => response.json())
+      .then((result) => {
+        openBtnQuery.href = `translime://open?install=${installPluginId}`;
+
+        const latestVersion = result['dist-tags'].latest;
+        const latestVersionInfo = result.versions[latestVersion];
+        const elInfo = document.querySelector('.plugin-info');
+        const elLogo = document.querySelector('.logo');
+
+        // logo
+        const logoSrc = latestVersionInfo.plugin.icon ? `https://unpkg.com/${installPluginId}@${latestVersion}/${latestVersionInfo.plugin.icon}` : '../icon.png';
+
+        // 标题
+        const elPluginTitle = document.createElement('div');
+        elPluginTitle.className = 'plugin-title';
+        elPluginTitle.textContent = latestVersionInfo.plugin.title || latestVersionInfo.name || '';
+
+        // 简介
+        const elPluginDesc = document.createElement('div');
+        elPluginDesc.className = 'plugin-desc';
+        elPluginDesc.textContent = latestVersionInfo.plugin.description || latestVersionInfo.description || '';
+
+        elLogo.setAttribute('src', logoSrc);
+        elInfo.appendChild(elPluginTitle);
+        elInfo.appendChild(elPluginDesc);
+      })
+      .catch(() => {
+        // fetch fail
+      });
   }
 })();
 </script>
