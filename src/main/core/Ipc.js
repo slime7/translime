@@ -1,4 +1,4 @@
-import ipcHandler from '@pkg/main/utils/ipcHandler';
+import ipcHandler from './ipcHandler';
 
 export default class Ipc {
   constructor(listener, sender) {

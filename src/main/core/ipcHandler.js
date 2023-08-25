@@ -9,8 +9,9 @@ import {
 } from 'electron';
 import { join, sep } from 'path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import createWindow from '@pkg/main/utils/createWindow';
-import mainStore from '@pkg/main/utils/useMainStore';
+import createWindow from '../utils/createWindow';
+import mainStore from '../utils/useMainStore';
+import logger from '../utils/logger';
 
 const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {
@@ -76,13 +77,13 @@ const ipcHandler = (ipc) => ({
     const sysDirPath = dirPath.replaceAll('/', sep);
     shell.openPath(sysDirPath)
       .catch((err) => {
-        console.error(err);
+        logger.error('', err);
       });
   },
   [ipcType.OPEN_APP_PATH]() {
     shell.openPath(mainStore.APPDATA_PATH)
       .catch((err) => {
-        console.error(err);
+        logger.error('', err);
       });
   },
   [ipcType.RELOAD]() {
@@ -391,6 +392,10 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.GET_LAUNCH_ARGV]() {
     ipc.sendToClient(ipcType.GET_LAUNCH_ARGV, process.argv);
+  },
+  [ipcType.LOGGER](level, args) {
+    console.log(level, args);
+    logger[level](...args);
   },
   ping() {
     console.log('pong', new Date());

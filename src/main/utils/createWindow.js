@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import createProtocol from '@pkg/main/utils/createProtocol';
+import createProtocol from './createProtocol';
 
 export default (fileUrl, browserWindowOptions, menu = false) => {
   let window = new BrowserWindow({
