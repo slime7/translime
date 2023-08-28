@@ -16,28 +16,28 @@ class CreateElectronApp extends EventEmitter {
   constructor() {
     super();
     this.isDevelopment = process.env.NODE_ENV === 'development';
-    this.win = mainStore.getWin();
   }
 
   init() {
-    logger.info(`app 启动 | ${process.env.NODE_ENV || 'production'}`);
     this.base();
     this.onAppReady();
     this.onAppQuit();
   }
 
+  // eslint-disable-next-line class-methods-use-this
   base() {
     mainStore.set('mainProcessLock', app.requestSingleInstanceLock());
     if (!mainStore.get('mainProcessLock')) {
       app.quit();
     } else {
+      logger.info(`app 启动 | ${process.env.NODE_ENV || 'production'}`);
       app.on('second-instance', (ev, commandLine) => {
         // 当运行第二个实例时,将会聚焦到 win 这个窗口
-        if (this.win) {
-          if (this.win.isMinimized()) {
-            this.win.restore();
+        if (mainStore.getWin()) {
+          if (mainStore.getWin().isMinimized()) {
+            mainStore.getWin().restore();
           }
-          this.win.focus();
+          mainStore.getWin().focus();
           linkHandler(commandLine.pop());
         }
       });
