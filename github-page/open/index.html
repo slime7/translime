@@ -58,12 +58,14 @@
   }
 
   .actions .btn {
+    all: unset;
     padding: .5rem 1rem;
     border-radius: 999px;
     border: none;
     color: #fff;
     background-color: #039be5;
     text-decoration: none;
+    cursor: pointer;
   }
 
   .actions .btn:hover {
@@ -83,20 +85,57 @@
 
     <div class="actions">
       <a class="btn download-btn" href="https://github.com/slime7/translime/releases" target="_blank">下载 translime</a>
-      <a class="btn open-btn" href="translime://open">打开 translime 并安装插件</a>
+      <button type="button" class="btn open-btn">打开 translime 并安装插件</button>
     </div>
   </div>
 <script>
 (function () {
+  const openApp = (url, urlAlt = null) => new Promise(async (resolve) => {
+    const clickTime = +new Date();
+    let count = 0;
+    const inputBlurHandler = () => {
+      // 已安装 app
+      resolve(true);
+    };
+    const input = document.createElement('input');
+    input.style.width = '0';
+    input.style.height = '0';
+    input.style.position = 'fixed';
+    input.style.top = '0';
+    input.style.left = '0';
+    input.addEventListener('blur', inputBlurHandler);
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.style.display = 'none';
+    document.body.appendChild(input);
+    input.focus();
+    document.body.appendChild(iframe);
+    const timer = setInterval(() => {
+      count += 1;
+      const deltaTime = +new Date() - clickTime;
+      if (count >= 50 || deltaTime > 1500) {
+        input.removeEventListener('blur', inputBlurHandler);
+        document.body.removeChild(input);
+        document.body.removeChild(iframe);
+        clearInterval(timer);
+        resolve(false);
+        if (urlAlt) {
+          window.location.href = urlAlt;
+        }
+      }
+    }, 20);
+  });
+
   const openBtnQuery = document.querySelector('.open-btn');
   const url = new URL(window.location);
+  let appLink = 'translime://open';
   const installPluginId = url.searchParams.get('install');
   if (installPluginId) {
     // 获取插件详情
     fetch(`https://registry.npmjs.com/${installPluginId}`)
       .then((response) => response.json())
       .then((result) => {
-        openBtnQuery.href = `translime://open?install=${installPluginId}`;
+        appLink = `translime://open?install=${installPluginId}`;
 
         const latestVersion = result['dist-tags'].latest;
         const latestVersionInfo = result.versions[latestVersion];
@@ -124,6 +163,10 @@
         // fetch fail
       });
   }
+
+  openBtnQuery.addEventListener('click', async () => {
+    await openApp(appLink, 'https://github.com/slime7/translime/releases');
+  });
 })();
 </script>
 </body>
