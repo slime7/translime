@@ -17,10 +17,9 @@ export default class Ipc {
   }
 
   sendMsg(channel, msgBody, clientWin) {
-    if (!clientWin) {
-      this.sender.send(channel, msgBody);
-    } else {
-      clientWin.send(channel, msgBody);
+    const targetWin = clientWin || this.sender;
+    if (!targetWin.isDestroyed()) {
+      targetWin.send(channel, msgBody);
     }
   }
 
