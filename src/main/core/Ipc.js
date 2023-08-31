@@ -31,9 +31,9 @@ export default class Ipc {
     }, clientWin);
   }
 
-  appendHandler(type, handlerFa) {
+  appendHandler(type, handlerFn) {
     if (!this.handlerList[type]) {
-      this.handlerList[type] = handlerFa({ sendToClient: this.sendToClient.bind(this) });
+      this.handlerList[type] = handlerFn({ sendToClient: this.sendToClient.bind(this) });
       return true;
     }
     return false;
