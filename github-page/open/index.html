@@ -93,9 +93,10 @@
   const openApp = (url, urlAlt = null) => new Promise(async (resolve) => {
     const clickTime = +new Date();
     let count = 0;
+    let installed = false;
     const inputBlurHandler = () => {
       // 已安装 app
-      resolve(true);
+      installed = true;
     };
     const input = document.createElement('input');
     input.style.width = '0';
@@ -118,7 +119,10 @@
         document.body.removeChild(input);
         document.body.removeChild(iframe);
         clearInterval(timer);
-        resolve(false);
+        resolve(installed);
+        if (installed) {
+          return;
+        }
         if (urlAlt) {
           window.location.href = urlAlt;
         }
@@ -165,7 +169,7 @@
   }
 
   openBtnQuery.addEventListener('click', async () => {
-    await openApp(appLink);
+    await openApp(appLink, 'https://github.com/slime7/translime/releases');
   });
 })();
 </script>

@@ -17,10 +17,14 @@ export default class Ipc {
   }
 
   sendMsg(channel, msgBody, clientWin) {
-    if (!clientWin) {
+    if (clientWin && !clientWin.isDestroyed()) {
+      if (clientWin.webContents) {
+        clientWin.webContents.send(channel, msgBody);
+      } else {
+        clientWin.send(channel, msgBody);
+      }
+    } else if (!this.sender.isDestroyed()) {
       this.sender.send(channel, msgBody);
-    } else {
-      clientWin.send(channel, msgBody);
     }
   }
 
@@ -31,9 +35,9 @@ export default class Ipc {
     }, clientWin);
   }
 
-  appendHandler(type, handlerFa) {
+  appendHandler(type, handlerFn) {
     if (!this.handlerList[type]) {
-      this.handlerList[type] = handlerFa({ sendToClient: this.sendToClient.bind(this) });
+      this.handlerList[type] = handlerFn({ sendToClient: this.sendToClient.bind(this) });
       return true;
     }
     return false;
