@@ -1,0 +1,54 @@
+{
+  "name": "translime-plugin-rtmp-recorder",
+  "version": "1.0.3",
+  "description": "translime 插件：rtmp 流视频保存到文件",
+  "license": "MIT",
+  "keywords": [
+    "translime",
+    "translime-plugin"
+  ],
+  "main": "./dist/index.umd.js",
+  "module": "./dist/index.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.umd.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "dev": "vite -c ui.vite.config.js",
+    "build:plugin": "vite build",
+    "build:ui": "vite build -c ui.vite.config.js",
+    "build": "npm run build:plugin && npm run build:ui"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^24.0.1",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@vitejs/plugin-vue": "^4.2.3",
+    "dayjs": "^1.11.8",
+    "eslint": "^8.43.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-vue": "^9.15.1",
+    "fluent-ffmpeg": "^2.1.2",
+    "vite": "^4.4.3",
+    "vite-plugin-css-injected-by-js": "^3.1.2",
+    "vue": "^3.3.0",
+    "vuetify": "^3.3.14"
+  },
+  "plugin": {
+    "title": "直播录像",
+    "description": "rtmp 流视频保存到文件",
+    "ui": "dist/ui.esm.js"
+  },
+  "peerDependencies": {
+    "electron": "^26.0.0",
+    "vue": "^3.3.0",
+    "vuetify": "^3.3.14"
+  }
+}

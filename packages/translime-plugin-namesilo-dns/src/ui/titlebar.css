@@ -1,0 +1,18 @@
+.titlebar {
+  @apply h-8 flex items-center bg-black select-none;
+  opacity: .4;
+  -webkit-app-region: drag;
+}
+
+html:hover .titlebar {
+  opacity: .8;
+}
+
+.titlebar .window-control-block {
+  @apply h-full px-2 flex items-center gap-x-1;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar .window-control-block .control-btn {
+  @apply rounded-md hover:bg-neutral-800 cursor-pointer;
+}

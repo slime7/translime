@@ -1,6 +1,6 @@
 利用 link 命令添加本地测试包的简要步骤：
 
-1. 在要测试的包的根目录中运行`yarn link`命令，它会将该包链接到全局 yarn 目录中。
+1. 在要测试的包的根目录中运行`yarn link`或`pnpm link`命令，它会将该包链接到全局 yarn 目录中。
 
 2. 在项目主目录的`plugins_dev`目录下，运行`yarn link <包名>`命令，它会将该包链接到 node_modules 目录下。
 
