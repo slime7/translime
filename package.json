@@ -1,63 +1,23 @@
 {
-  "name": "translime",
-  "version": "0.3.5",
-  "author": {
-    "name": "Slime7",
-    "email": "slime7@foxmail.com",
-    "url": "https://github.com/slime7"
-  },
-  "license": "MIT",
+  "private": true,
+  "version": "1.0.0",
   "engines": {
     "node": ">=v16.0",
     "npm": ">=7.7"
   },
-  "main": "dist/main/index.js",
   "scripts": {
-    "dev": "node scripts/watch.js",
-    "serve": "node scripts/watch.js",
-    "build": "rimraf dist && node scripts/build.js",
-    "build:unpack": "rimraf dist && node scripts/build.js --unpack",
-    "postinstall": "electron-builder install-app-deps",
-    "postuninstall": "electron-builder install-app-deps",
+    "dev": "pnpm -C packages/app run dev",
+    "dev:app": "pnpm -C packages/app run dev",
+    "build:app": "pnpm -C packages/app run build",
     "lint": "eslint --ext js,jsx,ts,vue src/"
   },
   "dependencies": {
-    "axios": "^1.3.4",
-    "dayjs": "^1.11.9",
-    "electron-store": "^8.1.0",
-    "electron-updater": "^6.1.1",
-    "npm": "^9.8.0",
-    "pinia": "^2.1.4",
-    "semver-compare": "^1.0.0",
-    "tar": "^6.1.13",
-    "vue": "^3.3.0",
-    "vue-router": "^4.2.4",
-    "vuetify": "^3.3.14",
-    "winston": "^3.10.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^4.2.3",
-    "cross-env": "7.0.3",
-    "electron": "^26.0.0",
-    "electron-builder": "^24.4.0",
-    "electron-devtools-installer": "3.2.0",
-    "eslint": "~8.44.0",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-import-resolver-alias": "^1.1.2",
-    "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-vue": "^9.8.0",
-    "playwright": "1.15.2",
-    "rimraf": "^4.3.1",
-    "rollup-plugin-auto-external": "^2.0.0",
-    "sass": "^1.63.6",
-    "sass-loader": "^13.3.2",
-    "terser": "^5.16.3",
-    "vite": "^4.4.1",
-    "vite-plugin-static-copy": "^0.16.0",
-    "vite-plugin-vuetify": "^1.0.2",
-    "wait-on": "^7.0.1"
   },
-  "external": [
-    "npm"
-  ]
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ]
+  }
 }
