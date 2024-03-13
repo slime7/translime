@@ -25,19 +25,19 @@ jobs:
 
       - name: Install dependencies & build
         run: |
-          yarn --frozen-lockfile
-          yarn build
+          pnpm
+          pnpm build
 
       - name: upload
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}
-          path: dist_electron/*.exe
+          path: packages/app/dist_electron/*.exe
 
       - name: release
         uses: softprops/action-gh-release@v1
         with:
-          files: "dist_electron/*.exe"
+          files: "packages/app/dist_electron/*.exe"
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
