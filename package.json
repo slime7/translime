@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "1.0.0",
+  "version": "0.3.5",
   "engines": {
     "node": ">=v16.0",
     "npm": ">=7.7"
