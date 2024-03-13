@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies & build
         run: |
           pnpm i --frozen-lockfile
-          pnpm build
+          pnpm build:app
 
       - name: upload
         uses: actions/upload-artifact@v3
