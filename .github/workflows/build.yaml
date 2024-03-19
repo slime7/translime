@@ -16,24 +16,27 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest]
+        node-version: [18]
 
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v3
 
-      - name: Install Node.js, NPM
-        uses: actions/setup-node@v4
-        with:
-          node-version: 16
-
-      - uses: pnpm/action-setup@v3
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
         with:
           version: 8
 
+      - name: Install Node.js, NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
       - name: Install dependencies & build
         run: |
-          pnpm i --frozen-lockfile
-          pnpm build:app
+          pnpm install --frozen-lockfile
+          pnpm -r --filter "translime" build
 
       - name: upload
         uses: actions/upload-artifact@v3
