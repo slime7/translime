@@ -29,7 +29,7 @@ const create = () => {
       }),
       new transports.File({
         filename,
-        level: process.env.NODE_ENV === 'development' ? 'silly' : 'verbose',
+        level: import.meta.env.DEV ? 'silly' : 'verbose',
         format: logFormat,
         maxsize: 3000000,
       }),

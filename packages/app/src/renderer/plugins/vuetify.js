@@ -23,11 +23,13 @@ const vuetify = createVuetify({
         colors: {
           background: '#f2f2f2',
           primary: '#039be5', // light-blue-darken-1
+          'primary-light': '#e0f2fe',
         },
       },
       dark: {
         colors: {
           primary: '#039be5',
+          'primary-light': '#e0f2fe',
         },
       },
     },

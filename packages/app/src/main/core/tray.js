@@ -14,6 +14,14 @@ const createTray = () => {
       type: 'separator',
     },
     {
+      label: '打开',
+      click() {
+        if (mainStore.getWin()) {
+          mainStore.getWin().show();
+        }
+      },
+    },
+    {
       label: '退出',
       click() {
         if (mainStore.getWin()) {
