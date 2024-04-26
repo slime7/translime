@@ -18,4 +18,4 @@ Thanks to [JetBrains](https://www.jetbrains.com/) for supporting us free open so
 
 ### 许可证
 
-查看 [LICENSE](./LICENSE)
+查看 [LICENSE](../../LICENSE)
