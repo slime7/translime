@@ -3,6 +3,7 @@ import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
 import { zhHans } from 'vuetify/locale';
 import { aliases, md } from 'vuetify/iconsets/md';
+import { md3 } from 'vuetify/blueprints';
 
 const vuetify = createVuetify({
   locale: {
@@ -44,6 +45,7 @@ const vuetify = createVuetify({
       }],
     },
   },
+  blueprint: md3,
 });
 
 export default vuetify;

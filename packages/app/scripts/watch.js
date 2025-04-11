@@ -6,143 +6,149 @@ const { spawn } = require('child_process');
 const waitOn = require('wait-on');
 const { join } = require('path');
 
-/** @type 'production' | 'development' | 'test' */
+/**
+ * @typedef {'production' | 'development' | 'test'} BuildMode
+ * @type {BuildMode}
+ */
 // eslint-disable-next-line no-multi-assign
 const mode = process.env.MODE = process.env.MODE || 'development';
 
 /** @type {import('vite').LogLevel} */
 const LOG_LEVEL = 'info';
 
-let manualRestart = false;
-
-/** @type {ChildProcessWithoutNullStreams | null} */
-let spawnProcess = null;
-
-/** @type {import('vite').InlineConfig} */
-const sharedConfig = {
-  mode,
-  build: {
-    watch: {},
-  },
-  logLevel: LOG_LEVEL,
-};
-
-/** Messages on stderr that match any of the contained patterns will be stripped from output */
-const stderrFilterPatterns = [
-  // warning about devtools extension
+// 需要过滤的错误模式
+const STDERR_FILTER_PATTERNS = [
+  // 关于devtools扩展的警告
   // https://github.com/cawa-93/vite-electron-builder/issues/492
   // https://github.com/MarshallOfSound/electron-devtools-installer/issues/143
   /ExtensionLoadWarning/,
 ];
 
-/**
- * @param configFile
- * @param writeBundle
- * @param name
- * @returns {Promise<import('vite').RollupOutput | Array<import('vite').RollupOutput> | import('vite').RollupWatcher>}
- */
-const getWatcher = ({ name, configFile, writeBundle }) => build({
-  ...sharedConfig,
-  configFile,
-  plugins: [{ name, writeBundle }],
-});
+let manualRestart = false;
+let electronProcess = null;
 
 /**
- * Start or restart App when source files are changed
- * @param {import('vite').ViteDevServer} viteDevServer
- * @returns {Promise<import('vite').RollupOutput | Array<import('vite').RollupOutput> | import('vite').RollupWatcher>}
+ * 共享的Vite配置
+ * @type {import('vite').InlineConfig}
  */
-const setupMainPackageWatcher = (viteDevServer) => {
-  // Write a value to an environment variable to pass it to the main process.
-  {
-    const protocol = `http${viteDevServer.config.server.https ? 's' : ''}:`;
-    const host = viteDevServer.config.server.host || 'localhost';
-    const { port } = viteDevServer.config.server; // Vite searches for and occupies the first free port: 3000, 3001, 3002 and so on
-    const path = '/';
-    process.env.VITE_DEV_SERVER_URL = `${protocol}//${host}:${port}${path}`;
+const sharedConfig = {
+  mode,
+  build: { watch: {} },
+  logLevel: LOG_LEVEL,
+};
+
+/**
+ * 启动Electron进程
+ * @param {import('vite').Logger} logger - Vite日志记录器
+ */
+const startElectronProcess = (logger) => {
+  if (electronProcess !== null) {
+    manualRestart = true;
+    electronProcess.kill('SIGINT');
+    electronProcess = null;
+    logger.warn('Electron app restarted', { timestamp: true });
   }
 
-  const logger = createLogger(LOG_LEVEL, {
-    prefix: '[main]',
+  electronProcess = spawn(String(electronPath), ['--inspect=5858', '.']);
+
+  // 处理标准输出
+  electronProcess.stdout.on('data', (data) => {
+    const output = data.toString().trim();
+    if (output) logger.warn(output, { timestamp: true });
   });
 
-  return getWatcher({
-    name: 'reload-app-on-main-package-change',
-    configFile: 'src/vite.main.config.js',
-    writeBundle() {
-      if (spawnProcess !== null) {
-        manualRestart = true;
-        spawnProcess.kill('SIGINT');
-        spawnProcess = null;
-        logger.warn('Electron app restarted', { timestamp: true });
-      }
+  // 处理标准错误输出
+  electronProcess.stderr.on('data', (data) => {
+    const error = data.toString().trim();
+    if (!error) return;
 
-      spawnProcess = spawn(String(electronPath), ['--inspect=5858', '.']);
-      spawnProcess.stdout.on('data', (d) => d.toString().trim() && logger.warn(d.toString(), { timestamp: true }));
-      spawnProcess.stderr.on('data', (d) => {
-        const data = d.toString().trim();
-        if (!data) return;
-        const mayIgnore = stderrFilterPatterns.some((r) => r.test(data));
-        if (mayIgnore) return;
-        logger.error(data, { timestamp: true });
-      });
-      spawnProcess.on('exit', (_, signal) => {
-        if (!manualRestart) {
-          if (!signal) {
-            process.exit(0);
-          }
-        } else {
-          manualRestart = false;
-        }
-      });
-    },
+    const shouldIgnore = STDERR_FILTER_PATTERNS.some((pattern) => pattern.test(error));
+    if (!shouldIgnore) logger.error(error, { timestamp: true });
+  });
+
+  // 处理进程退出
+  electronProcess.on('exit', (code, signal) => {
+    if (!manualRestart && !signal) { process.exit(code || 0); } else {
+      manualRestart = false;
+    }
   });
 };
 
 /**
- * Start or restart App when source files are changed
+ * 设置主进程文件监听器
  * @param {import('vite').ViteDevServer} viteDevServer
  * @returns {Promise<import('vite').RollupOutput | Array<import('vite').RollupOutput> | import('vite').RollupWatcher>}
  */
-const setupPreloadPackageWatcher = (viteDevServer) => getWatcher({
-  name: 'reload-page-on-preload-package-change',
+const setupMainProcessWatcher = (viteDevServer) => {
+  // 设置开发服务器URL环境变量
+  const protocol = `http${viteDevServer.config.server.https ? 's' : ''}:`;
+  const host = viteDevServer.config.server.host || 'localhost';
+  const { port } = viteDevServer.config.server;
+  process.env.VITE_DEV_SERVER_URL = `${protocol}//${host}:${port}/`;
+
+  const logger = createLogger(LOG_LEVEL, { prefix: '[main]' });
+
+  return build({
+    ...sharedConfig,
+    configFile: 'src/vite.main.config.js',
+    plugins: [{
+      name: 'reload-app-on-main-package-change',
+      writeBundle: () => startElectronProcess(logger),
+    }],
+  });
+};
+
+/**
+ * 设置预加载文件监听器
+ * @param {import('vite').ViteDevServer} viteDevServer
+ * @returns {Promise<import('vite').RollupOutput | Array<import('vite').RollupOutput> | import('vite').RollupWatcher>}
+ */
+const setupPreloadWatcher = (viteDevServer) => build({
+  ...sharedConfig,
   configFile: 'src/vite.preload.config.js',
-  writeBundle() {
-    viteDevServer.ws.send({
-      type: 'full-reload',
-    });
-  },
+  plugins: [{
+    name: 'reload-page-on-preload-package-change',
+    writeBundle: () => viteDevServer.ws.send({ type: 'full-reload' }),
+  }],
 });
 
-const startViteServer = async () => {
-  const viteDevServer = await createServer({
+/**
+ * 启动Vite开发服务器
+ * @returns {Promise<import('vite').ViteDevServer>}
+ */
+const startDevServer = async () => {
+  const server = await createServer({
     ...sharedConfig,
     configFile: 'src/vite.renderer.config.js',
   });
-
-  await viteDevServer.listen();
-  return viteDevServer;
+  await server.listen();
+  return server;
 };
 
-const start = async () => {
+/**
+ * 启动开发环境
+ * @returns {Promise<void>}
+ */
+const startDevEnvironment = async () => {
   try {
-    const viteDevServer = await startViteServer();
+    const viteDevServer = await startDevServer();
 
-    await setupPreloadPackageWatcher(viteDevServer);
-    // 等待 preload.js 构建完成
+    await setupPreloadWatcher(viteDevServer);
     await waitOn({
       resources: [join(__dirname, '../dist/preload/index.js')],
       timeout: 5000,
     });
-    await setupMainPackageWatcher(viteDevServer);
-  } catch (e) {
-    console.error(e);
-    if (spawnProcess !== null) {
-      spawnProcess.kill('SIGINT');
-      spawnProcess = null;
+
+    await setupMainProcessWatcher(viteDevServer);
+  } catch (error) {
+    console.error('Development server error:', error);
+    if (electronProcess !== null) {
+      electronProcess.kill('SIGINT');
+      electronProcess = null;
     }
     process.exit(1);
   }
 };
 
-start();
+// 启动开发环境
+startDevEnvironment();
