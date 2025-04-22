@@ -6,7 +6,8 @@ import {
 import path from 'path';
 import fs from 'fs';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import axiosHttpAdapter from 'axios/lib/adapters/http.js';
+// eslint-disable-next-line import/extensions,import/no-unresolved
+import axiosHttpAdapter from 'axios/lib/adapters/http';
 import useAxios from '@/hooks/useAxios';
 
 const axios = useAxios(axiosHttpAdapter);

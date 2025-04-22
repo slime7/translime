@@ -77,6 +77,7 @@ export default defineConfig(({ mode }) => {
         external: [
           'vue',
           ...builtinModules,
+          ...Array.form(builtinModules).map((m) => `node:${m}`),
         ],
       },
     },

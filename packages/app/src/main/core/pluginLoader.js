@@ -5,7 +5,7 @@ import { app, clipboard, Menu } from 'electron';
 import EventEmitter from 'events';
 import childProcess from 'child_process';
 import { createRequire } from 'module';
-import tar from 'tar';
+import * as tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../utils/useMainStore';
 import logger from '../utils/logger';

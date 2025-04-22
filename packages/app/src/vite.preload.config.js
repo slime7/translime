@@ -24,11 +24,18 @@ export default defineConfig(({ mode }) => {
           find: /^@\/(.*)/,
           replacement: `${join(PACKAGE_ROOT, '../renderer')}/$1`,
         },
+        /* axios 在 1.x 版本中的 `package.json` 使用了 exports 字段，使 lib 目录无法正常引入
+         * https://github.com/axios/axios/issues/5000
+         */
+        {
+          find: /^axios\/lib\/(.*)/,
+          replacement: `${join(MODULES_ROOT, 'axios/lib')}/$1`,
+        },
       ],
     },
     build: {
       sourcemap: isDev ? 'inline' : false,
-      target: 'es2021',
+      target: 'node18',
       outDir: join(PACKAGE_ROOT, '../../dist/preload'),
       assetsDir: '.',
       minify: isDev ? false : 'terser',
@@ -47,6 +54,7 @@ export default defineConfig(({ mode }) => {
         external: [
           'electron',
           ...builtinModules,
+          ...Array.form(builtinModules).map((m) => `node:${m}`),
         ],
         output: {
           entryFileNames: '[name].js',
