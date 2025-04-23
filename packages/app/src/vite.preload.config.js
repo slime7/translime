@@ -2,8 +2,8 @@ import { join } from 'node:path';
 import { builtinModules } from 'node:module';
 import { defineConfig } from 'vite';
 
-const PACKAGE_ROOT = join(__dirname, 'preload');
-const MODULES_ROOT = join(__dirname, '../node_modules');
+const PACKAGE_ROOT = join(import.meta.dirname, 'preload');
+const MODULES_ROOT = join(import.meta.dirname, '../node_modules');
 
 /**
  * @see https://vitejs.dev/config/
@@ -48,16 +48,20 @@ export default defineConfig(({ mode }) => {
       },
       lib: {
         entry: 'index.js',
+        /**
+         * preload 使用 esm 出现 bug
+         * https://github.com/electron/electron/issues/46614
+         */
         formats: ['cjs'],
       },
       rollupOptions: {
         external: [
           'electron',
           ...builtinModules,
-          ...Array.form(builtinModules).map((m) => `node:${m}`),
+          ...builtinModules.map((m) => `node:${m}`),
         ],
         output: {
-          entryFileNames: '[name].js',
+          entryFileNames: '[name].cjs',
         },
       },
       emptyOutDir: true,

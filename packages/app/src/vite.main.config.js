@@ -41,14 +41,14 @@ export default defineConfig(({ mode }) => {
       },
       lib: {
         entry: 'index.js',
-        formats: ['cjs'],
+        formats: ['es'],
       },
       rollupOptions: {
         external: [
           'electron',
           'electron-devtools-installer',
           ...builtinModules,
-          ...Array.form(builtinModules).map((m) => `node:${m}`),
+          ...builtinModules.map((m) => `node:${m}`),
           ...external,
         ],
         output: {

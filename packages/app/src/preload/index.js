@@ -3,12 +3,14 @@ import {
   clipboard,
   ipcRenderer,
 } from 'electron';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 // eslint-disable-next-line import/extensions,import/no-unresolved
-import axiosHttpAdapter from 'axios/lib/adapters/http';
+import axiosHttpAdapter from 'axios/lib/adapters/http.js';
 import useAxios from '@/hooks/useAxios';
+
+const dir = __dirname;
 
 const axios = useAxios(axiosHttpAdapter);
 const apiKey = 'electron';
@@ -135,7 +137,7 @@ const api = {
       type: ipcType.IS_NOTIFICATION_SUPPORTED,
     }),
   },
-  APP_ROOT: path.resolve(__dirname, '../'),
+  APP_ROOT: path.resolve(dir, '../'),
 };
 api.ipcRenderer.receive('ipc-reply', (msg) => {
   console.log(`ipc-reply by ${msg.type}`, msg);

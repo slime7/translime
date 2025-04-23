@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 
-const { createServer, build, createLogger } = require('vite');
-const electronPath = require('electron');
-const { spawn } = require('child_process');
-const waitOn = require('wait-on');
-const { join } = require('path');
+import { createServer, build, createLogger } from 'vite';
+import electronPath from 'electron';
+import { spawn } from 'child_process';
+import waitOn from 'wait-on';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const filename = fileURLToPath(import.meta.url);
+const dir = dirname(filename);
 
 /**
  * @typedef {'production' | 'development' | 'test'} BuildMode
@@ -135,7 +139,7 @@ const startDevEnvironment = async () => {
 
     await setupPreloadWatcher(viteDevServer);
     await waitOn({
-      resources: [join(__dirname, '../dist/preload/index.js')],
+      resources: [join(dir, '../dist/preload/index.cjs')],
       timeout: 5000,
     });
 

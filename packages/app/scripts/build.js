@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-const builder = require('electron-builder');
-const { build: viteBuild } = require('vite');
-const { resolve } = require('path');
-const fs = require('fs');
-const builderConfig = require('../electron-builder.config');
-const pkg = require('../package.json');
+import builder from 'electron-builder';
+import { build as viteBuild } from 'vite';
+import { resolve } from 'node:path';
+import fs from 'node:fs';
+import builderConfig from '../electron-builder.config.js';
+import pkg from '../package.json' assert { type: 'json' };
 
 /**
  * @typedef {'production' | 'development' | 'test'} BuildMode
