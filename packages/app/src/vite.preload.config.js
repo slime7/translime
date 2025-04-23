@@ -24,20 +24,13 @@ export default defineConfig(({ mode }) => {
           find: /^@\/(.*)/,
           replacement: `${join(PACKAGE_ROOT, '../renderer')}/$1`,
         },
-        /* axios 在 1.x 版本中的 `package.json` 使用了 exports 字段，使 lib 目录无法正常引入
-         * https://github.com/axios/axios/issues/5000
-         */
-        {
-          find: /^axios\/lib\/(.*)/,
-          replacement: `${join(MODULES_ROOT, 'axios/lib')}/$1`,
-        },
       ],
+      mainFields: ['module', 'jsnext:main', 'jsnext', 'main'],
     },
     build: {
       sourcemap: isDev ? 'inline' : false,
       target: 'node18',
       outDir: join(PACKAGE_ROOT, '../../dist/preload'),
-      assetsDir: '.',
       minify: isDev ? false : 'terser',
       terserOptions: isDev ? undefined : {
         ecma: 2021,
@@ -53,6 +46,7 @@ export default defineConfig(({ mode }) => {
          * https://github.com/electron/electron/issues/46614
          */
         formats: ['cjs'],
+        fileName: () => '[name].cjs',
       },
       rollupOptions: {
         external: [
@@ -60,9 +54,6 @@ export default defineConfig(({ mode }) => {
           ...builtinModules,
           ...builtinModules.map((m) => `node:${m}`),
         ],
-        output: {
-          entryFileNames: '[name].cjs',
-        },
       },
       emptyOutDir: true,
       brotliSize: false,

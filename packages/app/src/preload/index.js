@@ -6,13 +6,10 @@ import {
 import path from 'node:path';
 import fs from 'node:fs';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-// eslint-disable-next-line import/extensions,import/no-unresolved
 import axiosHttpAdapter from 'axios/lib/adapters/http.js';
-import useAxios from '@/hooks/useAxios';
 
 const dir = __dirname;
 
-const axios = useAxios(axiosHttpAdapter);
 const apiKey = 'electron';
 const ipcWhiteList = {
   send: [
@@ -165,7 +162,6 @@ ipcRenderer.invoke('ipc-fn', {
 const translime = {
   // axios
   axiosHttpAdapter,
-  axios: { ...axios },
   // winston logger
   logger: {
     log: (...args) => ipcRenderer.invoke('ipc-fn', {
