@@ -5,8 +5,8 @@ import {
 } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
-import * as ipcType from '@pkg/share/utils/ipcConstant';
 import axiosHttpAdapter from 'axios/lib/adapters/http.js';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 
 const dir = __dirname;
 
@@ -161,7 +161,20 @@ ipcRenderer.invoke('ipc-fn', {
 
 const translime = {
   // axios
-  axiosHttpAdapter,
+  axiosHttpAdapter: (config) => {
+    if (config.signal && typeof config.signal === 'function') {
+      // eslint-disable-next-line no-param-reassign
+      config.signal = config.signal();
+    }
+    return axiosHttpAdapter(config);
+  },
+  createAbortController: () => {
+    const controller = new AbortController();
+    return {
+      signal: () => controller.signal,
+      abort: (reason) => controller.abort(reason),
+    };
+  },
   // winston logger
   logger: {
     log: (...args) => ipcRenderer.invoke('ipc-fn', {
