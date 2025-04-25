@@ -215,10 +215,10 @@ export default {
       }
       loading.search = true;
       try {
+        const searchText = `text=${q ? `translime-plugin-${q}+` : ''}keywords:translime%20plugin`;
         // doc: https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md#get-v1search
-        const data = await useHttp('https://registry.npmjs.com/-/v1/search', {
+        const data = await useHttp(`https://registry.npmjs.com/-/v1/search?${searchText}`, {
           params: {
-            text: q ? `translime-plugin-${q}` : 'keywords:translime plugin',
             size: 8,
             from: page,
             x: Math.random(),
