@@ -12,6 +12,7 @@
     "npm": ">=7.7"
   },
   "main": "dist/main/index.js",
+  "type": "module",
   "scripts": {
     "dev": "node scripts/watch.js",
     "serve": "node scripts/watch.js",
@@ -22,16 +23,16 @@
     "lint": "eslint --ext js,jsx,ts,vue src/"
   },
   "dependencies": {
-    "axios": "^1.6.7",
+    "axios": "~1.8.4",
     "dayjs": "^1.11.9",
-    "electron": "35.1.4",
+    "electron": "^35.2.0",
     "electron-builder": "^26.0.12",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.1.1",
     "npm": "^9.8.0",
     "pinia": "^2.3.1",
     "semver-compare": "^1.0.0",
-    "tar": "^6.1.13",
+    "tar": "^7.4.3",
     "vue": "^3.5.13",
     "vue-router": "^4.2.4",
     "vuetify": "^3.8.1",
@@ -52,7 +53,7 @@
     "sass": "^1.86.3",
     "sass-loader": "^16.0.5",
     "terser": "^5.16.3",
-    "vite": "^6.2.5",
+    "vite": "^6.3.2",
     "vite-plugin-static-copy": "^0.16.0",
     "vite-plugin-vuetify": "^2.1.1",
     "wait-on": "^7.0.1"

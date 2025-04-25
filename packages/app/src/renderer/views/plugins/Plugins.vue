@@ -7,7 +7,7 @@
         <v-text-field
           v-model="search"
           placeholder="输入插件包名"
-          variant="solo"
+          variant="outlined"
           density="compact"
           prefix="translime-plugin-"
           @keyup.enter="searchAction"
@@ -159,7 +159,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
-import useAxios from '@/hooks/useAxios';
+import useHttp from '@/hooks/useHttp';
 import useGlobalStore from '@/store/globalStore';
 import { showTextEditContextMenu, selectFileDialog } from '@/utils';
 import PluginCard from './PluginCard.vue';
@@ -176,7 +176,6 @@ export default {
     const store = useGlobalStore();
     const alert = useAlert();
     const dialog = useDialog();
-    const axios = useAxios();
     const route = useRoute();
     const router = useRouter();
     const loading = reactive({
@@ -216,17 +215,17 @@ export default {
       }
       loading.search = true;
       try {
+        const searchText = `text=${q ? `translime-plugin-${q}+` : ''}keywords:translime%20plugin`;
         // doc: https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md#get-v1search
-        const { data } = await axios('https://registry.npmjs.com/-/v1/search', {
-          method: 'get',
+        const data = await useHttp(`https://registry.npmjs.com/-/v1/search?${searchText}`, {
           params: {
-            text: q ? `translime-plugin-${q}` : 'translime-plugin',
             size: 8,
             from: page,
             x: Math.random(),
           },
-        });
-        searchResult.list.push(...data.objects.map((item) => parseSearchResult(item.package)));
+        }).get();
+        const filterData = data.objects.filter((item) => item.package.name.includes('translime-plugin'));
+        searchResult.list.push(...filterData.map((item) => parseSearchResult(item.package)));
         searchResult.total = +data.total;
         searchPage.value = page;
       } catch (err) {

@@ -1,11 +1,11 @@
 import { join } from 'node:path';
 import { builtinModules } from 'node:module';
-import { external } from '../package.json';
 import { defineConfig } from 'vite';
+import { external } from '../package.json';
 
 const PACKAGE_ROOT = join(__dirname, 'main');
 
-/**=
+/**
  * @see https://vitejs.dev/config/
  */
 export default defineConfig(({ mode }) => {
@@ -28,12 +28,12 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: isDev ? 'inline' : false,
-      target: 'node14',
+      target: 'node18',
       outDir: join(PACKAGE_ROOT, '../../dist/main'),
       assetsDir: '.',
       minify: isDev ? false : 'terser',
       terserOptions: isDev ? undefined : {
-        ecma: 2020,
+        ecma: 2021,
         compress: {
           passes: 2,
         },
@@ -41,13 +41,14 @@ export default defineConfig(({ mode }) => {
       },
       lib: {
         entry: 'index.js',
-        formats: ['cjs'],
+        formats: ['es'],
       },
       rollupOptions: {
         external: [
           'electron',
           'electron-devtools-installer',
           ...builtinModules,
+          ...builtinModules.map((m) => `node:${m}`),
           ...external,
         ],
         output: {

@@ -1,11 +1,15 @@
-import path from 'path';
+import { fileURLToPath } from 'node:url';
 import { app } from 'electron';
 import pkg from '@pkg/../package.json';
+import path from 'node:path';
 import appConfigStore from './appConfigStore';
+
+const filename = fileURLToPath(import.meta.url);
+const dir = path.dirname(filename);
 
 const useMainStore = () => {
   const APP_VERSION = pkg.version;
-  const ROOT = path.join(__dirname, '..');
+  const ROOT = path.join(dir, '..');
   const APPDATA_PATH = app.getPath('userData');
   const TEMP_DIR = app.getPath('temp');
   const config = appConfigStore;

@@ -8,6 +8,7 @@
       :elevation="isHovering ? 10 : 2"
       :disabled="disabled"
       rounded="xl"
+      color="primary-container"
     >
       <div class="d-flex flex-no-wrap justify-space-between">
         <div class="min-w-0">
@@ -177,7 +178,7 @@ import verCompare from 'semver-compare';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
-import useAxios from '@/hooks/useAxios';
+import useHttp from '@/hooks/useHttp';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
 import usePluginActions from './hooks/usePluginActions';
@@ -207,7 +208,6 @@ export default {
     const pluginId = plugin.value.packageName;
     const ipc = useIpc();
     const store = useGlobalStore();
-    const axios = useAxios();
 
     const { plugins } = storeToRefs(store);
     const isInstalled = computed(() => plugins.value.some((p) => p.packageName === plugin.value.packageName));
@@ -256,12 +256,12 @@ export default {
       }
       getVersionLoading.value = true;
       try {
-        const { data } = await axios(`https://registry.npmjs.com/${pluginId}`, {
+        const data = await useHttp(`https://registry.npmjs.com/${pluginId}`, {
           method: 'get',
           params: {
             x: Math.random(),
           },
-        });
+        }).get();
         versionLoaded.value = true;
         const versions = Object.keys(data.versions).map((version) => ({
           value: version,

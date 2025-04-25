@@ -7,11 +7,15 @@ import {
   clipboard,
   nativeTheme,
 } from 'electron';
-import { join, sep } from 'path';
+import { join, sep, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '../utils/createWindow';
 import mainStore from '../utils/useMainStore';
 import logger from '../utils/logger';
+
+const filename = fileURLToPath(import.meta.url);
+const dir = dirname(filename);
 
 const ipcHandler = (ipc) => ({
   [ipcType.DEVTOOLS](win = 'app') {
@@ -133,7 +137,7 @@ const ipcHandler = (ipc) => ({
         skipTaskbar: typeof options.skipTaskbar !== 'undefined' ? options.skipTaskbar : false,
         focusable: typeof options.focusable !== 'undefined' ? options.focusable : true,
         webPreferences: {
-          preload: join(__dirname, '../preload/index.js'),
+          preload: join(dir, '../preload/index.cjs'),
           nodeIntegration: false,
           contextIsolation: true,
           sandbox: false,

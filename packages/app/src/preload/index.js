@@ -3,13 +3,13 @@ import {
   clipboard,
   ipcRenderer,
 } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import * as ipcType from '@pkg/share/utils/ipcConstant';
+import path from 'node:path';
+import fs from 'node:fs';
 import axiosHttpAdapter from 'axios/lib/adapters/http.js';
-import useAxios from '@/hooks/useAxios';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 
-const axios = useAxios(axiosHttpAdapter);
+const dir = __dirname;
+
 const apiKey = 'electron';
 const ipcWhiteList = {
   send: [
@@ -134,7 +134,7 @@ const api = {
       type: ipcType.IS_NOTIFICATION_SUPPORTED,
     }),
   },
-  APP_ROOT: path.resolve(__dirname, '../'),
+  APP_ROOT: path.resolve(dir, '../'),
 };
 api.ipcRenderer.receive('ipc-reply', (msg) => {
   console.log(`ipc-reply by ${msg.type}`, msg);
@@ -161,8 +161,20 @@ ipcRenderer.invoke('ipc-fn', {
 
 const translime = {
   // axios
-  axiosHttpAdapter,
-  axios: { ...axios },
+  axiosHttpAdapter: (config) => {
+    if (config.signal && typeof config.signal === 'function') {
+      // eslint-disable-next-line no-param-reassign
+      config.signal = config.signal();
+    }
+    return axiosHttpAdapter(config);
+  },
+  createAbortController: () => {
+    const controller = new AbortController();
+    return {
+      signal: () => controller.signal,
+      abort: (reason) => controller.abort(reason),
+    };
+  },
   // winston logger
   logger: {
     log: (...args) => ipcRenderer.invoke('ipc-fn', {

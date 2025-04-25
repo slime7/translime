@@ -7,8 +7,8 @@ import vue from '@vitejs/plugin-vue';
 import vuetify from 'vite-plugin-vuetify';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
-const RENDERER_ROOT = join(__dirname, 'renderer');
-const MODULES_ROOT = join(__dirname, '../node_modules');
+const RENDERER_ROOT = join(import.meta.dirname, 'renderer');
+const MODULES_ROOT = join(import.meta.dirname, '../node_modules');
 const isProd = process.env.MODE === 'production';
 
 /**
@@ -77,6 +77,7 @@ export default defineConfig(({ mode }) => {
         external: [
           'vue',
           ...builtinModules,
+          ...builtinModules.map((m) => `node:${m}`),
         ],
       },
     },

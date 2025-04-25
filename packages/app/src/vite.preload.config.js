@@ -2,8 +2,8 @@ import { join } from 'node:path';
 import { builtinModules } from 'node:module';
 import { defineConfig } from 'vite';
 
-const PACKAGE_ROOT = join(__dirname, 'preload');
-const MODULES_ROOT = join(__dirname, '../node_modules');
+const PACKAGE_ROOT = join(import.meta.dirname, 'preload');
+const MODULES_ROOT = join(import.meta.dirname, '../node_modules');
 
 /**
  * @see https://vitejs.dev/config/
@@ -25,12 +25,12 @@ export default defineConfig(({ mode }) => {
           replacement: `${join(PACKAGE_ROOT, '../renderer')}/$1`,
         },
       ],
+      mainFields: ['module', 'jsnext:main', 'jsnext', 'main'],
     },
     build: {
       sourcemap: isDev ? 'inline' : false,
-      target: 'es2021',
+      target: 'node18',
       outDir: join(PACKAGE_ROOT, '../../dist/preload'),
-      assetsDir: '.',
       minify: isDev ? false : 'terser',
       terserOptions: isDev ? undefined : {
         ecma: 2021,
@@ -41,16 +41,19 @@ export default defineConfig(({ mode }) => {
       },
       lib: {
         entry: 'index.js',
+        /**
+         * preload 使用 esm 出现 bug
+         * https://github.com/electron/electron/issues/46614
+         */
         formats: ['cjs'],
+        fileName: () => '[name].cjs',
       },
       rollupOptions: {
         external: [
           'electron',
           ...builtinModules,
+          ...builtinModules.map((m) => `node:${m}`),
         ],
-        output: {
-          entryFileNames: '[name].js',
-        },
       },
       emptyOutDir: true,
       brotliSize: false,

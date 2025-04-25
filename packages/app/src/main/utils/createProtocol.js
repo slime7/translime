@@ -1,8 +1,11 @@
 import { protocol } from 'electron';
-import * as path from 'path';
-import { readFileSync } from 'fs';
-import { URL } from 'url';
+import * as path from 'node:path';
+import { readFileSync } from 'node:fs';
+import { URL, fileURLToPath } from 'node:url';
 import logger from './logger';
+
+const filename = fileURLToPath(import.meta.url);
+const dir = path.dirname(filename);
 
 export default (scheme) => {
   if (protocol.isProtocolHandled(scheme)) {
@@ -15,7 +18,7 @@ export default (scheme) => {
       pathName = decodeURI(pathName); // Needed in case URL contains spaces
 
       try {
-        const data = await readFileSync(path.join(__dirname, '../renderer', pathName));
+        const data = await readFileSync(path.join(dir, '../renderer', pathName));
         const extension = path.extname(pathName)
           .toLowerCase();
         let mimeType = '';

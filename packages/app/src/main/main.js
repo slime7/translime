@@ -6,11 +6,15 @@ import {
   screen,
 } from 'electron';
 import Store from 'electron-store';
-import { join } from 'path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createProtocol from './utils/createProtocol';
 import mainStore from './utils/useMainStore';
 import Ipc from './core/Ipc';
+
+const filename = fileURLToPath(import.meta.url);
+const dir = dirname(filename);
 
 export default () => {
   const { workArea } = screen.getPrimaryDisplay();
@@ -44,7 +48,7 @@ export default () => {
     minWidth: 700,
     titleBarStyle: useNativeTitleBar ? 'default' : 'hidden',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(dir, '../preload/index.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
