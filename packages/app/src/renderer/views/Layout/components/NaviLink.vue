@@ -59,7 +59,7 @@
           :color="isHovering ? color : 'grey-darken-2'"
           :rounded="isHovering ? 'xl' : 'circle'"
         >
-          <v-icon v-if="icon" :color="isHovering ? 'white' : color">{{ icon }}</v-icon>
+          <v-icon v-if="icon" :color="isHovering ? 'on-primary-container' : color">{{ icon }}</v-icon>
           <img v-else-if="image" :src="image" alt="" width="56" />
           <div v-else class="text-no-wrap text-truncate" :class="isHovering ? 'white--text' : textColor">
             <slot></slot>

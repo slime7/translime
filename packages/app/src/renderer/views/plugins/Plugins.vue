@@ -7,7 +7,7 @@
         <v-text-field
           v-model="search"
           placeholder="输入插件包名"
-          variant="solo"
+          variant="outlined"
           density="compact"
           prefix="translime-plugin-"
           @keyup.enter="searchAction"

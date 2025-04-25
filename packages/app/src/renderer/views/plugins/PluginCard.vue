@@ -8,6 +8,7 @@
       :elevation="isHovering ? 10 : 2"
       :disabled="disabled"
       rounded="xl"
+      color="primary-container"
     >
       <div class="d-flex flex-no-wrap justify-space-between">
         <div class="min-w-0">
