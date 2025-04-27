@@ -11,10 +11,27 @@ import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createProtocol from './utils/createProtocol';
 import mainStore from './utils/useMainStore';
+import logger from './utils/logger';
 import Ipc from './core/Ipc';
 
 const filename = fileURLToPath(import.meta.url);
 const dir = dirname(filename);
+const isInDisplay = (winProps) => {
+  const displays = screen.getAllDisplays();
+  let inDisplay = false;
+  let appDisplayName = '';
+  displays.forEach((display) => {
+    const { workArea } = display;
+    if (winProps.x >= workArea.x && winProps.x + 120 <= workArea.x + workArea.width) {
+      if (winProps.y >= workArea.y && winProps.y + 80 <= workArea.y + workArea.height) {
+        inDisplay = true;
+        appDisplayName = display.label;
+      }
+    }
+  });
+  logger.info(`app current display: ${appDisplayName}`);
+  return inDisplay;
+};
 
 export default () => {
   const { workArea } = screen.getPrimaryDisplay();
@@ -37,6 +54,13 @@ export default () => {
   } = mainStore.config.get('window', defaultWin);
   maximize = false;
   const useNativeTitleBar = mainStore.config.get('setting.useNativeTitleBar', false);
+  // 判断是否在屏幕视野内
+  if (!isInDisplay({
+    x, y, width, height,
+  })) {
+    x = defaultWin.x;
+    y = defaultWin.y;
+  }
   // Create the browser window.
   const win = new BrowserWindow({
     x,
