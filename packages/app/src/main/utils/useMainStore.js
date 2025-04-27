@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { app } from 'electron';
-import pkg from '@pkg/../package.json';
 import path from 'node:path';
+import pkg from '@pkg/../package.json' with { type: 'json' };
 import appConfigStore from './appConfigStore';
 
 const filename = fileURLToPath(import.meta.url);
@@ -52,7 +52,7 @@ const useMainStore = () => {
   };
 };
 
-const mainStore = useMainStore();
+let mainStore = useMainStore();
 if (!global.mainStore) {
   global.mainStore = mainStore;
   global.config = mainStore.config;

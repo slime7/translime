@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import path from 'path';
+import path from 'node:path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import logger from '../utils/logger';
 import { parseAppArgv, parseDeepLink } from '../utils';

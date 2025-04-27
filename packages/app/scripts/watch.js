@@ -2,7 +2,7 @@
 
 import { createServer, build, createLogger } from 'vite';
 import electronPath from 'electron';
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 import waitOn from 'wait-on';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

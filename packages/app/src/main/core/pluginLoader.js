@@ -1,10 +1,10 @@
-import path from 'path';
-import fs from 'fs';
-import zlib from 'zlib';
+import path from 'node:path';
+import fs from 'node:fs';
+import zlib from 'node:zlib';
 import { app, clipboard, Menu } from 'electron';
-import EventEmitter from 'events';
-import childProcess from 'child_process';
-import { createRequire } from 'module';
+import EventEmitter from 'node:events';
+import childProcess from 'node:child_process';
+import { createRequire } from 'node:module';
 import * as tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../utils/useMainStore';

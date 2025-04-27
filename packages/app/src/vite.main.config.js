@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
           replacement: `${join(PACKAGE_ROOT, '../renderer')}/$1`,
         },
       ],
+      mainFields: ['module', 'jsnext:main', 'jsnext', 'main'],
     },
     build: {
       sourcemap: isDev ? 'inline' : false,

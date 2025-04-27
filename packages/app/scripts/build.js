@@ -5,7 +5,7 @@ import { build as viteBuild } from 'vite';
 import { resolve } from 'node:path';
 import fs from 'node:fs';
 import builderConfig from '../electron-builder.config.js';
-import pkg from '../package.json' assert { type: 'json' };
+import pkg from '../package.json' with { type: 'json' };
 
 /**
  * @typedef {'production' | 'development' | 'test'} BuildMode

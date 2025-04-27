@@ -3,7 +3,7 @@ import {
   ipcMain,
   protocol,
 } from 'electron';
-import EventEmitter from 'events';
+import EventEmitter from 'node:events';
 import createMainWindow from './main';
 import mainStore from './utils/useMainStore';
 import logger from './utils/logger';

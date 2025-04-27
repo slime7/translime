@@ -3,7 +3,6 @@ import { builtinModules } from 'node:module';
 import { defineConfig } from 'vite';
 
 const PACKAGE_ROOT = join(import.meta.dirname, 'preload');
-const MODULES_ROOT = join(import.meta.dirname, '../node_modules');
 
 /**
  * @see https://vitejs.dev/config/
