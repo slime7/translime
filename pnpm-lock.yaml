@@ -271,51 +271,51 @@ importers:
   packages/translime-plugin-rtmp-recorder:
     dependencies:
       electron:
-        specifier: ^26.0.0
-        version: 26.6.10
+        specifier: ^35.0.0
+        version: 35.2.0
     devDependencies:
       '@rollup/plugin-commonjs':
-        specifier: ^24.0.1
-        version: 24.1.0(rollup@3.29.4)
+        specifier: ^28.0.3
+        version: 28.0.3(rollup@4.40.0)
       '@rollup/plugin-node-resolve':
-        specifier: ^15.0.1
-        version: 15.2.3(rollup@3.29.4)
+        specifier: ^15.3.1
+        version: 15.3.1(rollup@4.40.0)
       '@vitejs/plugin-vue':
-        specifier: ^4.2.3
-        version: 4.6.2(vite@4.5.2(@types/node@22.14.1)(sass@1.86.3)(terser@5.39.0))(vue@3.4.21(typescript@5.8.3))
+        specifier: ^4.6.2
+        version: 4.6.2(vite@6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0))(vue@3.5.13(typescript@5.8.3))
       dayjs:
-        specifier: ^1.11.8
+        specifier: ^1.11.9
         version: 1.11.10
       eslint:
-        specifier: ^8.43.0
-        version: 8.44.0
+        specifier: ~9.24.0
+        version: 9.24.0(jiti@1.21.0)
       eslint-config-airbnb-base:
         specifier: ^15.0.0
-        version: 15.0.0(eslint-plugin-import@2.29.1(eslint@8.44.0))(eslint@8.44.0)
+        version: 15.0.0(eslint-plugin-import@2.31.0(eslint@9.24.0(jiti@1.21.0)))(eslint@9.24.0(jiti@1.21.0))
       eslint-import-resolver-alias:
         specifier: ^1.1.2
-        version: 1.1.2(eslint-plugin-import@2.29.1(eslint@8.44.0))
+        version: 1.1.2(eslint-plugin-import@2.31.0(eslint@9.24.0(jiti@1.21.0)))
       eslint-plugin-import:
-        specifier: ^2.27.5
-        version: 2.29.1(eslint@8.44.0)
+        specifier: ^2.31.0
+        version: 2.31.0(eslint@9.24.0(jiti@1.21.0))
       eslint-plugin-vue:
-        specifier: ^9.15.1
-        version: 9.23.0(eslint@8.44.0)
+        specifier: ^10.0.0
+        version: 10.0.0(eslint@9.24.0(jiti@1.21.0))(vue-eslint-parser@9.4.2(eslint@9.24.0(jiti@1.21.0)))
       fluent-ffmpeg:
-        specifier: ^2.1.2
-        version: 2.1.2
+        specifier: ^2.1.3
+        version: 2.1.3
       vite:
-        specifier: ^4.4.3
-        version: 4.5.2(@types/node@22.14.1)(sass@1.86.3)(terser@5.39.0)
+        specifier: ^6.3.2
+        version: 6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0)
       vite-plugin-css-injected-by-js:
         specifier: ^3.1.2
-        version: 3.4.0(vite@4.5.2(@types/node@22.14.1)(sass@1.86.3)(terser@5.39.0))
+        version: 3.4.0(vite@6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0))
       vue:
-        specifier: ^3.3.0
-        version: 3.4.21(typescript@5.8.3)
+        specifier: ^3.5.0
+        version: 3.5.13(typescript@5.8.3)
       vuetify:
-        specifier: ^3.3.14
-        version: 3.5.8(typescript@5.8.3)(vite-plugin-vuetify@2.1.1)(vue@3.4.21(typescript@5.8.3))
+        specifier: ^3.8.0
+        version: 3.8.1(typescript@5.8.3)(vite-plugin-vuetify@2.1.1)(vue@3.5.13(typescript@5.8.3))
 
   packages/translime-plugin-static-server:
     devDependencies:
@@ -618,8 +618,8 @@ packages:
     resolution: {integrity: sha512-Qkzpg2s9GnVV2I2BjRksUi43U5e6+zaQMcjoJy0C+C5oxaKl+fmckGDQFtRpZpZV0NQekuZZ+tGz7EA9TVnQtQ==}
     engines: {node: '>=12'}
 
-  '@electron/node-gyp@git+https://git@github.com:electron/node-gyp.git#06b29aafb7708acef8b3669835c8a7857ebc92d2':
-    resolution: {commit: 06b29aafb7708acef8b3669835c8a7857ebc92d2, repo: git@github.com:electron/node-gyp.git, type: git}
+  '@electron/node-gyp@https://codeload.github.com/electron/node-gyp/tar.gz/06b29aafb7708acef8b3669835c8a7857ebc92d2':
+    resolution: {tarball: https://codeload.github.com/electron/node-gyp/tar.gz/06b29aafb7708acef8b3669835c8a7857ebc92d2}
     version: 10.2.0-electron.1
     engines: {node: '>=12.13.0'}
     hasBin: true
@@ -1305,8 +1305,26 @@ packages:
       rollup:
         optional: true
 
+  '@rollup/plugin-commonjs@28.0.3':
+    resolution: {integrity: sha512-pyltgilam1QPdn+Zd9gaCfOLcnjMEJ9gV+bTw6/r73INdvzf1ah9zLIJBm+kW7R6IUFIQ1YO+VqZtYxZNWFPEQ==}
+    engines: {node: '>=16.0.0 || 14 >= 14.17'}
+    peerDependencies:
+      rollup: ^2.68.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
   '@rollup/plugin-node-resolve@15.2.3':
     resolution: {integrity: sha512-j/lym8nf5E21LwBT4Df1VD6hRO2L2iwUeUmP7litikRsVp1H6NWx20NEp0Y7su+7XGc476GnXXc4kFeZNGmaSQ==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      rollup: ^2.78.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
+  '@rollup/plugin-node-resolve@15.3.1':
+    resolution: {integrity: sha512-tgg6b91pAybXHJQMAAwW9VuWBO6Thi+q7BCNARLwSqlmsHz0XYURtGvh/AuwSADXSI4h/2uHbs7s4FzlZDGSGA==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       rollup: ^2.78.0||^3.0.0||^4.0.0
@@ -1528,9 +1546,6 @@ packages:
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
-
-  '@types/node@18.19.23':
-    resolution: {integrity: sha512-wtE3d0OUfNKtZYAqZb8HAWGxxXsImJcPUAgZNw+dWFxO6s5tIwIjyKnY76tsTatsNCLJPkVYwUpq15D38ng9Aw==}
 
   '@types/node@22.14.0':
     resolution: {integrity: sha512-Kmpl+z84ILoG+3T/zQFyAJsU6EPTmOCj8/2+83fSN6djd6I4o7uOuGIH6vq3PrjY5BGitSbFuMN18j3iknubbA==}
@@ -1984,6 +1999,9 @@ packages:
   async-function@1.0.0:
     resolution: {integrity: sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA==}
     engines: {node: '>= 0.4'}
+
+  async@0.2.10:
+    resolution: {integrity: sha512-eAkdoKxU6/LkKDBzLpT+t6Ff5EtfSF4wx1WfJiPEEV7WNLnDaRXk0oVysiEPm262roaachGexwUv94WhSgN5TQ==}
 
   async@3.2.5:
     resolution: {integrity: sha512-baNZyqaaLhyLVKm/DlvdW051MSgO6b8eVfIezl9E5PqWxFgzLm/wQntEW4zOytVburDEr0JlALEpdOFwvErLsg==}
@@ -2631,13 +2649,8 @@ packages:
   electron-to-chromium@1.4.702:
     resolution: {integrity: sha512-LYLXyEUsZ3nNSwiOWjI88N1PJUAMU2QphQSgGLVkFnb3FxZxNui2Vzi2PaKPgPWbsWbZstZnh6BMf/VQJamjiQ==}
 
-  electron-to-chromium@1.5.140:
-    resolution: {integrity: sha512-o82Rj+ONp4Ip7Cl1r7lrqx/pXhbp/lh9DpKcMNscFJdh8ebyRofnc7Sh01B4jx403RI0oqTBvlZ7OBIZLMr2+Q==}
-
-  electron@26.6.10:
-    resolution: {integrity: sha512-pV2SD0RXzAiNRb/2yZrsVmVkBOMrf+DVsPulIgRjlL0+My9BL5spFuhHVMQO9yHl9tFpWtuRpQv0ofM/i9P8xg==}
-    engines: {node: '>= 12.20.55'}
-    hasBin: true
+  electron-to-chromium@1.5.143:
+    resolution: {integrity: sha512-QqklJMOFBMqe46k8iIOwA9l2hz57V2OKMmP5eSWcUvwx+mASAsbU+wkF1pHjn9ZVSBPrsYWr4/W/95y5SwYg2g==}
 
   electron@35.2.0:
     resolution: {integrity: sha512-GHda7oCkN0pA23qzah735DEbRa06IPwlzP3uvjAmf9af8gxdj5i93JEHeQVGVmSVpd7sSb1pfecs9nz7B1q5ag==}
@@ -3144,9 +3157,9 @@ packages:
   flatted@3.3.3:
     resolution: {integrity: sha512-GX+ysw4PBCz0PzosHDepZGANEuFCMLrnRTiEy9McGjmkCQYwRq4A/X786G/fjM/+OjsWSU1ZrY5qyARZmO/uwg==}
 
-  fluent-ffmpeg@2.1.2:
-    resolution: {integrity: sha512-IZTB4kq5GK0DPp7sGQ0q/BWurGHffRtQQwVkiqDgeO6wYJLLV5ZhgNOQ65loZxxuPMKZKZcICCUnaGtlxBiR0Q==}
-    engines: {node: '>=0.8.0'}
+  fluent-ffmpeg@2.1.3:
+    resolution: {integrity: sha512-Be3narBNt2s6bsaqP6Jzq91heDgOEaDCJAXcE3qcma/EJBSy5FB4cvO31XBInuAuKBx8Kptf8dkhjK0IOru39Q==}
+    engines: {node: '>=18'}
 
   fn.name@1.1.0:
     resolution: {integrity: sha512-GRnmB5gPyJpAhTQdSZTSp9uaPSvl09KoYcMQtsB9rQoOmzs9dH6ffeccH+Z+cv6P68Hu5bC6JjRh4Ah/mHSNRw==}
@@ -5576,9 +5589,6 @@ packages:
     resolution: {integrity: sha512-nWJ91DjeOkej/TA8pXQ3myruKpKEYgqvpw9lz4OPHj/NWFNluYrjbz9j01CJ8yKQd2g4jFoOkINCTW2I5LEEyw==}
     engines: {node: '>= 0.4'}
 
-  undici-types@5.26.5:
-    resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
-
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
@@ -6313,7 +6323,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@electron/node-gyp@git+https://git@github.com:electron/node-gyp.git#06b29aafb7708acef8b3669835c8a7857ebc92d2':
+  '@electron/node-gyp@https://codeload.github.com/electron/node-gyp/tar.gz/06b29aafb7708acef8b3669835c8a7857ebc92d2':
     dependencies:
       env-paths: 2.2.1
       exponential-backoff: 3.1.2
@@ -6369,7 +6379,7 @@ snapshots:
 
   '@electron/rebuild@3.7.0':
     dependencies:
-      '@electron/node-gyp': git+https://git@github.com:electron/node-gyp.git#06b29aafb7708acef8b3669835c8a7857ebc92d2
+      '@electron/node-gyp': https://codeload.github.com/electron/node-gyp/tar.gz/06b29aafb7708acef8b3669835c8a7857ebc92d2
       '@malept/cross-spawn-promise': 2.0.0
       chalk: 4.1.2
       debug: 4.4.0
@@ -7036,6 +7046,18 @@ snapshots:
     optionalDependencies:
       rollup: 3.29.4
 
+  '@rollup/plugin-commonjs@28.0.3(rollup@4.40.0)':
+    dependencies:
+      '@rollup/pluginutils': 5.1.0(rollup@4.40.0)
+      commondir: 1.0.1
+      estree-walker: 2.0.2
+      fdir: 6.4.4(picomatch@4.0.2)
+      is-reference: 1.2.1
+      magic-string: 0.30.17
+      picomatch: 4.0.2
+    optionalDependencies:
+      rollup: 4.40.0
+
   '@rollup/plugin-node-resolve@15.2.3(rollup@3.29.4)':
     dependencies:
       '@rollup/pluginutils': 5.1.0(rollup@3.29.4)
@@ -7046,6 +7068,16 @@ snapshots:
       resolve: 1.22.8
     optionalDependencies:
       rollup: 3.29.4
+
+  '@rollup/plugin-node-resolve@15.3.1(rollup@4.40.0)':
+    dependencies:
+      '@rollup/pluginutils': 5.1.0(rollup@4.40.0)
+      '@types/resolve': 1.20.2
+      deepmerge: 4.3.1
+      is-module: 1.0.0
+      resolve: 1.22.10
+    optionalDependencies:
+      rollup: 4.40.0
 
   '@rollup/pluginutils@4.2.1':
     dependencies:
@@ -7059,6 +7091,14 @@ snapshots:
       picomatch: 2.3.1
     optionalDependencies:
       rollup: 3.29.4
+
+  '@rollup/pluginutils@5.1.0(rollup@4.40.0)':
+    dependencies:
+      '@types/estree': 1.0.7
+      estree-walker: 2.0.2
+      picomatch: 2.3.1
+    optionalDependencies:
+      rollup: 4.40.0
 
   '@rollup/rollup-android-arm-eabi@4.40.0':
     optional: true
@@ -7224,10 +7264,6 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
-  '@types/node@18.19.23':
-    dependencies:
-      undici-types: 5.26.5
-
   '@types/node@22.14.0':
     dependencies:
       undici-types: 6.21.0
@@ -7327,6 +7363,11 @@ snapshots:
   '@vitejs/plugin-vue@4.6.2(vite@6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.29.1))(vue@3.5.13(typescript@5.8.3))':
     dependencies:
       vite: 6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.29.1)
+      vue: 3.5.13(typescript@5.8.3)
+
+  '@vitejs/plugin-vue@4.6.2(vite@6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0))(vue@3.5.13(typescript@5.8.3))':
+    dependencies:
+      vite: 6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0)
       vue: 3.5.13(typescript@5.8.3)
 
   '@vue/compiler-core@3.4.21':
@@ -7921,6 +7962,8 @@ snapshots:
 
   async-function@1.0.0: {}
 
+  async@0.2.10: {}
+
   async@3.2.5: {}
 
   async@3.2.6: {}
@@ -8075,7 +8118,7 @@ snapshots:
   browserslist@4.24.4:
     dependencies:
       caniuse-lite: 1.0.30001715
-      electron-to-chromium: 1.5.140
+      electron-to-chromium: 1.5.143
       node-releases: 2.0.19
       update-browserslist-db: 1.1.3(browserslist@4.24.4)
     optional: true
@@ -8710,16 +8753,8 @@ snapshots:
 
   electron-to-chromium@1.4.702: {}
 
-  electron-to-chromium@1.5.140:
+  electron-to-chromium@1.5.143:
     optional: true
-
-  electron@26.6.10:
-    dependencies:
-      '@electron/get': 2.0.3
-      '@types/node': 18.19.23
-      extract-zip: 2.0.1
-    transitivePeerDependencies:
-      - supports-color
 
   electron@35.2.0:
     dependencies:
@@ -9581,9 +9616,9 @@ snapshots:
 
   flatted@3.3.3: {}
 
-  fluent-ffmpeg@2.1.2:
+  fluent-ffmpeg@2.1.3:
     dependencies:
-      async: 3.2.5
+      async: 0.2.10
       which: 1.3.1
 
   fn.name@1.1.0: {}
@@ -10888,7 +10923,7 @@ snapshots:
 
   magic-string@0.30.8:
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.4.15
+      '@jridgewell/sourcemap-codec': 1.5.0
 
   make-dir@4.0.0:
     dependencies:
@@ -11092,7 +11127,7 @@ snapshots:
   normalize-package-data@2.5.0:
     dependencies:
       hosted-git-info: 2.8.9
-      resolve: 1.22.8
+      resolve: 1.22.10
       semver: 5.7.2
       validate-npm-package-license: 3.0.4
 
@@ -11400,7 +11435,7 @@ snapshots:
       postcss: 8.4.35
       postcss-value-parser: 4.2.0
       read-cache: 1.0.0
-      resolve: 1.22.8
+      resolve: 1.22.10
 
   postcss-js@4.0.1(postcss@8.4.35):
     dependencies:
@@ -12393,8 +12428,6 @@ snapshots:
       has-symbols: 1.1.0
       which-boxed-primitive: 1.1.1
 
-  undici-types@5.26.5: {}
-
   undici-types@6.21.0: {}
 
   unique-filename@2.0.1:
@@ -12469,6 +12502,10 @@ snapshots:
     dependencies:
       vite: 4.5.2(@types/node@22.14.1)(sass@1.86.3)(terser@5.39.0)
 
+  vite-plugin-css-injected-by-js@3.4.0(vite@6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0)):
+    dependencies:
+      vite: 6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0)
+
   vite-plugin-static-copy@0.16.0(vite@6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.29.1)):
     dependencies:
       chokidar: 3.6.0
@@ -12525,6 +12562,21 @@ snapshots:
       jiti: 1.21.0
       sass: 1.86.3
       terser: 5.29.1
+
+  vite@6.3.2(@types/node@22.14.1)(jiti@1.21.0)(sass@1.86.3)(terser@5.39.0):
+    dependencies:
+      esbuild: 0.25.2
+      fdir: 6.4.4(picomatch@4.0.2)
+      picomatch: 4.0.2
+      postcss: 8.5.3
+      rollup: 4.40.0
+      tinyglobby: 0.2.13
+    optionalDependencies:
+      '@types/node': 22.14.1
+      fsevents: 2.3.3
+      jiti: 1.21.0
+      sass: 1.86.3
+      terser: 5.39.0
 
   vue-demi@0.14.10(vue@3.5.13(typescript@5.8.3)):
     dependencies:

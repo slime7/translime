@@ -1,5 +1,5 @@
-import EventEmitter from 'events';
-import { resolve } from 'path';
+import EventEmitter from 'node:events';
+import { resolve } from 'node:path';
 import ffmpeg from 'fluent-ffmpeg';
 import pkg from '../package.json';
 

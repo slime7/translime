@@ -23,6 +23,9 @@ const config = {
       formats: ['es', 'umd'],
       fileName: (format) => `index.${format}.js`,
     },
+    commonjsOptions: {
+      include: [],
+    },
     rollupOptions: {
       plugins: [
         resolve(),
@@ -30,6 +33,7 @@ const config = {
       ],
       external: [
         ...builtinModules,
+        ...builtinModules.map((m) => `node:${m}`),
       ],
     },
   },

@@ -1,6 +1,6 @@
 import vue from '@vitejs/plugin-vue';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
-import pkg from './package.json';
+import pkg from './package.json' with { type: 'json' };
 
 /**
  * @type {import('vite').UserConfig}
