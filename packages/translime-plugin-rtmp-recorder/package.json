@@ -38,8 +38,8 @@
     "fluent-ffmpeg": "^2.1.3",
     "vite": "^6.3.2",
     "vite-plugin-css-injected-by-js": "^3.1.2",
-    "vue": "^3.5.0",
-    "vuetify": "^3.8.0"
+    "vue": "^3.5.13",
+    "vuetify": "^3.8.1"
   },
   "plugin": {
     "title": "直播录像",
@@ -48,7 +48,7 @@
   },
   "peerDependencies": {
     "electron": "^35.0.0",
-    "vue": "^3.5.0",
-    "vuetify": "^3.8.0"
+    "vue": "^3.5.13",
+    "vuetify": "^3.8.1"
   }
 }
