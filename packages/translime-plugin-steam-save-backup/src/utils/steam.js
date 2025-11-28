@@ -129,7 +129,7 @@ export async function getSteamUserIds(steamPath) {
 
 /**
  * 尝试查找游戏的存档路径
- * 目前主要查找 userdata 下的目录
+ * 通过解析 userdata 下的 remotecache.vdf 获取
  * @param {string} steamPath 
  * @param {string} appId 
  * @returns {Promise<string[]>} 可能的存档路径列表
@@ -139,11 +139,40 @@ export async function findSavePaths(steamPath, appId) {
   const paths = [];
 
   for (const userId of userIds) {
-    const savePath = path.join(steamPath, 'userdata', userId, appId);
-    if (await fs.pathExists(savePath)) {
-      paths.push(savePath);
+    const appDir = path.join(steamPath, 'userdata', userId, appId);
+    const remoteCachePath = path.join(appDir, 'remotecache.vdf');
+
+    if (await fs.pathExists(remoteCachePath)) {
+      try {
+        const content = await fs.readFile(remoteCachePath, 'utf8');
+        const data = vdf.parse(content);
+
+        // remotecache.vdf 结构通常为 { "AppID": { "filename": { "root": "0", ... } } }
+        const appData = data[appId];
+        if (appData) {
+          let hasRemoteRoot = false;
+
+          // 检查是否有文件在 root 0 (即 remote 目录)
+          for (const fileKey in appData) {
+            const fileInfo = appData[fileKey];
+            if (fileInfo && String(fileInfo.root) === '0') {
+              hasRemoteRoot = true;
+              break;
+            }
+          }
+
+          if (hasRemoteRoot) {
+            const remoteDir = path.join(appDir, 'remote');
+            if (await fs.pathExists(remoteDir)) {
+              paths.push(remoteDir);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`解析 remotecache.vdf 失败 (${appId}):`, e);
+      }
     }
   }
 
-  return paths;
+  return [...new Set(paths)];
 }
