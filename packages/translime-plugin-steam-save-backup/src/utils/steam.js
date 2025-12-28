@@ -1,6 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
-import vdf from 'vdf';
+import vdf from './vdf-parser.js';
 import { execSync } from 'child_process';
 
 /**
@@ -93,7 +93,7 @@ export async function scanInstalledGames(steamPath) {
           games.push({
             appid: appState.appid,
             name: appState.name,
-            installDir: path.join(steamappsPath, 'common', appState.installDir),
+            installDir: path.join(steamappsPath, 'common', appState.installdir),
             libraryPath: lib,
           });
         }
@@ -128,15 +128,46 @@ export async function getSteamUserIds(steamPath) {
 }
 
 /**
+ * Steam remotecache.vdf 中 root 值的含义（基于实际测试）：
+ * 0 = <userdata>/<userId>/<appId>/remote/ (Steam Cloud 同步目录)
+ * 1 = 游戏安装目录
+ * 2 = %USERPROFILE%\Documents\ (我的文档) 或 Saved Games
+ * 3 = %LOCALAPPDATA% (AppData\Local) - 例如 EarthDefenceForce6
+ * 4 = %APPDATA% (AppData\Roaming) - 例如 Factorio saves
+ * 12 = %LOCALAPPDATA%Low (AppData\LocalLow)
+ * 
+ * 注：同一游戏可能使用多个 root 类型，备份时需要记录所有来源
+ */
+
+/**
+ * 存档路径信息
+ * @typedef {Object} SavePathInfo
+ * @property {number} root - root 类型
+ * @property {string} relativePath - 相对路径（从文件路径中提取的目录部分）
+ * @property {string|null} absolutePath - 解析后的绝对路径（如果可以确定）
+ * @property {string[]} files - 该目录下的文件列表
+ */
+
+/**
  * 尝试查找游戏的存档路径
  * 通过解析 userdata 下的 remotecache.vdf 获取
  * @param {string} steamPath 
  * @param {string} appId 
- * @returns {Promise<string[]>} 可能的存档路径列表
+ * @param {string} [gameInstallDir] - 游戏安装目录（用于解析 root=1 的路径）
+ * @returns {Promise<SavePathInfo[]>} 存档路径信息列表
  */
-export async function findSavePaths(steamPath, appId) {
+export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
   const userIds = await getSteamUserIds(steamPath);
-  const paths = [];
+  /** @type {Map<string, SavePathInfo>} */
+  const pathsMap = new Map();
+
+  // 获取系统目录
+  const userProfile = process.env.USERPROFILE || process.env.HOME || '';
+  const appData = process.env.APPDATA || path.join(userProfile, 'AppData', 'Roaming');
+  const localAppData = process.env.LOCALAPPDATA || path.join(userProfile, 'AppData', 'Local');
+  const documentsPath = path.join(userProfile, 'Documents');
+  const savedGamesPath = path.join(userProfile, 'Saved Games');
+  const localAppDataLow = path.join(userProfile, 'AppData', 'LocalLow');
 
   for (const userId of userIds) {
     const appDir = path.join(steamPath, 'userdata', userId, appId);
@@ -147,24 +178,68 @@ export async function findSavePaths(steamPath, appId) {
         const content = await fs.readFile(remoteCachePath, 'utf8');
         const data = vdf.parse(content);
 
-        // remotecache.vdf 结构通常为 { "AppID": { "filename": { "root": "0", ... } } }
-        const appData = data[appId];
-        if (appData) {
-          let hasRemoteRoot = false;
-
-          // 检查是否有文件在 root 0 (即 remote 目录)
-          for (const fileKey in appData) {
-            const fileInfo = appData[fileKey];
-            if (fileInfo && String(fileInfo.root) === '0') {
-              hasRemoteRoot = true;
-              break;
+        // remotecache.vdf 结构为 { "AppID": { "ChangeNumber": "x", "filename": { "root": "x", ... } } }
+        const appData2 = data[appId];
+        if (appData2) {
+          // 遍历所有文件条目
+          for (const fileKey in appData2) {
+            const fileInfo = appData2[fileKey];
+            // 跳过非文件条目（如 ChangeNumber, ostype）
+            if (!fileInfo || typeof fileInfo !== 'object' || !('root' in fileInfo)) {
+              continue;
             }
-          }
 
-          if (hasRemoteRoot) {
-            const remoteDir = path.join(appDir, 'remote');
-            if (await fs.pathExists(remoteDir)) {
-              paths.push(remoteDir);
+            const rootType = parseInt(String(fileInfo.root), 10);
+            // 从文件路径中提取目录部分
+            const filePath = fileKey.replace(/\\/g, '/');
+            const dirPath = path.dirname(filePath);
+
+            // 创建唯一键（root + 目录路径）
+            const key = `${rootType}:${dirPath}`;
+
+            if (!pathsMap.has(key)) {
+              let absolutePath = null;
+
+              // 根据 root 类型解析绝对路径
+              switch (rootType) {
+                case 0: // Steam Cloud remote 目录
+                  absolutePath = path.join(appDir, 'remote', dirPath);
+                  break;
+                case 1: // 游戏安装目录
+                  if (gameInstallDir) {
+                    absolutePath = path.join(gameInstallDir, dirPath);
+                  }
+                  break;
+                case 2: // Documents (我的文档) 或 Saved Games
+                  absolutePath = path.join(documentsPath, dirPath);
+                  // 如果不存在，尝试 Saved Games
+                  if (!(await fs.pathExists(absolutePath))) {
+                    const altPath = path.join(savedGamesPath, dirPath);
+                    if (await fs.pathExists(altPath)) {
+                      absolutePath = altPath;
+                    }
+                  }
+                  break;
+                case 3: // AppData\Local
+                  absolutePath = path.join(localAppData, dirPath);
+                  break;
+                case 4: // AppData\Roaming
+                  absolutePath = path.join(appData, dirPath);
+                  break;
+                case 12: // AppData\LocalLow
+                  absolutePath = path.join(localAppDataLow, dirPath);
+                  break;
+              }
+
+              pathsMap.set(key, {
+                root: rootType,
+                relativePath: dirPath,
+                absolutePath: absolutePath,
+                files: [path.basename(filePath)],
+              });
+            } else {
+              // 添加文件到现有条目
+              pathsMap.get(key).files.push(path.basename(filePath));
             }
           }
         }
@@ -174,5 +249,6 @@ export async function findSavePaths(steamPath, appId) {
     }
   }
 
-  return [...new Set(paths)];
+  return Array.from(pathsMap.values());
 }
+

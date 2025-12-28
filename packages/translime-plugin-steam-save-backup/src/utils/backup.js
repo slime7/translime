@@ -9,28 +9,53 @@ export const DEFAULT_BACKUP_ROOT = path.join(os.homedir(), 'Documents', 'Transli
  * 备份存档
  * @param {string} gameId 游戏 AppID
  * @param {string} gameName 游戏名称
- * @param {string} sourcePath 存档源路径
+ * @param {Array<{root: number, relativePath: string, absolutePath: string, files: string[]}>} savePaths 存档路径信息数组
  * @param {string} [backupRoot] 备份根目录
  */
-export async function backupSave(gameId, gameName, sourcePath, backupRoot = DEFAULT_BACKUP_ROOT) {
+export async function backupSave(gameId, gameName, savePaths, backupRoot = DEFAULT_BACKUP_ROOT) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(backupRoot, gameId.toString(), timestamp);
 
   // 1. 创建备份目录
   await fs.ensureDir(backupDir);
 
-  // 2. 复制文件
-  // 使用 copy 复制整个目录
-  await fs.copy(sourcePath, path.join(backupDir, 'data'));
+  // 2. 备份所有存档路径
+  const backedUpPaths = [];
+  for (let i = 0; i < savePaths.length; i++) {
+    const saveInfo = savePaths[i];
+    if (!saveInfo.absolutePath) continue;
 
-  // 3. 生成 info.json
+    // 检查路径是否存在
+    if (!(await fs.pathExists(saveInfo.absolutePath))) {
+      console.warn(`存档路径不存在，跳过: ${saveInfo.absolutePath}`);
+      continue;
+    }
+
+    // 为每个路径创建子目录，使用索引区分
+    const dataDir = path.join(backupDir, `data_${i}`);
+    await fs.copy(saveInfo.absolutePath, dataDir);
+
+    backedUpPaths.push({
+      index: i,
+      root: saveInfo.root,
+      relativePath: saveInfo.relativePath,
+      absolutePath: saveInfo.absolutePath,
+      files: saveInfo.files,
+    });
+  }
+
+  if (backedUpPaths.length === 0) {
+    throw new Error('没有找到可备份的存档文件');
+  }
+
+  // 3. 生成 info.json，包含完整的路径信息以便还原
   const info = {
     gameId,
     gameName,
-    originalPath: sourcePath,
+    savePaths: backedUpPaths,  // 保存所有路径信息
     backupTime: new Date().toISOString(),
     timestamp,
-    note: '', // 预留备注字段
+    note: '',
   };
 
   await fs.writeJson(path.join(backupDir, 'info.json'), info, { spaces: 2 });
@@ -81,21 +106,49 @@ export async function restoreSave(backupPath) {
   }
 
   const info = await fs.readJson(infoPath);
-  const targetPath = info.originalPath;
-  const sourceDataPath = path.join(backupPath, 'data');
 
-  if (!(await fs.pathExists(sourceDataPath))) {
-    throw new Error('无效备份：未找到 data 目录');
+  // 支持新格式（多路径）和旧格式（单路径）
+  if (info.savePaths && Array.isArray(info.savePaths)) {
+    // 新格式：多路径备份
+    const restoredPaths = [];
+
+    for (const saveInfo of info.savePaths) {
+      const sourceDataPath = path.join(backupPath, `data_${saveInfo.index}`);
+      const targetPath = saveInfo.absolutePath;
+
+      if (!(await fs.pathExists(sourceDataPath))) {
+        console.warn(`备份数据不存在，跳过: ${sourceDataPath}`);
+        continue;
+      }
+
+      // 确保目标父目录存在
+      await fs.ensureDir(path.dirname(targetPath));
+
+      // 还原：清空目标目录并复制
+      await fs.emptyDir(targetPath);
+      await fs.copy(sourceDataPath, targetPath);
+
+      restoredPaths.push(targetPath);
+    }
+
+    if (restoredPaths.length === 0) {
+      throw new Error('没有成功还原任何存档');
+    }
+
+    return { success: true, restoredPaths };
+  } else {
+    // 旧格式：单路径备份（兼容）
+    const targetPath = info.originalPath;
+    const sourceDataPath = path.join(backupPath, 'data');
+
+    if (!(await fs.pathExists(sourceDataPath))) {
+      throw new Error('无效备份：未找到 data 目录');
+    }
+
+    await fs.ensureDir(path.dirname(targetPath));
+    await fs.emptyDir(targetPath);
+    await fs.copy(sourceDataPath, targetPath);
+
+    return { success: true, targetPath };
   }
-
-  // 确保目标父目录存在
-  await fs.ensureDir(path.dirname(targetPath));
-
-  // 还原：清空目标目录并复制
-  // 注意：这是一种破坏性操作，最好先做个临时备份，或者让用户确认
-  // 这里直接覆盖
-  await fs.emptyDir(targetPath);
-  await fs.copy(sourceDataPath, targetPath);
-
-  return { success: true, targetPath };
 }

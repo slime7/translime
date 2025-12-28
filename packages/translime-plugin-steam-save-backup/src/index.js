@@ -64,9 +64,9 @@ const ipcHandlers = [
   },
   {
     type: 'backup-save',
-    handler: ({ sendToClient }) => async ({ gameId, gameName, savePath }) => {
+    handler: ({ sendToClient }) => async ({ gameId, gameName, savePaths }) => {
       try {
-        const result = await backupSave(gameId, gameName, savePath);
+        const result = await backupSave(gameId, gameName, savePaths);
         sendToClient(`backup-save-reply@${id}`, result);
       } catch (e) {
         sendToClient(`backup-save-reply@${id}`, { success: false, message: e.message });

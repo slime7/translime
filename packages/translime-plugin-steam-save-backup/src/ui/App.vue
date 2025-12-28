@@ -236,14 +236,28 @@ const loadBackups = (gameId) => {
 const backupGame = () => {
   if (!selectedGame.value || !canBackup.value) return;
   
-  // 默认使用第一个存档路径
-  const savePath = selectedGame.value.savePaths[0];
+  // savePaths 是 SavePathInfo 数组，需要传递 absolutePath
+  const savePathInfos = selectedGame.value.savePaths;
+  // 过滤出有效的绝对路径
+  const validPaths = savePathInfos
+    .filter(info => info.absolutePath)
+    .map(info => ({
+      root: info.root,
+      relativePath: info.relativePath,
+      absolutePath: info.absolutePath,
+      files: info.files
+    }));
+  
+  if (validPaths.length === 0) {
+    showMessage('未找到有效的存档路径', 'error');
+    return;
+  }
   
   backupLoading.value = true;
   ipc.send(`backup-save@${PLUGIN_ID}`, {
     gameId: selectedGame.value.appid,
     gameName: selectedGame.value.name,
-    savePath
+    savePaths: validPaths  // 传递所有有效路径信息
   });
 };
 

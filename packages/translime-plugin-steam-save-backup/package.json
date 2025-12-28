@@ -22,8 +22,7 @@
     "build": "npm run build:plugin && npm run build:ui"
   },
   "dependencies": {
-    "fs-extra": "^11.2.0",
-    "vdf": "^0.0.2"
+    "fs-extra": "^11.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.6.2",
