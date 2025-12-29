@@ -1,6 +1,9 @@
-import path from 'path';
-import fs from 'fs-extra';
-import { getSteamPath, scanInstalledGames, getSteamUserIds, findSavePaths } from './utils/steam';
+import {
+  getSteamPath,
+  scanInstalledGames,
+  getSteamUserIds,
+  findSavePaths,
+} from './utils/steam';
 import { backupSave, getBackups, restoreSave } from './utils/backup';
 
 const id = 'translime-plugin-steam-save-backup';
@@ -38,13 +41,17 @@ const ipcHandlers = [
       try {
         const games = await scanInstalledGames(steamPath);
         // 为每个游戏查找可能的存档路径
+        // eslint-disable-next-line no-restricted-syntax
         for (const game of games) {
+          // eslint-disable-next-line no-await-in-loop
           const savePaths = await findSavePaths(steamPath, game.appid);
           game.savePaths = savePaths;
         }
 
         const userIds = await getSteamUserIds(steamPath);
-        sendToClient(`scan-games-reply@${id}`, { success: true, games, userIds, steamPath });
+        sendToClient(`scan-games-reply@${id}`, {
+          success: true, games, userIds, steamPath,
+        });
       } catch (e) {
         console.error('扫描游戏失败：', e);
         sendToClient(`scan-games-reply@${id}`, { success: false, message: e.message });

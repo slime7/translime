@@ -1,7 +1,7 @@
 /**
  * 简单的 Valve VDF (KeyValues) 格式解析器
  * 内置实现，避免外部依赖打包问题
- * 
+ *
  * Steam ACF/VDF 文件格式示例：
  * "AppState"
  * {
@@ -95,8 +95,8 @@ export function parse(text) {
     let result = '';
     while (pos < text.length) {
       const ch = text[pos];
-      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' ||
-        ch === '{' || ch === '}' || ch === '"') {
+      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r'
+        || ch === '{' || ch === '}' || ch === '"') {
         break;
       }
       result += ch;

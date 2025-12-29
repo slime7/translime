@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
-import vdf from './vdf-parser.js';
 import { execSync } from 'child_process';
+import vdf from './vdf-parser.js';
 
 /**
  * 获取 Steam 安装路径
@@ -37,7 +37,7 @@ export async function getSteamPath() {
 
 /**
  * 获取所有 Steam 库文件夹路径
- * @param {string} steamPath 
+ * @param {string} steamPath
  */
 export async function getLibraryFolders(steamPath) {
   const libraryFoldersPath = path.join(steamPath, 'steamapps', 'libraryfolders.vdf');
@@ -65,12 +65,12 @@ export async function getLibraryFolders(steamPath) {
   }
 
   // 去重并规范化
-  return [...new Set(libraries.map(p => path.normalize(p)))];
+  return [...new Set(libraries.map((p) => path.normalize(p)))];
 }
 
 /**
  * 扫描已安装的游戏
- * @param {string} steamPath 
+ * @param {string} steamPath
  */
 export async function scanInstalledGames(steamPath) {
   const libraries = await getLibraryFolders(steamPath);
@@ -81,7 +81,7 @@ export async function scanInstalledGames(steamPath) {
     if (!(await fs.pathExists(steamappsPath))) continue;
 
     const files = await fs.readdir(steamappsPath);
-    const acfFiles = files.filter(f => f.endsWith('.acf'));
+    const acfFiles = files.filter((f) => f.endsWith('.acf'));
 
     for (const file of acfFiles) {
       try {
@@ -108,7 +108,7 @@ export async function scanInstalledGames(steamPath) {
 
 /**
  * 获取 userdata 目录下的所有用户 ID
- * @param {string} steamPath 
+ * @param {string} steamPath
  */
 export async function getSteamUserIds(steamPath) {
   const userdataDir = path.join(steamPath, 'userdata');
@@ -135,7 +135,7 @@ export async function getSteamUserIds(steamPath) {
  * 3 = %LOCALAPPDATA% (AppData\Local) - 例如 EarthDefenceForce6
  * 4 = %APPDATA% (AppData\Roaming) - 例如 Factorio saves
  * 12 = %LOCALAPPDATA%Low (AppData\LocalLow)
- * 
+ *
  * 注：同一游戏可能使用多个 root 类型，备份时需要记录所有来源
  */
 
@@ -151,8 +151,8 @@ export async function getSteamUserIds(steamPath) {
 /**
  * 尝试查找游戏的存档路径
  * 通过解析 userdata 下的 remotecache.vdf 获取
- * @param {string} steamPath 
- * @param {string} appId 
+ * @param {string} steamPath
+ * @param {string} appId
  * @param {string} [gameInstallDir] - 游戏安装目录（用于解析 root=1 的路径）
  * @returns {Promise<SavePathInfo[]>} 存档路径信息列表
  */
@@ -234,7 +234,7 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
               pathsMap.set(key, {
                 root: rootType,
                 relativePath: dirPath,
-                absolutePath: absolutePath,
+                absolutePath,
                 files: [path.basename(filePath)],
               });
             } else {
@@ -251,4 +251,3 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
 
   return Array.from(pathsMap.values());
 }
-
