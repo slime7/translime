@@ -212,6 +212,11 @@ const setupIpcListeners = () => {
   });
 };
 
+// 加载备份列表
+const loadBackups = (gameId) => {
+  ipc.send(`get-backups@${PLUGIN_ID}`, gameId);
+};
+
 // 扫描游戏
 const scanGames = () => {
   loading.value = true;
@@ -222,11 +227,6 @@ const scanGames = () => {
 const selectGame = (game) => {
   selectedGame.value = game;
   loadBackups(game.appid);
-};
-
-// 加载备份列表
-const loadBackups = (gameId) => {
-  ipc.send(`get-backups@${PLUGIN_ID}`, gameId);
 };
 
 // 备份游戏
@@ -262,7 +262,8 @@ const backupGame = () => {
 
 // 还原备份
 const restoreBackup = (backup) => {
-  if (!confirm(`确定要还原 ${formatTime(backup.backupTime)} 的备份吗？当前存档将被覆盖。`)) {
+  // eslint-disable-next-line no-alert
+  if (!window.confirm(`确定要还原 ${formatTime(backup.backupTime)} 的备份吗？当前存档将被覆盖。`)) {
     return;
   }
 

@@ -5,9 +5,9 @@
  * Steam ACF/VDF 文件格式示例：
  * "AppState"
  * {
- *     "appid"		"582010"
- *     "name"		"Monster Hunter: World"
- *     "installdir"		"Monster Hunter World"
+ *     "appid"  "582010"
+ *     "name"  "Monster Hunter: World"
+ *     "installdir"  "Monster Hunter World"
  * }
  */
 
@@ -21,9 +21,10 @@ export function parse(text) {
     throw new Error('VDF parse 需要字符串参数');
   }
 
+  let cleanText = text;
   // 移除 BOM
-  if (text.charCodeAt(0) === 0xFEFF) {
-    text = text.slice(1);
+  if (cleanText.charCodeAt(0) === 0xFEFF) {
+    cleanText = cleanText.slice(1);
   }
 
   let pos = 0;
@@ -32,21 +33,19 @@ export function parse(text) {
    * 跳过空白字符和注释
    */
   function skipWhitespace() {
-    while (pos < text.length) {
-      const ch = text[pos];
+    while (pos < cleanText.length) {
+      const ch = cleanText[pos];
       // 跳过空白
       if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-        pos++;
-        continue;
-      }
-      // 跳过单行注释
-      if (ch === '/' && text[pos + 1] === '/') {
-        while (pos < text.length && text[pos] !== '\n') {
-          pos++;
+        pos += 1;
+      } else if (ch === '/' && cleanText[pos + 1] === '/') {
+        // 跳过单行注释
+        while (pos < cleanText.length && cleanText[pos] !== '\n') {
+          pos += 1;
         }
-        continue;
+      } else {
+        break;
       }
-      break;
     }
   }
 
@@ -55,22 +54,22 @@ export function parse(text) {
    * @returns {string}
    */
   function parseQuotedString() {
-    if (text[pos] !== '"') {
-      throw new Error(`期望 '"'，但得到 '${text[pos]}' 在位置 ${pos}`);
+    if (cleanText[pos] !== '"') {
+      throw new Error(`期望 '"'，但得到 '${cleanText[pos]}' 在位置 ${pos}`);
     }
-    pos++; // 跳过开始的引号
+    pos += 1; // 跳过开始的引号
 
     let result = '';
-    while (pos < text.length) {
-      const ch = text[pos];
+    while (pos < cleanText.length) {
+      const ch = cleanText[pos];
       if (ch === '"') {
-        pos++; // 跳过结束的引号
+        pos += 1; // 跳过结束的引号
         return result;
       }
-      if (ch === '\\' && pos + 1 < text.length) {
+      if (ch === '\\' && pos + 1 < cleanText.length) {
         // 处理转义字符
-        pos++;
-        const escaped = text[pos];
+        pos += 1;
+        const escaped = cleanText[pos];
         switch (escaped) {
           case 'n': result += '\n'; break;
           case 't': result += '\t'; break;
@@ -78,10 +77,10 @@ export function parse(text) {
           case '"': result += '"'; break;
           default: result += escaped;
         }
-        pos++;
+        pos += 1;
       } else {
         result += ch;
-        pos++;
+        pos += 1;
       }
     }
     throw new Error('未闭合的字符串');
@@ -93,14 +92,14 @@ export function parse(text) {
    */
   function parseUnquotedString() {
     let result = '';
-    while (pos < text.length) {
-      const ch = text[pos];
+    while (pos < cleanText.length) {
+      const ch = cleanText[pos];
       if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r'
         || ch === '{' || ch === '}' || ch === '"') {
         break;
       }
       result += ch;
-      pos++;
+      pos += 1;
     }
     return result;
   }
@@ -115,29 +114,30 @@ export function parse(text) {
     skipWhitespace();
 
     // 检查是否有开始的 {
-    if (text[pos] === '{') {
-      pos++; // 跳过 {
+    if (cleanText[pos] === '{') {
+      pos += 1; // 跳过 {
     }
 
-    while (pos < text.length) {
+    while (pos < cleanText.length) {
       skipWhitespace();
 
-      if (pos >= text.length) break;
+      if (pos >= cleanText.length) break;
 
       // 检查对象结束
-      if (text[pos] === '}') {
-        pos++; // 跳过 }
+      if (cleanText[pos] === '}') {
+        pos += 1; // 跳过 }
         return result;
       }
 
       // 解析键
       let key;
-      if (text[pos] === '"') {
+      if (cleanText[pos] === '"') {
         key = parseQuotedString();
       } else {
         key = parseUnquotedString();
         if (!key) {
-          pos++;
+          pos += 1;
+          // eslint-disable-next-line no-continue
           continue;
         }
       }
@@ -145,14 +145,14 @@ export function parse(text) {
       skipWhitespace();
 
       // 检查值的类型
-      if (text[pos] === '{') {
+      if (cleanText[pos] === '{') {
         // 子对象
-        pos++; // 跳过 {
+        pos += 1; // 跳过 {
         result[key] = parseObject();
-      } else if (text[pos] === '"') {
+      } else if (cleanText[pos] === '"') {
         // 字符串值
         result[key] = parseQuotedString();
-      } else if (text[pos] !== '}' && text[pos] !== undefined) {
+      } else if (cleanText[pos] !== '}' && cleanText[pos] !== undefined) {
         // 不带引号的值
         result[key] = parseUnquotedString();
       }
@@ -166,21 +166,23 @@ export function parse(text) {
   // 处理根级别的键值对
   const root = {};
 
-  while (pos < text.length) {
+  while (pos < cleanText.length) {
     skipWhitespace();
-    if (pos >= text.length) break;
+    if (pos >= cleanText.length) break;
 
     // 解析根级别的键
     let key;
-    if (text[pos] === '"') {
+    if (cleanText[pos] === '"') {
       key = parseQuotedString();
-    } else if (text[pos] === '{' || text[pos] === '}') {
-      pos++;
+    } else if (cleanText[pos] === '{' || cleanText[pos] === '}') {
+      pos += 1;
+      // eslint-disable-next-line no-continue
       continue;
     } else {
       key = parseUnquotedString();
       if (!key) {
-        pos++;
+        pos += 1;
+        // eslint-disable-next-line no-continue
         continue;
       }
     }
@@ -188,10 +190,10 @@ export function parse(text) {
     skipWhitespace();
 
     // 解析值
-    if (text[pos] === '{') {
-      pos++; // 跳过 {
+    if (cleanText[pos] === '{') {
+      pos += 1; // 跳过 {
       root[key] = parseObject();
-    } else if (text[pos] === '"') {
+    } else if (cleanText[pos] === '"') {
       root[key] = parseQuotedString();
     } else {
       root[key] = parseUnquotedString();
@@ -211,7 +213,7 @@ export function stringify(obj, indent = 0) {
   const tabs = '\t'.repeat(indent);
   let result = '';
 
-  for (const [key, value] of Object.entries(obj)) {
+  Object.entries(obj).forEach(([key, value]) => {
     if (typeof value === 'object' && value !== null) {
       result += `${tabs}"${key}"\n`;
       result += `${tabs}{\n`;
@@ -220,7 +222,7 @@ export function stringify(obj, indent = 0) {
     } else {
       result += `${tabs}"${key}"\t\t"${value}"\n`;
     }
-  }
+  });
 
   return result;
 }

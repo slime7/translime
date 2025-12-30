@@ -41,12 +41,11 @@ const ipcHandlers = [
       try {
         const games = await scanInstalledGames(steamPath);
         // 为每个游戏查找可能的存档路径
-        // eslint-disable-next-line no-restricted-syntax
-        for (const game of games) {
-          // eslint-disable-next-line no-await-in-loop
+        await Promise.all(games.map(async (game) => {
           const savePaths = await findSavePaths(steamPath, game.appid);
+          // eslint-disable-next-line no-param-reassign
           game.savePaths = savePaths;
-        }
+        }));
 
         const userIds = await getSteamUserIds(steamPath);
         sendToClient(`scan-games-reply@${id}`, {
