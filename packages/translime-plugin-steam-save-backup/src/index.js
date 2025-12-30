@@ -4,7 +4,13 @@ import {
   getSteamUserIds,
   findSavePaths,
 } from './utils/steam';
-import { backupSave, getBackups, restoreSave } from './utils/backup';
+import {
+  backupSave,
+  getBackups,
+  restoreSave,
+  getBackupCount,
+  deleteBackup,
+} from './utils/backup';
 
 const id = 'translime-plugin-steam-save-backup';
 let steamPath = null;
@@ -43,8 +49,11 @@ const ipcHandlers = [
         // 为每个游戏查找可能的存档路径
         await Promise.all(games.map(async (game) => {
           const savePaths = await findSavePaths(steamPath, game.appid);
+          const backupCount = await getBackupCount(game.appid);
           // eslint-disable-next-line no-param-reassign
           game.savePaths = savePaths;
+          // eslint-disable-next-line no-param-reassign
+          game.backupCount = backupCount;
         }));
 
         const userIds = await getSteamUserIds(steamPath);
@@ -87,6 +96,17 @@ const ipcHandlers = [
         sendToClient(`restore-save-reply@${id}`, result);
       } catch (e) {
         sendToClient(`restore-save-reply@${id}`, { success: false, message: e.message });
+      }
+    },
+  },
+  {
+    type: 'delete-backup',
+    handler: ({ sendToClient }) => async (backupPath) => {
+      try {
+        const result = await deleteBackup(backupPath);
+        sendToClient(`delete-backup-reply@${id}`, result);
+      } catch (e) {
+        sendToClient(`delete-backup-reply@${id}`, { success: false, message: e.message });
       }
     },
   },

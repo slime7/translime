@@ -151,5 +151,45 @@ export async function restoreSave(backupPath) {
   await fs.emptyDir(targetPath);
   await fs.copy(sourceDataPath, targetPath);
 
+
   return { success: true, targetPath };
+}
+
+/**
+ * 获取指定游戏的备份数量
+ * @param {string} gameId
+ * @param {string} [backupRoot]
+ */
+export async function getBackupCount(gameId, backupRoot = DEFAULT_BACKUP_ROOT) {
+  const gameBackupDir = path.join(backupRoot, gameId.toString());
+  if (!(await fs.pathExists(gameBackupDir))) return 0;
+
+  try {
+    const dirs = await fs.readdir(gameBackupDir);
+    // 简单过滤掉非目录项（虽然按照逻辑这里应该都是目录）
+    // 为了性能，这里不做深度检查，假设每个子项都是一个备份
+    return dirs.length;
+  } catch (e) {
+    console.warn(`获取备份数量失败 (${gameId}):`, e);
+    return 0;
+  }
+}
+
+/**
+ * 删除指定的备份
+ * @param {string} backupPath 备份的完整路径
+ */
+export async function deleteBackup(backupPath) {
+  if (!(await fs.pathExists(backupPath))) {
+    throw new Error('备份不存在');
+  }
+
+  // 简单的安全检查：确保我们要删除的是 Translime 的备份目录
+  // 检查是否存在 info.json
+  if (!(await fs.pathExists(path.join(backupPath, 'info.json')))) {
+    throw new Error('安全检查失败：该目录似乎不是有效的备份目录');
+  }
+
+  await fs.remove(backupPath);
+  return { success: true };
 }
