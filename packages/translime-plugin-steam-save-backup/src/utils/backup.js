@@ -193,3 +193,22 @@ export async function deleteBackup(backupPath) {
   await fs.remove(backupPath);
   return { success: true };
 }
+
+/**
+ * 更新备份备注
+ * @param {string} backupPath 备份的完整路径
+ * @param {string} note 备注内容
+ */
+export async function updateBackupNote(backupPath, note) {
+  const infoPath = path.join(backupPath, 'info.json');
+  if (!(await fs.pathExists(infoPath))) {
+    throw new Error('备份不存在');
+  }
+
+  const info = await fs.readJson(infoPath);
+  // 限制长度为 80 字符
+  info.note = (note || '').substring(0, 80);
+
+  await fs.writeJson(infoPath, info, { spaces: 2 });
+  return { success: true, note: info.note };
+}

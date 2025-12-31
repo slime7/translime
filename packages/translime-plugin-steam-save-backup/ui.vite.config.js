@@ -17,7 +17,7 @@ const config = {
     target: 'node14',
     outDir: './dist',
     lib: {
-      entry: 'src/ui/App.vue',
+      entry: 'src/ui/ui.vue',
       name: 'translime-plugin-steam-save-backup',
       formats: ['esm'],
       fileName: (format) => `ui.${format}.js`,

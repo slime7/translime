@@ -25,9 +25,10 @@
       </v-col>
     </v-row>
 
-    <v-row v-else-if="games.length > 0">
+    <!-- 正常显示的游戏列表 -->
+    <v-row v-if="visibleGames.length > 0">
       <v-col
-        v-for="game in games"
+        v-for="game in visibleGames"
         :key="game.appid"
         cols="12"
         sm="6"
@@ -42,19 +43,36 @@
           hover
         >
           <div class="d-flex flex-row align-center pa-4">
-            <v-avatar color="primary" size="56" status="active">
+            <v-avatar color="primary" size="56">
               <span class="text-h5 font-weight-bold text-white">
                 {{ game.name.charAt(0).toUpperCase() }}
               </span>
             </v-avatar>
-            <div class="ml-4 overflow-hidden">
-              <div class="text-h6 text-truncate font-weight-medium">
-                {{ game.name }}
-              </div>
+            <div class="ml-4 overflow-hidden flex-grow-1">
+              <v-tooltip :text="game.name" location="top">
+                <template v-slot:activator="{ props }">
+                  <div v-bind="props" class="text-h6 text-truncate font-weight-medium">
+                    {{ game.name }}
+                  </div>
+                </template>
+              </v-tooltip>
               <div class="text-caption text-grey-darken-1">
                 APP ID: {{ game.appid }}
               </div>
             </div>
+            <v-tooltip text="隐藏此游戏" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  v-bind="props"
+                  icon="visibility_off"
+                  variant="text"
+                  size="small"
+                  color="grey"
+                  @click.stop="excludeGame(game)"
+                  :loading="excludeLoading === game.appid"
+                ></v-btn>
+              </template>
+            </v-tooltip>
           </div>
 
           <v-divider></v-divider>
@@ -76,9 +94,70 @@
       </v-col>
     </v-row>
 
-    <div v-else-if="!loading" class="d-flex flex-column align-center justify-center fill-height w-100 mt-10">
+    <!-- 已隐藏的游戏 (默认折叠) -->
+    <v-row v-if="hiddenGames.length > 0" class="mt-8">
+      <v-col cols="12">
+        <v-expansion-panels variant="accordion">
+          <v-expansion-panel elevation="0" class="bg-transparent">
+            <v-expansion-panel-title class="text-subtitle-1 text-grey font-weight-bold">
+              <v-icon icon="visibility_off" class="mr-2"></v-icon>
+              已隐藏的游戏 ({{ hiddenGames.length }} 个)
+            </v-expansion-panel-title>
+            <v-expansion-panel-text class="pa-0">
+              <v-row class="mt-2">
+                <v-col
+                  v-for="game in hiddenGames"
+                  :key="game.appid"
+                  cols="12"
+                  sm="6"
+                  md="4"
+                  lg="3"
+                  xl="2"
+                >
+                  <v-card
+                    class="mx-auto fill-height d-flex flex-column"
+                    variant="outlined"
+                    density="compact"
+                    style="opacity: 0.7"
+                  >
+                    <div class="d-flex flex-row align-center pa-3">
+                      <v-avatar color="grey-lighten-2" size="40">
+                        <span class="text-subtitle-1 font-weight-bold text-grey">
+                          {{ game.name.charAt(0).toUpperCase() }}
+                        </span>
+                      </v-avatar>
+                      <div class="ml-3 overflow-hidden flex-grow-1">
+                        <div class="text-subtitle-2 text-truncate font-weight-medium text-grey-darken-1">
+                          {{ game.name }}
+                        </div>
+                      </div>
+                      <v-tooltip text="恢复显示" location="top">
+                        <template v-slot:activator="{ props }">
+                          <v-btn
+                            v-bind="props"
+                            icon="visibility"
+                            variant="text"
+                            size="x-small"
+                            color="primary"
+                            @click="includeGame(game)"
+                            :loading="excludeLoading === game.appid"
+                          ></v-btn>
+                        </template>
+                      </v-tooltip>
+                    </div>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+      </v-col>
+    </v-row>
+
+    <div v-if="!loading && visibleGames.length === 0 && hiddenGames.length === 0" class="d-flex flex-column align-center justify-center fill-height w-100 mt-10">
       <v-icon size="80" color="grey-lighten-2">sports_esports</v-icon>
       <div class="text-h6 text-grey mt-4">未发现 Steam 游戏</div>
+      <div class="text-caption text-grey mt-1">请尝试在插件设置中手动配置 Steam 路径</div>
       <v-btn class="mt-4" color="primary" variant="text" @click="scanGames">重新扫描</v-btn>
     </div>
 
@@ -98,7 +177,31 @@
           </v-btn>
         </v-toolbar>
 
-        <v-card-text class="pa-0 flex-grow-1">
+        <v-card-text class="pa-0 flex-grow-1 overflow-y-auto">
+          <!-- 存档路径显示 (默认折叠) -->
+          <v-expansion-panels v-if="selectedGame?.savePaths?.length" variant="accordion" class="mb-2">
+            <v-expansion-panel elevation="0">
+              <v-expansion-panel-title class="text-subtitle-2 text-grey-darken-1">
+                <v-icon icon="folder_open" size="small" class="mr-2"></v-icon>
+                检测到存档路径 ({{ selectedGame.savePaths.length }} 个)
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <div v-for="(pathInfo, index) in selectedGame.savePaths" :key="index" class="text-caption mb-4 text-break-all">
+                  <div class="font-weight-bold mb-1 d-flex align-center">
+                    <v-chip size="x-small" label class="mr-2" color="primary" variant="tonal">路径 {{ index + 1 }}</v-chip>
+                    <span class="text-grey-darken-3">{{ pathInfo.absolutePath || '未探测到有效路径' }}</span>
+                  </div>
+                  <div class="ml-4 pl-3 border-s border-opacity-25">
+                    <div v-for="file in pathInfo.files" :key="file" class="text-grey-darken-1 d-flex align-center py-0.5">
+                      <v-icon icon="description" size="14" class="mr-1 text-grey-lighten-1"></v-icon>
+                      {{ file }}
+                    </div>
+                  </div>
+                </div>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
+
           <!-- 警告信息 -->
           <v-alert
             v-if="!canBackup"
@@ -121,14 +224,14 @@
             >
               <v-list-item class="pa-3">
                 <template v-slot:prepend>
-                <v-avatar color="blue-lighten-5" icon="history" color-icon="primary"></v-avatar>
+                <v-avatar color="blue-lighten-5" icon="save" color-icon="primary"></v-avatar>
                 </template>
 
                 <v-list-item-title class="font-weight-bold">
                   {{ formatTime(backup.backupTime) }}
                 </v-list-item-title>
-                <v-list-item-subtitle class="mt-1 text-caption">
-                  路径: {{ backup.originalPath || '多路径备份' }}
+                <v-list-item-subtitle v-if="backup.note" class="mt-1 text-primary text-caption font-italic">
+                  “{{ backup.note }}”
                 </v-list-item-subtitle>
 
                 <template v-slot:append>
@@ -146,6 +249,20 @@
                       :loading="restoreLoading === backup.id"
                     >
                       还原
+                    </v-btn>
+                    </template>
+                  </v-tooltip>
+
+                  <v-tooltip text="备注" location="top">
+                    <template v-slot:activator="{ props }">
+                    <v-btn
+                      v-bind="props"
+                      variant="text"
+                      color="grey"
+                      icon="edit_note"
+                      size="small"
+                      @click="openNoteDialog(backup)"
+                    >
                     </v-btn>
                     </template>
                   </v-tooltip>
@@ -207,6 +324,38 @@
       <v-btn color="white" variant="text" @click="snackbar.show = false">关闭</v-btn>
       </template>
     </v-snackbar>
+
+    <!-- 备注编辑对话框 -->
+    <v-dialog v-model="noteDialog.show" max-width="400px">
+      <v-card class="rounded-lg">
+        <v-toolbar color="primary" density="compact">
+          <v-toolbar-title>编辑备注</v-toolbar-title>
+          <v-spacer></v-spacer>
+          <v-btn icon @click="noteDialog.show = false">
+            <v-icon>close</v-icon>
+          </v-btn>
+        </v-toolbar>
+        <v-card-text class="pa-4">
+          <v-text-field
+            v-model="noteDialog.note"
+            label="备份说明"
+            placeholder="例如：打BOSS前、某个结局等"
+            counter="80"
+            maxlength="80"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            autofocus
+            @keyup.enter="saveNote"
+          ></v-text-field>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="noteDialog.show = false">取消</v-btn>
+          <v-btn color="primary" variant="elevated" @click="saveNote" :loading="noteDialog.loading">保存</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -225,8 +374,9 @@ const {
   VContainer, VRow, VCol,
   VToolbar, VToolbarTitle, VSpacer, VBtn, VIcon,
   VListItem, VAvatar, VListItemTitle, VListItemSubtitle,
-  VAlert, VCard, VCardActions, VCardText,
+  VAlert, VCard, VCardActions, VCardText, VTextField,
   VSnackbar, VDialog, VProgressCircular, VDivider, VChip, VTooltip,
+  VExpansionPanels, VExpansionPanel, VExpansionPanelTitle, VExpansionPanelText,
 } = window.vuetify$?.components || {};
 
 // 插件 ID
@@ -240,13 +390,22 @@ const loading = ref(false);
 const backupLoading = ref(false);
 const restoreLoading = ref(null); // 存储正在还原的备份 ID
 const deleteLoading = ref(null); // 存储正在删除的备份 ID
+const excludeLoading = ref(null); // 存储正在隐藏的游戏 ID
 const games = ref([]);
 const selectedGame = ref(null);
 const backups = ref([]);
 const snackbar = ref({ show: false, text: '', color: 'success' });
 const dialog = ref({ show: false });
+const noteDialog = ref({
+  show: false,
+  note: '',
+  backup: null,
+  loading: false,
+});
 
 // 计算属性
+const visibleGames = computed(() => games.value.filter((g) => !g.excluded));
+const hiddenGames = computed(() => games.value.filter((g) => g.excluded));
 const canBackup = computed(() => selectedGame.value && selectedGame.value.savePaths && selectedGame.value.savePaths.length > 0);
 
 // 格式化时间
@@ -346,6 +505,50 @@ const setupIpcListeners = () => {
       showMessage(res.message || '删除失败', 'error');
     }
   });
+
+  // 隐藏游戏结果
+  ipc.on(`exclude-game-reply@${PLUGIN_ID}`, (res) => {
+    excludeLoading.value = null;
+    if (res.success) {
+      showMessage('游戏已隐藏');
+      const game = games.value.find((g) => String(g.appid) === res.appid);
+      if (game) {
+        game.excluded = true;
+      }
+    } else {
+      showMessage(res.message || '隐藏失败', 'error');
+    }
+  });
+
+  // 恢复显示游戏结果
+  ipc.on(`include-game-reply@${PLUGIN_ID}`, (res) => {
+    excludeLoading.value = null;
+    if (res.success) {
+      showMessage('游戏已恢复显示');
+      const game = games.value.find((g) => String(g.appid) === res.appid);
+      if (game) {
+        game.excluded = false;
+      }
+    } else {
+      showMessage(res.message || '恢复失败', 'error');
+    }
+  });
+
+  // 更新备注结果
+  ipc.on(`update-backup-note-reply@${PLUGIN_ID}`, (res) => {
+    noteDialog.value.loading = false;
+    if (res.success) {
+      showMessage('备注已更新');
+      noteDialog.value.show = false;
+      // 更新本地备份列表中的数据
+      if (noteDialog.value.backup) {
+        // eslint-disable-next-line no-param-reassign
+        noteDialog.value.backup.note = res.note;
+      }
+    } else {
+      showMessage(res.message || '更新备注失败', 'error');
+    }
+  });
 };
 
 // 扫描游戏
@@ -413,6 +616,41 @@ const deleteAppBackup = (backup) => {
   ipc.send(`delete-backup@${PLUGIN_ID}`, backup.path);
 };
 
+// 隐藏游戏
+const excludeGame = (game) => {
+  // eslint-disable-next-line no-alert
+  if (!window.confirm(`确定要隐藏游戏 "${game.name}" 吗？隐藏后可在下方“已隐藏的游戏”中恢复。`)) {
+    return;
+  }
+
+  excludeLoading.value = game.appid;
+  ipc.send(`exclude-game@${PLUGIN_ID}`, game.appid);
+};
+
+// 恢复显示游戏
+const includeGame = (game) => {
+  excludeLoading.value = game.appid;
+  ipc.send(`include-game@${PLUGIN_ID}`, game.appid);
+};
+
+// 打开备注对话框
+const openNoteDialog = (backup) => {
+  noteDialog.value.backup = backup;
+  noteDialog.value.note = backup.note || '';
+  noteDialog.value.show = true;
+};
+
+// 保存备注
+const saveNote = () => {
+  if (!noteDialog.value.backup) return;
+  
+  noteDialog.value.loading = true;
+  ipc.send(`update-backup-note@${PLUGIN_ID}`, {
+    backupPath: noteDialog.value.backup.path,
+    note: noteDialog.value.note,
+  });
+};
+
 onMounted(() => {
   setupIpcListeners();
   scanGames();
@@ -428,5 +666,9 @@ onMounted(() => {
 .overflow-y-auto::-webkit-scrollbar-thumb {
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
+}
+
+.text-break-all {
+  word-break: break-all;
 }
 </style>
