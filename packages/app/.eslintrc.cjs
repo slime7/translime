@@ -40,6 +40,51 @@ module.exports = {
       ts: 'never',
       tsx: 'never',
     }],
+    semi: ['error', 'always'],
+    'semi-spacing': ['error', { before: false, after: true }],
+    quotes: ['error', 'single', { avoidEscape: true }],
+    indent: ['error', 2],
+    'keyword-spacing': [
+      'error',
+      {
+        before: true,
+        after: true,
+        overrides: {
+          return: { after: true },
+          throw: { after: true },
+          case: { after: true },
+        },
+      },
+    ],
+    'comma-dangle': [
+      'error',
+      {
+        arrays: 'always-multiline',
+        objects: 'always-multiline',
+        imports: 'always-multiline',
+        exports: 'always-multiline',
+        functions: 'always-multiline',
+      },
+    ],
+    'object-curly-spacing': ['error', 'always'],
+    'space-before-function-paren': [
+      'error',
+      {
+        anonymous: 'always',
+        named: 'never',
+        asyncArrow: 'always',
+      },
+    ],
+    'space-unary-ops': [
+      'error',
+      {
+        words: true,
+        nonwords: false,
+        overrides: {},
+      },
+    ],
+    'space-in-parens': ['error', 'never'],
+    'no-unused-vars': ['error', { caughtErrors: 'none' }],
     'no-param-reassign': ['error', {
       props: true,
       ignorePropertyModificationsFor: [

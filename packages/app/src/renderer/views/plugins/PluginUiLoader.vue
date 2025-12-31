@@ -37,7 +37,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="plugin-ui-loader" :data-plugin-id="pluginId">
+  <div class="plugin-ui-loader fill-height" :data-plugin-id="pluginId">
     <template v-if="visible">
       <component :is="PluginUi" />
     </template>
