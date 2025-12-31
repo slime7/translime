@@ -322,6 +322,7 @@ class PluginLoader extends EventEmitter {
       }
     }
     pluginMain.enabled = true;
+    pluginMain.loadTime = Date.now();
     mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
@@ -363,13 +364,24 @@ class PluginLoader extends EventEmitter {
       mainStore.getChildWin(`plugin-window-${packageName}`).close();
     }
     // 删除 require 缓存
-    const findCacheIndex = Object.keys(requireFresh.cache).findIndex((k) => k.includes(`${path.sep}${plugin.packageName}${path.sep}`));
-    const cacheKey = findCacheIndex > -1 ? Object.keys(requireFresh.cache)[findCacheIndex] : null;
-    if (cacheKey) {
-      delete requireFresh.cache[cacheKey];
+    const cacheKeys = Object.keys(requireFresh.cache);
+    const packagePattern = `${path.sep}${plugin.packageName}${path.sep}`.toLowerCase();
+    const normalizedPluginPath = plugin.pluginPath.toLowerCase();
+
+    let deletedCount = 0;
+    cacheKeys.forEach((key) => {
+      const lowerKey = key.toLowerCase();
+      // 检查路径是否包含包名目录或位于插件根目录下
+      if (lowerKey.includes(packagePattern) || lowerKey.startsWith(normalizedPluginPath)) {
+        delete requireFresh.cache[key];
+        deletedCount += 1;
+      }
+    });
+
+    if (deletedCount > 0) {
+      logger.debug(`[plugin] 已清理插件 "${plugin.packageName}" 的 ${deletedCount} 个缓存项`);
     } else {
-      logger.debug(`[plugin] require 目标缓存: ${path.sep}${plugin.packageName}${path.sep}`);
-      logger.debug('[plugin] require 全部缓存: ', { cache: Object.keys(requireFresh.cache) });
+      logger.debug(`[plugin] 未找到插件 "${plugin.packageName}" 的相关缓存`, { target: packagePattern });
     }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {

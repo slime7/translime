@@ -2,7 +2,12 @@
   <div class="plugin-container">
     <plugin-title-bar :plugin="plugin" :visible="appBarVisible" v-if="plugin" />
 
-    <plugin-ui-loader v-if="loaderVisible" :plugin-path="pluginPath" :plugin-id="pluginId" />
+    <plugin-ui-loader
+      v-if="loaderVisible"
+      :key="`${pluginId}-${plugin.loadTime}`"
+      :plugin-path="pluginPath"
+      :plugin-id="pluginId"
+    />
   </div>
 </template>
 

@@ -2,6 +2,7 @@
 import {
   markRaw,
   onMounted,
+  onUnmounted,
   ref,
 } from 'vue';
 
@@ -19,12 +20,17 @@ const props = defineProps({
 const visible = ref(false);
 const PluginUi = ref();
 const error = ref(null);
+let currentUiUrl = '';
+
 const mountPlugin = async () => {
   try {
     const uiBlob = window.ts.loadPluginUi(props.pluginPath);
-    const uiUrl = URL.createObjectURL(uiBlob);
-    const ui = await import(/* @vite-ignore */ uiUrl);
-    PluginUi.value = markRaw(ui.default);
+    if (currentUiUrl) {
+      URL.revokeObjectURL(currentUiUrl);
+    }
+    currentUiUrl = URL.createObjectURL(uiBlob);
+    const ui = await import(/* @vite-ignore */ currentUiUrl);
+    PluginUi.value = markRaw(ui.default || ui);
     visible.value = true;
   } catch (err) {
     error.value = err.message;
@@ -33,6 +39,12 @@ const mountPlugin = async () => {
 
 onMounted(() => {
   mountPlugin();
+});
+
+onUnmounted(() => {
+  if (currentUiUrl) {
+    URL.revokeObjectURL(currentUiUrl);
+  }
 });
 </script>
 
