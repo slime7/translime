@@ -7,8 +7,9 @@ const config = {
   appId: 'translime.app',
   asar: true,
   asarUnpack: [
-    'node_modules/npm',
+    'node_modules/**',
   ],
+  electronLanguages: ['zh-CN', 'en-US', 'ja'],
   compression: 'maximum',
   directories: {
     output: 'dist_electron',

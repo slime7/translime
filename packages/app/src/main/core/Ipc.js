@@ -5,14 +5,21 @@ export default class Ipc {
     this.listener = listener;
     this.sender = sender;
     this.handlerList = ipcHandler(this);
-    this.listener.on('ipc-msg', (ev, { type, data }) => this.handlerList[type](data));
-    this.listener.handle('ipc-fn', async (ev, { type, args }) => {
-      try {
-        const data = await this.handlerList[type](...args);
-        return { data, err: null };
-      } catch (err) {
-        return { data: null, err: err.message };
+    this.listener.on('ipc-msg', (ev, { type, data }) => {
+      if (typeof this.handlerList[type] === 'function') {
+        this.handlerList[type](data);
       }
+    });
+    this.listener.handle('ipc-fn', async (ev, { type, args }) => {
+      if (typeof this.handlerList[type] === 'function') {
+        try {
+          const data = await this.handlerList[type](...args);
+          return { data, err: null };
+        } catch (err) {
+          return { data: null, err: err.message };
+        }
+      }
+      return { data: null, err: `IPC 处理函数 [${type}] 未找到` };
     });
   }
 
