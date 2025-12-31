@@ -95,7 +95,7 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.RELAUNCH]() {
     app.relaunch({
-      args: ['--relaunch'],
+      args: process.argv.slice(1).concat(['--relaunch']),
     });
     app.quit();
   },

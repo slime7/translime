@@ -396,6 +396,7 @@ class PluginLoader extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       const result = await execNpmCommand('install', module);
       if (result.code) {
+        logger.error(`[plugin] 安装插件 ${packageName} 失败`, { error: result.data });
         reject(new Error(result.data));
         return;
       }
