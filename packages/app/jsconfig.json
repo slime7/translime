@@ -27,9 +27,8 @@
     "src/**/*.json"
   ],
   "files": [
-    ".eslintrc.js",
-    ".stylelintrc.js",
-    "components.d.ts"
+    "eslint.config.mjs",
+    ".stylelintrc.mjs"
   ],
   "exclude": [
     "node_modules",
