@@ -1,11 +1,13 @@
 <template>
   <v-app>
     <v-system-bar class="system-bar pa-0" v-if="!useNativeTileBar">
-      <div class="px-4">translime</div>
+      <div class="px-4">
+        translime
+      </div>
 
       <v-spacer />
 
-      <window-controls :is-maximize="isMaximize"></window-controls>
+      <window-controls :is-maximize="isMaximize" />
     </v-system-bar>
 
     <navigation />
@@ -36,11 +38,11 @@
 
 <script>
 import {
+  computed,
   nextTick,
-  ref,
   onMounted,
   onUnmounted,
-  computed,
+  ref,
   watch,
 } from 'vue';
 import { useRoute } from 'vue-router';

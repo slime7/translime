@@ -23,10 +23,12 @@
             :color="isHovering || isExactActive ? color : 'grey-darken-2'"
             :rounded="isHovering || isExactActive ? 'xl' : 'circle'"
           >
-            <v-icon v-if="icon" :color="isHovering || isExactActive ? 'white' : color">{{ icon }}</v-icon>
-            <img v-else-if="image" :src="image" alt="" width="56" />
+            <v-icon v-if="icon" :color="isHovering || isExactActive ? 'white' : color">
+              {{ icon }}
+            </v-icon>
+            <img v-else-if="image" :src="image" alt="" width="56">
             <div v-else class="text-no-wrap text-truncate" :class="isHovering || isExactActive ? 'white--text' : textColor">
-              <slot></slot>
+              <slot />
             </div>
           </v-avatar>
         </v-badge>
@@ -59,10 +61,12 @@
           :color="isHovering ? color : 'grey-darken-2'"
           :rounded="isHovering ? 'xl' : 'circle'"
         >
-          <v-icon v-if="icon" :color="isHovering ? 'on-primary-container' : color">{{ icon }}</v-icon>
-          <img v-else-if="image" :src="image" alt="" width="56" />
+          <v-icon v-if="icon" :color="isHovering ? 'on-primary-container' : color">
+            {{ icon }}
+          </v-icon>
+          <img v-else-if="image" :src="image" alt="" width="56">
           <div v-else class="text-no-wrap text-truncate" :class="isHovering ? 'white--text' : textColor">
-            <slot></slot>
+            <slot />
           </div>
         </v-avatar>
       </v-badge>

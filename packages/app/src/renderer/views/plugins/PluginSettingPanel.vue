@@ -18,7 +18,7 @@
           <v-icon>close</v-icon>
         </v-btn>
         <v-toolbar-title>配置</v-toolbar-title>
-        <v-spacer></v-spacer>
+        <v-spacer />
         <v-toolbar-items>
           <v-btn
             dark
@@ -31,7 +31,9 @@
       </v-toolbar>
 
       <v-card-text>
-        <div class="mt-4">有些设置可能需要重启插件生效</div>
+        <div class="mt-4">
+          有些设置可能需要重启插件生效
+        </div>
 
         <v-form v-if="!loading.getSettings" class="mt-4" ref="settingForm">
           <v-container fluid>
@@ -58,7 +60,7 @@
                 :text="settings[menuItem.key] && settings[menuItem.key].length ? settings[menuItem.key].join(',') : '未选择'"
                 location="bottom"
               >
-                <template v-slot:activator="{ props }">
+                <template #activator="{ props }">
                   <v-text-field
                     v-bind="props"
                     :model-value="settings[menuItem.key] && settings[menuItem.key].length ? settings[menuItem.key].join(',') : ''"
@@ -153,16 +155,16 @@
 
 <script>
 import {
-  ref,
   computed,
   reactive,
+  ref,
   toRaw,
   watch,
 } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useToast from '@/hooks/useToast';
-import { showTextEditContextMenu, selectFileDialog } from '@/utils';
+import { selectFileDialog, showTextEditContextMenu } from '@/utils';
 
 export default {
   name: 'PluginSettingPanel',
@@ -219,42 +221,42 @@ export default {
       settingMenu.forEach((menu) => {
         let parsed;
         switch (menu.type) {
-          case 'input':
-          case 'password':
-          case 'switch':
-          case 'file':
-            parsed = {
-              ...menu,
-              name: menu.name || '',
-              key: menu.key || menu.name,
-            };
-            break;
-          case 'checkbox':
-          case 'radio':
-          case 'list':
-            parsed = {
-              ...menu,
-              name: menu.name || '',
-              key: menu.key || menu.name,
-              choices: menu.choices.map((c) => {
-                if (typeof c === 'string') {
-                  return {
-                    name: c,
-                    value: c,
-                  };
-                }
-                if (!c.value) {
-                  return {
-                    ...c,
-                    value: c.name,
-                  };
-                }
-                return c;
-              }),
-            };
-            break;
-          default:
-            break;
+        case 'input':
+        case 'password':
+        case 'switch':
+        case 'file':
+          parsed = {
+            ...menu,
+            name: menu.name || '',
+            key: menu.key || menu.name,
+          };
+          break;
+        case 'checkbox':
+        case 'radio':
+        case 'list':
+          parsed = {
+            ...menu,
+            name: menu.name || '',
+            key: menu.key || menu.name,
+            choices: menu.choices.map((c) => {
+              if (typeof c === 'string') {
+                return {
+                  name: c,
+                  value: c,
+                };
+              }
+              if (!c.value) {
+                return {
+                  ...c,
+                  value: c.name,
+                };
+              }
+              return c;
+            }),
+          };
+          break;
+        default:
+          break;
         }
         parsedSettingMenu.push(parsed);
         if (!settings[parsed.key]) {

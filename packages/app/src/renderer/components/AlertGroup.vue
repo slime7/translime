@@ -13,7 +13,7 @@
     >
       {{ alertItem.msg }}
 
-      <template v-slot:close>
+      <template #close>
         <v-btn class="v-alert__dismissible" small icon @click="dismiss(alertItem.uuid)">
           <v-icon>cancel</v-icon>
         </v-btn>

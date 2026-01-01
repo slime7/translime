@@ -73,7 +73,7 @@
           :open="plugin.windowMode ? plugin.packageName : null"
           :image="plugin.icon ? plugin.icon : null"
           :tooltip="plugin.title"
-          :isDev="plugin.dev"
+          :is-dev="plugin.dev"
         >
           {{ plugin.title }}
         </navi-link>

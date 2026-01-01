@@ -5,17 +5,17 @@
     :dark="vTheme.global.current.value.dark"
   >
     <v-list-item link :lines="lines" @click="onClick($event)">
-      <template v-slot:prepend>
+      <template #prepend>
         <v-list-item-action start>
           <v-radio color="primary" :model-value="value" />
         </v-list-item-action>
       </template>
 
       <v-list-item-title>
-        <slot></slot>
+        <slot />
       </v-list-item-title>
       <v-list-item-subtitle>
-        <slot name="subtitle"></slot>
+        <slot name="subtitle" />
       </v-list-item-subtitle>
     </v-list-item>
   </v-sheet>

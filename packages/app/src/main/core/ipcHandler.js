@@ -1,13 +1,13 @@
 import {
   app,
+  clipboard,
   dialog,
   Menu,
+  nativeTheme,
   Notification,
   shell,
-  clipboard,
-  nativeTheme,
 } from 'electron';
-import { join, sep, dirname } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '../utils/createWindow';

@@ -6,7 +6,7 @@ import {
   screen,
 } from 'electron';
 import Store from 'electron-store';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createProtocol from './utils/createProtocol';

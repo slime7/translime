@@ -1,6 +1,6 @@
-import { ref, reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { useIpc, useDialog } from '@/hooks/electron';
+import { useDialog, useIpc } from '@/hooks/electron';
 
 const ipc = useIpc();
 const ipcRaw = useIpc(false);

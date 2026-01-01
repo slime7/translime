@@ -1,16 +1,20 @@
 <template>
   <v-app>
     <v-system-bar app class="system-bar pa-0" v-if="!appSetting.useNativeTitleBar">
-      <div v-if="!plugin" class="px-4">translime</div>
-      <div v-else class="px-4">{{ plugin.title }} - translime</div>
+      <div v-if="!plugin" class="px-4">
+        translime
+      </div>
+      <div v-else class="px-4">
+        {{ plugin.title }} - translime
+      </div>
 
       <v-spacer />
 
       <window-controls
         :is-maximize="isMaximize"
         :win="`plugin-window-${pluginId}`"
-        @windowMaximize="getIsMaximize"
-        @windowUnmaximize="getIsMaximize"
+        @window-maximize="getIsMaximize"
+        @window-unmaximize="getIsMaximize"
       />
     </v-system-bar>
 

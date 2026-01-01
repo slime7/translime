@@ -9,12 +9,27 @@
       "@/*": [
         "./src/renderer/*"
       ]
-    }
+    },
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "scripthost"
+    ]
   },
   "include": [
     "src/**/*.js",
     "src/**/*.jsx",
-    "src/**/*.vue"
+    "src/**/*.vue",
+    "src/**/*.css",
+    "src/**/*.scss",
+    "src/**/*.less",
+    "src/**/*.json"
+  ],
+  "files": [
+    ".eslintrc.js",
+    ".stylelintrc.js",
+    "components.d.ts"
   ],
   "exclude": [
     "node_modules",

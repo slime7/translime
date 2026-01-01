@@ -1,6 +1,5 @@
 <template>
   <div>
-
     <h1>{{ msg }}</h1>
 
     <v-btn @click="countIncrease" color="primary">

@@ -1,4 +1,4 @@
-import { defineStore, acceptHMRUpdate } from 'pinia';
+import { acceptHMRUpdate, defineStore } from 'pinia';
 import { appConfigStore } from '@/utils';
 
 const useGlobalStore = defineStore('globalStore', {

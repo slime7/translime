@@ -2,7 +2,9 @@
   <v-container class="setting">
     <h2>设置</h2>
 
-    <h3 class="mt-4">通用</h3>
+    <h3 class="mt-4">
+      通用
+    </h3>
 
     <div>
       <v-checkbox
@@ -11,11 +13,13 @@
         label="开机自动启动"
         hide-details
         color="primary"
-        @update:modelValue="onOpenAtLogin"
+        @update:model-value="onOpenAtLogin"
       />
     </div>
 
-    <h5 class="mt-2">主题</h5>
+    <h5 class="mt-2">
+      主题
+    </h5>
 
     <div>
       <card-radio
@@ -49,15 +53,19 @@
         inset
         hide-details
         color="primary"
-        @update:modelValue="onUseNativeTitleBar"
+        @update:model-value="onUseNativeTitleBar"
       />
     </div>
 
     <v-divider class="mt-4" />
 
-    <h3 class="mt-4">插件</h3>
+    <h3 class="mt-4">
+      插件
+    </h3>
 
-    <h5 class="mt-2">npm 服务器</h5>
+    <h5 class="mt-2">
+      npm 服务器
+    </h5>
 
     <div>
       <card-radio
@@ -69,7 +77,9 @@
         @click="onSelectRegistry(registry.link, registry.id)"
       >
         {{ registry.name }}
-        <template v-slot:subtitle>{{ registry.link }}</template>
+        <template #subtitle>
+          {{ registry.link }}
+        </template>
       </card-radio>
 
       <v-dialog
@@ -115,7 +125,9 @@
       </v-dialog>
     </div>
 
-    <h5 class="mt-4">开发</h5>
+    <h5 class="mt-4">
+      开发
+    </h5>
 
     <div>
       <v-switch
@@ -125,30 +137,34 @@
         inset
         hide-details
         color="primary"
-        @update:modelValue="onShowDevPlugin"
+        @update:model-value="onShowDevPlugin"
       />
     </div>
 
     <div class="mt-4">
-      <v-btn @click="showDevtools">打开 devtools(F12)</v-btn>
+      <v-btn @click="showDevtools">
+        打开 devtools(F12)
+      </v-btn>
 
-      <v-btn class="ml-4" @click="relaunch">重新启动</v-btn>
+      <v-btn class="ml-4" @click="relaunch">
+        重新启动
+      </v-btn>
     </div>
   </v-container>
 </template>
 
 <script>
 import {
-  ref,
   computed,
   onMounted,
+  ref,
   watch,
 } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
-import { showTextEditContextMenu, appConfigStore } from '@/utils';
+import { appConfigStore, showTextEditContextMenu } from '@/utils';
 import CardRadio from '@/components/CardRadio.vue';
 
 export default {
