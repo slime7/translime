@@ -9,8 +9,10 @@
       color="transparent"
       class="mb-4"
     >
-      <v-toolbar-title class="text-h5 font-weight-bold text-primary"> Steam 存档备份 </v-toolbar-title>
-      <v-spacer></v-spacer>
+      <v-toolbar-title class="text-h5 font-weight-bold text-primary">
+        Steam 存档备份
+      </v-toolbar-title>
+      <v-spacer />
       <v-btn
         prepend-icon="refresh"
         variant="tonal"
@@ -32,8 +34,10 @@
           indeterminate
           color="primary"
           size="64"
-        ></v-progress-circular>
-        <div class="mt-4 text-grey">正在扫描 Steam 游戏...</div>
+        />
+        <div class="mt-4 text-grey">
+          正在扫描 Steam 游戏...
+        </div>
       </v-col>
     </v-row>
 
@@ -77,7 +81,9 @@
                   </div>
                 </template>
               </v-tooltip>
-              <div class="text-caption text-grey-darken-1">APP ID: {{ game.appid }}</div>
+              <div class="text-caption text-grey-darken-1">
+                APP ID: {{ game.appid }}
+              </div>
             </div>
             <v-tooltip
               text="隐藏此游戏"
@@ -92,12 +98,12 @@
                   color="grey"
                   @click.stop="excludeGame(game)"
                   :loading="excludeLoading === game.appid"
-                ></v-btn>
+                />
               </template>
             </v-tooltip>
           </div>
 
-          <v-divider></v-divider>
+          <v-divider />
 
           <v-card-text class="pt-2 pb-2">
             <div class="d-flex justify-space-between align-center">
@@ -112,7 +118,7 @@
               <v-icon
                 color="grey-lighten-1"
                 icon="chevron_right"
-              ></v-icon>
+              />
             </div>
           </v-card-text>
         </v-card>
@@ -134,7 +140,7 @@
               <v-icon
                 icon="visibility_off"
                 class="mr-2"
-              ></v-icon>
+              />
               已隐藏的游戏 ({{ hiddenGames.length }} 个)
             </v-expansion-panel-title>
             <v-expansion-panel-text class="pa-0">
@@ -181,7 +187,7 @@
                             color="primary"
                             @click="includeGame(game)"
                             :loading="excludeLoading === game.appid"
-                          ></v-btn>
+                          />
                         </template>
                       </v-tooltip>
                     </div>
@@ -201,17 +207,23 @@
       <v-icon
         size="80"
         color="grey-lighten-2"
-        >sports_esports</v-icon
       >
-      <div class="text-h6 text-grey mt-4">未发现 Steam 游戏</div>
-      <div class="text-caption text-grey mt-1">请尝试在插件设置中手动配置 Steam 路径</div>
+        sports_esports
+      </v-icon>
+      <div class="text-h6 text-grey mt-4">
+        未发现 Steam 游戏
+      </div>
+      <div class="text-caption text-grey mt-1">
+        请尝试在插件设置中手动配置 Steam 路径
+      </div>
       <v-btn
         class="mt-4"
         color="primary"
         variant="text"
         @click="scanGames"
-        >重新扫描</v-btn
       >
+        重新扫描
+      </v-btn>
     </div>
 
     <!-- 备份详情模态框 -->
@@ -258,7 +270,7 @@
                   icon="folder_open"
                   size="small"
                   class="mr-2"
-                ></v-icon>
+                />
                 检测到存档路径 ({{ selectedGame.savePaths.length }} 个)
               </v-expansion-panel-title>
               <v-expansion-panel-text>
@@ -274,8 +286,9 @@
                       class="mr-2"
                       color="primary"
                       variant="tonal"
-                      >路径 {{ index + 1 }}</v-chip
                     >
+                      路径 {{ index + 1 }}
+                    </v-chip>
                     <span class="text-grey-darken-3">{{ pathInfo.absolutePath || '未探测到有效路径' }}</span>
                   </div>
                   <div class="ml-4 pl-3 border-s border-opacity-25">
@@ -288,7 +301,7 @@
                         icon="description"
                         size="14"
                         class="mr-1 text-grey-lighten-1"
-                      ></v-icon>
+                      />
                       {{ file }}
                     </div>
                   </div>
@@ -326,7 +339,7 @@
                     color="blue-lighten-5"
                     icon="save"
                     color-icon="primary"
-                  ></v-avatar>
+                  />
                 </template>
 
                 <v-list-item-title class="font-weight-bold">
@@ -373,8 +386,7 @@
                           icon="edit_note"
                           size="small"
                           @click="openNoteDialog(backup)"
-                        >
-                        </v-btn>
+                        />
                       </template>
                     </v-tooltip>
 
@@ -391,8 +403,7 @@
                           size="small"
                           @click="deleteAppBackup(backup)"
                           :loading="deleteLoading === backup.id"
-                        >
-                        </v-btn>
+                        />
                       </template>
                     </v-tooltip>
                   </div>
@@ -409,16 +420,19 @@
             <v-icon
               size="64"
               color="grey-lighten-2"
-              >inventory_2</v-icon
             >
-            <div class="mt-2">暂无备份记录</div>
+              inventory_2
+            </v-icon>
+            <div class="mt-2">
+              暂无备份记录
+            </div>
           </div>
         </v-card-text>
 
-        <v-divider></v-divider>
+        <v-divider />
 
         <v-card-actions class="pa-4">
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn
             variant="text"
             @click="dialog.show = false"
@@ -451,8 +465,9 @@
           color="white"
           variant="text"
           @click="snackbar.show = false"
-          >关闭</v-btn
         >
+          关闭
+        </v-btn>
       </template>
     </v-snackbar>
 
@@ -467,7 +482,7 @@
           density="compact"
         >
           <v-toolbar-title>编辑备注</v-toolbar-title>
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn
             icon
             @click="noteDialog.show = false"
@@ -487,22 +502,24 @@
             hide-details="auto"
             autofocus
             @keyup.enter="saveNote"
-          ></v-text-field>
+          />
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn
             variant="text"
             @click="noteDialog.show = false"
-            >取消</v-btn
           >
+            取消
+          </v-btn>
           <v-btn
             color="primary"
             variant="elevated"
             @click="saveNote"
             :loading="noteDialog.loading"
-            >保存</v-btn
           >
+            保存
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -510,7 +527,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, toRaw } from 'vue';
+import {
+  computed,
+  onMounted,
+  ref,
+  toRaw,
+} from 'vue';
 
 // 从全局对象获取 Vuetify 组件
 // 注意：实际运行时环境中已有 Vuetify 全局变量，这里解构仅作参考或 IDE 提示
@@ -575,14 +597,13 @@ const hiddenGames = computed(() => games.value.filter((g) => g.excluded));
 const canBackup = computed(() => selectedGame.value && selectedGame.value.savePaths && selectedGame.value.savePaths.length > 0);
 
 // 格式化时间
-const formatTime = (isoString) =>
-  new Date(isoString).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+const formatTime = (isoString) => new Date(isoString).toLocaleString('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 // 显示消息
 const showMessage = (text, color = 'success') => {
@@ -826,14 +847,14 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 /* 隐藏滚动条但允许滚动 */
 .overflow-y-auto::-webkit-scrollbar {
   width: 8px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: rgba(0, 0, 0, .2);
   border-radius: 4px;
 }
 

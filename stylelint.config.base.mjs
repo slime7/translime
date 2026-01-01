@@ -1,5 +1,6 @@
 /** @type {import('stylelint').Config} */
 export default {
+  customSyntax: 'postcss-scss',
   extends: [
     'stylelint-config-standard-scss', // SCSS 标准规则
     'stylelint-config-recommended-vue/scss', // Vue SFC 中的 SCSS 支持
