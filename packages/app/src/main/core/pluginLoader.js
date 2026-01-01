@@ -93,6 +93,7 @@ const readPlugin = (pluginPath, devPlugins = null) => {
         gif: 'image/gif',
         bmp: 'image/bmp',
         webp: 'image/webp',
+        svg: 'image/svg+xml',
       };
       const ext = path.extname(imgPath).toLowerCase().replace('.', '');
       plugin.icon = `data:${mimeTypes[ext]};base64, ${fs.readFileSync(imgPath, { encoding: 'base64' })}`;

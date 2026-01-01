@@ -170,11 +170,15 @@
     >
       <v-card v-if="selectedGame" class="rounded-lg" height="80vh">
         <v-toolbar color="primary" density="compact" class="flex-grow-0">
-          <v-toolbar-title>{{ selectedGame.name }} - 备份管理</v-toolbar-title>
-          <v-spacer></v-spacer>
-          <v-btn icon @click="dialog.show = false">
-            <v-icon>close</v-icon>
-          </v-btn>
+          <v-toolbar-title>({{ selectedGame.appid }}){{ selectedGame.name }} - 备份管理</v-toolbar-title>
+
+          <template #append>
+          <div class="d-flex ga-1">
+            <v-btn icon @click="dialog.show = false">
+              <v-icon>close</v-icon>
+            </v-btn>
+          </div>
+          </template>
         </v-toolbar>
 
         <v-card-text class="pa-0 flex-grow-1 overflow-y-auto">
@@ -643,7 +647,7 @@ const openNoteDialog = (backup) => {
 // 保存备注
 const saveNote = () => {
   if (!noteDialog.value.backup) return;
-  
+
   noteDialog.value.loading = true;
   ipc.send(`update-backup-note@${PLUGIN_ID}`, {
     backupPath: noteDialog.value.backup.path,

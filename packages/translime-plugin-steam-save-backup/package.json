@@ -34,7 +34,7 @@
   "plugin": {
     "title": "Steam Save Backup",
     "description": "备份和还原 Steam 游戏存档",
-    "icon": "./src/icon.png",
+    "icon": "src/icon.svg",
     "ui": "dist/ui.esm.js"
   },
   "peerDependencies": {
