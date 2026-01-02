@@ -87,12 +87,12 @@ export const pluginWillUnload = () => {
 export const ipcHandlers = [
   {
     type: 'scan-games',
-    handler: ({ sendToClient }) => async () => {
+    handler: ({ sendToClient }) => async (params, sender) => {
       const settings = config?.get(`plugin.${id}.settings`, {}) || {};
       const currentSteamPath = settings.customSteamPath || await getSteamPath();
 
       if (!currentSteamPath) {
-        sendToClient(`scan-games-reply@${id}`, { success: false, message: '未找到 Steam' });
+        sendToClient(`scan-games-reply@${id}`, { success: false, message: '未找到 Steam' }, sender);
         return;
       }
 
@@ -119,60 +119,60 @@ export const ipcHandlers = [
         const userIds = await getSteamUserIds(currentSteamPath);
         sendToClient(`scan-games-reply@${id}`, {
           success: true, games, userIds, steamPath: currentSteamPath,
-        });
+        }, sender);
       } catch (e) {
         console.error('扫描游戏失败：', e);
-        sendToClient(`scan-games-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`scan-games-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
   {
     type: 'get-backups',
-    handler: ({ sendToClient }) => async (gameId) => {
+    handler: ({ sendToClient }) => async (gameId, sender) => {
       try {
         const backups = await getBackups(gameId);
-        sendToClient(`get-backups-reply@${id}`, { success: true, backups });
+        sendToClient(`get-backups-reply@${id}`, { success: true, backups }, sender);
       } catch (e) {
-        sendToClient(`get-backups-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`get-backups-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
   {
     type: 'backup-save',
-    handler: ({ sendToClient }) => async ({ gameId, gameName, savePaths }) => {
+    handler: ({ sendToClient }) => async ({ gameId, gameName, savePaths }, sender) => {
       try {
         const result = await backupSave(gameId, gameName, savePaths);
-        sendToClient(`backup-save-reply@${id}`, result);
+        sendToClient(`backup-save-reply@${id}`, result, sender);
       } catch (e) {
-        sendToClient(`backup-save-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`backup-save-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
   {
     type: 'restore-save',
-    handler: ({ sendToClient }) => async (backupPath) => {
+    handler: ({ sendToClient }) => async (backupPath, sender) => {
       try {
         const result = await restoreSave(backupPath);
-        sendToClient(`restore-save-reply@${id}`, result);
+        sendToClient(`restore-save-reply@${id}`, result, sender);
       } catch (e) {
-        sendToClient(`restore-save-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`restore-save-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
   {
     type: 'delete-backup',
-    handler: ({ sendToClient }) => async (backupPath) => {
+    handler: ({ sendToClient }) => async (backupPath, sender) => {
       try {
         const result = await deleteBackup(backupPath);
-        sendToClient(`delete-backup-reply@${id}`, result);
+        sendToClient(`delete-backup-reply@${id}`, result, sender);
       } catch (e) {
-        sendToClient(`delete-backup-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`delete-backup-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
   {
     type: 'exclude-game',
-    handler: ({ sendToClient }) => async (appid) => {
+    handler: ({ sendToClient }) => async (appid, sender) => {
       try {
         const excludeList = getExcludeList();
         const appidStr = String(appid);
@@ -180,15 +180,15 @@ export const ipcHandlers = [
           excludeList.push(appidStr);
           saveExcludeList(excludeList);
         }
-        sendToClient(`exclude-game-reply@${id}`, { success: true, appid: appidStr });
+        sendToClient(`exclude-game-reply@${id}`, { success: true, appid: appidStr }, sender);
       } catch (e) {
-        sendToClient(`exclude-game-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`exclude-game-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
   {
     type: 'include-game',
-    handler: ({ sendToClient }) => async (appid) => {
+    handler: ({ sendToClient }) => async (appid, sender) => {
       try {
         let excludeList = getExcludeList();
         const appidStr = String(appid);
@@ -196,20 +196,20 @@ export const ipcHandlers = [
           excludeList = excludeList.filter((id) => id !== appidStr);
           saveExcludeList(excludeList);
         }
-        sendToClient(`include-game-reply@${id}`, { success: true, appid: appidStr });
+        sendToClient(`include-game-reply@${id}`, { success: true, appid: appidStr }, sender);
       } catch (e) {
-        sendToClient(`include-game-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`include-game-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
   {
     type: 'update-backup-note',
-    handler: ({ sendToClient }) => async ({ backupPath, note }) => {
+    handler: ({ sendToClient }) => async ({ backupPath, note }, sender) => {
       try {
         const result = await updateBackupNote(backupPath, note);
-        sendToClient(`update-backup-note-reply@${id}`, { success: true, ...result });
+        sendToClient(`update-backup-note-reply@${id}`, { success: true, ...result }, sender);
       } catch (e) {
-        sendToClient(`update-backup-note-reply@${id}`, { success: false, message: e.message });
+        sendToClient(`update-backup-note-reply@${id}`, { success: false, message: e.message }, sender);
       }
     },
   },
