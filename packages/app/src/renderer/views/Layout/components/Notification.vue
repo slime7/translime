@@ -10,7 +10,9 @@
       <v-spacer />
 
       <div v-if="!alertList.length">
-        <div class="d-flex justify-center">无新通知</div>
+        <div class="d-flex justify-center">
+          无新通知
+        </div>
       </div>
 
       <div class="d-flex flex-column">
@@ -25,16 +27,16 @@
           <div>{{ alertItem.msg }}</div>
         </v-alert>
       </div>
-      <div id="notify-list-bottom"></div>
+      <div id="notify-list-bottom" />
     </div>
   </v-navigation-drawer>
 </template>
 
 <script>
 import {
+  computed,
   ref,
   watch,
-  computed,
 } from 'vue';
 import { myDate } from '@pkg/share/utils';
 import useAlert from '@/hooks/useAlert';

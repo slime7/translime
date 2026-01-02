@@ -1,6 +1,6 @@
 <template>
   <v-hover
-    v-slot:default="{ isHovering, props }"
+    v-slot="{ isHovering, props }"
   >
     <v-card
       class="plugin-item-card ease-animation fill-height"
@@ -13,7 +13,7 @@
       <div class="d-flex flex-no-wrap justify-space-between">
         <div class="min-w-0">
           <v-tooltip :text="cardTitle" location="top">
-            <template v-slot:activator="{ props }">
+            <template #activator="{ props }">
               <v-card-title
                 class="text-h5"
                 v-bind="props"
@@ -168,10 +168,10 @@
 <script>
 import { storeToRefs } from 'pinia';
 import {
-  ref,
-  reactive,
-  toRefs,
   computed,
+  reactive,
+  ref,
+  toRefs,
   watch,
 } from 'vue';
 import verCompare from 'semver-compare';

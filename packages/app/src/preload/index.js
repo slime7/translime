@@ -1,6 +1,6 @@
 import {
-  contextBridge,
   clipboard,
+  contextBridge,
   ipcRenderer,
 } from 'electron';
 import path from 'node:path';

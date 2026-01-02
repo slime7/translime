@@ -54,6 +54,8 @@ onUnmounted(() => {
       <component :is="PluginUi" />
     </template>
 
-    <div v-else>{{ error }}</div>
+    <div v-else>
+      {{ error }}
+    </div>
   </div>
 </template>

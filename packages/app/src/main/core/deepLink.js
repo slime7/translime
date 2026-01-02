@@ -12,14 +12,14 @@ export const linkHandler = (url) => {
   }
 
   switch (link.main) {
-    case 'open':
-      global.mainStore.ipc().sendToClient(ipcType.DEEP_LINK_OPEN, link.params);
-      break;
-    case 'plugin':
-      // todo: 插件扩展
-      break;
-    default:
-      break;
+  case 'open':
+    global.mainStore.ipc().sendToClient(ipcType.DEEP_LINK_OPEN, link.params);
+    break;
+  case 'plugin':
+    // todo: 插件扩展
+    break;
+  default:
+    break;
   }
 };
 

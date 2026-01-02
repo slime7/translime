@@ -1,0 +1,50 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <linearGradient id="bg_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5" />
+      <stop offset="100%" style="stop-color:#7C3AED" />
+    </linearGradient>
+    <linearGradient id="disk_grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF; stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#FFFFFF; stop-opacity:0.7" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="15" />
+      <feOffset dx="0" dy="10" result="offsetblur" />
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 游戏手柄主体 - 使用渐变色代替半透明白，以便在无背景时也清晰可见 -->
+  <g filter="url(#shadow)">
+    <path d="M152 180H360C386.51 180 408 201.49 408 228V300C408 344.183 372.183 380 328 380H184C139.817 380 104 344.183 104 300V228C104 201.49 125.49 180 152 180Z" fill="url(#bg_grad)" />
+    <path d="M104 300C104 322.091 121.909 340 144 340H184L214 380H298L328 340H368C390.091 340 408 322.091 408 300V228C408 201.49 386.51 180 360 180H152C125.49 180 104 201.49 104 228V300Z" fill="white" fill-opacity="0.2" />
+    
+    <!-- 手柄细节 - 方向键 -->
+    <rect x="140" y="250" width="40" height="12" rx="6" fill="white" />
+    <rect x="154" y="236" width="12" height="40" rx="6" fill="white" />
+    
+    <!-- 手柄细节 - 按钮 -->
+    <circle cx="340" cy="245" r="10" fill="white" />
+    <circle cx="365" cy="270" r="10" fill="white" />
+    <circle cx="340" cy="295" r="10" fill="white" />
+    <circle cx="315" cy="270" r="10" fill="white" />
+    
+    <!-- 磁盘 (保存) 图标 - 叠加在右下角 -->
+    <g transform="translate(260, 240) scale(0.45)">
+      <!-- 磁盘背景，使用深色增强对比 -->
+      <path d="M50 0H350C377.614 0 400 22.3858 400 50V350C400 377.614 377.614 400 350 400H50C22.3858 400 0 377.614 0 350V50C0 22.3858 22.3858 0 50 0Z" fill="#1E293B" />
+      <path d="M50 0H350C377.614 0 400 22.3858 400 50V350C400 377.614 377.614 400 350 400H50C22.3858 400 0 377.614 0 350V50C0 22.3858 22.3858 0 50 0Z" fill="url(#disk_grad)" opacity="0.9" />
+      <!-- 磁盘标签区 -->
+      <rect x="80" y="40" width="240" height="140" rx="10" fill="#4F46E5" />
+      <rect x="120" y="220" width="160" height="140" rx="10" fill="#4F46E5" opacity="0.3" />
+      <rect x="140" y="260" width="120" height="100" rx="5" fill="white" />
+    </g>
+  </g>
+</svg>

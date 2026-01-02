@@ -2,38 +2,62 @@
   <div class="window-controls fill-height">
     <div class="d-flex fill-height">
       <div class="window-control-btn d-flex align-center justify-center fill-height" @click="appMinimize">
-        <svg width='11' height='11' viewBox='0 0 11 11' fill='none'
-             xmlns='http://www.w3.org/2000/svg'>
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 11 11"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path
-            :d='icon.minimize'
-            fill='currentColor'/>
+            :d="icon.minimize"
+            fill="currentColor"
+          />
         </svg>
       </div>
 
       <div class="window-control-btn d-flex align-center justify-center fill-height" v-if="isMaximize" @click="appUnmaximize">
-        <svg width='11' height='11' viewBox='0 0 11 11' fill='none'
-             xmlns='http://www.w3.org/2000/svg'>
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 11 11"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path
-            :d='icon.unmaximize'
-            fill='currentColor'/>
+            :d="icon.unmaximize"
+            fill="currentColor"
+          />
         </svg>
       </div>
 
       <div class="window-control-btn d-flex align-center justify-center fill-height" v-if="!isMaximize" @click="appMaximize">
-        <svg width='11' height='11' viewBox='0 0 11 11' fill='none'
-             xmlns='http://www.w3.org/2000/svg'>
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 11 11"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path
-            :d='icon.maximize'
-            fill='currentColor'/>
+            :d="icon.maximize"
+            fill="currentColor"
+          />
         </svg>
       </div>
 
       <div class="window-control-btn close d-flex align-center justify-center fill-height" @click="appClose">
-        <svg width='11' height='11' viewBox='0 0 11 11' fill='none'
-             xmlns='http://www.w3.org/2000/svg'>
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 11 11"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path
-            :d='icon.close'
-            fill='currentColor'/>
+            :d="icon.close"
+            fill="currentColor"
+          />
         </svg>
       </div>
     </div>
@@ -43,10 +67,10 @@
 <script>
 import { toRefs } from 'vue';
 import {
-  APP_MINIMIZE,
-  APP_MAXIMIZE,
-  APP_UNMAXIMIZE,
   APP_CLOSE,
+  APP_MAXIMIZE,
+  APP_MINIMIZE,
+  APP_UNMAXIMIZE,
 } from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 

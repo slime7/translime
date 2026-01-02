@@ -1,7 +1,7 @@
 import { protocol } from 'electron';
 import * as path from 'node:path';
 import { readFileSync } from 'node:fs';
-import { URL, fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 import logger from './logger';
 
 const filename = fileURLToPath(import.meta.url);

@@ -1,4 +1,4 @@
-// eslint-disable-next-line import/extensions
+
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
 import { zhHans } from 'vuetify/locale';

@@ -1,9 +1,9 @@
 <template>
-<footer>
-  <toast/>
-  <simple-dialog/>
-  <alert-group/>
-</footer>
+  <footer>
+    <toast />
+    <simple-dialog />
+    <alert-group />
+  </footer>
 </template>
 
 <script>

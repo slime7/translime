@@ -24,7 +24,7 @@ const showContextMenu = () => {
     :scroll-behavior="props.visible ? 'inverted' : 'hide inverted'"
     density="compact"
   >
-    <template v-slot:prepend>
+    <template #prepend>
       <v-btn
         append-icon="expand_more"
         variant="text"

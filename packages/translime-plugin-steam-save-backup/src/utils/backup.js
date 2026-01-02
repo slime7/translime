@@ -23,22 +23,36 @@ export async function backupSave(gameId, gameName, savePaths, backupRoot = DEFAU
   const results = await Promise.all(savePaths.map(async (saveInfo, i) => {
     if (!saveInfo.absolutePath) return null;
 
-    // 检查路径是否存在
+    // 检查源目录是否存在
     if (!(await fs.pathExists(saveInfo.absolutePath))) {
       console.warn(`存档路径不存在，跳过: ${saveInfo.absolutePath}`);
       return null;
     }
 
-    // 为每个路径创建子目录，使用索引区分
     const dataDir = path.join(backupDir, `data_${i}`);
-    await fs.copy(saveInfo.absolutePath, dataDir);
+    await fs.ensureDir(dataDir);
+
+    // 精确备份：只复制指定的文件
+    const fileResults = await Promise.all(saveInfo.files.map(async (file) => {
+      const srcFile = path.join(saveInfo.absolutePath, file);
+      const destFile = path.join(dataDir, file);
+      if (await fs.pathExists(srcFile)) {
+        await fs.ensureDir(path.dirname(destFile));
+        await fs.copy(srcFile, destFile);
+        return file;
+      }
+      return null;
+    }));
+
+    const actualFiles = fileResults.filter((f) => f !== null);
+    if (actualFiles.length === 0) return null;
 
     return {
       index: i,
       root: saveInfo.root,
       relativePath: saveInfo.relativePath,
       absolutePath: saveInfo.absolutePath,
-      files: saveInfo.files,
+      files: actualFiles,
     };
   }));
 
@@ -48,11 +62,11 @@ export async function backupSave(gameId, gameName, savePaths, backupRoot = DEFAU
     throw new Error('没有找到可备份的存档文件');
   }
 
-  // 3. 生成 info.json，包含完整的路径信息以便还原
+  // 3. 生成 info.json
   const info = {
     gameId,
     gameName,
-    savePaths: backedUpPaths, // 保存所有路径信息
+    savePaths: backedUpPaths,
     backupTime: new Date().toISOString(),
     timestamp,
     note: '',
@@ -99,7 +113,7 @@ export async function getBackups(gameId, backupRoot = DEFAULT_BACKUP_ROOT) {
 
 /**
  * 还原存档
- * @param {string} backupPath 备份目录路径 (包含 info.json 的那一层)
+ * @param {string} backupPath 备份目录路径
  */
 export async function restoreSave(backupPath) {
   const infoPath = path.join(backupPath, 'info.json');
@@ -109,37 +123,29 @@ export async function restoreSave(backupPath) {
 
   const info = await fs.readJson(infoPath);
 
-  // 支持新格式（多路径）和旧格式（单路径）
+  // 支持新格式（多路径+精确文件）和旧格式（全目录）
   if (info.savePaths && Array.isArray(info.savePaths)) {
-    // 新格式：多路径备份
     const results = await Promise.all(info.savePaths.map(async (saveInfo) => {
-      const sourceDataPath = path.join(backupPath, `data_${saveInfo.index}`);
-      const targetPath = saveInfo.absolutePath;
+      const sourceDataDir = path.join(backupPath, `data_${saveInfo.index}`);
+      if (!(await fs.pathExists(sourceDataDir))) return null;
 
-      if (!(await fs.pathExists(sourceDataPath))) {
-        console.warn(`备份数据不存在，跳过: ${sourceDataPath}`);
-        return null;
-      }
+      // 逐个还原文件
+      await Promise.all(saveInfo.files.map(async (file) => {
+        const src = path.join(sourceDataDir, file);
+        const dest = path.join(saveInfo.absolutePath, file);
+        if (await fs.pathExists(src)) {
+          await fs.ensureDir(path.dirname(dest));
+          await fs.copy(src, dest, { overwrite: true });
+        }
+      }));
 
-      // 确保目标父目录存在
-      await fs.ensureDir(path.dirname(targetPath));
-
-      // 还原：清空目标目录并复制
-      await fs.emptyDir(targetPath);
-      await fs.copy(sourceDataPath, targetPath);
-
-      return targetPath;
+      return saveInfo.absolutePath;
     }));
 
-    const restoredPaths = results.filter((p) => p !== null);
-
-    if (restoredPaths.length === 0) {
-      throw new Error('没有成功还原任何存档');
-    }
-
+    const restoredPaths = [...new Set(results.filter((p) => p !== null))];
     return { success: true, restoredPaths };
   }
-  // 旧格式：单路径备份（兼容）
+  // 旧格式：单路径备份（兼容旧的整个目录拷贝模式）
   const targetPath = info.originalPath;
   const sourceDataPath = path.join(backupPath, 'data');
 
@@ -151,15 +157,9 @@ export async function restoreSave(backupPath) {
   await fs.emptyDir(targetPath);
   await fs.copy(sourceDataPath, targetPath);
 
-
   return { success: true, targetPath };
 }
 
-/**
- * 获取指定游戏的备份数量
- * @param {string} gameId
- * @param {string} [backupRoot]
- */
 export async function getBackupCount(gameId, backupRoot = DEFAULT_BACKUP_ROOT) {
   const gameBackupDir = path.join(backupRoot, gameId.toString());
   if (!(await fs.pathExists(gameBackupDir))) return 0;

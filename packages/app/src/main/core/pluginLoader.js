@@ -20,20 +20,34 @@ const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
 const PLUGIN_PACKAGE_DIR = path.join(PLUGIN_DIR, 'package');
 const NPM_EXEC_PATH = import.meta.env.DEV
   ? path.join(mainStore.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
-  : path.join(mainStore.ROOT, '..', 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  : path.join(
+    mainStore.ROOT,
+    '..',
+    'app.asar.unpacked',
+    'node_modules',
+    'npm',
+    'bin',
+    'npm-cli.js',
+  );
 
-const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH, pluginName);
+const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(
+  isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH,
+  pluginName,
+);
 
 async function readPluginPackageInfo(filePath) {
   return new Promise((resolve, reject) => {
     const fileStream = fs.createReadStream(filePath);
     const unzipStream = fileStream.pipe(zlib.createGunzip()); // 使用zlib库中的createGunzip方法将压缩包解压缩
-    const extractStream = unzipStream.pipe(tar.extract({ cwd: mainStore.TEMP_DIR })); // 使用tar库中的extract方法解压缩后提取文件
+    const extractStream = unzipStream.pipe(
+      tar.extract({ cwd: mainStore.TEMP_DIR }),
+    ); // 使用tar库中的extract方法解压缩后提取文件
 
     let found = false; // 添加一个标志来记录是否找到目标文件
 
     extractStream.on('entry', (entry) => {
-      if (entry.path === 'package/package.json') { // 如果找到目标文件，则读取并返回其内容
+      if (entry.path === 'package/package.json') {
+        // 如果找到目标文件，则读取并返回其内容
         found = true; // 找到目标文件，将标志设置为true
         let content = '';
         entry.on('data', (chunk) => {
@@ -52,7 +66,8 @@ async function readPluginPackageInfo(filePath) {
     });
 
     extractStream.on('end', () => {
-      if (!found) { // 如果未找到目标文件，则Promise被拒绝
+      if (!found) {
+        // 如果未找到目标文件，则Promise被拒绝
         reject(new Error('无法识别这个插件包'));
       }
     });
@@ -64,10 +79,15 @@ async function readPluginPackageInfo(filePath) {
 }
 
 const readPlugin = (pluginPath, devPlugins = null) => {
-  const pluginPkg = JSON.parse(fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'));
+  const pluginPkg = JSON.parse(
+    fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'),
+  );
   const plugin = pluginPkg.plugin || {};
   plugin.packageName = pluginPkg.name;
-  if (devPlugins && devPlugins.some((p) => p.packageName === plugin.packageName)) {
+  if (
+    devPlugins
+    && devPlugins.some((p) => p.packageName === plugin.packageName)
+  ) {
     // 优先加载 dev 插件
     return false;
   }
@@ -93,6 +113,7 @@ const readPlugin = (pluginPath, devPlugins = null) => {
         gif: 'image/gif',
         bmp: 'image/bmp',
         webp: 'image/webp',
+        svg: 'image/svg+xml',
       };
       const ext = path.extname(imgPath).toLowerCase().replace('.', '');
       plugin.icon = `data:${mimeTypes[ext]};base64, ${fs.readFileSync(imgPath, { encoding: 'base64' })}`;
@@ -103,7 +124,7 @@ const readPlugin = (pluginPath, devPlugins = null) => {
     plugin.icon = null;
   }
   if (plugin.windowUrl) {
-    plugin.windowUrl = (/^https?:\/\//i.test(plugin.windowUrl))
+    plugin.windowUrl = /^https?:\/\//i.test(plugin.windowUrl)
       ? plugin.windowUrl
       : `file://${path.resolve(pluginPath, plugin.windowUrl)}`;
   }
@@ -118,7 +139,10 @@ const readPlugin = (pluginPath, devPlugins = null) => {
   }
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
-  plugin.enabled = mainStore.config.get(`plugin.${plugin.packageName}.enabled`, true);
+  plugin.enabled = mainStore.config.get(
+    `plugin.${plugin.packageName}.enabled`,
+    true,
+  );
   if (!devPlugins) {
     plugin.dev = true;
   }
@@ -129,30 +153,35 @@ const readPlugin = (pluginPath, devPlugins = null) => {
 const execNpmCommand = (cmd, module, options = {}) => {
   const internalOptions = {
     ...{
-      registry: mainStore.config.get('setting.registry', 'https://registry.npmmirror.com/'),
+      registry: mainStore.config.get(
+        'setting.registry',
+        'https://registry.npmmirror.com/',
+      ),
     },
     ...options,
   };
-  const args = [
-    cmd,
-  ];
+  const args = [cmd];
   if (cmd === 'install') {
-    args.push(...[
-      '--no-progress',
-      '--no-prune',
-      '--install-strategy=shallow',
-      '--ignore-scripts',
-      '--legacy-peer-deps',
-    ]);
+    args.push(
+      ...[
+        '--no-progress',
+        '--no-prune',
+        '--install-strategy=shallow',
+        '--ignore-scripts',
+        '--legacy-peer-deps',
+      ],
+    );
   }
   if (cmd === 'uninstall') {
-    args.push(...[
-      '--no-progress',
-      '--no-prune',
-      '--install-strategy=shallow',
-      '--ignore-scripts',
-      '--legacy-peer-deps',
-    ]);
+    args.push(
+      ...[
+        '--no-progress',
+        '--no-prune',
+        '--install-strategy=shallow',
+        '--ignore-scripts',
+        '--legacy-peer-deps',
+      ],
+    );
   }
   if (internalOptions.registry) {
     args.push(`--registry=${internalOptions.registry}`);
@@ -168,13 +197,17 @@ const execNpmCommand = (cmd, module, options = {}) => {
     });
 
     let output = '';
-    npm.stdout?.on('data', (data) => {
-      output += data.toString();
-    }).pipe(process.stdout);
+    npm.stdout
+      ?.on('data', (data) => {
+        output += data.toString();
+      })
+      .pipe(process.stdout);
 
-    npm.stderr?.on('data', (data) => {
-      output += data.toString();
-    }).pipe(process.stderr);
+    npm.stderr
+      ?.on('data', (data) => {
+        output += data.toString();
+      })
+      .pipe(process.stderr);
 
     npm.on('close', (code) => {
       if (!code) {
@@ -217,7 +250,11 @@ class PluginLoader extends EventEmitter {
         } catch (aErr) {
           fs.mkdirSync(PLUGIN_PACKAGE_DIR);
         }
-        fs.writeFileSync(PLUGIN_JSON_PATH, JSON.stringify(pkg, null, 2), 'utf8');
+        fs.writeFileSync(
+          PLUGIN_JSON_PATH,
+          JSON.stringify(pkg, null, 2),
+          'utf8',
+        );
       }
     });
 
@@ -252,7 +289,9 @@ class PluginLoader extends EventEmitter {
     const showDevPlugin = mainStore.config.get('setting.showDevPlugin', false);
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
-    const devDeps = showDevPlugin ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV) : [];
+    const devDeps = showDevPlugin
+      ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV)
+      : [];
     const filterFn = (isDev = false) => (name) => {
       if (!/^translime-plugin-/.test(name)) {
         return false;
@@ -266,9 +305,11 @@ class PluginLoader extends EventEmitter {
       }
     };
     // 读取插件
-    const devModules = devDeps.filter(filterFn(true))
+    const devModules = devDeps
+      .filter(filterFn(true))
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true)));
-    const modules = deps.filter(filterFn())
+    const modules = deps
+      .filter(filterFn())
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath), devModules))
       .filter((plugin) => plugin);
 
@@ -282,7 +323,6 @@ class PluginLoader extends EventEmitter {
     for (const plugin of plugins) {
       this.plugins.push(plugin);
       if (plugin.enabled) {
-        // eslint-disable-next-line no-await-in-loop
         this.enablePlugin(plugin.packageName, true);
       }
     }
@@ -298,7 +338,10 @@ class PluginLoader extends EventEmitter {
     let plugin = this.getPlugin(packageName);
     const pluginPath = resolvePluginPath(packageName);
     if (!plugin) {
-      plugin = readPlugin(pluginPath, this.getPlugins().filter((p) => p.dev));
+      plugin = readPlugin(
+        pluginPath,
+        this.getPlugins().filter((p) => p.dev),
+      );
       logger.debug('[plugin] reload plugin: ', { plugin });
     }
     let pluginMain = {};
@@ -327,7 +370,12 @@ class PluginLoader extends EventEmitter {
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
       mergedPlugin.ipcHandlers.forEach((handler) => {
-        mainStore.ipc().appendHandler(`${handler.type}@${mergedPlugin.packageName}`, handler.handler);
+        mainStore
+          .ipc()
+          .appendHandler(
+            `${handler.type}@${mergedPlugin.packageName}`,
+            handler.handler,
+          );
       });
     }
     mergedPlugin.windowOptions = {};
@@ -335,7 +383,10 @@ class PluginLoader extends EventEmitter {
       mergedPlugin.windowMode = true;
       mergedPlugin.windowOptions = pluginMain.windowOptions || {};
     } else if (typeof mergedPlugin.windowMode === 'undefined') {
-      mergedPlugin.windowMode = mainStore.config.get(`plugin.${plugin.packageName}.windowMode`, false);
+      mergedPlugin.windowMode = mainStore.config.get(
+        `plugin.${plugin.packageName}.windowMode`,
+        false,
+      );
     }
     if (!init) {
       processPlugin(mergedPlugin);
@@ -372,16 +423,23 @@ class PluginLoader extends EventEmitter {
     cacheKeys.forEach((key) => {
       const lowerKey = key.toLowerCase();
       // 检查路径是否包含包名目录或位于插件根目录下
-      if (lowerKey.includes(packagePattern) || lowerKey.startsWith(normalizedPluginPath)) {
+      if (
+        lowerKey.includes(packagePattern)
+        || lowerKey.startsWith(normalizedPluginPath)
+      ) {
         delete requireFresh.cache[key];
         deletedCount += 1;
       }
     });
 
     if (deletedCount > 0) {
-      logger.debug(`[plugin] 已清理插件 "${plugin.packageName}" 的 ${deletedCount} 个缓存项`);
+      logger.debug(
+        `[plugin] 已清理插件 "${plugin.packageName}" 的 ${deletedCount} 个缓存项`,
+      );
     } else {
-      logger.debug(`[plugin] 未找到插件 "${plugin.packageName}" 的相关缓存`, { target: packagePattern });
+      logger.debug(`[plugin] 未找到插件 "${plugin.packageName}" 的相关缓存`, {
+        target: packagePattern,
+      });
     }
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
@@ -396,7 +454,9 @@ class PluginLoader extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       const result = await execNpmCommand('install', module);
       if (result.code) {
-        logger.error(`[plugin] 安装插件 ${packageName} 失败`, { error: result.data });
+        logger.error(`[plugin] 安装插件 ${packageName} 失败`, {
+          error: result.data,
+        });
         reject(new Error(result.data));
         return;
       }
@@ -506,7 +566,8 @@ class PluginLoader extends EventEmitter {
       {
         id: 'open-plugin-setting-panel',
         label: '设置',
-        visible: (plugin.enabled && !!plugin.settingMenu && !!plugin.settingMenu.length),
+        visible:
+          plugin.enabled && !!plugin.settingMenu && !!plugin.settingMenu.length,
         click() {
           ipcEv.sendToClient(ipcType.OPEN_PLUGIN_SETTING_PANEL, {
             packageName,
@@ -518,11 +579,17 @@ class PluginLoader extends EventEmitter {
         label: '新窗口打开插件',
         type: 'checkbox',
         checked: plugin.windowMode,
-        visible: (!!plugin.ui && !plugin.windowUrl),
+        visible: !!plugin.ui && !plugin.windowUrl,
         click() {
           plugin.windowMode = !plugin.windowMode;
-          mainStore.config.set(`plugin.${packageName}.windowMode`, plugin.windowMode);
-          if (!plugin.windowMode && mainStore.getChildWin(`plugin-window-${packageName}`)) {
+          mainStore.config.set(
+            `plugin.${packageName}.windowMode`,
+            plugin.windowMode,
+          );
+          if (
+            !plugin.windowMode
+            && mainStore.getChildWin(`plugin-window-${packageName}`)
+          ) {
             mainStore.getChildWin(`plugin-window-${packageName}`).close();
           }
           ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
@@ -532,7 +599,9 @@ class PluginLoader extends EventEmitter {
         id: 'copy-plugin-link',
         label: '复制分享链接',
         click() {
-          clipboard.writeText(`https://slime7.github.io/translime/open/?install=${packageName}`);
+          clipboard.writeText(
+            `https://slime7.github.io/translime/open/?install=${packageName}`,
+          );
           ipcEv.sendToClient(ipcType.IPC_TOAST, ['链接已复制']);
         },
       },

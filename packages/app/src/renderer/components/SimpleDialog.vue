@@ -8,9 +8,11 @@
       @input="close"
     >
       <v-card>
-        <v-card-title :class="titleClass">{{ dialog.title }}</v-card-title>
+        <v-card-title :class="titleClass">
+          {{ dialog.title }}
+        </v-card-title>
 
-        <v-card-text v-html="dialog.content"></v-card-text>
+        <v-card-text v-html="dialog.content" />
         <v-card-text v-if="dialog.type === 'loading'">
           <div class="d-flex align-center justify-center ma-4">
             <v-progress-circular
@@ -18,13 +20,15 @@
               color="primary"
               size="96"
               width="12"
-            ></v-progress-circular>
+            />
           </div>
         </v-card-text>
 
         <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn @click="close">关闭</v-btn>
+          <v-spacer />
+          <v-btn @click="close">
+            关闭
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -49,7 +53,7 @@
             color="primary"
             size="32"
             width="4"
-          ></v-progress-circular>
+          />
         </v-sheet>
       </div>
     </v-dialog>
@@ -60,16 +64,19 @@
       max-width="290"
       v-model="confirm.visible"
     >
-
       <v-card>
-        <v-card-title v-text="confirm.title"></v-card-title>
+        <v-card-title v-text="confirm.title" />
 
-        <v-card-text v-text="confirm.content"></v-card-text>
+        <v-card-text v-text="confirm.content" />
 
         <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn text @click="confirm.reject">取消</v-btn>
-          <v-btn color="primary" @click="confirm.resolve">确定</v-btn>
+          <v-spacer />
+          <v-btn text @click="confirm.reject">
+            取消
+          </v-btn>
+          <v-btn color="primary" @click="confirm.resolve">
+            确定
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

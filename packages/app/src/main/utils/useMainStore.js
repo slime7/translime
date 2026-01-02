@@ -52,7 +52,7 @@ const useMainStore = () => {
   };
 };
 
-let mainStore = useMainStore();
+const mainStore = useMainStore();
 if (!global.mainStore) {
   global.mainStore = mainStore;
   global.config = mainStore.config;

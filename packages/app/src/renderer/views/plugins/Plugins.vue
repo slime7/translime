@@ -13,7 +13,7 @@
           @keyup.enter="searchAction"
           @click.right="showTextEditContextMenu"
         >
-          <template v-slot:append>
+          <template #append>
             <v-btn
               color="primary"
               :disabled="loading.install || loading.search"
@@ -28,7 +28,7 @@
               density="comfortable"
               icon="folder_zip"
               @click="installLocalPluginDialog.open()"
-            ></v-btn>
+            />
           </template>
         </v-text-field>
       </div>
@@ -55,7 +55,7 @@
 
           <template v-if="loading.search">
             <div class="w-100 my-2 d-flex justify-center">
-              <v-progress-circular color="primary" indeterminate></v-progress-circular>
+              <v-progress-circular color="primary" indeterminate />
             </div>
           </template>
         </v-row>
@@ -118,7 +118,7 @@
             :text="installLocalPluginDialog.filepath || '未选择'"
             location="bottom"
           >
-            <template v-slot:activator="{ props }">
+            <template #activator="{ props }">
               <v-text-field
                 v-bind="props"
                 :value="installLocalPluginDialog.filepath"
@@ -147,10 +147,10 @@
 
 <script>
 import {
-  ref,
-  reactive,
   onActivated,
   onMounted,
+  reactive,
+  ref,
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -161,7 +161,7 @@ import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
 import useHttp from '@/hooks/useHttp';
 import useGlobalStore from '@/store/globalStore';
-import { showTextEditContextMenu, selectFileDialog } from '@/utils';
+import { selectFileDialog, showTextEditContextMenu } from '@/utils';
 import PluginCard from './PluginCard.vue';
 
 export default {
