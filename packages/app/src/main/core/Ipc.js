@@ -7,7 +7,7 @@ export default class Ipc {
     this.handlerList = ipcHandler(this);
     this.listener.on('ipc-msg', (ev, { type, data }) => {
       if (typeof this.handlerList[type] === 'function') {
-        this.handlerList[type](data);
+        this.handlerList[type](data, ev.sender);
       }
     });
     this.listener.handle('ipc-fn', async (ev, { type, args }) => {

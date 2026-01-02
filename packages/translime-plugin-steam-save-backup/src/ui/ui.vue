@@ -158,7 +158,7 @@
                     class="mx-auto fill-height d-flex flex-column"
                     variant="outlined"
                     density="compact"
-                    style="opacity: 0.7"
+                    style="opacity: .7"
                   >
                     <div class="d-flex flex-row align-center pa-3">
                       <v-avatar
@@ -523,6 +523,60 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- 通用确认对话框 -->
+    <v-dialog
+      v-model="confirmDialog.show"
+      max-width="400px"
+      persistent
+    >
+      <v-card class="rounded-lg pa-2">
+        <v-card-text class="text-center pt-6">
+          <v-avatar
+            :color="confirmDialog.color"
+            size="64"
+            class="mb-4"
+            variant="tonal"
+          >
+            <v-icon
+              :icon="confirmDialog.icon"
+              size="32"
+            />
+          </v-avatar>
+          <div class="text-h6 font-weight-bold mb-2">
+            {{ confirmDialog.title }}
+          </div>
+          <div class="text-body-2 text-grey-darken-1 mb-4">
+            {{ confirmDialog.message }}
+            <div
+              v-if="confirmDialog.detail"
+              class="mt-1 font-italic font-weight-medium"
+            >
+              {{ confirmDialog.detail }}
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            color="grey"
+            @click="confirmDialog.show = false"
+            :disabled="confirmDialog.loading"
+          >
+            取消
+          </v-btn>
+          <v-btn
+            :color="confirmDialog.color"
+            variant="elevated"
+            @click="handleConfirm"
+            :loading="confirmDialog.loading"
+          >
+            {{ confirmDialog.confirmText }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -588,6 +642,17 @@ const noteDialog = ref({
   show: false,
   note: '',
   backup: null,
+  loading: false,
+});
+const confirmDialog = ref({
+  show: false,
+  title: '',
+  message: '',
+  detail: '',
+  icon: '',
+  color: 'primary',
+  confirmText: '确定',
+  onConfirm: null,
   loading: false,
 });
 
@@ -784,37 +849,68 @@ const backupGame = () => {
   );
 };
 
+// 通用确认处理
+const handleConfirm = async () => {
+  if (confirmDialog.value.onConfirm) {
+    confirmDialog.value.loading = true;
+    try {
+      await confirmDialog.value.onConfirm();
+    } finally {
+      confirmDialog.value.loading = false;
+      confirmDialog.value.show = false;
+    }
+  }
+};
+
 // 还原备份
 const restoreBackup = (backup) => {
-  // eslint-disable-next-line no-alert
-  if (!window.confirm(`确定要还原 ${formatTime(backup.backupTime)} 的备份吗？当前存档将被覆盖。`)) {
-    return;
-  }
-
-  restoreLoading.value = backup.id;
-  ipc.send(`restore-save@${PLUGIN_ID}`, backup.path);
+  confirmDialog.value = {
+    show: true,
+    title: '还原备份',
+    icon: 'settings_backup_restore',
+    color: 'primary',
+    message: `确定要还原 ${formatTime(backup.backupTime)} 的备份吗？`,
+    detail: '当前存档将被覆盖。',
+    confirmText: '立刻还原',
+    onConfirm: async () => {
+      restoreLoading.value = backup.id;
+      ipc.send(`restore-save@${PLUGIN_ID}`, backup.path);
+    },
+  };
 };
 
 // 删除备份
 const deleteAppBackup = (backup) => {
-  // eslint-disable-next-line no-alert
-  if (!window.confirm(`确定要删除 ${formatTime(backup.backupTime)} 的备份吗？此操作不可逆。`)) {
-    return;
-  }
-
-  deleteLoading.value = backup.id;
-  ipc.send(`delete-backup@${PLUGIN_ID}`, backup.path);
+  confirmDialog.value = {
+    show: true,
+    title: '删除备份',
+    icon: 'delete',
+    color: 'error',
+    message: `确定要删除 ${formatTime(backup.backupTime)} 的备份吗？`,
+    detail: '此操作不可逆。',
+    confirmText: '确认删除',
+    onConfirm: async () => {
+      deleteLoading.value = backup.id;
+      ipc.send(`delete-backup@${PLUGIN_ID}`, backup.path);
+    },
+  };
 };
 
 // 隐藏游戏
 const excludeGame = (game) => {
-  // eslint-disable-next-line no-alert
-  if (!window.confirm(`确定要隐藏游戏 "${game.name}" 吗？隐藏后可在下方“已隐藏的游戏”中恢复。`)) {
-    return;
-  }
-
-  excludeLoading.value = game.appid;
-  ipc.send(`exclude-game@${PLUGIN_ID}`, game.appid);
+  confirmDialog.value = {
+    show: true,
+    title: '隐藏游戏',
+    icon: 'visibility_off',
+    color: 'warning',
+    message: `确定要隐藏游戏 "${game.name}" 吗？`,
+    detail: '隐藏后可在下方“已隐藏的游戏”中恢复。',
+    confirmText: '确认隐藏',
+    onConfirm: async () => {
+      excludeLoading.value = game.appid;
+      ipc.send(`exclude-game@${PLUGIN_ID}`, game.appid);
+    },
+  };
 };
 
 // 恢复显示游戏
@@ -854,7 +950,7 @@ onMounted(() => {
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, .2);
+  background-color: rgb(0 0 0 / 20%);
   border-radius: 4px;
 }
 
