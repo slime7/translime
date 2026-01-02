@@ -295,13 +295,13 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.DIALOG_SHOW_SAVE_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
+      return dialog.showSaveDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
     }
     return dialog.showSaveDialog(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_MESSAGE_BOX](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
+      return dialog.showMessageBox(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
     }
     return dialog.showMessageBox(winOrOptions);
   },
@@ -310,7 +310,7 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
+      return dialog.showCertificateTrustDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
     }
     return dialog.showCertificateTrustDialog(winOrOptions);
   },
