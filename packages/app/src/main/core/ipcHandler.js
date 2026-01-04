@@ -174,113 +174,84 @@ const ipcHandler = (ipc) => ({
       });
     }
   },
-  [ipcType.GET_PATH](name) {
-    return new Promise((resolve, reject) => {
+  async [ipcType.GET_PATH](name) {
+    return app.getPath(name);
+  },
+  async [ipcType.GET_PLUGINS](packageName) {
+    if (mainStore.get('pluginLoader')) {
+      const plugins = packageName ? await mainStore.get('pluginLoader').getPlugin(packageName) : await mainStore.get('pluginLoader').getPlugins();
+      return JSON.parse(JSON.stringify(plugins));
+    }
+    throw new Error('插件未初始化');
+  },
+  async [ipcType.INSTALL_PLUGIN](packageString) {
+    if (mainStore.get('pluginLoader')) {
       try {
-        const path = app.getPath(name);
-        resolve(path);
+        const [packageName, version] = packageString.split('@');
+        const result = await mainStore.get('pluginLoader').installPlugin(packageName, version);
+        return result;
       } catch (err) {
-        reject(err);
+        throw new Error(`插件安装出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.GET_PLUGINS](packageName) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        const plugins = packageName ? await mainStore.get('pluginLoader').getPlugin(packageName) : await mainStore.get('pluginLoader').getPlugins();
-        resolve(JSON.parse(JSON.stringify(plugins)));
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.INSTALL_LOCAL_PLUGIN](packagePath) {
+    if (mainStore.get('pluginLoader')) {
+      try {
+        const result = await mainStore.get('pluginLoader').installLocalPlugin(packagePath);
+        return result;
+      } catch (err) {
+        throw new Error(`插件安装出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.INSTALL_PLUGIN](packageString) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          const [packageName, version] = packageString.split('@');
-          const result = await mainStore.get('pluginLoader').installPlugin(packageName, version);
-          resolve(result);
-        } catch (err) {
-          reject(new Error(`插件安装出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.UNINSTALL_PLUGIN](packageName) {
+    if (mainStore.get('pluginLoader')) {
+      try {
+        const result = await mainStore.get('pluginLoader').uninstallPlugin(packageName);
+        return result;
+      } catch (err) {
+        throw new Error(`插件卸载出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.INSTALL_LOCAL_PLUGIN](packagePath) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          const result = await mainStore.get('pluginLoader').installLocalPlugin(packagePath);
-          resolve(result);
-        } catch (err) {
-          reject(new Error(`插件安装出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.DISABLE_PLUGIN](packageName) {
+    if (mainStore.get('pluginLoader')) {
+      try {
+        mainStore.get('pluginLoader').disablePlugin(packageName);
+        return true;
+      } catch (err) {
+        throw new Error(`插件停用出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.UNINSTALL_PLUGIN](packageName) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          const result = await mainStore.get('pluginLoader').uninstallPlugin(packageName);
-          resolve(result);
-        } catch (err) {
-          reject(new Error(`插件卸载出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.ENABLE_PLUGIN](packageName) {
+    if (mainStore.get('pluginLoader')) {
+      try {
+        await mainStore.get('pluginLoader').enablePlugin(packageName);
+        return true;
+      } catch (err) {
+        throw new Error(`插件启用出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.DISABLE_PLUGIN](packageName) {
-    return new Promise((resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          mainStore.get('pluginLoader').disablePlugin(packageName);
-          resolve(true);
-        } catch (err) {
-          reject(new Error(`插件停用出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
-      }
-    });
+  async [ipcType.GET_PLUGIN_SETTING](packageName) {
+    const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
+    return settings;
   },
-  [ipcType.ENABLE_PLUGIN](packageName) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          await mainStore.get('pluginLoader').enablePlugin(packageName);
-          resolve(true);
-        } catch (err) {
-          reject(new Error(`插件启用出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
-      }
-    });
-  },
-  [ipcType.GET_PLUGIN_SETTING](packageName) {
-    return new Promise(async (resolve) => {
-      const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
-      resolve(settings);
-    });
-  },
-  [ipcType.SET_PLUGIN_SETTING](packageName, key, settings = null) {
-    return new Promise(async (resolve) => {
-      if (typeof key === 'object' && !settings) {
-        mainStore.config.set(`plugin.${packageName}.settings`, key);
-      } else {
-        mainStore.config.set(`plugin.${packageName}.settings.${key}`, settings);
-      }
-      mainStore.get('pluginLoader')?.onPluginSettingSave(packageName);
-      resolve(true);
-    });
+  async [ipcType.SET_PLUGIN_SETTING](packageName, key, settings = null) {
+    if (typeof key === 'object' && !settings) {
+      mainStore.config.set(`plugin.${packageName}.settings`, key);
+    } else {
+      mainStore.config.set(`plugin.${packageName}.settings.${key}`, settings);
+    }
+    mainStore.get('pluginLoader')?.onPluginSettingSave(packageName);
+    return true;
   },
   [ipcType.OPEN_PLUGIN_CONTEXT_MENU](packageName) {
     if (mainStore.get('pluginLoader')) {

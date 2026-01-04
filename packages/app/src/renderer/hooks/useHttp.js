@@ -90,50 +90,48 @@ export default (url, axiosConfig = {}) => {
       finalConfig.url = finalUrl;
     }
 
-    return new Promise(async (resolve, reject) => {
-      try {
-        const httpResponse = await axios(finalConfig);
+    try {
+      const httpResponse = await axios(finalConfig);
+      response.value = httpResponse;
+      responseData.value = httpResponse.data;
+      responseHeaders.value = httpResponse.headers;
+      requestConfig.value = httpResponse.config;
+      return httpResponse;
+    } catch (err) {
+      if (err.response) {
+        const httpResponse = err.response;
         response.value = httpResponse;
         responseData.value = httpResponse.data;
         responseHeaders.value = httpResponse.headers;
         requestConfig.value = httpResponse.config;
-        resolve(httpResponse);
-      } catch (err) {
-        if (err.response) {
-          const httpResponse = err.response;
-          response.value = httpResponse;
-          responseData.value = httpResponse.data;
-          responseHeaders.value = httpResponse.headers;
-          requestConfig.value = httpResponse.config;
-        }
-        responseError.value = err;
-        reject(err);
-      } finally {
-        if (currentCounter === requestCounter) {
-          loading.value = false;
-        }
-        /* eslint-disable no-console,no-underscore-dangle */
-        const request = response.value?.request || responseError.value?.request._options;
-        const isError = !response.value;
-        console.groupCollapsed(
-          `%c ${request.method} ${request.protocol} ${isError ? request.hostname : request.host}${request.path} `,
-          'background: rgb(70, 70, 70); color: rgb(240, 235, 200); width:100%;',
-        );
-        console.log('Time: ', new Date());
-        console.log('Method: ', request.method || finalConfig.method);
-        console.log('Status: ', response.value?.status || undefined);
-        console.log('Host: ', `${request.protocol}${isError ? request.hostname : request.host}`);
-        console.log('Path: ', request.path);
-        console.log('Params: ', finalConfig.params);
-        console.log('Data: ', finalConfig.data);
-        console.log('Request Headers: ');
-        console.log(request._header || request.headers);
-        console.log('Response Headers: ', response.value?.headers);
-        console.log('Response data: ', responseData.value);
-        console.groupEnd();
-        /* eslint-enable no-console,no-underscore-dangle */
       }
-    });
+      responseError.value = err;
+      throw err;
+    } finally {
+      if (currentCounter === requestCounter) {
+        loading.value = false;
+      }
+      /* eslint-disable no-console,no-underscore-dangle */
+      const request = response.value?.request || responseError.value?.request._options;
+      const isError = !response.value;
+      console.groupCollapsed(
+        `%c ${request.method} ${request.protocol} ${isError ? request.hostname : request.host}${request.path} `,
+        'background: rgb(70, 70, 70); color: rgb(240, 235, 200); width:100%;',
+      );
+      console.log('Time: ', new Date());
+      console.log('Method: ', request.method || finalConfig.method);
+      console.log('Status: ', response.value?.status || undefined);
+      console.log('Host: ', `${request.protocol}${isError ? request.hostname : request.host}`);
+      console.log('Path: ', request.path);
+      console.log('Params: ', finalConfig.params);
+      console.log('Data: ', finalConfig.data);
+      console.log('Request Headers: ');
+      console.log(request._header || request.headers);
+      console.log('Response Headers: ', response.value?.headers);
+      console.log('Response data: ', responseData.value);
+      console.groupEnd();
+      /* eslint-enable no-console,no-underscore-dangle */
+    }
   };
 
   const returnResult = {

@@ -88,6 +88,8 @@ export default {
     },
   },
 
+  emits: ['windowMinimize', 'windowUnmaximize', 'windowMaximize', 'windowClose'],
+
   setup(props, { emit }) {
     const ipc = useIpc();
 
@@ -136,16 +138,17 @@ export default {
 }
 
 .window-control-btn:hover {
-  background-color: rgba(0, 0, 0, .2);
+  background-color: rgb(0 0 0 / 20%);
 }
+
 @media (prefers-color-scheme: dark) {
   .window-control-btn:hover {
-    background-color: rgba(255, 255, 255, .3);
+    background-color: rgb(255 255 255 / 30%);
   }
 }
 
 .window-control-btn.close:hover {
-  background-color: rgba(232, 17, 35, 0.9) !important;
+  background-color: rgb(232 17 35 / 90%) !important;
 }
 
 .window-control-btn.close:hover path {

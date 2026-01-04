@@ -112,8 +112,8 @@
                 <label class="mr-2" v-text="menuItem.name" />
                 <v-checkbox
                   v-model="settings[menuItem.key]"
-                  v-for="(menuCheckboxItem, index) in menuItem.choices"
-                  :key="index"
+                  v-for="(menuCheckboxItem, cIndex) in menuItem.choices"
+                  :key="cIndex"
                   :label="menuCheckboxItem.name"
                   :value="menuCheckboxItem.value"
                   class="mr-2 flex-grow-0"
@@ -133,8 +133,8 @@
                   hide-details
                 >
                   <v-radio
-                    v-for="(menuRadioItem, index) in menuItem.choices"
-                    :key="index"
+                    v-for="(menuRadioItem, rIndex) in menuItem.choices"
+                    :key="rIndex"
                     :label="menuRadioItem.name"
                     :value="menuRadioItem.value"
                     color="primary"
@@ -179,6 +179,8 @@ export default {
       required: true,
     },
   },
+
+  emits: ['update:modelValue'],
 
   setup(props, { emit }) {
     const ipc = useIpc();

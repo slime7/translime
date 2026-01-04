@@ -13,10 +13,10 @@
       <div class="d-flex flex-no-wrap justify-space-between">
         <div class="min-w-0">
           <v-tooltip :text="cardTitle" location="top">
-            <template #activator="{ props }">
+            <template #activator="{ props: titleProps }">
               <v-card-title
                 class="text-h5"
-                v-bind="props"
+                v-bind="titleProps"
               >
                 <v-chip
                   v-if="plugin.dev"

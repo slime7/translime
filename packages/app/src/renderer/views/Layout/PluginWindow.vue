@@ -20,7 +20,7 @@
 
     <v-main class="fill-height">
       <div class="d-flex flex-column fill-height" id="app-main-container">
-        <div class="scroll-content flex">
+        <div class="scroll-content flex-fill">
           <div class="plugin-container">
             <plugin-title-bar :plugin="plugin" :visible="appBarVisible" v-if="plugin" />
 

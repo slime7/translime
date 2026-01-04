@@ -3,28 +3,26 @@ import useDialogStore from '@/store/dialogStore';
 const useDialog = () => {
   const dialogStore = useDialogStore();
 
-  const showConfirm = (content, title = null) => {
+  const showConfirm = async (content, title = null) => {
     const payload = {
       content,
     };
     if (title) {
       payload.title = title;
     }
-    return new Promise(async (resolve) => {
-      const result = {
-        confirm: true,
-        cancel: false,
-      };
-      try {
-        await dialogStore.showConfirm(payload);
-      } catch (err) {
-        result.confirm = false;
-        result.cancel = true;
-      } finally {
-        dialogStore.clearConfirm();
-      }
-      resolve(result);
-    });
+    const result = {
+      confirm: true,
+      cancel: false,
+    };
+    try {
+      await dialogStore.showConfirm(payload);
+    } catch (err) {
+      result.confirm = false;
+      result.cancel = true;
+    } finally {
+      dialogStore.clearConfirm();
+    }
+    return result;
   };
 
   const show = (content, title, attr = {}, hideClose = false) => {

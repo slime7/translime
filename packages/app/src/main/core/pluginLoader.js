@@ -450,26 +450,18 @@ class PluginLoader extends EventEmitter {
     }
   }
 
-  doInstallCommand(packageName, module) {
-    return new Promise(async (resolve, reject) => {
-      const result = await execNpmCommand('install', module);
-      if (result.code) {
-        logger.error(`[plugin] 安装插件 ${packageName} 失败`, {
-          error: result.data,
-        });
-        reject(new Error(result.data));
-        return;
-      }
-      try {
-        // 启用新插件并加入到 this.plugins
-        const plugin = this.enablePlugin(packageName);
-        this.plugins.push(plugin);
-      } catch (err) {
-        reject(err);
-        return;
-      }
-      resolve(result.data);
-    });
+  async doInstallCommand(packageName, module) {
+    const result = await execNpmCommand('install', module);
+    if (result.code) {
+      logger.error(`[plugin] 安装插件 ${packageName} 失败`, {
+        error: result.data,
+      });
+      throw new Error(result.data);
+    }
+    // 启用新插件并加入到 this.plugins
+    const plugin = this.enablePlugin(packageName);
+    this.plugins.push(plugin);
+    return result.data;
   }
 
   async installPlugin(packageName, version) {
@@ -518,16 +510,13 @@ class PluginLoader extends EventEmitter {
     return this.doInstallCommand(packageName, module);
   }
 
-  uninstallPlugin(packageName) {
-    return new Promise(async (resolve, reject) => {
-      this.disablePlugin(packageName, true);
-      const result = await execNpmCommand('uninstall', packageName);
-      if (!result.code) {
-        resolve(result.data);
-      } else {
-        reject(new Error(result.data));
-      }
-    });
+  async uninstallPlugin(packageName) {
+    this.disablePlugin(packageName, true);
+    const result = await execNpmCommand('uninstall', packageName);
+    if (!result.code) {
+      return result.data;
+    }
+    throw new Error(result.data);
   }
 
   popPluginMenu(packageName, ipcEv) {

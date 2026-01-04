@@ -12,6 +12,7 @@
           {{ dialog.title }}
         </v-card-title>
 
+        <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
         <v-card-text v-html="dialog.content" />
         <v-card-text v-if="dialog.type === 'loading'">
           <div class="d-flex align-center justify-center ma-4">
@@ -65,8 +66,10 @@
       v-model="confirm.visible"
     >
       <v-card>
+        <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
         <v-card-title v-text="confirm.title" />
 
+        <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
         <v-card-text v-text="confirm.content" />
 
         <v-card-actions>

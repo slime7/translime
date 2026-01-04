@@ -5,6 +5,7 @@ import {
 } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+// eslint-disable-next-line import/extensions
 import axiosHttpAdapter from 'axios/lib/adapters/http.js';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 
