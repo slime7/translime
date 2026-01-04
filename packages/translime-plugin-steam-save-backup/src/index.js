@@ -1,19 +1,19 @@
 import {
-  getSteamPath,
-  scanInstalledGames,
-  getSteamUserIds,
   findSavePaths,
+  getSteamPath,
+  getSteamUserIds,
+  scanInstalledGames,
 } from './utils/steam';
 import {
   backupSave,
+  deleteBackup,
+  getBackupCount,
   getBackups,
   restoreSave,
-  getBackupCount,
-  deleteBackup,
   updateBackupNote,
 } from './utils/backup';
 
-const id = 'translime-plugin-steam-save-backup';
+const pluginId = 'translime-plugin-steam-save-backup';
 const { mainStore } = global;
 const config = mainStore?.config;
 let steamPath = null;
@@ -23,7 +23,7 @@ const getExcludeList = () => {
   if (!config) {
     return [];
   }
-  const val = config.get(`plugin.${id}.settings.excludeList`, []);
+  const val = config.get(`plugin.${pluginId}.settings.excludeList`, []);
   if (Array.isArray(val)) {
     return val.map((v) => String(v));
   }
@@ -37,7 +37,7 @@ const getExcludeList = () => {
 const saveExcludeList = (list) => {
   if (!config) return;
   // 保持为数组存储，但在设置界面可能显示为逗号分隔字符串（取决于 Translime 实现）
-  config.set(`plugin.${id}.settings.excludeList`, list);
+  config.set(`plugin.${pluginId}.settings.excludeList`, list);
 };
 
 // 插件设置菜单
@@ -62,8 +62,8 @@ export const settingMenu = [
 
 // 加载时执行
 export const pluginDidLoad = async () => {
-  console.log(`${id} loaded`);
-  const settings = config?.get(`plugin.${id}.settings`, {}) || {};
+  console.log(`${pluginId} loaded`);
+  const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
 
   if (settings.customSteamPath) {
     steamPath = settings.customSteamPath;
@@ -80,7 +80,7 @@ export const pluginDidLoad = async () => {
 
 // 禁用时执行
 export const pluginWillUnload = () => {
-  console.log(`${id} unloaded`);
+  console.log(`${pluginId} unloaded`);
 };
 
 // IPC 定义
@@ -88,11 +88,11 @@ export const ipcHandlers = [
   {
     type: 'scan-games',
     handler: ({ sendToClient }) => async (params, sender) => {
-      const settings = config?.get(`plugin.${id}.settings`, {}) || {};
+      const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
       const currentSteamPath = settings.customSteamPath || await getSteamPath();
 
       if (!currentSteamPath) {
-        sendToClient(`scan-games-reply@${id}`, { success: false, message: '未找到 Steam' }, sender);
+        sendToClient(`scan-games-reply@${pluginId}`, { success: false, message: '未找到 Steam' }, sender);
         return;
       }
 
@@ -117,12 +117,12 @@ export const ipcHandlers = [
         }));
 
         const userIds = await getSteamUserIds(currentSteamPath);
-        sendToClient(`scan-games-reply@${id}`, {
+        sendToClient(`scan-games-reply@${pluginId}`, {
           success: true, games, userIds, steamPath: currentSteamPath,
         }, sender);
       } catch (e) {
         console.error('扫描游戏失败：', e);
-        sendToClient(`scan-games-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`scan-games-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },
@@ -131,9 +131,9 @@ export const ipcHandlers = [
     handler: ({ sendToClient }) => async (gameId, sender) => {
       try {
         const backups = await getBackups(gameId);
-        sendToClient(`get-backups-reply@${id}`, { success: true, backups }, sender);
+        sendToClient(`get-backups-reply@${pluginId}`, { success: true, backups }, sender);
       } catch (e) {
-        sendToClient(`get-backups-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`get-backups-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },
@@ -142,9 +142,9 @@ export const ipcHandlers = [
     handler: ({ sendToClient }) => async ({ gameId, gameName, savePaths }, sender) => {
       try {
         const result = await backupSave(gameId, gameName, savePaths);
-        sendToClient(`backup-save-reply@${id}`, result, sender);
+        sendToClient(`backup-save-reply@${pluginId}`, result, sender);
       } catch (e) {
-        sendToClient(`backup-save-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`backup-save-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },
@@ -153,9 +153,9 @@ export const ipcHandlers = [
     handler: ({ sendToClient }) => async (backupPath, sender) => {
       try {
         const result = await restoreSave(backupPath);
-        sendToClient(`restore-save-reply@${id}`, result, sender);
+        sendToClient(`restore-save-reply@${pluginId}`, result, sender);
       } catch (e) {
-        sendToClient(`restore-save-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`restore-save-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },
@@ -164,9 +164,9 @@ export const ipcHandlers = [
     handler: ({ sendToClient }) => async (backupPath, sender) => {
       try {
         const result = await deleteBackup(backupPath);
-        sendToClient(`delete-backup-reply@${id}`, result, sender);
+        sendToClient(`delete-backup-reply@${pluginId}`, result, sender);
       } catch (e) {
-        sendToClient(`delete-backup-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`delete-backup-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },
@@ -180,9 +180,9 @@ export const ipcHandlers = [
           excludeList.push(appidStr);
           saveExcludeList(excludeList);
         }
-        sendToClient(`exclude-game-reply@${id}`, { success: true, appid: appidStr }, sender);
+        sendToClient(`exclude-game-reply@${pluginId}`, { success: true, appid: appidStr }, sender);
       } catch (e) {
-        sendToClient(`exclude-game-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`exclude-game-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },
@@ -196,9 +196,9 @@ export const ipcHandlers = [
           excludeList = excludeList.filter((id) => id !== appidStr);
           saveExcludeList(excludeList);
         }
-        sendToClient(`include-game-reply@${id}`, { success: true, appid: appidStr }, sender);
+        sendToClient(`include-game-reply@${pluginId}`, { success: true, appid: appidStr }, sender);
       } catch (e) {
-        sendToClient(`include-game-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`include-game-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },
@@ -207,9 +207,9 @@ export const ipcHandlers = [
     handler: ({ sendToClient }) => async ({ backupPath, note }, sender) => {
       try {
         const result = await updateBackupNote(backupPath, note);
-        sendToClient(`update-backup-note-reply@${id}`, { success: true, ...result }, sender);
+        sendToClient(`update-backup-note-reply@${pluginId}`, { success: true, ...result }, sender);
       } catch (e) {
-        sendToClient(`update-backup-note-reply@${id}`, { success: false, message: e.message }, sender);
+        sendToClient(`update-backup-note-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },

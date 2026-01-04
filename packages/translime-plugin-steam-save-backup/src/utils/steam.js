@@ -236,33 +236,33 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
     const { root, relativePath: dirPath, appDir } = item;
 
     switch (root) {
-      case 1: // 游戏安装目录
-        if (gameInstallDir) {
-          absolutePath = path.join(gameInstallDir, dirPath);
+    case 1: // 游戏安装目录
+      if (gameInstallDir) {
+        absolutePath = path.join(gameInstallDir, dirPath);
+      }
+      break;
+    case 2: // Documents
+      absolutePath = path.join(documentsPath, dirPath);
+      if (!(await fs.pathExists(absolutePath))) {
+        const altPath = path.join(savedGamesPath, dirPath);
+        if (await fs.pathExists(altPath)) {
+          absolutePath = altPath;
         }
-        break;
-      case 2: // Documents
-        absolutePath = path.join(documentsPath, dirPath);
-        if (!(await fs.pathExists(absolutePath))) {
-          const altPath = path.join(savedGamesPath, dirPath);
-          if (await fs.pathExists(altPath)) {
-            absolutePath = altPath;
-          }
-        }
-        break;
-      case 3: // AppData\Local
-        absolutePath = path.join(localAppData, dirPath);
-        break;
-      case 4: // AppData\Roaming
-        absolutePath = path.join(appData, dirPath);
-        break;
-      case 12: // AppData\LocalLow
-        absolutePath = path.join(localAppDataLow, dirPath);
-        break;
-      case 0: // Steam Cloud remote 目录
-      default:
-        absolutePath = path.join(appDir, 'remote', dirPath);
-        break;
+      }
+      break;
+    case 3: // AppData\Local
+      absolutePath = path.join(localAppData, dirPath);
+      break;
+    case 4: // AppData\Roaming
+      absolutePath = path.join(appData, dirPath);
+      break;
+    case 12: // AppData\LocalLow
+      absolutePath = path.join(localAppDataLow, dirPath);
+      break;
+    case 0: // Steam Cloud remote 目录
+    default:
+      absolutePath = path.join(appDir, 'remote', dirPath);
+      break;
     }
 
     return {

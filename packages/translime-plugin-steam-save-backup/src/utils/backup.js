@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 
 // 默认备份根目录
-export const DEFAULT_BACKUP_ROOT = path.join(os.homedir(), 'Documents', 'TranslimeSteamBackups');
+export const DEFAULT_BACKUP_ROOT = path.join(global.APPDATA_PATH || path.join(os.homedir(), 'Documents'), 'TranslimeSteamBackups');
 
 /**
  * 备份存档
