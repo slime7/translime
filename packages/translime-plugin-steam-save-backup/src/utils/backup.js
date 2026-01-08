@@ -1,18 +1,26 @@
-import fs from 'fs-extra';
-import path from 'path';
-import os from 'os';
+import path from 'node:path';
+import os from 'node:os';
+import fs from './fs-wrapper';
 
 // 默认备份根目录
-export const DEFAULT_BACKUP_ROOT = path.join(global.APPDATA_PATH || path.join(os.homedir(), 'Documents'), 'TranslimeSteamBackups');
+const getDefaultBackupRoot = () => path.join(global.APPDATA_PATH || path.join(os.homedir(), 'Documents'), 'TranslimeSteamBackups');
+
+export const resolveBackupRoot = async (customPath) => {
+  if (customPath && (await fs.pathExists(customPath))) {
+    return customPath;
+  }
+  return getDefaultBackupRoot();
+};
 
 /**
  * 备份存档
  * @param {string} gameId 游戏 AppID
  * @param {string} gameName 游戏名称
  * @param {Array<{root: number, relativePath: string, absolutePath: string, files: string[]}>} savePaths 存档路径信息数组
- * @param {string} [backupRoot] 备份根目录
+ * @param {string} [customBackupRoot] 自定义备份根目录
  */
-export async function backupSave(gameId, gameName, savePaths, backupRoot = DEFAULT_BACKUP_ROOT) {
+export async function backupSave(gameId, gameName, savePaths, customBackupRoot) {
+  const backupRoot = await resolveBackupRoot(customBackupRoot);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(backupRoot, gameId.toString(), timestamp);
 
@@ -80,9 +88,10 @@ export async function backupSave(gameId, gameName, savePaths, backupRoot = DEFAU
 /**
  * 获取指定游戏的备份列表
  * @param {string} gameId
- * @param {string} [backupRoot]
+ * @param {string} [customBackupRoot]
  */
-export async function getBackups(gameId, backupRoot = DEFAULT_BACKUP_ROOT) {
+export async function getBackups(gameId, customBackupRoot) {
+  const backupRoot = await resolveBackupRoot(customBackupRoot);
   const gameBackupDir = path.join(backupRoot, gameId.toString());
   if (!(await fs.pathExists(gameBackupDir))) return [];
 
@@ -160,7 +169,8 @@ export async function restoreSave(backupPath) {
   return { success: true, targetPath };
 }
 
-export async function getBackupCount(gameId, backupRoot = DEFAULT_BACKUP_ROOT) {
+export async function getBackupCount(gameId, customBackupRoot) {
+  const backupRoot = await resolveBackupRoot(customBackupRoot);
   const gameBackupDir = path.join(backupRoot, gameId.toString());
   if (!(await fs.pathExists(gameBackupDir))) return 0;
 

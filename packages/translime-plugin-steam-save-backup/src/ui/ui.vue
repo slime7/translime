@@ -14,6 +14,16 @@
       </v-toolbar-title>
       <v-spacer />
       <v-btn
+        prepend-icon="folder_open"
+        variant="tonal"
+        color="secondary"
+        class="mr-2"
+        @click="openBackupDir"
+        :loading="openDirLoading"
+      >
+        打开备份目录
+      </v-btn>
+      <v-btn
         prepend-icon="refresh"
         variant="tonal"
         color="primary"
@@ -629,6 +639,7 @@ const ipc = window.electron.useIpc();
 
 // 状态
 const loading = ref(false);
+const openDirLoading = ref(false);
 const backupLoading = ref(false);
 const restoreLoading = ref(null); // 存储正在还原的备份 ID
 const deleteLoading = ref(null); // 存储正在删除的备份 ID
@@ -680,8 +691,22 @@ const loadBackups = (gameId) => {
   ipc.send(`get-backups@${PLUGIN_ID}`, gameId);
 };
 
+// 打开备份目录
+const openBackupDir = () => {
+  openDirLoading.value = true;
+  ipc.send(`open-backup-dir@${PLUGIN_ID}`);
+};
+
 // 监听 IPC 回复
 const setupIpcListeners = () => {
+  // 打开备份目录结果
+  ipc.on(`open-backup-dir-reply@${PLUGIN_ID}`, (res) => {
+    openDirLoading.value = false;
+    if (!res.success) {
+      showMessage(res.message || '打开目录失败', 'error');
+    }
+  });
+
   // 扫描结果
   ipc.on(`scan-games-reply@${PLUGIN_ID}`, (res) => {
     loading.value = false;

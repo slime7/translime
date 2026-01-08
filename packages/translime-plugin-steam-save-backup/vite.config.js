@@ -9,19 +9,29 @@ const config = {
   build: {
     minify: false,
     sourcemap: 'inline',
-    target: 'node16',
+    target: 'node18',
     outDir: './dist',
     emptyOutDir: true,
     lib: {
       entry: 'src/index.js',
       name: 'plugin',
-      formats: ['es', 'umd'],
+      formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
     rollupOptions: {
       external: [
+        'electron',
         ...builtinModules,
+        ...builtinModules.map((m) => `node:${m}`),
       ],
+      output: {
+        exports: 'named',
+        globals: builtinModules.reduce((acc, m) => {
+          acc[m] = m;
+          acc[`node:${m}`] = m;
+          return acc;
+        }, {}),
+      },
     },
   },
 };

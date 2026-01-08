@@ -1,3 +1,5 @@
+import { shell } from 'electron';
+import fs from './utils/fs-wrapper';
 import {
   findSavePaths,
   getSteamPath,
@@ -9,6 +11,7 @@ import {
   deleteBackup,
   getBackupCount,
   getBackups,
+  resolveBackupRoot,
   restoreSave,
   updateBackupNote,
 } from './utils/backup';
@@ -53,6 +56,16 @@ export const settingMenu = [
     },
   },
   {
+    key: 'customBackupRoot',
+    type: 'file',
+    name: '自定义备份存储位置',
+    required: false,
+    placeholder: '留空则使用默认位置',
+    dialogOptions: {
+      properties: ['openDirectory', 'dontAddToRecent'],
+    },
+  },
+  {
     key: 'excludeList',
     type: 'input',
     name: '排除列表 (AppID, 逗号分隔)',
@@ -90,6 +103,7 @@ export const ipcHandlers = [
     handler: ({ sendToClient }) => async (params, sender) => {
       const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
       const currentSteamPath = settings.customSteamPath || await getSteamPath();
+      const backupRoot = settings.customBackupRoot;
 
       if (!currentSteamPath) {
         sendToClient(`scan-games-reply@${pluginId}`, { success: false, message: '未找到 Steam' }, sender);
@@ -109,7 +123,7 @@ export const ipcHandlers = [
         // 为每个游戏查找可能的存档路径
         await Promise.all(games.map(async (game) => {
           const savePaths = await findSavePaths(currentSteamPath, game.appid);
-          const backupCount = await getBackupCount(game.appid);
+          const backupCount = await getBackupCount(game.appid, backupRoot);
           // eslint-disable-next-line no-param-reassign
           game.savePaths = savePaths;
           // eslint-disable-next-line no-param-reassign
@@ -130,7 +144,9 @@ export const ipcHandlers = [
     type: 'get-backups',
     handler: ({ sendToClient }) => async (gameId, sender) => {
       try {
-        const backups = await getBackups(gameId);
+        const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
+        const backupRoot = settings.customBackupRoot;
+        const backups = await getBackups(gameId, backupRoot);
         sendToClient(`get-backups-reply@${pluginId}`, { success: true, backups }, sender);
       } catch (e) {
         sendToClient(`get-backups-reply@${pluginId}`, { success: false, message: e.message }, sender);
@@ -141,7 +157,9 @@ export const ipcHandlers = [
     type: 'backup-save',
     handler: ({ sendToClient }) => async ({ gameId, gameName, savePaths }, sender) => {
       try {
-        const result = await backupSave(gameId, gameName, savePaths);
+        const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
+        const backupRoot = settings.customBackupRoot;
+        const result = await backupSave(gameId, gameName, savePaths, backupRoot);
         sendToClient(`backup-save-reply@${pluginId}`, result, sender);
       } catch (e) {
         sendToClient(`backup-save-reply@${pluginId}`, { success: false, message: e.message }, sender);
@@ -210,6 +228,29 @@ export const ipcHandlers = [
         sendToClient(`update-backup-note-reply@${pluginId}`, { success: true, ...result }, sender);
       } catch (e) {
         sendToClient(`update-backup-note-reply@${pluginId}`, { success: false, message: e.message }, sender);
+      }
+    },
+  },
+  {
+    type: 'open-backup-dir',
+    handler: ({ sendToClient }) => async (params, sender) => {
+      try {
+        const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
+        const backupRoot = settings.customBackupRoot;
+        const root = await resolveBackupRoot(backupRoot);
+
+        // 确保目录存在，避免 shell.openPath 报错
+        await fs.ensureDir(root);
+        const error = await shell.openPath(root);
+
+        if (error) {
+          console.error('Failed to open backup directory:', error);
+          sendToClient(`open-backup-dir-reply@${pluginId}`, { success: false, message: error }, sender);
+        } else {
+          sendToClient(`open-backup-dir-reply@${pluginId}`, { success: true }, sender);
+        }
+      } catch (e) {
+        sendToClient(`open-backup-dir-reply@${pluginId}`, { success: false, message: e.message }, sender);
       }
     },
   },

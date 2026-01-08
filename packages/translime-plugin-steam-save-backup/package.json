@@ -7,12 +7,10 @@
     "translime",
     "translime-plugin"
   ],
-  "main": "./dist/index.umd.js",
-  "module": "./dist/index.es.js",
+  "main": "./dist/index.cjs.js",
   "exports": {
     ".": {
-      "import": "./dist/index.es.js",
-      "require": "./dist/index.umd.js"
+      "require": "./dist/index.cjs.js"
     }
   },
   "files": [
@@ -25,11 +23,10 @@
     "build:ui": "vite build -c ui.vite.config.js",
     "build": "npm run build:plugin && npm run build:ui"
   },
-  "dependencies": {
-    "fs-extra": "^11.2.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.6.2",
+    "electron": "~39.2.4",
     "vite": "^6.3.2",
     "vite-plugin-css-injected-by-js": "^3.1.2",
     "vue": "^3.5.13",
@@ -42,6 +39,7 @@
     "ui": "dist/ui.esm.js"
   },
   "peerDependencies": {
+    "electron": "~39.2.4",
     "vue": "^3.5.13",
     "vuetify": "^3.8.1"
   }
