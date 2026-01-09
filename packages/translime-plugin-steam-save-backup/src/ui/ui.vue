@@ -687,47 +687,9 @@ const showMessage = (text, color = 'success') => {
 };
 
 // 加载备份列表
-const loadBackups = (gameId) => {
-  ipc.send(`get-backups@${PLUGIN_ID}`, gameId);
-};
-
-// 打开备份目录
-const openBackupDir = () => {
-  openDirLoading.value = true;
-  ipc.send(`open-backup-dir@${PLUGIN_ID}`);
-};
-
-// 监听 IPC 回复
-const setupIpcListeners = () => {
-  // 打开备份目录结果
-  ipc.on(`open-backup-dir-reply@${PLUGIN_ID}`, (res) => {
-    openDirLoading.value = false;
-    if (!res.success) {
-      showMessage(res.message || '打开目录失败', 'error');
-    }
-  });
-
-  // 扫描结果
-  ipc.on(`scan-games-reply@${PLUGIN_ID}`, (res) => {
-    loading.value = false;
-    if (res.success) {
-      games.value = res.games || [];
-      // 如果当前正在查看某个游戏详情，更新其备份数显示等（虽然详情页备份数不直接显示，但保持数据一致）
-      if (selectedGame.value) {
-        const updated = games.value.find((g) => g.appid === selectedGame.value.appid);
-        if (updated) {
-          // 只更新基本信息，不覆盖正在操作的状态
-          selectedGame.value.name = updated.name;
-          selectedGame.value.backupCount = updated.backupCount;
-        }
-      }
-    } else {
-      showMessage(res.message || '扫描失败', 'error');
-    }
-  });
-
-  // 备份列表结果
-  ipc.on(`get-backups-reply@${PLUGIN_ID}`, (res) => {
+const loadBackups = async (gameId) => {
+  try {
+    const res = await ipc.invoke(`get-backups@${PLUGIN_ID}`, gameId);
     if (res.success) {
       backups.value = res.backups || [];
       // 更新游戏列表中的数量
@@ -743,95 +705,51 @@ const setupIpcListeners = () => {
       console.error('加载备份失败', res.message);
       showMessage('无法加载备份列表', 'error');
     }
-  });
+  } catch (err) {
+    console.error('加载备份失败', err);
+    showMessage('无法加载备份列表', 'error');
+  }
+};
 
-  // 备份结果
-  ipc.on(`backup-save-reply@${PLUGIN_ID}`, (res) => {
-    backupLoading.value = false;
-    if (res.success) {
-      showMessage('备份创建成功');
-      // 刷新备份列表
-      if (selectedGame.value) {
-        loadBackups(selectedGame.value.appid);
-      }
-      // 刷新游戏列表（主要是为了更新数量，但直接 update list 更快，这里也可以重新 scan）
-      // 简单起见，我们假设 loadBackups 的回调里会更新数量
-    } else {
-      showMessage(res.message || '备份失败', 'error');
+// 打开备份目录
+const openBackupDir = async () => {
+  openDirLoading.value = true;
+  try {
+    const res = await ipc.invoke(`open-backup-dir@${PLUGIN_ID}`);
+    if (!res.success) {
+      showMessage(res.message || '打开目录失败', 'error');
     }
-  });
-
-  // 还原结果
-  ipc.on(`restore-save-reply@${PLUGIN_ID}`, (res) => {
-    restoreLoading.value = null;
-    if (res.success) {
-      showMessage('还原成功');
-    } else {
-      showMessage(res.message || '还原失败', 'error');
-    }
-  });
-
-  // 删除结果
-  ipc.on(`delete-backup-reply@${PLUGIN_ID}`, (res) => {
-    deleteLoading.value = null;
-    if (res.success) {
-      showMessage('备份已删除');
-      if (selectedGame.value) {
-        loadBackups(selectedGame.value.appid);
-      }
-    } else {
-      showMessage(res.message || '删除失败', 'error');
-    }
-  });
-
-  // 隐藏游戏结果
-  ipc.on(`exclude-game-reply@${PLUGIN_ID}`, (res) => {
-    excludeLoading.value = null;
-    if (res.success) {
-      showMessage('游戏已隐藏');
-      const game = games.value.find((g) => String(g.appid) === res.appid);
-      if (game) {
-        game.excluded = true;
-      }
-    } else {
-      showMessage(res.message || '隐藏失败', 'error');
-    }
-  });
-
-  // 恢复显示游戏结果
-  ipc.on(`include-game-reply@${PLUGIN_ID}`, (res) => {
-    excludeLoading.value = null;
-    if (res.success) {
-      showMessage('游戏已恢复显示');
-      const game = games.value.find((g) => String(g.appid) === res.appid);
-      if (game) {
-        game.excluded = false;
-      }
-    } else {
-      showMessage(res.message || '恢复失败', 'error');
-    }
-  });
-
-  // 更新备注结果
-  ipc.on(`update-backup-note-reply@${PLUGIN_ID}`, (res) => {
-    noteDialog.value.loading = false;
-    if (res.success) {
-      showMessage('备注已更新');
-      noteDialog.value.show = false;
-      // 更新本地备份列表中的数据
-      if (noteDialog.value.backup) {
-        noteDialog.value.backup.note = res.note;
-      }
-    } else {
-      showMessage(res.message || '更新备注失败', 'error');
-    }
-  });
+  } catch (err) {
+    showMessage(err.message || '打开目录失败', 'error');
+  } finally {
+    openDirLoading.value = false;
+  }
 };
 
 // 扫描游戏
-const scanGames = () => {
+const scanGames = async () => {
   loading.value = true;
-  ipc.send(`scan-games@${PLUGIN_ID}`);
+  try {
+    const res = await ipc.invoke(`scan-games@${PLUGIN_ID}`);
+    if (res.success) {
+      games.value = res.games || [];
+      // 如果当前正在查看某个游戏详情，更新其备份数显示等
+      if (selectedGame.value) {
+        const updated = games.value.find((g) => g.appid === selectedGame.value.appid);
+        if (updated) {
+          // 只更新基本信息，不覆盖正在操作的状态
+          selectedGame.value.name = updated.name;
+          selectedGame.value.backupCount = updated.backupCount;
+        }
+      }
+    } else {
+      showMessage(res.message || '扫描失败', 'error');
+    }
+  } catch (err) {
+    showMessage(err.message || '扫描失败', 'error');
+  } finally {
+    loading.value = false;
+  }
 };
 
 // 打开游戏详情
@@ -843,7 +761,7 @@ const openGameDetails = (game) => {
 };
 
 // 备份游戏
-const backupGame = () => {
+const backupGame = async () => {
   if (!selectedGame.value || !canBackup.value) {
     return;
   }
@@ -864,14 +782,29 @@ const backupGame = () => {
   }
 
   backupLoading.value = true;
-  ipc.send(
-    `backup-save@${PLUGIN_ID}`,
-    toRaw({
-      gameId: selectedGame.value.appid,
-      gameName: selectedGame.value.name,
-      savePaths: JSON.parse(JSON.stringify(validPaths)),
-    }),
-  );
+  try {
+    const res = await ipc.invoke(
+      `backup-save@${PLUGIN_ID}`,
+      toRaw({
+        gameId: selectedGame.value.appid,
+        gameName: selectedGame.value.name,
+        savePaths: JSON.parse(JSON.stringify(validPaths)),
+      }),
+    );
+    if (res.success) {
+      showMessage('备份创建成功');
+      // 刷新备份列表
+      if (selectedGame.value) {
+        loadBackups(selectedGame.value.appid);
+      }
+    } else {
+      showMessage(res.message || '备份失败', 'error');
+    }
+  } catch (err) {
+    showMessage(err.message || '备份失败', 'error');
+  } finally {
+    backupLoading.value = false;
+  }
 };
 
 // 通用确认处理
@@ -899,7 +832,18 @@ const restoreBackup = (backup) => {
     confirmText: '立刻还原',
     onConfirm: async () => {
       restoreLoading.value = backup.id;
-      ipc.send(`restore-save@${PLUGIN_ID}`, backup.path);
+      try {
+        const res = await ipc.invoke(`restore-save@${PLUGIN_ID}`, backup.path);
+        if (res.success) {
+          showMessage('还原成功');
+        } else {
+          showMessage(res.message || '还原失败', 'error');
+        }
+      } catch (err) {
+        showMessage(err.message || '还原失败', 'error');
+      } finally {
+        restoreLoading.value = null;
+      }
     },
   };
 };
@@ -916,7 +860,21 @@ const deleteAppBackup = (backup) => {
     confirmText: '确认删除',
     onConfirm: async () => {
       deleteLoading.value = backup.id;
-      ipc.send(`delete-backup@${PLUGIN_ID}`, backup.path);
+      try {
+        const res = await ipc.invoke(`delete-backup@${PLUGIN_ID}`, backup.path);
+        if (res.success) {
+          showMessage('备份已删除');
+          if (selectedGame.value) {
+            loadBackups(selectedGame.value.appid);
+          }
+        } else {
+          showMessage(res.message || '删除失败', 'error');
+        }
+      } catch (err) {
+        showMessage(err.message || '删除失败', 'error');
+      } finally {
+        deleteLoading.value = null;
+      }
     },
   };
 };
@@ -929,19 +887,49 @@ const excludeGame = (game) => {
     icon: 'visibility_off',
     color: 'warning',
     message: `确定要隐藏游戏 "${game.name}" 吗？`,
-    detail: '隐藏后可在下方“已隐藏的游戏”中恢复。',
+    detail: '隐藏后可在下方"已隐藏的游戏"中恢复。',
     confirmText: '确认隐藏',
     onConfirm: async () => {
       excludeLoading.value = game.appid;
-      ipc.send(`exclude-game@${PLUGIN_ID}`, game.appid);
+      try {
+        const res = await ipc.invoke(`exclude-game@${PLUGIN_ID}`, game.appid);
+        if (res.success) {
+          showMessage('游戏已隐藏');
+          const gameItem = games.value.find((g) => String(g.appid) === res.appid);
+          if (gameItem) {
+            gameItem.excluded = true;
+          }
+        } else {
+          showMessage(res.message || '隐藏失败', 'error');
+        }
+      } catch (err) {
+        showMessage(err.message || '隐藏失败', 'error');
+      } finally {
+        excludeLoading.value = null;
+      }
     },
   };
 };
 
 // 恢复显示游戏
-const includeGame = (game) => {
+const includeGame = async (game) => {
   excludeLoading.value = game.appid;
-  ipc.send(`include-game@${PLUGIN_ID}`, game.appid);
+  try {
+    const res = await ipc.invoke(`include-game@${PLUGIN_ID}`, game.appid);
+    if (res.success) {
+      showMessage('游戏已恢复显示');
+      const gameItem = games.value.find((g) => String(g.appid) === res.appid);
+      if (gameItem) {
+        gameItem.excluded = false;
+      }
+    } else {
+      showMessage(res.message || '恢复失败', 'error');
+    }
+  } catch (err) {
+    showMessage(err.message || '恢复失败', 'error');
+  } finally {
+    excludeLoading.value = null;
+  }
 };
 
 // 打开备注对话框
@@ -952,18 +940,35 @@ const openNoteDialog = (backup) => {
 };
 
 // 保存备注
-const saveNote = () => {
-  if (!noteDialog.value.backup) return;
+const saveNote = async () => {
+  if (!noteDialog.value.backup) {
+    return;
+  }
 
   noteDialog.value.loading = true;
-  ipc.send(`update-backup-note@${PLUGIN_ID}`, {
-    backupPath: noteDialog.value.backup.path,
-    note: noteDialog.value.note,
-  });
+  try {
+    const res = await ipc.invoke(`update-backup-note@${PLUGIN_ID}`, {
+      backupPath: noteDialog.value.backup.path,
+      note: noteDialog.value.note,
+    });
+    if (res.success) {
+      showMessage('备注已更新');
+      noteDialog.value.show = false;
+      // 更新本地备份列表中的数据
+      if (noteDialog.value.backup) {
+        noteDialog.value.backup.note = res.note;
+      }
+    } else {
+      showMessage(res.message || '更新备注失败', 'error');
+    }
+  } catch (err) {
+    showMessage(err.message || '更新备注失败', 'error');
+  } finally {
+    noteDialog.value.loading = false;
+  }
 };
 
 onMounted(() => {
-  setupIpcListeners();
   scanGames();
 });
 </script>

@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import fs from './fs-wrapper';
+import {
+  pathExists,
+  readdir,
+  readFile,
+  stat,
+} from './fs-wrapper';
 import { parse as vdfParse } from './vdf-parser';
 
 /**
@@ -19,12 +24,16 @@ export async function getSteamPath() {
   ];
 
   const pathChecks = await Promise.all(defaultPaths.map(async (p) => {
-    if (await fs.pathExists(p)) return p;
+    if (await pathExists(p)) {
+      return p;
+    }
     return null;
   }));
 
   const foundPath = pathChecks.find((p) => p !== null);
-  if (foundPath) return foundPath;
+  if (foundPath) {
+    return foundPath;
+  }
 
   // 2. 尝试查询注册表 (Windows)
   try {
@@ -49,9 +58,9 @@ export async function getLibraryFolders(steamPath) {
   const libraryFoldersPath = path.join(steamPath, 'steamapps', 'libraryfolders.vdf');
   const libraries = [steamPath]; // 默认包含主目录
 
-  if (await fs.pathExists(libraryFoldersPath)) {
+  if (await pathExists(libraryFoldersPath)) {
     try {
-      const content = await fs.readFile(libraryFoldersPath, 'utf8');
+      const content = await readFile(libraryFoldersPath, 'utf8');
       const data = vdfParse(content);
 
       if (data && data.libraryfolders) {
@@ -82,14 +91,16 @@ export async function scanInstalledGames(steamPath) {
 
   const gamesAcrossLibraries = await Promise.all(libraries.map(async (lib) => {
     const steamappsPath = path.join(lib, 'steamapps');
-    if (!(await fs.pathExists(steamappsPath))) return [];
+    if (!(await pathExists(steamappsPath))) {
+      return [];
+    }
 
-    const files = await fs.readdir(steamappsPath);
+    const files = await readdir(steamappsPath);
     const acfFiles = files.filter((f) => f.endsWith('.acf'));
 
     const gamesInLib = await Promise.all(acfFiles.map(async (file) => {
       try {
-        const content = await fs.readFile(path.join(steamappsPath, file), 'utf8');
+        const content = await readFile(path.join(steamappsPath, file), 'utf8');
         const data = vdfParse(content);
         const appState = data.AppState;
 
@@ -119,12 +130,14 @@ export async function scanInstalledGames(steamPath) {
  */
 export async function getSteamUserIds(steamPath) {
   const userdataDir = path.join(steamPath, 'userdata');
-  if (!(await fs.pathExists(userdataDir))) return [];
+  if (!(await pathExists(userdataDir))) {
+    return [];
+  }
 
-  const files = await fs.readdir(userdataDir);
+  const files = await readdir(userdataDir);
 
   const results = await Promise.all(files.map(async (file) => {
-    const stats = await fs.stat(path.join(userdataDir, file));
+    const stats = await stat(path.join(userdataDir, file));
     if (stats.isDirectory() && /^\d+$/.test(file)) {
       return file;
     }
@@ -191,9 +204,9 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
     const appDir = path.join(steamPath, 'userdata', userId, appId);
     const remoteCachePath = path.join(appDir, 'remotecache.vdf');
 
-    if (await fs.pathExists(remoteCachePath)) {
+    if (await pathExists(remoteCachePath)) {
       try {
-        const content = await fs.readFile(remoteCachePath, 'utf8');
+        const content = await readFile(remoteCachePath, 'utf8');
         const data = vdfParse(content);
         const appData2 = data[appId];
         if (appData2) {
@@ -243,9 +256,9 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
       break;
     case 2: // Documents
       absolutePath = path.join(documentsPath, dirPath);
-      if (!(await fs.pathExists(absolutePath))) {
+      if (!(await pathExists(absolutePath))) {
         const altPath = path.join(savedGamesPath, dirPath);
-        if (await fs.pathExists(altPath)) {
+        if (await pathExists(altPath)) {
           absolutePath = altPath;
         }
       }

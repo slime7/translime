@@ -1,5 +1,5 @@
 import { shell } from 'electron';
-import fs from './utils/fs-wrapper';
+import { ensureDir } from './utils/fs-wrapper';
 import {
   findSavePaths,
   getSteamPath,
@@ -38,7 +38,9 @@ const getExcludeList = () => {
 
 // 保存排除列表
 const saveExcludeList = (list) => {
-  if (!config) return;
+  if (!config) {
+    return;
+  }
   // 保持为数组存储，但在设置界面可能显示为逗号分隔字符串（取决于 Translime 实现）
   config.set(`plugin.${pluginId}.settings.excludeList`, list);
 };
@@ -96,18 +98,17 @@ export const pluginWillUnload = () => {
   console.log(`${pluginId} unloaded`);
 };
 
-// IPC 定义
+// IPC 定义 - 使用 invoke 模式，直接返回结果
 export const ipcHandlers = [
   {
     type: 'scan-games',
-    handler: ({ sendToClient }) => async (params, sender) => {
+    handler: () => async () => {
       const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
       const currentSteamPath = settings.customSteamPath || await getSteamPath();
       const backupRoot = settings.customBackupRoot;
 
       if (!currentSteamPath) {
-        sendToClient(`scan-games-reply@${pluginId}`, { success: false, message: '未找到 Steam' }, sender);
-        return;
+        return { success: false, message: '未找到 Steam' };
       }
 
       try {
@@ -131,66 +132,66 @@ export const ipcHandlers = [
         }));
 
         const userIds = await getSteamUserIds(currentSteamPath);
-        sendToClient(`scan-games-reply@${pluginId}`, {
+        return {
           success: true, games, userIds, steamPath: currentSteamPath,
-        }, sender);
+        };
       } catch (e) {
         console.error('扫描游戏失败：', e);
-        sendToClient(`scan-games-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'get-backups',
-    handler: ({ sendToClient }) => async (gameId, sender) => {
+    handler: () => async (gameId) => {
       try {
         const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
         const backupRoot = settings.customBackupRoot;
         const backups = await getBackups(gameId, backupRoot);
-        sendToClient(`get-backups-reply@${pluginId}`, { success: true, backups }, sender);
+        return { success: true, backups };
       } catch (e) {
-        sendToClient(`get-backups-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'backup-save',
-    handler: ({ sendToClient }) => async ({ gameId, gameName, savePaths }, sender) => {
+    handler: () => async ({ gameId, gameName, savePaths }) => {
       try {
         const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
         const backupRoot = settings.customBackupRoot;
         const result = await backupSave(gameId, gameName, savePaths, backupRoot);
-        sendToClient(`backup-save-reply@${pluginId}`, result, sender);
+        return result;
       } catch (e) {
-        sendToClient(`backup-save-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'restore-save',
-    handler: ({ sendToClient }) => async (backupPath, sender) => {
+    handler: () => async (backupPath) => {
       try {
         const result = await restoreSave(backupPath);
-        sendToClient(`restore-save-reply@${pluginId}`, result, sender);
+        return result;
       } catch (e) {
-        sendToClient(`restore-save-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'delete-backup',
-    handler: ({ sendToClient }) => async (backupPath, sender) => {
+    handler: () => async (backupPath) => {
       try {
         const result = await deleteBackup(backupPath);
-        sendToClient(`delete-backup-reply@${pluginId}`, result, sender);
+        return result;
       } catch (e) {
-        sendToClient(`delete-backup-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'exclude-game',
-    handler: ({ sendToClient }) => async (appid, sender) => {
+    handler: () => async (appid) => {
       try {
         const excludeList = getExcludeList();
         const appidStr = String(appid);
@@ -198,15 +199,15 @@ export const ipcHandlers = [
           excludeList.push(appidStr);
           saveExcludeList(excludeList);
         }
-        sendToClient(`exclude-game-reply@${pluginId}`, { success: true, appid: appidStr }, sender);
+        return { success: true, appid: appidStr };
       } catch (e) {
-        sendToClient(`exclude-game-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'include-game',
-    handler: ({ sendToClient }) => async (appid, sender) => {
+    handler: () => async (appid) => {
       try {
         let excludeList = getExcludeList();
         const appidStr = String(appid);
@@ -214,43 +215,43 @@ export const ipcHandlers = [
           excludeList = excludeList.filter((id) => id !== appidStr);
           saveExcludeList(excludeList);
         }
-        sendToClient(`include-game-reply@${pluginId}`, { success: true, appid: appidStr }, sender);
+        return { success: true, appid: appidStr };
       } catch (e) {
-        sendToClient(`include-game-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'update-backup-note',
-    handler: ({ sendToClient }) => async ({ backupPath, note }, sender) => {
+    handler: () => async ({ backupPath, note }) => {
       try {
         const result = await updateBackupNote(backupPath, note);
-        sendToClient(`update-backup-note-reply@${pluginId}`, { success: true, ...result }, sender);
+        return { success: true, ...result };
       } catch (e) {
-        sendToClient(`update-backup-note-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },
   {
     type: 'open-backup-dir',
-    handler: ({ sendToClient }) => async (params, sender) => {
+    handler: () => async () => {
       try {
         const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
         const backupRoot = settings.customBackupRoot;
         const root = await resolveBackupRoot(backupRoot);
 
         // 确保目录存在，避免 shell.openPath 报错
-        await fs.ensureDir(root);
+
+        await ensureDir(root);
         const error = await shell.openPath(root);
 
         if (error) {
           console.error('Failed to open backup directory:', error);
-          sendToClient(`open-backup-dir-reply@${pluginId}`, { success: false, message: error }, sender);
-        } else {
-          sendToClient(`open-backup-dir-reply@${pluginId}`, { success: true }, sender);
+          return { success: false, message: error };
         }
+        return { success: true };
       } catch (e) {
-        sendToClient(`open-backup-dir-reply@${pluginId}`, { success: false, message: e.message }, sender);
+        return { success: false, message: e.message };
       }
     },
   },

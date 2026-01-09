@@ -1,3 +1,4 @@
+import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 
@@ -5,7 +6,7 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-const config = {
+export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
     cssInjectedByJsPlugin(),
@@ -13,7 +14,7 @@ const config = {
   envDir: process.cwd(),
   build: {
     minify: false,
-    sourcemap: 'inline',
+    sourcemap: mode === 'preview' ? 'inline' : false,
     target: 'node14',
     outDir: './dist',
     lib: {
@@ -29,6 +30,4 @@ const config = {
     },
     emptyOutDir: false,
   },
-};
-
-export default config;
+}));

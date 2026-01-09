@@ -1,12 +1,21 @@
 import path from 'node:path';
 import os from 'node:os';
-import fs from './fs-wrapper';
+import {
+  copy,
+  emptyDir,
+  ensureDir,
+  pathExists,
+  readdir,
+  readJson,
+  remove,
+  writeJson,
+} from './fs-wrapper';
 
 // 默认备份根目录
 const getDefaultBackupRoot = () => path.join(global.APPDATA_PATH || path.join(os.homedir(), 'Documents'), 'TranslimeSteamBackups');
 
 export const resolveBackupRoot = async (customPath) => {
-  if (customPath && (await fs.pathExists(customPath))) {
+  if (customPath && (await pathExists(customPath))) {
     return customPath;
   }
   return getDefaultBackupRoot();
@@ -25,35 +34,39 @@ export async function backupSave(gameId, gameName, savePaths, customBackupRoot) 
   const backupDir = path.join(backupRoot, gameId.toString(), timestamp);
 
   // 1. 创建备份目录
-  await fs.ensureDir(backupDir);
+  await ensureDir(backupDir);
 
   // 2. 备份所有存档路径
   const results = await Promise.all(savePaths.map(async (saveInfo, i) => {
-    if (!saveInfo.absolutePath) return null;
+    if (!saveInfo.absolutePath) {
+      return null;
+    }
 
     // 检查源目录是否存在
-    if (!(await fs.pathExists(saveInfo.absolutePath))) {
+    if (!(await pathExists(saveInfo.absolutePath))) {
       console.warn(`存档路径不存在，跳过: ${saveInfo.absolutePath}`);
       return null;
     }
 
     const dataDir = path.join(backupDir, `data_${i}`);
-    await fs.ensureDir(dataDir);
+    await ensureDir(dataDir);
 
     // 精确备份：只复制指定的文件
     const fileResults = await Promise.all(saveInfo.files.map(async (file) => {
       const srcFile = path.join(saveInfo.absolutePath, file);
       const destFile = path.join(dataDir, file);
-      if (await fs.pathExists(srcFile)) {
-        await fs.ensureDir(path.dirname(destFile));
-        await fs.copy(srcFile, destFile);
+      if (await pathExists(srcFile)) {
+        await ensureDir(path.dirname(destFile));
+        await copy(srcFile, destFile);
         return file;
       }
       return null;
     }));
 
     const actualFiles = fileResults.filter((f) => f !== null);
-    if (actualFiles.length === 0) return null;
+    if (actualFiles.length === 0) {
+      return null;
+    }
 
     return {
       index: i,
@@ -80,7 +93,7 @@ export async function backupSave(gameId, gameName, savePaths, customBackupRoot) 
     note: '',
   };
 
-  await fs.writeJson(path.join(backupDir, 'info.json'), info, { spaces: 2 });
+  await writeJson(path.join(backupDir, 'info.json'), info, { spaces: 2 });
 
   return { success: true, path: backupDir, info };
 }
@@ -93,15 +106,17 @@ export async function backupSave(gameId, gameName, savePaths, customBackupRoot) 
 export async function getBackups(gameId, customBackupRoot) {
   const backupRoot = await resolveBackupRoot(customBackupRoot);
   const gameBackupDir = path.join(backupRoot, gameId.toString());
-  if (!(await fs.pathExists(gameBackupDir))) return [];
+  if (!(await pathExists(gameBackupDir))) {
+    return [];
+  }
 
-  const dirs = await fs.readdir(gameBackupDir);
+  const dirs = await readdir(gameBackupDir);
 
   const results = await Promise.all(dirs.map(async (dir) => {
     const infoPath = path.join(gameBackupDir, dir, 'info.json');
-    if (await fs.pathExists(infoPath)) {
+    if (await pathExists(infoPath)) {
       try {
-        const info = await fs.readJson(infoPath);
+        const info = await readJson(infoPath);
         return {
           ...info,
           path: path.join(gameBackupDir, dir),
@@ -126,25 +141,27 @@ export async function getBackups(gameId, customBackupRoot) {
  */
 export async function restoreSave(backupPath) {
   const infoPath = path.join(backupPath, 'info.json');
-  if (!(await fs.pathExists(infoPath))) {
+  if (!(await pathExists(infoPath))) {
     throw new Error('无效备份：未找到 info.json');
   }
 
-  const info = await fs.readJson(infoPath);
+  const info = await readJson(infoPath);
 
   // 支持新格式（多路径+精确文件）和旧格式（全目录）
   if (info.savePaths && Array.isArray(info.savePaths)) {
     const results = await Promise.all(info.savePaths.map(async (saveInfo) => {
       const sourceDataDir = path.join(backupPath, `data_${saveInfo.index}`);
-      if (!(await fs.pathExists(sourceDataDir))) return null;
+      if (!(await pathExists(sourceDataDir))) {
+        return null;
+      }
 
       // 逐个还原文件
       await Promise.all(saveInfo.files.map(async (file) => {
         const src = path.join(sourceDataDir, file);
         const dest = path.join(saveInfo.absolutePath, file);
-        if (await fs.pathExists(src)) {
-          await fs.ensureDir(path.dirname(dest));
-          await fs.copy(src, dest, { overwrite: true });
+        if (await pathExists(src)) {
+          await ensureDir(path.dirname(dest));
+          await copy(src, dest, { overwrite: true });
         }
       }));
 
@@ -158,13 +175,13 @@ export async function restoreSave(backupPath) {
   const targetPath = info.originalPath;
   const sourceDataPath = path.join(backupPath, 'data');
 
-  if (!(await fs.pathExists(sourceDataPath))) {
+  if (!(await pathExists(sourceDataPath))) {
     throw new Error('无效备份：未找到 data 目录');
   }
 
-  await fs.ensureDir(path.dirname(targetPath));
-  await fs.emptyDir(targetPath);
-  await fs.copy(sourceDataPath, targetPath);
+  await ensureDir(path.dirname(targetPath));
+  await emptyDir(targetPath);
+  await copy(sourceDataPath, targetPath);
 
   return { success: true, targetPath };
 }
@@ -172,10 +189,12 @@ export async function restoreSave(backupPath) {
 export async function getBackupCount(gameId, customBackupRoot) {
   const backupRoot = await resolveBackupRoot(customBackupRoot);
   const gameBackupDir = path.join(backupRoot, gameId.toString());
-  if (!(await fs.pathExists(gameBackupDir))) return 0;
+  if (!(await pathExists(gameBackupDir))) {
+    return 0;
+  }
 
   try {
-    const dirs = await fs.readdir(gameBackupDir);
+    const dirs = await readdir(gameBackupDir);
     // 简单过滤掉非目录项（虽然按照逻辑这里应该都是目录）
     // 为了性能，这里不做深度检查，假设每个子项都是一个备份
     return dirs.length;
@@ -190,17 +209,17 @@ export async function getBackupCount(gameId, customBackupRoot) {
  * @param {string} backupPath 备份的完整路径
  */
 export async function deleteBackup(backupPath) {
-  if (!(await fs.pathExists(backupPath))) {
+  if (!(await pathExists(backupPath))) {
     throw new Error('备份不存在');
   }
 
   // 简单的安全检查：确保我们要删除的是 Translime 的备份目录
   // 检查是否存在 info.json
-  if (!(await fs.pathExists(path.join(backupPath, 'info.json')))) {
+  if (!(await pathExists(path.join(backupPath, 'info.json')))) {
     throw new Error('安全检查失败：该目录似乎不是有效的备份目录');
   }
 
-  await fs.remove(backupPath);
+  await remove(backupPath);
   return { success: true };
 }
 
@@ -211,14 +230,14 @@ export async function deleteBackup(backupPath) {
  */
 export async function updateBackupNote(backupPath, note) {
   const infoPath = path.join(backupPath, 'info.json');
-  if (!(await fs.pathExists(infoPath))) {
+  if (!(await pathExists(infoPath))) {
     throw new Error('备份不存在');
   }
 
-  const info = await fs.readJson(infoPath);
+  const info = await readJson(infoPath);
   // 限制长度为 80 字符
   info.note = (note || '').substring(0, 80);
 
-  await fs.writeJson(infoPath, info, { spaces: 2 });
+  await writeJson(infoPath, info, { spaces: 2 });
   return { success: true, note: info.note };
 }
