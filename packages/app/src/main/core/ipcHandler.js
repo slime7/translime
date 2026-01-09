@@ -382,11 +382,6 @@ const ipcHandler = (ipc) => ({
       }, 2000);
     });
   },
-  [ipcType.OVER_TO_BACK]({ type, data }) {
-    if (mainStore.get('launchWin')) {
-      ipc.sendToClient(type, data, mainStore.get('launchWin').webContents);
-    }
-  },
 });
 
 export default ipcHandler;

@@ -41,7 +41,6 @@ export const GET_LAUNCH_ARGV = 'get-launch-argv';
 export const DEEP_LINK_OPEN = 'deep-link-open';
 export const LOGGER = 'logger';
 export const IPC_TOAST = 'ipc-toast';
-export const OVER_TO_BACK = 'over-to-back';
 
 export default {
   DEVTOOLS,
@@ -86,5 +85,4 @@ export default {
   DEEP_LINK_OPEN,
   LOGGER,
   IPC_TOAST,
-  OVER_TO_BACK,
 };

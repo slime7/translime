@@ -55,7 +55,8 @@ class CreateElectronApp extends EventEmitter {
     ipcMain.on('main-renderer-ready', () => {
       setupDeepLink();
       if (mainStore.get('launchWin')) {
-        mainStore.get('launchWin').hide();
+        mainStore.get('launchWin').close();
+        mainStore.set('launchWin', null);
       }
       mainStore.getWin().show();
 
@@ -101,10 +102,6 @@ class CreateElectronApp extends EventEmitter {
   onAppQuit() {
     app.on('will-quit', () => {
       mainStore.get('pluginLoader').appClose();
-      if (mainStore.get('launchWin')) {
-        mainStore.get('launchWin').destroy();
-        mainStore.set('launchWin', null);
-      }
       logger.info('app 关闭');
     });
 

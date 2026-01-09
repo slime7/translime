@@ -25,19 +25,16 @@ export default class Ipc {
 
   sendMsg(channel, msgBody, clientWin) {
     if (clientWin && !clientWin.isDestroyed()) {
-      const contents = clientWin.webContents || clientWin;
-      contents.send(channel, msgBody);
-    } else if (this.sender && !this.sender.isDestroyed()) {
+      if (clientWin.webContents) {
+        clientWin.webContents.send(channel, msgBody);
+      } else {
+        clientWin.send(channel, msgBody);
+      }
+    } else if (!this.sender.isDestroyed()) {
       this.sender.send(channel, msgBody);
     }
   }
 
-  /**
-   * 发送消息到客户端
-   * @param {string} type 消息类型
-   * @param {any} data 消息数据
-   * @param {BrowserWindow|WebContents} clientWin 目标窗口，为 null 时发送给初始化时的 sender
-   */
   sendToClient(type, data, clientWin = null) {
     this.sendMsg('ipc-reply', {
       type,
