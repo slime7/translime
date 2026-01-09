@@ -19,7 +19,7 @@
         color="secondary"
         class="mr-2"
         @click="openBackupDir"
-        :loading="openDirLoading"
+        :loading="loading.openDir"
       >
         打开备份目录
       </v-btn>
@@ -28,14 +28,14 @@
         variant="tonal"
         color="primary"
         @click="scanGames"
-        :loading="loading"
+        :loading="loading.scan"
       >
         刷新列表
       </v-btn>
     </v-toolbar>
 
     <!-- 游戏列表 (卡片网格) -->
-    <v-row v-if="loading && games.length === 0">
+    <v-row v-if="loading.scan && games.length === 0">
       <v-col
         cols="12"
         class="text-center mt-10"
@@ -107,7 +107,7 @@
                   size="small"
                   color="grey"
                   @click.stop="excludeGame(game)"
-                  :loading="excludeLoading === game.appid"
+                  :loading="loading.exclude === game.appid"
                 />
               </template>
             </v-tooltip>
@@ -196,7 +196,7 @@
                             size="x-small"
                             color="primary"
                             @click="includeGame(game)"
-                            :loading="excludeLoading === game.appid"
+                            :loading="loading.exclude === game.appid"
                           />
                         </template>
                       </v-tooltip>
@@ -211,7 +211,7 @@
     </v-row>
 
     <div
-      v-if="!loading && visibleGames.length === 0 && hiddenGames.length === 0"
+      v-if="!loading.scan && visibleGames.length === 0 && hiddenGames.length === 0"
       class="d-flex flex-column align-center justify-center fill-height w-100 mt-10"
     >
       <v-icon
@@ -377,7 +377,7 @@
                           prepend-icon="settings_backup_restore"
                           class="mr-2"
                           @click="restoreBackup(backup)"
-                          :loading="restoreLoading === backup.id"
+                          :loading="loading.restore === backup.id"
                         >
                           还原
                         </v-btn>
@@ -454,7 +454,7 @@
             prepend-icon="cloud_upload"
             variant="elevated"
             @click="backupGame"
-            :loading="backupLoading"
+            :loading="loading.backup"
             :disabled="!canBackup"
           >
             立即备份
@@ -638,12 +638,14 @@ const PLUGIN_ID = 'translime-plugin-steam-save-backup';
 const ipc = window.electron.useIpc();
 
 // 状态
-const loading = ref(false);
-const openDirLoading = ref(false);
-const backupLoading = ref(false);
-const restoreLoading = ref(null); // 存储正在还原的备份 ID
-const deleteLoading = ref(null); // 存储正在删除的备份 ID
-const excludeLoading = ref(null); // 存储正在隐藏的游戏 ID
+const loading = ref({
+  scan: false,
+  openDir: false,
+  backup: false,
+  restore: null, // 存储正在还原的备份 ID
+  delete: null, // 存储正在删除的备份 ID
+  exclude: null, // 存储正在隐藏的游戏 ID
+});
 const games = ref([]);
 const selectedGame = ref(null);
 const backups = ref([]);
@@ -713,7 +715,7 @@ const loadBackups = async (gameId) => {
 
 // 打开备份目录
 const openBackupDir = async () => {
-  openDirLoading.value = true;
+  loading.value.openDir = true;
   try {
     const res = await ipc.invoke(`open-backup-dir@${PLUGIN_ID}`);
     if (!res.success) {
@@ -722,13 +724,13 @@ const openBackupDir = async () => {
   } catch (err) {
     showMessage(err.message || '打开目录失败', 'error');
   } finally {
-    openDirLoading.value = false;
+    loading.value.openDir = false;
   }
 };
 
 // 扫描游戏
 const scanGames = async () => {
-  loading.value = true;
+  loading.value.scan = true;
   try {
     const res = await ipc.invoke(`scan-games@${PLUGIN_ID}`);
     if (res.success) {
@@ -748,7 +750,7 @@ const scanGames = async () => {
   } catch (err) {
     showMessage(err.message || '扫描失败', 'error');
   } finally {
-    loading.value = false;
+    loading.value.scan = false;
   }
 };
 
@@ -781,7 +783,7 @@ const backupGame = async () => {
     return;
   }
 
-  backupLoading.value = true;
+  loading.value.backup = true;
   try {
     const res = await ipc.invoke(
       `backup-save@${PLUGIN_ID}`,
@@ -803,7 +805,7 @@ const backupGame = async () => {
   } catch (err) {
     showMessage(err.message || '备份失败', 'error');
   } finally {
-    backupLoading.value = false;
+    loading.value.backup = false;
   }
 };
 
@@ -831,7 +833,7 @@ const restoreBackup = (backup) => {
     detail: '当前存档将被覆盖。',
     confirmText: '立刻还原',
     onConfirm: async () => {
-      restoreLoading.value = backup.id;
+      loading.value.restore = backup.id;
       try {
         const res = await ipc.invoke(`restore-save@${PLUGIN_ID}`, backup.path);
         if (res.success) {
@@ -842,7 +844,7 @@ const restoreBackup = (backup) => {
       } catch (err) {
         showMessage(err.message || '还原失败', 'error');
       } finally {
-        restoreLoading.value = null;
+        loading.value.restore = null;
       }
     },
   };
@@ -859,7 +861,7 @@ const deleteAppBackup = (backup) => {
     detail: '此操作不可逆。',
     confirmText: '确认删除',
     onConfirm: async () => {
-      deleteLoading.value = backup.id;
+      loading.value.delete = backup.id;
       try {
         const res = await ipc.invoke(`delete-backup@${PLUGIN_ID}`, backup.path);
         if (res.success) {
@@ -873,7 +875,7 @@ const deleteAppBackup = (backup) => {
       } catch (err) {
         showMessage(err.message || '删除失败', 'error');
       } finally {
-        deleteLoading.value = null;
+        loading.value.delete = null;
       }
     },
   };
@@ -890,7 +892,7 @@ const excludeGame = (game) => {
     detail: '隐藏后可在下方"已隐藏的游戏"中恢复。',
     confirmText: '确认隐藏',
     onConfirm: async () => {
-      excludeLoading.value = game.appid;
+      loading.value.exclude = game.appid;
       try {
         const res = await ipc.invoke(`exclude-game@${PLUGIN_ID}`, game.appid);
         if (res.success) {
@@ -905,7 +907,7 @@ const excludeGame = (game) => {
       } catch (err) {
         showMessage(err.message || '隐藏失败', 'error');
       } finally {
-        excludeLoading.value = null;
+        loading.value.exclude = null;
       }
     },
   };
@@ -913,7 +915,7 @@ const excludeGame = (game) => {
 
 // 恢复显示游戏
 const includeGame = async (game) => {
-  excludeLoading.value = game.appid;
+  loading.value.exclude = game.appid;
   try {
     const res = await ipc.invoke(`include-game@${PLUGIN_ID}`, game.appid);
     if (res.success) {
@@ -928,7 +930,7 @@ const includeGame = async (game) => {
   } catch (err) {
     showMessage(err.message || '恢复失败', 'error');
   } finally {
-    excludeLoading.value = null;
+    loading.value.exclude = null;
   }
 };
 
