@@ -412,7 +412,7 @@
                           icon="delete"
                           size="small"
                           @click="deleteAppBackup(backup)"
-                          :loading="deleteLoading === backup.id"
+                          :loading="loading.delete === backup.id"
                         />
                       </template>
                     </v-tooltip>

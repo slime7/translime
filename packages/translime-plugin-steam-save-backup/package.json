@@ -1,6 +1,6 @@
 {
   "name": "translime-plugin-steam-save-backup",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Steam 游戏存档备份与还原插件",
   "license": "MIT",
   "keywords": [
