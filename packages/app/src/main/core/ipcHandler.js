@@ -7,6 +7,7 @@ import {
   Notification,
   shell,
 } from 'electron';
+import fs from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
@@ -377,6 +378,9 @@ const ipcHandler = {
   },
   [ipcType.LOGGER](level, args) {
     logger[level](...args);
+  },
+  async [ipcType.LOAD_PLUGIN_UI](pluginPath) {
+    return fs.readFileSync(pluginPath, 'utf8');
   },
   ping() {
     console.log('pong', new Date());
