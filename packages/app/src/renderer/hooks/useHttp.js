@@ -112,7 +112,6 @@ export default (url, axiosConfig = {}) => {
       if (currentCounter === requestCounter) {
         loading.value = false;
       }
-      console.log(response.value, responseError.value);
       /* eslint-disable no-console,no-underscore-dangle */
       const request = response.value?.request || responseError.value?.request._options;
       const isError = !response.value;
@@ -120,6 +119,7 @@ export default (url, axiosConfig = {}) => {
         `%c ${request.method} ${request.protocol} ${isError ? request.hostname : request.host}${request.path} `,
         'background: rgb(70, 70, 70); color: rgb(240, 235, 200); width:100%;',
       );
+      console.log('Axios Response: ', response.value);
       console.log('Time: ', new Date());
       console.log('Method: ', request?.method || finalConfig.method);
       console.log('Status: ', response.value?.status || undefined);

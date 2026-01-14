@@ -1,9 +1,13 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-import { app, clipboard, Menu } from 'electron';
+import {
+  app,
+  clipboard,
+  Menu,
+  utilityProcess,
+} from 'electron';
 import EventEmitter from 'node:events';
-import childProcess from 'node:child_process';
 import { createRequire } from 'node:module';
 import * as tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
@@ -192,25 +196,26 @@ const execNpmCommand = (cmd, module, options = {}) => {
   }
   args.push(module);
   return new Promise((resolve) => {
-    const npm = childProcess.fork(NPM_EXEC_PATH, args, {
+    const npm = utilityProcess.fork(NPM_EXEC_PATH, args, {
       cwd: PLUGIN_DIR,
-      silent: true,
+      stdio: 'pipe',
+      serviceName: 'npm',
     });
 
     let output = '';
-    npm.stdout
-      ?.on('data', (data) => {
-        output += data.toString();
-      })
-      .pipe(process.stdout);
+    npm.stdout?.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      process.stdout.write(text);
+    });
 
-    npm.stderr
-      ?.on('data', (data) => {
-        output += data.toString();
-      })
-      .pipe(process.stderr);
+    npm.stderr?.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      process.stderr.write(text);
+    });
 
-    npm.on('close', (code) => {
+    npm.on('exit', (code) => {
       if (!code) {
         resolve({ code: 0, data: output });
       } else if (code && output.indexOf('code E404') > -1) {
@@ -219,7 +224,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
         resolve({ code, data: output });
       }
     });
-    logger.debug('[plugin] npm 执行参数', { args: npm.spawnargs });
+    logger.debug('[plugin] npm 执行参数', { args: [NPM_EXEC_PATH, ...args] });
   });
 };
 
