@@ -126,6 +126,7 @@ export default {
 .navi-panel {
   :deep(.navi-btn) {
     height: 56px;
+
     & + .navi-btn {
       margin-top: 8px;
     }

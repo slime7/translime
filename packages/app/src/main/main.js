@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createProtocol from './utils/createProtocol';
 import mainStore from './utils/useMainStore';
+import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import Ipc from './core/Ipc';
 
@@ -75,56 +76,53 @@ export default () => {
       preload: join(dir, '../preload/index.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
       webviewTag: true,
     },
   });
-  mainStore.set('win', win);
+  appManager.setWin(win);
   Store.initRenderer();
-  const ipc = new Ipc(ipcMain, mainStore.getWin().webContents);
-  mainStore.set('ipc', ipc);
+  const ipc = new Ipc(ipcMain, appManager.getWin().webContents);
+  appManager.setIpc(ipc);
 
-  mainStore.getWin().on('maximize', () => {
+  appManager.getWin().on('maximize', () => {
     maximize = true;
     ipc.sendToClient('set-maximize-status', true);
   });
 
-  mainStore.getWin().on('unmaximize', () => {
+  appManager.getWin().on('unmaximize', () => {
     maximize = false;
     ipc.sendToClient('set-maximize-status', false);
   });
 
-  ipcMain.handle('appConfigStore', (event, method, ...rest) => {
-    const data = mainStore.config[method](...rest);
-    return Promise.resolve({ data, err: null });
-  });
+  ipcMain.handle('appConfigStore', (event, method, ...rest) => mainStore.config[method](...rest));
 
   nativeTheme.on('updated', () => {
-    if (mainStore.ipc()) {
-      mainStore.ipc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors });
-      Object.keys(mainStore.getChildWin()).forEach((windowKey) => {
-        mainStore.ipc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors }, mainStore.getChildWin(windowKey).webContents);
+    if (appManager.getIpc()) {
+      appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors });
+      Object.keys(appManager.getChildWin()).forEach((windowKey) => {
+        appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors }, appManager.getChildWin(windowKey).webContents);
       });
     }
   });
 
   if (import.meta.env.VITE_DEV_SERVER_URL !== undefined) {
     // Load the url of the dev server if in development mode
-    mainStore.getWin().loadURL(import.meta.env.VITE_DEV_SERVER_URL);
+    appManager.getWin().loadURL(import.meta.env.VITE_DEV_SERVER_URL);
     if (!process.env.IS_TEST) {
-      mainStore.getWin().webContents.openDevTools({ mode: 'undocked' });
+      appManager.getWin().webContents.openDevTools({ mode: 'undocked' });
     }
   } else {
     createProtocol('app');
     // Load the index.html when not in development
-    mainStore.getWin().loadURL('app://./index.html');
+    appManager.getWin().loadURL('app://./index.html');
   }
-  mainStore.getWin().setMenu(null);
+  appManager.getWin().setMenu(null);
 
-  mainStore.getWin().on('close', () => {
+  appManager.getWin().on('close', () => {
     if (!maximize) {
-      const pos = mainStore.getWin().getPosition();
-      const size = mainStore.getWin().getSize();
+      const pos = appManager.getWin().getPosition();
+      const size = appManager.getWin().getSize();
       [x, y, width, height] = [...pos, ...size];
     }
     mainStore.config.set('window', {
@@ -136,8 +134,8 @@ export default () => {
     });
   });
 
-  mainStore.getWin().on('closed', () => {
-    mainStore.set('win', null);
+  appManager.getWin().on('closed', () => {
+    appManager.setWin(null);
     app.quit();
   });
 };

@@ -41,6 +41,9 @@ export const GET_LAUNCH_ARGV = 'get-launch-argv';
 export const DEEP_LINK_OPEN = 'deep-link-open';
 export const LOGGER = 'logger';
 export const IPC_TOAST = 'ipc-toast';
+export const LOAD_PLUGIN_UI = 'load-plugin-ui';
+export const NET_REQUEST = 'net-request';
+export const NET_ABORT = 'net-abort';
 
 export default {
   DEVTOOLS,
@@ -85,4 +88,7 @@ export default {
   DEEP_LINK_OPEN,
   LOGGER,
   IPC_TOAST,
+  LOAD_PLUGIN_UI,
+  NET_REQUEST,
+  NET_ABORT,
 };

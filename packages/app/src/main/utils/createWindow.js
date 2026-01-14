@@ -9,11 +9,9 @@ export default (fileUrl, browserWindowOptions, menu = false) => {
     show: false,
     minWidth: 200,
     webPreferences: {
-      // Use pluginOptions.nodeIntegration, leave this alone
-      // See https://github.com/nklayman/vue-cli-plugin-electron-builder/blob/v2/docs/guide/configuration.md#node-integration for more info
       nodeIntegration: false,
-      contextIsolation: false,
-      sandbox: false,
+      contextIsolation: true, // 默认开启上下文隔离
+      sandbox: true,
     },
     ...browserWindowOptions,
   });

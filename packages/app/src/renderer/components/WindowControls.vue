@@ -102,19 +102,19 @@ export default {
     };
 
     const appMinimize = () => {
-      ipc.send(APP_MINIMIZE, win.value);
+      ipc.invoke(APP_MINIMIZE, win.value);
       emit('windowMinimize');
     };
     const appUnmaximize = () => {
-      ipc.send(APP_UNMAXIMIZE, win.value);
+      ipc.invoke(APP_UNMAXIMIZE, win.value);
       emit('windowUnmaximize');
     };
     const appMaximize = () => {
-      ipc.send(APP_MAXIMIZE, win.value);
+      ipc.invoke(APP_MAXIMIZE, win.value);
       emit('windowMaximize');
     };
     const appClose = () => {
-      ipc.send(APP_CLOSE, win.value);
+      ipc.invoke(APP_CLOSE, win.value);
       emit('windowClose');
     };
 

@@ -16,8 +16,12 @@
 
           <v-card-actions>
             <v-spacer />
-            <v-btn @click="open(server.port)">查看</v-btn>
-            <v-btn @click="closeServer(server.port)">关闭</v-btn>
+            <v-btn @click="open(server.port)">
+              查看
+            </v-btn>
+            <v-btn @click="closeServer(server.port)">
+              关闭
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
@@ -54,7 +58,7 @@
             @click="openServerIpc(server.path)"
           >
             {{ server.path }}
-            <v-tooltip activator="parent" :text="server.path" location="top"></v-tooltip>
+            <v-tooltip activator="parent" :text="server.path" location="top" />
           </v-btn>
         </v-col>
       </v-row>
@@ -64,9 +68,10 @@
 
 <script>
 const vuetify = window.vuetify$.components;
+const ipc = window.electron.useIpc();
 
 export default {
-  name: 'ui',
+  name: 'Ui',
 
   components: {
     ...vuetify,
@@ -87,10 +92,7 @@ export default {
       }
     },
     async openServerIpc(serverPath) {
-      const port = await window.electron.ipcRenderer.invoke('ipc-fn', {
-        type: 'new-server@translime-plugin-static-server',
-        args: [serverPath],
-      });
+      const port = await ipc.invoke('new-server@translime-plugin-static-server', serverPath);
       this.servers.push({
         port: +port,
         path: serverPath,
@@ -98,29 +100,18 @@ export default {
       this.addHistoryServers(serverPath);
     },
     async closeServer(port) {
-      await window.electron.ipcRenderer.invoke('ipc-fn', {
-        type: 'close-server@translime-plugin-static-server',
-        args: [port],
-      });
+      await ipc.invoke('close-server@translime-plugin-static-server', port);
     },
     onServerClose() {
-      window.electron.ipcRenderer.receive('ipc-reply', ({ type, data }) => {
-        if (type === 'server-closed@translime-plugin-static-server') {
-          this.servers = this.servers.filter((server) => +server.port !== +data.port);
-        }
+      ipc.on('server-closed@translime-plugin-static-server', (data) => {
+        this.servers = this.servers.filter((server) => +server.port !== +data.port);
       });
     },
     open(port) {
-      window.electron.ipcRenderer.send('ipc-msg', {
-        type: 'open-link',
-        data: { url: `http://localhost:${port}` },
-      });
+      ipc.send('open-link', { url: `http://localhost:${port}` });
     },
     async getServers() {
-      this.servers = await window.electron.ipcRenderer.invoke('ipc-fn', {
-        type: 'get-server-list@translime-plugin-static-server',
-        args: [],
-      });
+      this.servers = await ipc.invoke('get-server-list@translime-plugin-static-server');
     },
     addHistoryServers(serverPath) {
       const ind = this.historyServers.findIndex((server) => server.path === serverPath);

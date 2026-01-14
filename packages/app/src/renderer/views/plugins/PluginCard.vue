@@ -270,6 +270,7 @@ export default {
         versionList.push(...versions);
       } catch (err) {
         console.log(pluginId, err.message);
+        console.error(err);
         // alert.show(err.message, 'error');
       } finally {
         getVersionLoading.value = false;

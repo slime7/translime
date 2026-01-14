@@ -55,7 +55,6 @@
 import { onMounted, ref, version as vueVersion } from 'vue';
 import { version as vuetifyVersion } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { getUuiD } from '@pkg/share/utils';
 import { useIpc } from '@/hooks/electron';
 import globalStore from '@/store/globalStore';
 import useDialog from '@/hooks/useDialog';
@@ -74,16 +73,11 @@ export default {
 
     // 版本
     const versions = ref({});
-    const versionsIpcId = ref(`${ipcType.APP_VERSIONS}-${getUuiD()}`);
-    const getVersions = () => {
-      ipc.send(ipcType.APP_VERSIONS, versionsIpcId.value);
-    };
-    const onGetVersions = () => {
-      ipc.on(versionsIpcId.value, (v) => {
-        versions.value = v;
-        versions.value.vue = vueVersion;
-        versions.value.vuetify = vuetifyVersion;
-      });
+    const getVersions = async () => {
+      const result = await ipc.invoke(ipcType.APP_VERSIONS);
+      versions.value = result;
+      versions.value.vue = vueVersion;
+      versions.value.vuetify = vuetifyVersion;
     };
 
     // 测试方法
@@ -111,7 +105,6 @@ export default {
     };
 
     onMounted(() => {
-      onGetVersions();
       getVersions();
     });
 

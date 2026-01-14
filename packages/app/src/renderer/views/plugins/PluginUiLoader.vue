@@ -24,7 +24,7 @@ let currentUiUrl = '';
 
 const mountPlugin = async () => {
   try {
-    const uiBlob = window.ts.loadPluginUi(props.pluginPath);
+    const uiBlob = await window.ts.loadPluginUi(props.pluginPath);
     if (currentUiUrl) {
       URL.revokeObjectURL(currentUiUrl);
     }

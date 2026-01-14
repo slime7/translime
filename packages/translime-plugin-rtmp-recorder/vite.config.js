@@ -6,14 +6,14 @@ import commonjs from '@rollup/plugin-commonjs';
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-const config = {
+const config = ({ mode }) => ({
   envDir: process.cwd(),
   define: {
     'process.env.FLUENTFFMPEG_COV': false,
   },
   build: {
     minify: false,
-    sourcemap: 'inline',
+    sourcemap: mode === 'development' ? 'inline' : false,
     target: 'node16',
     outDir: './dist',
     emptyOutDir: true,
@@ -34,9 +34,10 @@ const config = {
       external: [
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
+        'fluent-ffmpeg',
       ],
     },
   },
-};
+});
 
 export default config;

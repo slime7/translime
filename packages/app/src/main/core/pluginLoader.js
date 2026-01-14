@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import * as tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../utils/useMainStore';
+import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
 
 const requireFresh = createRequire(import.meta.url);
@@ -370,9 +371,9 @@ class PluginLoader extends EventEmitter {
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
       mergedPlugin.ipcHandlers.forEach((handler) => {
-        mainStore
-          .ipc()
-          .appendHandler(
+        appManager
+          .getIpc()
+          ?.appendHandler(
             `${handler.type}@${mergedPlugin.packageName}`,
             handler.handler,
           );
@@ -403,7 +404,7 @@ class PluginLoader extends EventEmitter {
     // 移除 ipc
     if (plugin.ipcHandlers && plugin.ipcHandlers.length) {
       plugin.ipcHandlers.forEach((handler) => {
-        mainStore.ipc().removeHandler(`${handler.type}@${plugin.packageName}`);
+        appManager.getIpc()?.removeHandler(`${handler.type}@${plugin.packageName}`);
       });
     }
     // 调用插件卸载方法
@@ -411,8 +412,8 @@ class PluginLoader extends EventEmitter {
       plugin.pluginWillUnload();
     }
     // 关闭插件窗口
-    if (mainStore.getChildWin(`plugin-window-${packageName}`)) {
-      mainStore.getChildWin(`plugin-window-${packageName}`).close();
+    if (appManager.getChildWin(`plugin-window-${packageName}`)) {
+      appManager.getChildWin(`plugin-window-${packageName}`).close();
     }
     // 删除 require 缓存
     const cacheKeys = Object.keys(requireFresh.cache);
@@ -441,10 +442,12 @@ class PluginLoader extends EventEmitter {
         target: packagePattern,
       });
     }
+    const isDev = plugin.dev;
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
       const p = readPlugin(plugin.pluginPath, [packageName]);
       p.enabled = false;
+      p.dev = isDev; // 保留原始的 dev 标志
       this.plugins.push(p);
       mainStore.config.set(`plugin.${plugin.packageName}.enabled`, false);
     }
@@ -577,9 +580,9 @@ class PluginLoader extends EventEmitter {
           );
           if (
             !plugin.windowMode
-            && mainStore.getChildWin(`plugin-window-${packageName}`)
+            && appManager.getChildWin(`plugin-window-${packageName}`)
           ) {
-            mainStore.getChildWin(`plugin-window-${packageName}`).close();
+            appManager.getChildWin(`plugin-window-${packageName}`).close();
           }
           ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
         },

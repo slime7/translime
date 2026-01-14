@@ -2,6 +2,7 @@ import {
   computed, isRef, readonly, shallowRef,
 } from 'vue';
 import axios from 'axios';
+import electronNetAdapter from '@/utils/electronNetAdapter';
 
 /**
  * @typedef {Object} HttpChainable
@@ -39,7 +40,7 @@ import axios from 'axios';
 export default (url, axiosConfig = {}) => {
   let internalAxiosConfig = {
     method: 'GET',
-    adapter: [window.ts.axiosHttpAdapter],
+    adapter: [electronNetAdapter, 'fetch'],
     ...axiosConfig,
   };
   let requestCounter = 0;
@@ -53,7 +54,7 @@ export default (url, axiosConfig = {}) => {
 
   let controller;
   const createAbortSignal = () => {
-    controller = window.ts.createAbortController();
+    controller = new AbortController();
     internalAxiosConfig = {
       ...internalAxiosConfig,
       signal: controller.signal,
@@ -111,6 +112,7 @@ export default (url, axiosConfig = {}) => {
       if (currentCounter === requestCounter) {
         loading.value = false;
       }
+      console.log(response.value, responseError.value);
       /* eslint-disable no-console,no-underscore-dangle */
       const request = response.value?.request || responseError.value?.request._options;
       const isError = !response.value;
@@ -119,7 +121,7 @@ export default (url, axiosConfig = {}) => {
         'background: rgb(70, 70, 70); color: rgb(240, 235, 200); width:100%;',
       );
       console.log('Time: ', new Date());
-      console.log('Method: ', request.method || finalConfig.method);
+      console.log('Method: ', request?.method || finalConfig.method);
       console.log('Status: ', response.value?.status || undefined);
       console.log('Host: ', `${request.protocol}${isError ? request.hostname : request.host}`);
       console.log('Path: ', request.path);

@@ -7,14 +7,14 @@ import axiosHttpAdapter from 'axios/unsafe/adapters/http';
 import pkg from '../package.json';
 
 const id = pkg.name;
-const { mainStore } = global;
+const { mainStore, appManager } = global;
 const APP_VERSION = mainStore?.APP_VERSION || '0.0.0';
 const isVerDot3 = verCmp(APP_VERSION, '0.3.0') >= 0;
 const APPDATA_PATH = isVerDot3 ? mainStore.APPDATA_PATH : global.APPDATA_PATH;
 const pluginDir = path.resolve(APPDATA_PATH, 'google-domains-ddns');
 const logFile = path.resolve(pluginDir, 'logs.txt');
-const pluginWin = isVerDot3 ? () => mainStore.getChildWin(`plugin-window-${id}`) : global.childWins[`plugin-window-${id}`];
-const ipc = isVerDot3 ? mainStore.ipc() : global.ipc;
+const pluginWin = isVerDot3 ? () => appManager.getChildWin(`plugin-window-${id}`) : global.childWins[`plugin-window-${id}`];
+const ipc = isVerDot3 ? appManager.getIpc() : global.ipc;
 const config = isVerDot3 ? mainStore.config : global.store;
 
 let timer;
@@ -219,12 +219,14 @@ export const ipcHandlers = [
     type: 'start',
     handler: () => () => {
       start();
+      return true;
     },
   },
   {
     type: 'stop',
     handler: () => () => {
       stop();
+      return true;
     },
   },
   {
@@ -233,7 +235,7 @@ export const ipcHandlers = [
       if (pluginWin()) {
         ipc.sendToClient('logs', logs, pluginWin());
       }
-      return Promise.resolve(!!timer);
+      return !!timer;
     },
   },
 ];

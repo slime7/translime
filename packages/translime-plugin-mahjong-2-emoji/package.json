@@ -9,7 +9,7 @@
   ],
   "files": [
     "dist",
-    "src"
+    "src/icon.webp"
   ],
   "scripts": {
     "dev": "vite build --watch",

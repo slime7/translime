@@ -59,11 +59,9 @@ export default {
         }
       });
     };
-    const handleAppArgv = () => {
-      ipc.send(ipcType.GET_LAUNCH_ARGV);
-      ipc.on(ipcType.GET_LAUNCH_ARGV, (argv) => {
-        store.setAppArgv(argv);
-      });
+    const handleAppArgv = async () => {
+      const argv = await ipc.invoke(ipcType.GET_LAUNCH_ARGV);
+      store.setAppArgv(argv);
     };
     const onShowSettingPanel = () => {
       ipc.on(ipcType.OPEN_PLUGIN_SETTING_PANEL, ({ packageName }) => {

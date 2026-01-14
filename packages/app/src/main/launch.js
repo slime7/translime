@@ -2,7 +2,7 @@ import {
   screen,
 } from 'electron';
 import createWindow from './utils/createWindow';
-import mainStore from './utils/useMainStore';
+import appManager from './utils/useAppManager';
 
 export default () => {
   const { workArea } = screen.getPrimaryDisplay();
@@ -39,5 +39,5 @@ export default () => {
       sandbox: false,
     },
   });
-  mainStore.set('launchWin', launchWin);
+  appManager.setLaunchWin(launchWin);
 };

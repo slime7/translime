@@ -6,6 +6,7 @@ import {
 import EventEmitter from 'node:events';
 import createMainWindow from './main';
 import mainStore from './utils/useMainStore';
+import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import createLaunchWindow from './launch';
 import createTray from './core/tray';
@@ -26,18 +27,18 @@ class CreateElectronApp extends EventEmitter {
 
   // eslint-disable-next-line class-methods-use-this
   base() {
-    mainStore.set('mainProcessLock', app.requestSingleInstanceLock());
-    if (!mainStore.get('mainProcessLock')) {
+    appManager.state.mainProcessLock = app.requestSingleInstanceLock();
+    if (!appManager.state.mainProcessLock) {
       app.quit();
     } else {
       logger.info(`app 启动 | ${process.env.NODE_ENV || 'production'}`);
       app.on('second-instance', (ev, commandLine) => {
         // 当运行第二个实例时,将会聚焦到 win 这个窗口
-        if (mainStore.getWin()) {
-          if (mainStore.getWin().isMinimized()) {
-            mainStore.getWin().restore();
+        if (appManager.getWin()) {
+          if (appManager.getWin().isMinimized()) {
+            appManager.getWin().restore();
           }
-          mainStore.getWin().focus();
+          appManager.getWin().focus();
           linkHandler(commandLine.pop());
         }
       });
@@ -54,15 +55,15 @@ class CreateElectronApp extends EventEmitter {
 
     ipcMain.on('main-renderer-ready', () => {
       setupDeepLink();
-      if (mainStore.get('launchWin')) {
-        mainStore.get('launchWin').close();
-        mainStore.set('launchWin', null);
+      if (appManager.getLaunchWin()) {
+        appManager.getLaunchWin().close();
+        appManager.setLaunchWin(null);
       }
-      mainStore.getWin().show();
+      appManager.getWin().show();
 
       // 开始加载插件
-      mainStore.set('pluginLoader', pluginLoader);
-      mainStore.get('pluginLoader').getPlugins();
+      appManager.setPluginLoader(pluginLoader);
+      appManager.getPluginLoader().getPlugins();
     });
   }
 
@@ -70,7 +71,7 @@ class CreateElectronApp extends EventEmitter {
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
-      if (mainStore.getWin() === null) {
+      if (appManager.getWin() === null) {
         createMainWindow();
       }
     });
@@ -101,7 +102,7 @@ class CreateElectronApp extends EventEmitter {
 
   onAppQuit() {
     app.on('will-quit', () => {
-      mainStore.get('pluginLoader').appClose();
+      appManager.getPluginLoader()?.appClose();
       logger.info('app 关闭');
     });
 
