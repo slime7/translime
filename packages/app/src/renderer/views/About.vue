@@ -40,6 +40,60 @@
     </div>
 
     <h2 class="mt-2">
+      更新
+    </h2>
+
+    <div class="mt-4">
+      <div v-if="updateStatus === 'checking'">
+        正在检查更新...
+      </div>
+      <div v-else-if="updateStatus === 'available'">
+        发现新版本: v{{ updateInfo.version }}
+        <v-btn
+          size="small"
+          color="primary"
+          class="ml-2"
+          :loading="downloading"
+          @click="startDownload"
+        >
+          下载更新
+        </v-btn>
+      </div>
+      <div v-else-if="updateStatus === 'not-available'">
+        当前已是最新版本
+      </div>
+      <div v-else-if="updateStatus === 'downloading'">
+        正在下载: {{ downloadProgress.percent.toFixed(1) }}%
+        <v-progress-linear
+          v-model="downloadProgress.percent"
+          color="primary"
+          height="10"
+          striped
+          class="mt-2"
+        />
+      </div>
+      <div v-else-if="updateStatus === 'downloaded'">
+        更新已下载
+        <v-btn
+          size="small"
+          color="success"
+          class="ml-2"
+          @click="quitAndInstall"
+        >
+          重启并更新
+        </v-btn>
+      </div>
+      <div v-else-if="updateStatus === 'error'">
+        检查更新出错: {{ updateError }}
+      </div>
+      <div v-else>
+        <v-btn size="small" @click="checkForUpdate">
+          检查更新
+        </v-btn>
+      </div>
+    </div>
+
+    <h2 class="mt-2">
       链接
     </h2>
 
@@ -104,8 +158,58 @@ export default {
       openLink('https://github.com/slime7/translime');
     };
 
+    // 自动更新逻辑
+    const updateStatus = ref(''); // checking, available, not-available, downloading, downloaded, error
+    const updateInfo = ref({});
+    const downloadProgress = ref({ percent: 0 });
+    const updateError = ref('');
+    const downloading = ref(false);
+
+    const initAutoUpdate = () => {
+      ipc.on(ipcType.UPDATE_CHECKING, () => {
+        updateStatus.value = 'checking';
+      });
+      ipc.on(ipcType.UPDATE_AVAILABLE, (info) => {
+        updateStatus.value = 'available';
+        updateInfo.value = info;
+        toast.show(`发现新版本 v${info.version}`, 'info');
+      });
+      ipc.on(ipcType.UPDATE_NOT_AVAILABLE, () => {
+        updateStatus.value = 'not-available';
+      });
+      ipc.on(ipcType.UPDATE_ERROR, (err) => {
+        updateStatus.value = 'error';
+        updateError.value = err;
+      });
+      ipc.on(ipcType.UPDATE_DOWNLOAD_PROGRESS, (progress) => {
+        updateStatus.value = 'downloading';
+        downloadProgress.value = progress;
+        downloading.value = true;
+      });
+      ipc.on(ipcType.UPDATE_DOWNLOADED, (info) => {
+        updateStatus.value = 'downloaded';
+        updateInfo.value = info;
+        downloading.value = false;
+        toast.show('更新已下载，请重启安装', 'success');
+      });
+    };
+
+    const startDownload = () => {
+      downloading.value = true;
+      ipc.send(ipcType.START_DOWNLOAD_UPDATE);
+    };
+
+    const quitAndInstall = () => {
+      ipc.send(ipcType.QUIT_AND_INSTALL);
+    };
+
+    const checkForUpdate = () => {
+      ipc.send(ipcType.CHECK_FOR_UPDATE);
+    };
+
     onMounted(() => {
       getVersions();
+      initAutoUpdate();
     });
 
     return {
@@ -118,6 +222,15 @@ export default {
       appDir,
       githubLink,
       appArgv: store.appArgv,
+      // update
+      updateStatus,
+      updateInfo,
+      downloadProgress,
+      updateError,
+      downloading,
+      startDownload,
+      quitAndInstall,
+      checkForUpdate,
     };
   },
 };

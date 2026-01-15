@@ -5,13 +5,13 @@ import {
 } from 'electron';
 import EventEmitter from 'node:events';
 import createMainWindow from './main';
-import mainStore from './utils/useMainStore';
 import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import createLaunchWindow from './launch';
 import createTray from './core/tray';
 import pluginLoader from './core/pluginLoader';
 import setupDeepLink, { linkHandler } from './core/deepLink';
+import * as autoUpdate from './core/autoUpdate';
 
 class CreateElectronApp extends EventEmitter {
   constructor() {
@@ -97,6 +97,12 @@ class CreateElectronApp extends EventEmitter {
         if (process.platform === 'win32') {
           app.setAppUserModelId(this.isDevelopment ? process.execPath : 'translime.app');
         }
+
+        autoUpdate.init();
+        // 延迟一点检查更新，以免影响启动速度
+        setTimeout(() => {
+          autoUpdate.checkForUpdates();
+        }, 3000);
       });
   }
 

@@ -16,12 +16,14 @@ import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
 import netHandler from './netHandler';
+import autoUpdate from './autoUpdate';
 
 const filename = fileURLToPath(import.meta.url);
 const dir = dirname(filename);
 
 const ipcHandler = {
   ...netHandler,
+  ...autoUpdate,
   [ipcType.DEVTOOLS](win = 'app') {
     const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
     if (targetWin) {
