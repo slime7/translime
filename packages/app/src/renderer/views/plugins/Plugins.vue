@@ -424,16 +424,8 @@ export default {
       openPluginSettingPanel();
       installPluginConfirm();
     });
-    const checkUpdate = () => {
-      if (pluginCardRefs.value && pluginCardRefs.value.length) {
-        pluginCardRefs.value.forEach((plugin) => {
-          plugin.getVersions();
-        });
-      }
-    };
 
     onMounted(() => {
-      checkUpdate();
     });
 
     return {
