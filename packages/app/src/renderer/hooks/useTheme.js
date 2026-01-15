@@ -13,7 +13,7 @@ const useTheme = () => {
 
   const setDark = (dark) => {
     store.dark = dark;
-    vTheme.global.name.value = dark ? 'dark' : 'light';
+    vTheme.change(dark ? 'dark' : 'light');
   };
 
   const setTheme = (theme) => {

@@ -6,10 +6,12 @@
       <div class="mt-2">
         <v-text-field
           v-model="search"
-          placeholder="输入插件包名"
+          label="插件名"
+          placeholder="搜索插件或留空列出所有插件"
           variant="outlined"
           density="compact"
           prefix="translime-plugin-"
+          color="primary"
           @keyup.enter="searchAction"
           @click.right="showTextEditContextMenu"
         >

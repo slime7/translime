@@ -151,6 +151,7 @@
           class="ma-3"
           size="125"
           tile
+          variant="text"
           v-if="!plugin.searchResultItem && plugin.icon"
         >
           <v-img :src="plugin.icon" />

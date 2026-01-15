@@ -52,6 +52,7 @@
                 :rules="menuItem.required ? requiredRule : []"
                 :required="menuItem.required"
                 variant="outlined"
+                color="primary"
                 @click.right="showTextEditContextMenu"
               />
 
@@ -70,6 +71,7 @@
                     :rules="menuItem.required ? requiredRule : []"
                     :required="menuItem.required"
                     variant="outlined"
+                    color="primary"
                     readonly
                     @click:control="selectFile.open(menuItem)"
                   />
@@ -86,6 +88,7 @@
                 :rules="menuItem.required ? requiredRule : []"
                 :required="menuItem.required"
                 variant="outlined"
+                color="primary"
               />
 
               <template

@@ -69,14 +69,3 @@ a {
 .v-radio .material-icons {
   --md-icons-fill: 'FILL' 0;
 }
-
-/* fix vTextField prefix text opacity */
-#app {
-  .v-text-field__prefix {
-    opacity: 1;
-  }
-
-  .v-field--active .v-text-field__prefix {
-    color: var(--v-theme-primary);
-  }
-}

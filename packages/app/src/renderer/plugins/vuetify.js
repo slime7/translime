@@ -130,6 +130,13 @@ const vuetify = createVuetify({
     VBtn: {
       class: 'text-none',
     },
+    VSwitch: {
+      color: 'primary',
+      baseColor: 'surface-container-highest',
+      hideDetails: true,
+      inset: true,
+      trueIcon: 'check',
+    },
     global: {
       style: [{
         fontFamily: '"Roboto", "Noto Sans SC", "Microsoft YaHei", "微软雅黑", sans-serif',

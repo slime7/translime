@@ -100,7 +100,7 @@ export default {
     const getAppSettings = () => {
       const params = new URLSearchParams(window.location.search);
       const darkParam = params.get('dark');
-      vTheme.global.name.value = !!darkParam && darkParam !== 'false' && darkParam !== '0' ? 'dark' : 'light';
+      vTheme.change(!!darkParam && darkParam !== 'false' && darkParam !== '0' ? 'dark' : 'light');
 
       appSetting.value = JSON.parse(atob(params.get('app-setting')));
       if (appSetting.value.useNativeTitleBar) {
@@ -111,7 +111,7 @@ export default {
     };
     const themeUpdated = () => {
       ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
-        vTheme.global.name.value = dark ? 'dark' : 'light';
+        vTheme.change(dark ? 'dark' : 'light');
       });
     };
 
