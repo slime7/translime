@@ -201,16 +201,37 @@ export default {
       total: 0,
     });
     const searchPage = ref(0);
-    const parseSearchResult = (item) => ({
-      packageName: item.name,
-      title: item.name,
-      description: item.description,
-      author: item.author ? item.author.name : item.publisher.username,
-      icon: null,
-      version: item.version,
-      enabled: false,
-      searchResultItem: true,
-    });
+    const parseSearchResult = (item) => {
+      const versions = Object.keys(item.versions).map((version) => ({
+        value: version,
+        title: `@${version}`,
+      })).reverse();
+      const latest = item.versions[item['dist-tags'].latest];
+
+      return {
+        packageName: latest.name,
+        title: latest.plugin.title,
+        description: latest.plugin.description,
+        author: latest.author ? latest.author.name : latest.maintainers[0].name,
+        icon: latest.plugin.icon ? `https://unpkg.com/${latest.name}@${latest.version}/${latest.plugin.icon}` : null,
+        version: latest.version,
+        enabled: false,
+        searchResultItem: true,
+        versions,
+      };
+    };
+    const getPluginDetail = async (packageName) => {
+      try {
+        return await useHttp(`https://registry.npmjs.org/${packageName}`, {
+          params: {
+            x: Math.random(),
+          },
+        }).get();
+      } catch (err) {
+        alert.show(err.message, 'error');
+      }
+      return null;
+    };
     const searchRequest = async (q = '', page = 0) => {
       if (loading.search) {
         return;
@@ -227,7 +248,8 @@ export default {
           },
         }).get();
         const filterData = data.objects.filter((item) => item.package.name.includes('translime-plugin'));
-        searchResult.list.push(...filterData.map((item) => parseSearchResult(item.package)));
+        const packages = await Promise.all(filterData.map((p) => getPluginDetail(p.package.name, p.package.version)));
+        searchResult.list.push(...packages.map((item) => parseSearchResult(item)));
         searchResult.total = +data.total;
         searchPage.value = page;
       } catch (err) {

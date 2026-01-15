@@ -140,8 +140,7 @@
                 variant="outlined"
                 hide-details
                 density="compact"
-                :loading="getVersionLoading"
-                @update:menu="getVersions"
+                color="primary"
               />
             </template>
           </v-card-actions>
@@ -152,7 +151,7 @@
           size="125"
           tile
           variant="text"
-          v-if="!plugin.searchResultItem && plugin.icon"
+          v-if="plugin.icon"
         >
           <v-img :src="plugin.icon" />
         </v-avatar>
@@ -179,7 +178,6 @@ import verCompare from 'semver-compare';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
-import useHttp from '@/hooks/useHttp';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
 import usePluginActions from './hooks/usePluginActions';
@@ -219,8 +217,8 @@ export default {
       const installedPlugin = plugins.value.find((p) => p.packageName === plugin.value.packageName);
       return verCompare(plugin.value.version, installedPlugin.version) > 0;
     });
-    const cardTitle = computed(() => (plugin.value.author ? `${plugin.value.title}@${plugin.value.version}` : plugin.value.title));
-    const cardSubTitle = computed(() => (plugin.value.author ? plugin.value.author : plugin.value.version));
+    const cardTitle = computed(() => plugin.value.title);
+    const cardSubTitle = computed(() => `${plugin.value.author ? `${plugin.value.author} · ` : ''}${plugin.value.version}`);
     const authLink = () => {
       ipc.send(ipcType.OPEN_LINK, { url: String(plugin.value.link) });
     };
@@ -244,39 +242,9 @@ export default {
         value: '',
         title: '@latest',
       },
+      ...(plugin.value.versions ?? []),
     ]);
     const hasNewVersion = computed(() => versionList.length > 1 && verCompare(versionList[1].value, plugin.value.version) > 0);
-    const getVersionLoading = ref(false);
-    const versionLoaded = ref(false);
-    const getVersions = async () => {
-      if (versionLoaded.value) {
-        return;
-      }
-      if (getVersionLoading.value) {
-        return;
-      }
-      getVersionLoading.value = true;
-      try {
-        const data = await useHttp(`https://registry.npmjs.com/${pluginId}`, {
-          method: 'get',
-          params: {
-            x: Math.random(),
-          },
-        }).get();
-        versionLoaded.value = true;
-        const versions = Object.keys(data.versions).map((version) => ({
-          value: version,
-          title: `@${version}`,
-        })).reverse();
-        versionList.push(...versions);
-      } catch (err) {
-        console.log(pluginId, err.message);
-        console.error(err);
-        // alert.show(err.message, 'error');
-      } finally {
-        getVersionLoading.value = false;
-      }
-    };
     watch([isInstalled, canUpdated], () => {
       selectedVersion.value = '';
     });
@@ -284,7 +252,6 @@ export default {
     expose({
       showSettingPanel,
       pluginId,
-      getVersions,
     });
 
     return {
@@ -301,8 +268,6 @@ export default {
       canUpdated,
       selectedVersion,
       versionList,
-      getVersionLoading,
-      getVersions,
       hasNewVersion,
     };
   },
