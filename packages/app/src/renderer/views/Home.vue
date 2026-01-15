@@ -1,9 +1,13 @@
 <template>
   <v-container class="home">
     <div class="d-flex flex-column justify-center">
-      <h1>translime</h1>
+      <h1 class="text-center">
+        translime
+      </h1>
 
-      <p>一个基于 <code>electron</code> 实现的插件加载器。</p>
+      <p class="text-center">
+        一个基于 <code>electron</code> 实现的插件加载器。
+      </p>
 
       <v-row class="mt-2">
         <v-col cols="6">
@@ -54,6 +58,3 @@ export default {
   },
 };
 </script>
-
-<style lang="scss" scoped>
-</style>

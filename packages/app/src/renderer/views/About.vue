@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="about">
+  <v-container class="about">
     <template v-if="isDev">
       <h2>开发</h2>
 
