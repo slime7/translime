@@ -25,7 +25,9 @@
         </v-btn>
       </div>
 
-      <p>启动命令：{{ appArgv.join(' ') }}</p>
+      <p class="break-all">
+        启动命令：{{ appArgv.join(' ') }}
+      </p>
     </template>
 
     <h2>版本</h2>

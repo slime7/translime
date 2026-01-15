@@ -24,6 +24,7 @@
     "lint": "eslint --ext js,jsx,ts,vue src/ --fix"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "axios": "~1.8.4",
     "dayjs": "^1.11.9",
     "electron-store": "^8.1.0",
@@ -31,6 +32,7 @@
     "npm": "^9.8.0",
     "pinia": "^2.3.1",
     "semver-compare": "^1.0.0",
+    "tailwindcss": "^4.1.18",
     "tar": "^7.4.3",
     "vue": "^3.5.13",
     "vue-router": "^4.2.4",

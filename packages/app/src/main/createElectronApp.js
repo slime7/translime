@@ -64,6 +64,12 @@ class CreateElectronApp extends EventEmitter {
       // 开始加载插件
       appManager.setPluginLoader(pluginLoader);
       appManager.getPluginLoader().getPlugins();
+
+      autoUpdate.init();
+      // 延迟一点检查更新，以免影响启动速度
+      setTimeout(() => {
+        autoUpdate.checkForUpdates();
+      }, 15000);
     });
   }
 
@@ -97,12 +103,6 @@ class CreateElectronApp extends EventEmitter {
         if (process.platform === 'win32') {
           app.setAppUserModelId(this.isDevelopment ? process.execPath : 'translime.app');
         }
-
-        autoUpdate.init();
-        // 延迟一点检查更新，以免影响启动速度
-        setTimeout(() => {
-          autoUpdate.checkForUpdates();
-        }, 3000);
       });
   }
 

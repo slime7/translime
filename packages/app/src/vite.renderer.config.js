@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { builtinModules } from 'node:module';
 import { defineConfig, normalizePath } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import tailwindcss from '@tailwindcss/vite';
 import vuetify from 'vite-plugin-vuetify';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
@@ -47,15 +48,29 @@ export default defineConfig(({ mode }) => {
         ],
       }),
       vue(),
-      /* 使用自定义 sass 变量导致 dev 启动出问题
-       vuetify({
-       styles: {
-       configFile: 'plugins/variables.scss',
-       },
-       }),
-       */
-      vuetify(),
+      vuetify({
+        styles: {
+          configFile: resolve(RENDERER_ROOT, 'assets/styles/settings.scss'),
+        },
+      }),
+      tailwindcss(),
     ],
+    css: {
+      preprocessorOptions: {
+        sass: {
+          api: 'modern-compiler',
+        },
+        scss: {
+          api: 'modern-compiler',
+        },
+      },
+    },
+    optimizeDeps: {
+      exclude: [
+        'vuetify',
+        'vue-router',
+      ],
+    },
     base: '',
     server: {
       fs: {

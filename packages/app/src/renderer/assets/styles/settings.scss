@@ -1,0 +1,9 @@
+/**
+ * src/assets/styles/settings.scss
+ */
+
+@forward 'vuetify/settings' with (
+  $utilities: (),
+  $layers: true,
+  $body-font-family: ('Roboto', 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif),
+);

@@ -2,9 +2,9 @@
 @import '../fonts/robot/robot.css';
 @import '../fonts/noto sans sc/noto_sans_sc.css';
 @import '../fonts/source code pro/source_code_pro.css';
+@layer vuetify, tailwind;
 
 html {
-  font-family: Roboto, 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
   overflow-y: auto !important;
 }
 

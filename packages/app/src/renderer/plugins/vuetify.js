@@ -1,4 +1,3 @@
-
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
 import { zhHans } from 'vuetify/locale';
@@ -19,6 +18,7 @@ const vuetify = createVuetify({
   },
   theme: {
     defaultTheme: 'light',
+    layers: true,
     themes: {
       light: {
         colors: {
