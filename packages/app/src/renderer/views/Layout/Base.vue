@@ -16,7 +16,7 @@
       <notification />
 
       <div class="flex flex-col h-full" id="app-main-container">
-        <div class="scroll-content flex">
+        <div class="scroll-content">
           <router-view v-slot="{ Component, route }">
             <v-fade-transition
               mode="out-in"

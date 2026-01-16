@@ -1,87 +1,275 @@
 <template>
   <v-container class="setting">
-    <h2>设置</h2>
-
-    <h3 class="mt-4">
-      通用
-    </h3>
-
-    <div>
-      <v-checkbox
-        class="mt-2"
-        :model-value="settings.openAtLogin"
-        label="开机自动启动"
-        hide-details
-        color="primary"
-        @update:model-value="onOpenAtLogin"
-      />
+    <div class="text-center text-5xl">
+      设置
     </div>
 
-    <h5 class="mt-2">
-      主题
-    </h5>
+    <div class="mt-4 columns-1 lg:columns-2 gap-4 mx-auto max-w-204">
+      <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
+        <div class="text-primary">
+          通用
+        </div>
 
-    <div>
-      <card-radio
-        :value="settings.theme === 'light'"
-        class="mt-2"
-        @click="changeTheme('light')"
-      >
-        明亮
-      </card-radio>
-      <card-radio
-        :value="settings.theme === 'dark'"
-        class="mt-2"
-        @click="changeTheme('dark')"
-      >
-        暗黑
-      </card-radio>
-      <card-radio
-        :value="settings.theme === 'system'"
-        class="mt-2"
-        @click="changeTheme('system')"
-      >
-        系统
-      </card-radio>
+        <v-card
+          class="mt-2 rounded-[16px]"
+          rounded
+          variant="flat"
+          color="transparent"
+        >
+          <v-list
+            class="py-0"
+            indent="4"
+            bg-color="transparent"
+          >
+            <v-list-item
+              title="开机自动启动"
+              density="comfortable"
+              base-color="primary"
+              rounded
+              link
+              active
+              @click="onOpenAtLogin(!settings.openAtLogin)"
+            >
+              <template #append>
+                <v-switch
+                  :model-value="settings.openAtLogin"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  readonly
+                />
+              </template>
+            </v-list-item>
+
+            <v-list-item
+              title="显示开发中插件(重启后生效)"
+              density="comfortable"
+              class="mt-1"
+              base-color="primary"
+              rounded
+              link
+              active
+              @click="onShowDevPlugin(!settings.showDevPlugin)"
+            >
+              <template #append>
+                <v-switch
+                  :model-value="settings.showDevPlugin"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  readonly
+                />
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card>
+
+        <v-card
+          class="mt-2 rounded-[16px]"
+          rounded
+          variant="flat"
+          color="transparent"
+        >
+          <v-list
+            class="py-0"
+            indent="4"
+            bg-color="transparent"
+          >
+            <v-list-item
+              title="打开 devtools(F12)"
+              density="comfortable"
+              rounded
+              link
+              active
+              @click="showDevtools"
+            />
+
+            <v-list-item
+              title="重新启动"
+              density="comfortable"
+              class="mt-1"
+              rounded
+              link
+              active
+              @click="relaunch"
+            />
+          </v-list>
+        </v-card>
+      </div>
+
+      <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
+        <div class="text-primary">
+          插件域名
+        </div>
+
+        <v-card
+          class="mt-2 rounded-[16px]"
+          rounded
+          variant="flat"
+          color="transparent"
+        >
+          <v-list
+            class="py-0"
+            indent="4"
+            bg-color="transparent"
+            selectable
+            mandatory
+          >
+            <v-list-item
+              v-for="(registry, index) in registryList"
+              :key="registry.id"
+              :class="[settings.registry === registry.link ? 'rounded-[16px]' : 'rounded-[4px]', { 'mt-1': index > 0 }]"
+              :lines="registry.link ? 'two' : 'one'"
+              :title="registry.name"
+              :subtitle="registry.link || null"
+              density="comfortable"
+              rounded
+              link
+              :base-color="settings.registry === registry.link ? 'secondary' : 'primary'"
+              active
+              @click="onSelectRegistry(registry.link, registry.id)"
+            >
+              <template #prepend>
+                <v-radio
+                  :model-value="settings.registry === registry.link"
+                  class="mr-4"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  readonly
+                />
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card>
+      </div>
+
+      <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
+        <div class="text-primary">
+          外观
+        </div>
+
+        <v-card
+          class="mt-2 rounded-[16px]"
+          rounded
+          variant="flat"
+          color="transparent"
+        >
+          <v-list
+            class="py-0"
+            indent="4"
+            bg-color="transparent"
+            selectable
+            mandatory
+          >
+            <v-list-item
+              :class="[settings.theme === 'light' ? 'rounded-[16px]' : 'rounded-[4px]']"
+              title="明亮"
+              density="comfortable"
+              rounded
+              link
+              :base-color="settings.theme === 'light' ? 'secondary' : 'primary'"
+              active
+              @click="changeTheme('light')"
+            >
+              <template #prepend>
+                <v-radio
+                  :model-value="settings.theme === 'light'"
+                  class="mr-4"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  readonly
+                />
+              </template>
+            </v-list-item>
+
+            <v-list-item
+              class="mt-1"
+              :class="[settings.theme === 'dark' ? 'rounded-[16px]' : 'rounded-[4px]']"
+              title="暗黑"
+              density="comfortable"
+              rounded
+              link
+              :base-color="settings.theme === 'dark' ? 'secondary' : 'primary'"
+              active
+              @click="changeTheme('dark')"
+            >
+              <template #prepend>
+                <v-radio
+                  :model-value="settings.theme === 'dark'"
+                  class="mr-4"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  readonly
+                />
+              </template>
+            </v-list-item>
+
+            <v-list-item
+              class="mt-1"
+              :class="[settings.theme === 'system' ? 'rounded-[16px]' : 'rounded-[4px]']"
+              title="系统"
+              density="comfortable"
+              rounded
+              link
+              :base-color="settings.theme === 'system' ? 'secondary' : 'primary'"
+              active
+              @click="changeTheme('system')"
+            >
+              <template #prepend>
+                <v-radio
+                  :model-value="settings.theme === 'system'"
+                  class="mr-4"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  readonly
+                />
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card>
+
+        <v-card
+          class="mt-2 rounded-[16px]"
+          rounded
+          variant="flat"
+          color="transparent"
+        >
+          <v-list
+            class="py-0"
+            indent="4"
+            bg-color="transparent"
+            selectable
+            mandatory
+          >
+            <v-list-item
+              title="使用系统标题栏(重启后生效)"
+              density="comfortable"
+              base-color="primary"
+              rounded
+              link
+              active
+              @click="onUseNativeTitleBar(!settings.useNativeTitleBar)"
+            >
+              <template #append>
+                <v-switch
+                  :model-value="settings.useNativeTitleBar"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  readonly
+                />
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card>
+      </div>
     </div>
 
     <div>
-      <v-switch
-        class="mt-2"
-        v-model="useNativeTitleBarNext"
-        label="使用系统标题栏(重启后生效)"
-        inset
-        hide-details
-        color="primary"
-        @update:model-value="onUseNativeTitleBar"
-      />
-    </div>
-
-    <v-divider class="mt-4" />
-
-    <h3 class="mt-4">
-      插件
-    </h3>
-
-    <h5 class="mt-2">
-      npm 服务器
-    </h5>
-
-    <div>
-      <card-radio
-        v-for="registry in registryList"
-        :key="registry.id"
-        :value="settings.registry === registry.link"
-        :lines="registry.link ? 'two' : 'one'"
-        class="mt-2"
-        @click="onSelectRegistry(registry.link, registry.id)"
-      >
-        {{ registry.name }}
-        <template #subtitle>
-          {{ registry.link }}
-        </template>
-      </card-radio>
-
       <v-dialog
         v-model="customRegistryPanelVisible"
         persistent
@@ -124,32 +312,6 @@
         </v-card>
       </v-dialog>
     </div>
-
-    <h5 class="mt-4">
-      开发
-    </h5>
-
-    <div>
-      <v-switch
-        class="mt-2"
-        :model-value="settings.showDevPlugin"
-        label="显示开发中插件(重启后生效)"
-        inset
-        hide-details
-        color="primary"
-        @update:model-value="onShowDevPlugin"
-      />
-    </div>
-
-    <div class="mt-4">
-      <v-btn @click="showDevtools">
-        打开 devtools(F12)
-      </v-btn>
-
-      <v-btn class="ml-4" @click="relaunch">
-        重新启动
-      </v-btn>
-    </div>
   </v-container>
 </template>
 
@@ -165,14 +327,9 @@ import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { appConfigStore, showTextEditContextMenu } from '@/utils';
-import CardRadio from '@/components/CardRadio.vue';
 
 export default {
   name: 'AppSetting',
-
-  components: {
-    CardRadio,
-  },
 
   setup() {
     const ipc = useIpc();
@@ -272,7 +429,11 @@ export default {
     watch(() => store.appSetting.useNativeTitleBar, () => {
       useNativeTitleBarNext.value = store.appSetting.useNativeTitleBar;
     });
+    const setUseNativeTitleBar = (value) => {
+      store.setUseNativeTitleBar(value);
+    };
     const onUseNativeTitleBar = (v) => {
+      setUseNativeTitleBar(!!v);
       appConfigStore.set('setting.useNativeTitleBar', !!v);
     };
 
@@ -303,7 +464,4 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.setting {
-  max-width: 800px;
-}
 </style>
