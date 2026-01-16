@@ -3,19 +3,19 @@
     v-slot="{ isHovering, props }"
   >
     <v-card
-      class="plugin-item-card ease-animation fill-height"
+      class="plugin-item-card ease-animation h-full"
       v-bind="props"
       :elevation="isHovering ? 10 : 2"
       :disabled="disabled"
       rounded="xl"
-      color="primary-container"
+      color="tertiary-container"
     >
-      <div class="d-flex flex-no-wrap justify-space-between">
+      <div class="flex flex-nowrap justify-between">
         <div class="min-w-0">
           <v-tooltip :text="cardTitle" location="top">
             <template #activator="{ props: titleProps }">
               <v-card-title
-                class="text-h5"
+                class="text-2xl"
                 v-bind="titleProps"
               >
                 <v-chip
@@ -147,7 +147,7 @@
         </div>
 
         <v-avatar
-          class="ma-3"
+          class="m-3"
           size="125"
           tile
           variant="text"
@@ -275,10 +275,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.min-w-0 {
-  min-width: 0;
-}
-
 .version-selector {
   max-width: 135px;
 }

@@ -148,7 +148,7 @@
           </v-container>
         </v-form>
 
-        <div v-else class="d-flex justify-center">
+        <div v-else class="flex justify-center">
           <v-progress-circular indeterminate />
         </div>
       </v-card-text>

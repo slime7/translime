@@ -15,7 +15,7 @@
         <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
         <v-card-text v-html="dialog.content" />
         <v-card-text v-if="dialog.type === 'loading'">
-          <div class="d-flex align-center justify-center ma-4">
+          <div class="flex items-center justify-center m-4">
             <v-progress-circular
               indeterminate
               color="primary"
@@ -37,7 +37,7 @@
     <v-dialog
       class="simple-dialog loader"
       content-class="no-shadow"
-      :value="loader"
+      :model-value="loader"
       width="96"
       persistent
       no-click-animation
@@ -45,7 +45,7 @@
     >
       <div>
         <v-sheet
-          class="loader-wrapper ma-4 d-flex align-center justify-center"
+          class="loader-wrapper m-4 flex items-center justify-center"
           rounded="circle"
           elevation="6"
         >
@@ -65,7 +65,9 @@
       max-width="290"
       v-model="confirm.visible"
     >
-      <v-card>
+      <v-card
+        rounded="xl"
+      >
         <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
         <v-card-title v-text="confirm.title" />
 

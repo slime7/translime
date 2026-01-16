@@ -4,23 +4,23 @@
       <h2>开发</h2>
 
       <div class="mt-4">
-        <v-btn class="ma-2" color="primary" @click="testAlert">
+        <v-btn class="m-2" color="primary" @click="testAlert">
           发送 alert
         </v-btn>
 
-        <v-btn class="ma-2" color="primary" @click="testToast">
+        <v-btn class="m-2" color="primary" @click="testToast">
           发送 toast
         </v-btn>
 
-        <v-btn class="ma-2" color="primary" @click="testConfirm">
+        <v-btn class="m-2" color="primary" @click="testConfirm">
           发送 confirm
         </v-btn>
 
-        <v-btn class="ma-2" color="primary" @click="appDir">
+        <v-btn class="m-2" color="primary" @click="appDir">
           打开 app 目录
         </v-btn>
 
-        <v-btn class="ma-2" color="primary" @click="reloadApp">
+        <v-btn class="m-2" color="primary" @click="reloadApp">
           重载
         </v-btn>
       </div>

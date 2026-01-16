@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar app class="system-bar pa-0" v-if="!appSetting.useNativeTitleBar">
+    <v-system-bar app class="system-bar p-0" v-if="!appSetting.useNativeTitleBar">
       <div v-if="!plugin" class="px-4">
         translime
       </div>
@@ -18,9 +18,9 @@
       />
     </v-system-bar>
 
-    <v-main class="fill-height">
-      <div class="d-flex flex-column fill-height" id="app-main-container">
-        <div class="scroll-content flex-fill">
+    <v-main class="h-full">
+      <div class="flex flex-col h-full" id="app-main-container">
+        <div class="scroll-content flex-auto">
           <div class="plugin-container">
             <plugin-title-bar :plugin="plugin" :visible="appBarVisible" v-if="plugin" />
 

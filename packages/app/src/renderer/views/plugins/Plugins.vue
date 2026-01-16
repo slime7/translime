@@ -56,7 +56,7 @@
           </v-col>
 
           <template v-if="loading.search">
-            <div class="w-100 my-2 d-flex justify-center">
+            <div class="w-100 my-2 flex justify-center">
               <v-progress-circular color="primary" indeterminate />
             </div>
           </template>
@@ -131,7 +131,7 @@
             </template>
           </v-tooltip>
 
-          <div class="mt-2 d-flex justify-center">
+          <div class="mt-2 flex justify-center">
             <v-btn
               color="primary"
               rounded

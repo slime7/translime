@@ -1,7 +1,7 @@
 <template>
-  <div class="window-controls fill-height">
-    <div class="d-flex fill-height">
-      <div class="window-control-btn d-flex align-center justify-center fill-height" @click="appMinimize">
+  <div class="window-controls h-full">
+    <div class="flex h-full">
+      <div class="window-control-btn flex items-center justify-center" @click="appMinimize">
         <svg
           width="11"
           height="11"
@@ -16,7 +16,7 @@
         </svg>
       </div>
 
-      <div class="window-control-btn d-flex align-center justify-center fill-height" v-if="isMaximize" @click="appUnmaximize">
+      <div class="window-control-btn flex items-center justify-center" v-if="isMaximize" @click="appUnmaximize">
         <svg
           width="11"
           height="11"
@@ -31,7 +31,7 @@
         </svg>
       </div>
 
-      <div class="window-control-btn d-flex align-center justify-center fill-height" v-if="!isMaximize" @click="appMaximize">
+      <div class="window-control-btn flex items-center justify-center" v-if="!isMaximize" @click="appMaximize">
         <svg
           width="11"
           height="11"
@@ -46,7 +46,7 @@
         </svg>
       </div>
 
-      <div class="window-control-btn close d-flex align-center justify-center fill-height" @click="appClose">
+      <div class="window-control-btn close flex items-center justify-center" @click="appClose">
         <svg
           width="11"
           height="11"

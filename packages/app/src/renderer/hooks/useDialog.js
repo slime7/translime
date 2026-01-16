@@ -1,7 +1,15 @@
+import { storeToRefs } from 'pinia';
 import useDialogStore from '@/store/dialogStore';
 
 const useDialog = () => {
   const dialogStore = useDialogStore();
+
+  const {
+    dialogs,
+    titleClass,
+    loader,
+    confirm,
+  } = storeToRefs(dialogStore);
 
   const showConfirm = async (content, title = null) => {
     const payload = {
@@ -43,10 +51,10 @@ const useDialog = () => {
   };
 
   return {
-    dialogs: dialogStore.dialogs,
-    titleClass: dialogStore.titleClass,
-    loader: dialogStore.loader,
-    confirm: dialogStore.confirm,
+    dialogs,
+    titleClass,
+    loader,
+    confirm,
     showConfirm,
     show,
     pop: dialogStore.pop,

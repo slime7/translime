@@ -1,6 +1,6 @@
 <template>
   <v-container class="home">
-    <div class="d-flex flex-column justify-center">
+    <div class="flex flex-col justify-center">
       <h1 class="text-center">
         translime
       </h1>

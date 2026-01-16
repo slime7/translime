@@ -128,7 +128,8 @@ const vuetify = createVuetify({
   },
   defaults: {
     VBtn: {
-      class: 'text-none',
+      class: 'normal-case',
+      // rounded: '3xl',
     },
     VSwitch: {
       color: 'primary',

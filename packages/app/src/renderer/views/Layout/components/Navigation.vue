@@ -4,7 +4,7 @@
     permanent
     width="73"
   >
-    <div class="navi-panel pa-2">
+    <div class="navi-panel p-2">
       <navi-link
         :to="{ name: 'Home' }"
         icon="home"
@@ -38,7 +38,7 @@
       <v-hover v-slot="{ isHovering, props }">
         <a
           href="javascript:;"
-          class="navi-btn text-decoration-none d-block ease-animation"
+          class="navi-btn no-underline block ease-animation"
           v-bind="props"
           @click="showNotification"
         >
@@ -46,10 +46,10 @@
           <v-avatar
             class="transition-radius"
             size="56"
-            :color="isHovering ? 'primary' : 'grey-darken-2'"
-            :rounded="isHovering ? 'xl' : 'circle'"
+            :color="isHovering ? 'primary-container' : 'secondary-container'"
+            :rounded="isHovering ? 'xl' : 'full'"
           >
-            <v-icon :color="isHovering ? 'white' : 'primary'">notifications</v-icon>
+            <v-icon :color="isHovering ? 'on-primary-container' : 'on-secondary-container'">notifications</v-icon>
           </v-avatar>
 
           <v-tooltip
@@ -65,7 +65,7 @@
     <template v-if="pluginPages.length">
       <v-divider />
 
-      <div class="navi-panel pa-2">
+      <div class="navi-panel p-2">
         <navi-link
           v-for="plugin in pluginPages"
           :key="plugin.packageName"

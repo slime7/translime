@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar class="system-bar pa-0" v-if="!useNativeTileBar">
+    <v-system-bar class="system-bar p-0" v-if="!useNativeTileBar">
       <div class="px-4">
         translime
       </div>
@@ -15,7 +15,7 @@
     <v-main class="h-screen">
       <notification />
 
-      <div class="d-flex flex-column fill-height" id="app-main-container">
+      <div class="flex flex-col h-full" id="app-main-container">
         <div class="scroll-content flex">
           <router-view v-slot="{ Component, route }">
             <v-fade-transition
