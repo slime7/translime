@@ -24,6 +24,7 @@
     "lint": "eslint --ext js,jsx,ts,vue src/ --fix"
   },
   "dependencies": {
+    "@material/material-color-utilities": "^0.3.0",
     "@tailwindcss/vite": "^4.1.18",
     "axios": "~1.8.4",
     "dayjs": "^1.11.9",

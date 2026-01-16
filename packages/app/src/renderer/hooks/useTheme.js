@@ -28,10 +28,16 @@ const useTheme = () => {
     store.setAppTheme(theme);
   };
 
+  const setCustomTheme = (theme, colors) => {
+    console.log(vTheme.themes.value);
+    vTheme.themes.value[theme].colors = colors;
+  };
+
   return {
     getNativeTheme,
     setTheme,
     setDark,
+    setCustomTheme,
   };
 };
 
