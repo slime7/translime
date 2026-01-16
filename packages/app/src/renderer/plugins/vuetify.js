@@ -133,7 +133,6 @@ const vuetify = createVuetify({
     },
     VSwitch: {
       color: 'primary',
-      baseColor: 'surface-container-highest',
       hideDetails: true,
       inset: true,
       trueIcon: 'check',
