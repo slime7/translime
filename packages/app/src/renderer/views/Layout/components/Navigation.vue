@@ -1,6 +1,7 @@
 <template>
   <v-navigation-drawer
     class="navi-drawer"
+    color="surface-container-low"
     permanent
     width="73"
   >

@@ -1,5 +1,10 @@
 import { argbFromHex, hexFromArgb } from '@material/material-color-utilities';
-import { getThemeStyles, themeFromImage, themeFromSourceColor } from '@/utils/mdColorHelper';
+import {
+  getReadableColors,
+  getThemeStyles,
+  themeFromImage,
+  themeFromSourceColor,
+} from '@/utils/mdColorHelper';
 
 /**
  * Material Design 3 配色方案变体
@@ -7,13 +12,14 @@ import { getThemeStyles, themeFromImage, themeFromSourceColor } from '@/utils/md
  */
 
 /**
- * M3 主题对象
+ * M3 主题对象 (十六进制格式)
  * @typedef {object} M3Theme
- * @property {number} source - 源颜色 (ARGB)
- * @property {object} schemes - 包含 light 和 dark 配色方案
- * @property {object} schemes.light - 浅色方案下的所有颜色 token
- * @property {object} schemes.dark - 深色方案下的所有颜色 token
- * @property {object} palettes - 主要调色板
+ * @property {string} source - 源颜色 (十六进制格式，如 '#6750A4')
+ * @property {object} schemes - 包含 light 和 dark 配色方案 (十六进制格式)
+ * @property {object} schemes.light - 浅色方案下的所有颜色 token (十六进制格式)
+ * @property {object} schemes.dark - 深色方案下的所有颜色 token (十六进制格式)
+ * @property {object} palettes - 主要调色板 (ARGB 数字格式)
+ * @property {Array<object>} [customColors] - 自定义颜色数组 (十六进制格式)
  */
 
 /**
@@ -46,7 +52,8 @@ const getThemeColorFromColor = (
   customColors = [],
 ) => {
   const sourceArgb = argbFromHex(color);
-  return themeFromSourceColor(sourceArgb, variant, contrastLevel, customColors);
+  const theme = themeFromSourceColor(sourceArgb, variant, contrastLevel, customColors);
+  return getReadableColors(theme);
 };
 
 /**
@@ -78,7 +85,10 @@ const getThemeColorFromImage = async (
   variant = 'SchemeTonalSpot',
   contrastLevel = 0.0,
   customColors = [],
-) => themeFromImage(image, variant, contrastLevel, customColors);
+) => {
+  const theme = await themeFromImage(image, variant, contrastLevel, customColors);
+  return getReadableColors(theme);
+};
 
 /**
  * 将 M3 主题转换为 CSS 样式对象 (CSS 变量)

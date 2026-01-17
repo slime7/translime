@@ -54,6 +54,21 @@ a {
   transition: all .25s cubic-bezier(.4, 0, .2, 1);
 }
 
+.ease-standard {
+  transition-timing-function: cubic-bezier(.2, 0, 0, 1);
+  transition-duration: .3s;
+}
+
+.ease-decelerate {
+  transition-timing-function: cubic-bezier(0, 0, 0, 1);
+  transition-duration: .25s;
+}
+
+.ease-accelerate {
+  transition-timing-function: cubic-bezier(.3, 0, 1, 1);
+  transition-duration: .2s;
+}
+
 .custom-title-bar .v-overlay-container .v-overlay {
   top: 24px;
 
