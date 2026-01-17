@@ -71,7 +71,7 @@
           <mde-list-item
             title="颜色"
             item-type="select"
-            :selected="'translime'"
+            :selected="themeColorName"
             @click="setColorDialogOpen"
           />
           <mde-list-item
@@ -190,8 +190,57 @@
           <v-card-title>选择颜色</v-card-title>
 
           <v-card-text>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <v-card
+                class="rounded-2xl"
+                link
+                variant="outlined"
+                rounded
+                :color="setColorDialog.selected === 'translime' ? 'primary' : 'outline'"
+                @click="onSelectThemeColor('translime', '#20a6fc', 'SchemeRainbow')"
+              >
+                <v-card-text class="relative">
+                  <div class="flex flex-col items-center">
+                    <div class="flex">
+                      <div
+                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] z-4"
+                        :style="{ 'background-color': setColorDialog.translimeThemeColors[store.dark ? 'dark' : 'light'].primary }"
+                      />
+                      <div
+                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-3"
+                        :style="{ 'background-color': setColorDialog.translimeThemeColors[store.dark ? 'dark' : 'light'].secondary }"
+                      />
+                      <div
+                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-2"
+                        :style="{ 'background-color': setColorDialog.translimeThemeColors[store.dark ? 'dark' : 'light'].tertiary }"
+                      />
+                      <div
+                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-1"
+                        :style="{ 'background-color': setColorDialog.translimeThemeColors[store.dark ? 'dark' : 'light'].error }"
+                      />
+                    </div>
+
+                    <div class="mt-2 text-primary select-none">
+                      默认
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="setColorDialog.selected === 'translime'"
+                    class="absolute inset-0 flex items-center justify-center z-5"
+                  >
+                    <div class="w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] bg-[rgb(var(--v-theme-primary-container))] rounded-full flex items-center justify-center">
+                      <v-icon class="text-[rgb(var(--v-theme-on-primary-container))]">
+                        check
+                      </v-icon>
+                    </div>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </div>
+
             <v-card
-              class="rounded-2xl"
+              class="rounded-2xl mt-4"
               variant="flat"
               rounded
               title="颜色来源"
@@ -203,7 +252,11 @@
                 />
               </template>
               <template #append>
-                <v-btn icon="shuffle" variant="plain" />
+                <v-btn
+                  icon="shuffle"
+                  variant="plain"
+                  @click="generateRandomColor"
+                />
               </template>
             </v-card>
 
@@ -215,9 +268,10 @@
                 link
                 variant="outlined"
                 rounded
-                color="outline"
+                :color="setColorDialog.selected === 'custom' && setColorDialog.customColorVariant === customThemeItem.variant ? 'primary' : 'outline'"
+                @click="onSelectThemeColor('custom', customThemeItem.source, customThemeItem.variant)"
               >
-                <v-card-text>
+                <v-card-text class="relative">
                   <div class="flex flex-col items-center">
                     <div class="flex">
                       <div
@@ -242,6 +296,17 @@
                       {{ customThemeItem.variantTitle }}
                     </div>
                   </div>
+
+                  <div
+                    v-if="setColorDialog.selected === 'custom' && setColorDialog.customColorVariant === customThemeItem.variant"
+                    class="absolute inset-0 flex items-center justify-center z-5"
+                  >
+                    <div class="w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] bg-[rgb(var(--v-theme-primary-container))] rounded-full flex items-center justify-center">
+                      <v-icon class="text-[rgb(var(--v-theme-on-primary-container))]">
+                        check
+                      </v-icon>
+                    </div>
+                  </div>
                 </v-card-text>
               </v-card>
             </div>
@@ -260,6 +325,7 @@
             <v-btn
               color="primary"
               variant="elevated"
+              @click="setColorDialogConfirm"
             >
               确定
             </v-btn>
@@ -429,14 +495,47 @@ const variantList = [
   { title: '灰度色彩', value: 'SchemeMonochrome' },
   { title: '中性', value: 'SchemeNeutral' },
 ];
+const themeColorName = computed(() => {
+  let name;
+  switch (settings.themeColor.name) {
+  case 'translime':
+    name = '默认';
+    break;
+  case 'custom':
+  default:
+    name = `${settings.themeColor.source} - ${variantList.find((v) => v.value === settings.themeColor.variant).title}`;
+    break;
+  }
+  return name;
+});
 const setColorDialog = reactive({
   visible: false,
   selected: '',
   customColor: '#000',
   customColorVariant: 'SchemeTonalSpot',
   customThemeList: [],
+  translimeThemeColors: {
+    light: {
+      primary: '#00639b',
+      secondary: '#51606f',
+      tertiary: '#68587a',
+      error: '#ba1a1a',
+    },
+    dark: {
+      primary: '#96cbff',
+      secondary: '#b9c8da',
+      tertiary: '#d3bfe6',
+      error: '#ffb4ab',
+    },
+  },
 });
+const initCustomThemeColor = () => {
+  setColorDialog.selected = settings.themeColor.name;
+  setColorDialog.customColor = settings.themeColor.source;
+  setColorDialog.customColorVariant = settings.themeColor.variant;
+};
 const setColorDialogOpen = () => {
+  initCustomThemeColor();
   setColorDialog.customThemeList = variantList.map((v) => {
     const themeResult = mdColor.getThemeColorFromColor(setColorDialog.customColor, v.value);
     return {
@@ -448,19 +547,33 @@ const setColorDialogOpen = () => {
   });
   setColorDialog.visible = true;
 };
+const onSelectThemeColor = (name, source, variant) => {
+  setColorDialog.selected = name;
+  setColorDialog.customColor = source;
+  setColorDialog.customColorVariant = variant;
+};
+const generateRandomColor = () => {
+  const randomColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
+  setColorDialog.customColor = randomColor;
+};
 const setColorDialogCancel = () => {
+  setColorDialog.visible = false;
+};
+const setColorDialogConfirm = () => {
+  const themeColor = {
+    name: setColorDialog.selected,
+    source: setColorDialog.customColor,
+    variant: setColorDialog.customColorVariant,
+  };
+  const themeColorItem = setColorDialog.customThemeList.find((v) => v.variant === setColorDialog.customColorVariant);
+  // 将 M3 配色转换为 Vuetify 兼容格式 (kebab-case) 并合并到主题中，同时保存配置
+  const vuetifyColors = mdColor.getVuetifyColors({ schemes: themeColorItem.schemes });
+  theme.setCustomTheme(vuetifyColors, themeColor);
   setColorDialog.visible = false;
 };
 watch(() => setColorDialog.customColor, (color) => {
   setColorDialog.customThemeList = variantList.map((v) => {
     const themeResult = mdColor.getThemeColorFromColor(color, v.value);
-    console.log(
-      v.title,
-      '\n===\n',
-      Object.keys(themeResult.schemes.light).map((key) => `'${key.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}': '${themeResult.schemes.light[key].toLowerCase()}',`).join('\n'),
-      '\n===\n',
-      Object.keys(themeResult.schemes.dark).map((key) => `'${key.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}': '${themeResult.schemes.dark[key].toLowerCase()}',`).join('\n'),
-    );
     return {
       variant: v.value,
       variantTitle: v.title,
@@ -472,5 +585,6 @@ watch(() => setColorDialog.customColor, (color) => {
 
 onMounted(() => {
   initRegistryLink();
+  initCustomThemeColor();
 });
 </script>

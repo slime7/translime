@@ -10,6 +10,11 @@ const useGlobalStore = defineStore('globalStore', {
       theme: 'system',
       showDevPlugin: false,
       useNativeTitleBar: true,
+      themeColor: {
+        name: 'translime',
+        source: '#20a6fc',
+        variant: 'SchemeRainbow',
+      },
     },
     plugins: [],
     dark: false,
@@ -32,6 +37,11 @@ const useGlobalStore = defineStore('globalStore', {
         state.appSetting.theme = await appConfigStore.get('setting.theme', 'system');
         state.appSetting.showDevPlugin = await appConfigStore.get('setting.showDevPlugin', false);
         state.appSetting.useNativeTitleBar = await appConfigStore.get('setting.useNativeTitleBar', false);
+        state.appSetting.themeColor = await appConfigStore.get('setting.themeColor', {
+          name: 'translime',
+          source: '#20a6fc',
+          variant: 'SchemeRainbow',
+        });
       });
     },
     setAppOpenAtLogin(open) {
@@ -51,6 +61,9 @@ const useGlobalStore = defineStore('globalStore', {
     },
     setUseNativeTitleBar(v) {
       this.appSetting.useNativeTitleBar = v;
+    },
+    setAppThemeColor(themeColor) {
+      this.appSetting.themeColor = themeColor;
     },
   },
 });

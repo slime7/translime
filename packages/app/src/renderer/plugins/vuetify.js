@@ -73,9 +73,6 @@ const vuetify = createVuetify({
           scrim: '#000000',
         },
         dark: false,
-        variables: {
-          'overlay-background': '#181b26',
-        },
       },
       dark: {
         colors: {
@@ -130,9 +127,6 @@ const vuetify = createVuetify({
           scrim: '#000000',
         },
         dark: true,
-        variables: {
-          'overlay-background': '#181b26',
-        },
       },
     },
   },

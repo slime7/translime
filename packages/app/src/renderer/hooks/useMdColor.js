@@ -2,6 +2,7 @@ import { argbFromHex, hexFromArgb } from '@material/material-color-utilities';
 import {
   getReadableColors,
   getThemeStyles,
+  getVuetifyColors,
   themeFromImage,
   themeFromSourceColor,
 } from '@/utils/mdColorHelper';
@@ -139,6 +140,7 @@ export default function useMdColor() {
     getThemeColorFromColor,
     getThemeColorFromImage,
     getThemeCssVars,
+    getVuetifyColors,
     argbToHex,
     hexToArgb,
   };

@@ -163,3 +163,33 @@ export function getReadableColors(themeData) {
 
   return result;
 }
+
+/**
+ * 将 camelCase 键名转换为 kebab-case
+ *
+ * @param {string} str - camelCase 字符串
+ * @returns {string} kebab-case 字符串
+ */
+const toKebabCase = (str) => str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+
+/**
+ * 将 M3 主题配色转换为 Vuetify 兼容的格式 (kebab-case 键名)
+ *
+ * @param {object} themeData - M3 主题数据对象 (由 getReadableColors 返回的十六进制格式)
+ * @returns {object} Vuetify 兼容的主题配色对象，包含 light 和 dark 两个配色方案
+ *
+ * @example
+ * const theme = getReadableColors(themeFromSourceColor(...));
+ * const vuetifyColors = getVuetifyColors(theme);
+ * // vuetifyColors.light = { 'primary': '#xxx', 'on-primary': '#xxx', ... }
+ */
+export function getVuetifyColors(themeData) {
+  const convertScheme = (scheme) => Object.fromEntries(
+    Object.entries(scheme).map(([key, value]) => [toKebabCase(key), value]),
+  );
+
+  return {
+    light: convertScheme(themeData.schemes.light),
+    dark: convertScheme(themeData.schemes.dark),
+  };
+}
