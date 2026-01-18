@@ -11,7 +11,7 @@
 
       <v-row class="mt-2">
         <v-col cols="6">
-          <v-card variant="tonal" rounded="xl">
+          <v-card flat rounded class="rounded-2xl">
             <v-list-item lines="two" link v-navi="{ name: 'Plugins' }">
               <v-list-item-title>插件 · 已安装 {{ pluginCount }} 个</v-list-item-title>
               <v-list-item-subtitle>安装、管理插件</v-list-item-subtitle>
@@ -20,7 +20,7 @@
         </v-col>
 
         <v-col cols="6">
-          <v-card variant="tonal" rounded="xl">
+          <v-card flat rounded class="rounded-2xl">
             <v-list-item lines="two" link v-navi="{ name: 'Setting' }">
               <v-list-item-title>设置</v-list-item-title>
               <v-list-item-subtitle>插件和用户设置</v-list-item-subtitle>
