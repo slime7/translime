@@ -23,6 +23,7 @@ const showContextMenu = () => {
   <v-app-bar
     :scroll-behavior="props.visible ? 'inverted' : 'hide inverted'"
     density="compact"
+    color="surface-container"
   >
     <template #prepend>
       <v-btn
