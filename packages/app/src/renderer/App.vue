@@ -7,6 +7,7 @@ import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
+import useMdColor from '@/hooks/useMdColor';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
@@ -21,6 +22,7 @@ export default {
     const ipcRaw = useIpc(false);
     const store = globalStore();
     const theme = useTheme();
+    const mdColor = useMdColor();
     const alert = useAlert();
     const toast = useToast();
     const router = useRouter();
@@ -52,6 +54,23 @@ export default {
         theme.setDark(dark);
       });
     };
+    /**
+     * 读取设置中的主题配色并应用
+     * 如果配色名不是 'translime' (默认值)，则从 source 和 variant 生成 M3 配色并应用
+     */
+    const getThemeColors = async () => {
+      const themeColor = await appConfigStore.get('setting.themeColor', {
+        name: 'translime',
+        source: '#20a6fc',
+        variant: 'SchemeRainbow',
+      });
+      // 如果不是默认配色，则应用自定义配色
+      if (themeColor.name !== 'translime') {
+        const themeResult = mdColor.getThemeColorFromColor(themeColor.source, themeColor.variant);
+        const vuetifyColors = mdColor.getVuetifyColors(themeResult);
+        theme.setCustomTheme(vuetifyColors);
+      }
+    };
     const handleKeyEvent = () => {
       window.addEventListener('keyup', (ev) => {
         if (ev.key === 'F12' || (ev.key === 'I' && !ev.altKey && ev.ctrlKey && ev.shiftKey)) {
@@ -59,11 +78,9 @@ export default {
         }
       });
     };
-    const handleAppArgv = () => {
-      ipc.send(ipcType.GET_LAUNCH_ARGV);
-      ipc.on(ipcType.GET_LAUNCH_ARGV, (argv) => {
-        store.setAppArgv(argv);
-      });
+    const handleAppArgv = async () => {
+      const argv = await ipc.invoke(ipcType.GET_LAUNCH_ARGV);
+      store.setAppArgv(argv);
     };
     const onShowSettingPanel = () => {
       ipc.on(ipcType.OPEN_PLUGIN_SETTING_PANEL, ({ packageName }) => {
@@ -122,6 +139,7 @@ export default {
       onShowSettingPanel();
       onDeepLink();
       onIpcToast();
+      getThemeColors();
     });
 
     onUnmounted(() => {
@@ -133,5 +151,3 @@ export default {
   },
 };
 </script>
-
-<style lang="scss" src="./assets/styles/app.scss"></style>

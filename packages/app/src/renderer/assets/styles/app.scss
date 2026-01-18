@@ -2,9 +2,9 @@
 @import '../fonts/robot/robot.css';
 @import '../fonts/noto sans sc/noto_sans_sc.css';
 @import '../fonts/source code pro/source_code_pro.css';
+@layer vuetify, tailwind;
 
 html {
-  font-family: Roboto, 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
   overflow-y: auto !important;
 }
 
@@ -54,6 +54,21 @@ a {
   transition: all .25s cubic-bezier(.4, 0, .2, 1);
 }
 
+.ease-standard {
+  transition-timing-function: cubic-bezier(.2, 0, 0, 1);
+  transition-duration: .3s;
+}
+
+.ease-decelerate {
+  transition-timing-function: cubic-bezier(0, 0, 0, 1);
+  transition-duration: .25s;
+}
+
+.ease-accelerate {
+  transition-timing-function: cubic-bezier(.3, 0, 1, 1);
+  transition-duration: .2s;
+}
+
 .custom-title-bar .v-overlay-container .v-overlay {
   top: 24px;
 
@@ -70,13 +85,13 @@ a {
   --md-icons-fill: 'FILL' 0;
 }
 
-/* fix vTextField prefix text opacity */
-#app {
-  .v-text-field__prefix {
-    opacity: 1;
+.v-switch.v-switch--inset .v-selection-control:not(.v-selection-control--dirty) {
+  .v-switch__track {
+    border: 2px solid rgb(var(--v-theme-outline));
+    background-color: rgb(var(--v-theme-surface-container-highest));
   }
 
-  .v-field--active .v-text-field__prefix {
-    color: var(--v-theme-primary);
+  .v-switch__thumb {
+    background-color: rgb(var(--v-theme-outline));
   }
 }

@@ -119,7 +119,8 @@ class Record extends EventEmitter {
   }
 
   getPluginWin() {
-    return global?.childWins?.[`plugin-window-${this.id}`] || global.mainStore.getChildWin(`plugin-window-${this.id}`);
+    const { appManager } = global;
+    return appManager?.getChildWin(`plugin-window-${this.id}`);
   }
 }
 

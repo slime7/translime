@@ -24,7 +24,7 @@ let currentUiUrl = '';
 
 const mountPlugin = async () => {
   try {
-    const uiBlob = window.ts.loadPluginUi(props.pluginPath);
+    const uiBlob = await window.ts.loadPluginUi(props.pluginPath);
     if (currentUiUrl) {
       URL.revokeObjectURL(currentUiUrl);
     }
@@ -49,7 +49,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="plugin-ui-loader fill-height" :data-plugin-id="pluginId">
+  <div class="plugin-ui-loader" :data-plugin-id="pluginId">
     <template v-if="visible">
       <component :is="PluginUi" />
     </template>
@@ -59,3 +59,9 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+.plugin-ui-loader {
+  min-height: calc(100% - 48px);
+}
+</style>

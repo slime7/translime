@@ -1,7 +1,7 @@
 <template>
-  <div class="window-controls fill-height">
-    <div class="d-flex fill-height">
-      <div class="window-control-btn d-flex align-center justify-center fill-height" @click="appMinimize">
+  <div class="window-controls h-full">
+    <div class="flex h-full">
+      <div class="window-control-btn flex items-center justify-center" @click="appMinimize">
         <svg
           width="11"
           height="11"
@@ -16,7 +16,7 @@
         </svg>
       </div>
 
-      <div class="window-control-btn d-flex align-center justify-center fill-height" v-if="isMaximize" @click="appUnmaximize">
+      <div class="window-control-btn flex items-center justify-center" v-if="isMaximize" @click="appUnmaximize">
         <svg
           width="11"
           height="11"
@@ -31,7 +31,7 @@
         </svg>
       </div>
 
-      <div class="window-control-btn d-flex align-center justify-center fill-height" v-if="!isMaximize" @click="appMaximize">
+      <div class="window-control-btn flex items-center justify-center" v-if="!isMaximize" @click="appMaximize">
         <svg
           width="11"
           height="11"
@@ -46,7 +46,7 @@
         </svg>
       </div>
 
-      <div class="window-control-btn close d-flex align-center justify-center fill-height" @click="appClose">
+      <div class="window-control-btn close flex items-center justify-center" @click="appClose">
         <svg
           width="11"
           height="11"
@@ -88,6 +88,8 @@ export default {
     },
   },
 
+  emits: ['windowMinimize', 'windowUnmaximize', 'windowMaximize', 'windowClose'],
+
   setup(props, { emit }) {
     const ipc = useIpc();
 
@@ -100,19 +102,19 @@ export default {
     };
 
     const appMinimize = () => {
-      ipc.send(APP_MINIMIZE, win.value);
+      ipc.invoke(APP_MINIMIZE, win.value);
       emit('windowMinimize');
     };
     const appUnmaximize = () => {
-      ipc.send(APP_UNMAXIMIZE, win.value);
+      ipc.invoke(APP_UNMAXIMIZE, win.value);
       emit('windowUnmaximize');
     };
     const appMaximize = () => {
-      ipc.send(APP_MAXIMIZE, win.value);
+      ipc.invoke(APP_MAXIMIZE, win.value);
       emit('windowMaximize');
     };
     const appClose = () => {
-      ipc.send(APP_CLOSE, win.value);
+      ipc.invoke(APP_CLOSE, win.value);
       emit('windowClose');
     };
 
@@ -136,16 +138,17 @@ export default {
 }
 
 .window-control-btn:hover {
-  background-color: rgba(0, 0, 0, .2);
+  background-color: rgb(0 0 0 / 20%);
 }
+
 @media (prefers-color-scheme: dark) {
   .window-control-btn:hover {
-    background-color: rgba(255, 255, 255, .3);
+    background-color: rgb(255 255 255 / 30%);
   }
 }
 
 .window-control-btn.close:hover {
-  background-color: rgba(232, 17, 35, 0.9) !important;
+  background-color: rgb(232 17 35 / 90%) !important;
 }
 
 .window-control-btn.close:hover path {

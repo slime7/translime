@@ -38,6 +38,13 @@ const config = {
       },
     ],
   },
+  publish: [
+    {
+      provider: 'github',
+      owner: 'slime7',
+      repo: 'translime',
+    },
+  ],
 };
 
 export default config;

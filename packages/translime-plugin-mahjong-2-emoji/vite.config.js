@@ -6,14 +6,15 @@ import pkg from './package.json';
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-const config = {
+const config = ({ mode }) => ({
   plugins: [
     vue(),
     cssInjectedByJsPlugin(),
   ],
   envDir: process.cwd(),
   build: {
-    sourcemap: 'inline',
+    minify: false,
+    sourcemap: mode === 'development' ? 'inline' : false,
     target: 'node16',
     outDir: './dist',
     lib: {
@@ -30,6 +31,6 @@ const config = {
     },
     emptyOutDir: true,
   },
-};
+});
 
 export default config;

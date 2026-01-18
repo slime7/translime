@@ -39,5 +39,11 @@
     "vue",
     "html",
     "postcss"
-  ]
+  ],
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  "eslint.useFlatConfig": true
 }

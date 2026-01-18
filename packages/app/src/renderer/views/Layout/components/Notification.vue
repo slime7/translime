@@ -6,16 +6,16 @@
     location="right"
     width="560"
   >
-    <div class="notify-container pa-4 fill-height d-flex flex-column" v-scroll.self="onAlertContainerScroll">
+    <div class="notify-container p-4 h-full flex flex-col" v-scroll.self="onAlertContainerScroll">
       <v-spacer />
 
       <div v-if="!alertList.length">
-        <div class="d-flex justify-center">
+        <div class="flex justify-center">
           无新通知
         </div>
       </div>
 
-      <div class="d-flex flex-column">
+      <div class="flex flex-col">
         <v-alert
           v-for="alertItem in alertList"
           :key="alertItem.uuid"

@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar app class="system-bar pa-0" v-if="!appSetting.useNativeTitleBar">
+    <v-system-bar app class="system-bar p-0" v-if="!appSetting.useNativeTitleBar">
       <div v-if="!plugin" class="px-4">
         translime
       </div>
@@ -18,9 +18,9 @@
       />
     </v-system-bar>
 
-    <v-main class="fill-height">
-      <div class="d-flex flex-column fill-height" id="app-main-container">
-        <div class="scroll-content flex">
+    <v-main class="h-full">
+      <div class="flex flex-col h-full" id="app-main-container">
+        <div class="scroll-content flex-auto">
           <div class="plugin-container">
             <plugin-title-bar :plugin="plugin" :visible="appBarVisible" v-if="plugin" />
 
@@ -100,7 +100,7 @@ export default {
     const getAppSettings = () => {
       const params = new URLSearchParams(window.location.search);
       const darkParam = params.get('dark');
-      vTheme.global.name.value = !!darkParam && darkParam !== 'false' && darkParam !== '0' ? 'dark' : 'light';
+      vTheme.change(!!darkParam && darkParam !== 'false' && darkParam !== '0' ? 'dark' : 'light');
 
       appSetting.value = JSON.parse(atob(params.get('app-setting')));
       if (appSetting.value.useNativeTitleBar) {
@@ -111,7 +111,7 @@ export default {
     };
     const themeUpdated = () => {
       ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
-        vTheme.global.name.value = dark ? 'dark' : 'light';
+        vTheme.change(dark ? 'dark' : 'light');
       });
     };
 

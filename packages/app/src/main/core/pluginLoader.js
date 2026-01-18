@@ -1,13 +1,18 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-import { app, clipboard, Menu } from 'electron';
+import {
+  app,
+  clipboard,
+  Menu,
+  utilityProcess,
+} from 'electron';
 import EventEmitter from 'node:events';
-import childProcess from 'node:child_process';
 import { createRequire } from 'node:module';
 import * as tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../utils/useMainStore';
+import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
 
 const requireFresh = createRequire(import.meta.url);
@@ -191,25 +196,26 @@ const execNpmCommand = (cmd, module, options = {}) => {
   }
   args.push(module);
   return new Promise((resolve) => {
-    const npm = childProcess.fork(NPM_EXEC_PATH, args, {
+    const npm = utilityProcess.fork(NPM_EXEC_PATH, args, {
       cwd: PLUGIN_DIR,
-      silent: true,
+      stdio: 'pipe',
+      serviceName: 'npm',
     });
 
     let output = '';
-    npm.stdout
-      ?.on('data', (data) => {
-        output += data.toString();
-      })
-      .pipe(process.stdout);
+    npm.stdout?.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      process.stdout.write(text);
+    });
 
-    npm.stderr
-      ?.on('data', (data) => {
-        output += data.toString();
-      })
-      .pipe(process.stderr);
+    npm.stderr?.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      process.stderr.write(text);
+    });
 
-    npm.on('close', (code) => {
+    npm.on('exit', (code) => {
       if (!code) {
         resolve({ code: 0, data: output });
       } else if (code && output.indexOf('code E404') > -1) {
@@ -218,7 +224,7 @@ const execNpmCommand = (cmd, module, options = {}) => {
         resolve({ code, data: output });
       }
     });
-    logger.debug('[plugin] npm 执行参数', { args: npm.spawnargs });
+    logger.debug('[plugin] npm 执行参数', { args: [NPM_EXEC_PATH, ...args] });
   });
 };
 
@@ -370,9 +376,9 @@ class PluginLoader extends EventEmitter {
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
       mergedPlugin.ipcHandlers.forEach((handler) => {
-        mainStore
-          .ipc()
-          .appendHandler(
+        appManager
+          .getIpc()
+          ?.appendHandler(
             `${handler.type}@${mergedPlugin.packageName}`,
             handler.handler,
           );
@@ -403,7 +409,7 @@ class PluginLoader extends EventEmitter {
     // 移除 ipc
     if (plugin.ipcHandlers && plugin.ipcHandlers.length) {
       plugin.ipcHandlers.forEach((handler) => {
-        mainStore.ipc().removeHandler(`${handler.type}@${plugin.packageName}`);
+        appManager.getIpc()?.removeHandler(`${handler.type}@${plugin.packageName}`);
       });
     }
     // 调用插件卸载方法
@@ -411,8 +417,8 @@ class PluginLoader extends EventEmitter {
       plugin.pluginWillUnload();
     }
     // 关闭插件窗口
-    if (mainStore.getChildWin(`plugin-window-${packageName}`)) {
-      mainStore.getChildWin(`plugin-window-${packageName}`).close();
+    if (appManager.getChildWin(`plugin-window-${packageName}`)) {
+      appManager.getChildWin(`plugin-window-${packageName}`).close();
     }
     // 删除 require 缓存
     const cacheKeys = Object.keys(requireFresh.cache);
@@ -441,35 +447,29 @@ class PluginLoader extends EventEmitter {
         target: packagePattern,
       });
     }
+    const isDev = plugin.dev;
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
     if (!isUninstall) {
       const p = readPlugin(plugin.pluginPath, [packageName]);
       p.enabled = false;
+      p.dev = isDev; // 保留原始的 dev 标志
       this.plugins.push(p);
       mainStore.config.set(`plugin.${plugin.packageName}.enabled`, false);
     }
   }
 
-  doInstallCommand(packageName, module) {
-    return new Promise(async (resolve, reject) => {
-      const result = await execNpmCommand('install', module);
-      if (result.code) {
-        logger.error(`[plugin] 安装插件 ${packageName} 失败`, {
-          error: result.data,
-        });
-        reject(new Error(result.data));
-        return;
-      }
-      try {
-        // 启用新插件并加入到 this.plugins
-        const plugin = this.enablePlugin(packageName);
-        this.plugins.push(plugin);
-      } catch (err) {
-        reject(err);
-        return;
-      }
-      resolve(result.data);
-    });
+  async doInstallCommand(packageName, module) {
+    const result = await execNpmCommand('install', module);
+    if (result.code) {
+      logger.error(`[plugin] 安装插件 ${packageName} 失败`, {
+        error: result.data,
+      });
+      throw new Error(result.data);
+    }
+    // 启用新插件并加入到 this.plugins
+    const plugin = this.enablePlugin(packageName);
+    this.plugins.push(plugin);
+    return result.data;
   }
 
   async installPlugin(packageName, version) {
@@ -518,16 +518,13 @@ class PluginLoader extends EventEmitter {
     return this.doInstallCommand(packageName, module);
   }
 
-  uninstallPlugin(packageName) {
-    return new Promise(async (resolve, reject) => {
-      this.disablePlugin(packageName, true);
-      const result = await execNpmCommand('uninstall', packageName);
-      if (!result.code) {
-        resolve(result.data);
-      } else {
-        reject(new Error(result.data));
-      }
-    });
+  async uninstallPlugin(packageName) {
+    this.disablePlugin(packageName, true);
+    const result = await execNpmCommand('uninstall', packageName);
+    if (!result.code) {
+      return result.data;
+    }
+    throw new Error(result.data);
   }
 
   popPluginMenu(packageName, ipcEv) {
@@ -588,9 +585,9 @@ class PluginLoader extends EventEmitter {
           );
           if (
             !plugin.windowMode
-            && mainStore.getChildWin(`plugin-window-${packageName}`)
+            && appManager.getChildWin(`plugin-window-${packageName}`)
           ) {
-            mainStore.getChildWin(`plugin-window-${packageName}`).close();
+            appManager.getChildWin(`plugin-window-${packageName}`).close();
           }
           ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
         },

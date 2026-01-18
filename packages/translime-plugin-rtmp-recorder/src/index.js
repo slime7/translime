@@ -17,6 +17,7 @@ const ipcHandlers = [
     type: 'record',
     handler: ({ sendToClient }) => (args) => {
       record.start(sendToClient, args);
+      return true;
     },
   },
   {
@@ -27,6 +28,7 @@ const ipcHandlers = [
       } else {
         record.stopAll();
       }
+      return true;
     },
   },
 ];

@@ -39,6 +39,8 @@ export default {
     },
   },
 
+  emits: ['click'],
+
   setup(props, { emit }) {
     const vTheme = useVTheme();
 

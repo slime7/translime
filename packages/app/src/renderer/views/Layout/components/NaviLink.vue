@@ -7,7 +7,7 @@
       v-slot="{ isExactActive }"
     >
       <div
-        class="navi-btn text-decoration-none d-block ease-animation"
+        class="navi-btn no-underline block ease-animation"
         v-navi="to"
         v-bind="props"
       >
@@ -15,19 +15,19 @@
           :model-value="isDev"
           content="D"
           location="bottom end"
-          color="primary"
+          color="error"
         >
           <v-avatar
             class="transition-radius"
             size="56"
-            :color="isHovering || isExactActive ? color : 'grey-darken-2'"
-            :rounded="isHovering || isExactActive ? 'xl' : 'circle'"
+            :color="isHovering || isExactActive ? 'primary-container' : 'secondary-container'"
+            :rounded="isHovering || isExactActive ? 'xl' : 'full'"
           >
-            <v-icon v-if="icon" :color="isHovering || isExactActive ? 'white' : color">
+            <v-icon v-if="icon" :color="isHovering || isExactActive ? 'on-primary-container' : 'on-secondary-container'">
               {{ icon }}
             </v-icon>
             <img v-else-if="image" :src="image" alt="" width="56">
-            <div v-else class="text-no-wrap text-truncate" :class="isHovering || isExactActive ? 'white--text' : textColor">
+            <div v-else class="text-nowrap truncate" :class="isHovering || isExactActive ? 'on-primary-container' : 'on-secondary-container'">
               <slot />
             </div>
           </v-avatar>
@@ -53,19 +53,19 @@
         :model-value="isDev"
         content="D"
         location="bottom end"
-        color="primary"
+        color="error"
       >
         <v-avatar
           class="transition-radius"
           size="56"
-          :color="isHovering ? color : 'grey-darken-2'"
-          :rounded="isHovering ? 'xl' : 'circle'"
+          :color="isHovering ? 'primary-container' : 'secondary-container'"
+          :rounded="isHovering ? 'xl' : 'full'"
         >
-          <v-icon v-if="icon" :color="isHovering ? 'on-primary-container' : color">
+          <v-icon v-if="icon" :color="isHovering ? 'on-primary-container' : 'on-secondary-container'">
             {{ icon }}
           </v-icon>
           <img v-else-if="image" :src="image" alt="" width="56">
-          <div v-else class="text-no-wrap text-truncate" :class="isHovering ? 'white--text' : textColor">
+          <div v-else class="text-no-wrap text-truncate" :class="isHovering ? 'on-primary-container' : 'on-secondary-container'">
             <slot />
           </div>
         </v-avatar>
@@ -92,14 +92,6 @@ export default {
   props: {
     to: [Object, String, null, undefined],
     open: [String, null, undefined],
-    color: {
-      default: 'primary',
-      type: String,
-    },
-    textColor: {
-      default: 'primary--text',
-      type: String,
-    },
     icon: {
       default: false,
       type: [Boolean, String, null],

@@ -1,9 +1,10 @@
 import { Menu, nativeImage, Tray } from 'electron';
 import icon from '@pkg/share/static/icon.png';
 import mainStore from '../utils/useMainStore';
+import appManager from '../utils/useAppManager';
 
 const createTray = () => {
-  mainStore.set('tray', new Tray(nativeImage.createFromDataURL(icon)));
+  appManager.setTray(new Tray(nativeImage.createFromDataURL(icon)));
 
   const items = [
     {
@@ -16,27 +17,27 @@ const createTray = () => {
     {
       label: '打开',
       click() {
-        if (mainStore.getWin()) {
-          mainStore.getWin().show();
+        if (appManager.getWin()) {
+          appManager.getWin().show();
         }
       },
     },
     {
       label: '退出',
       click() {
-        if (mainStore.getWin()) {
-          mainStore.getWin().close();
+        if (appManager.getWin()) {
+          appManager.getWin().close();
         }
       },
     },
   ];
   const menu = Menu.buildFromTemplate(items);
 
-  mainStore.get('tray').setToolTip(`translime ${mainStore.APP_VERSION}`);
-  mainStore.get('tray').setContextMenu(menu);
-  mainStore.get('tray').on('double-click', () => {
-    if (mainStore.getWin()) {
-      mainStore.getWin().show();
+  appManager.getTray().setToolTip(`translime ${mainStore.APP_VERSION}`);
+  appManager.getTray().setContextMenu(menu);
+  appManager.getTray().on('double-click', () => {
+    if (appManager.getWin()) {
+      appManager.getWin().show();
     }
   });
 };

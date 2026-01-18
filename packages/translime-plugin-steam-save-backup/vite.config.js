@@ -1,29 +1,38 @@
+import { defineConfig } from 'vite';
 import { builtinModules } from 'node:module';
 
 /**
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-const config = {
+export default defineConfig(({ mode }) => ({
   envDir: process.cwd(),
   build: {
     minify: false,
-    sourcemap: 'inline',
-    target: 'node16',
+    sourcemap: mode === 'preview' ? 'inline' : false,
+    target: 'node18',
     outDir: './dist',
     emptyOutDir: true,
     lib: {
       entry: 'src/index.js',
       name: 'plugin',
-      formats: ['es', 'umd'],
+      formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
     rollupOptions: {
       external: [
+        'electron',
         ...builtinModules,
+        ...builtinModules.map((m) => `node:${m}`),
       ],
+      output: {
+        exports: 'named',
+        globals: builtinModules.reduce((acc, m) => {
+          acc[m] = m;
+          acc[`node:${m}`] = m;
+          return acc;
+        }, {}),
+      },
     },
   },
-};
-
-export default config;
+}));

@@ -6,11 +6,11 @@ import commonjs from '@rollup/plugin-commonjs';
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-const config = {
+const config = ({ mode }) => ({
   envDir: process.cwd(),
   build: {
     minify: false,
-    sourcemap: 'inline',
+    sourcemap: mode === 'development' ? 'inline' : false,
     target: 'node16',
     outDir: './dist',
     emptyOutDir: true,
@@ -27,9 +27,12 @@ const config = {
       ],
       external: [
         ...builtinModules,
+        'axios',
+        'semver-compare',
+        'fast-xml-parser',
       ],
     },
   },
-};
+});
 
 export default config;

@@ -71,11 +71,11 @@ export function parse(text) {
         pos += 1;
         const escaped = cleanText[pos];
         switch (escaped) {
-          case 'n': result += '\n'; break;
-          case 't': result += '\t'; break;
-          case '\\': result += '\\'; break;
-          case '"': result += '"'; break;
-          default: result += escaped;
+        case 'n': result += '\n'; break;
+        case 't': result += '\t'; break;
+        case '\\': result += '\\'; break;
+        case '"': result += '"'; break;
+        default: result += escaped;
         }
         pos += 1;
       } else {

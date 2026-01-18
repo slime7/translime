@@ -1,6 +1,6 @@
 {
   "name": "translime",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "repository": "github:slime7/translime",
   "author": {
     "name": "Slime7",
@@ -24,16 +24,20 @@
     "lint": "eslint --ext js,jsx,ts,vue src/ --fix"
   },
   "dependencies": {
+    "@material/material-color-utilities": "^0.3.0",
+    "@tailwindcss/vite": "^4.1.18",
     "axios": "~1.8.4",
     "dayjs": "^1.11.9",
     "electron-store": "^8.1.0",
+    "electron-updater": "^6.7.3",
     "npm": "^9.8.0",
     "pinia": "^2.3.1",
     "semver-compare": "^1.0.0",
+    "tailwindcss": "^4.1.18",
     "tar": "^7.4.3",
     "vue": "^3.5.13",
     "vue-router": "^4.2.4",
-    "vuetify": "^3.8.1",
+    "vuetify": "^3.11.6",
     "winston": "^3.10.0"
   },
   "devDependencies": {

@@ -13,28 +13,6 @@ const useMainStore = () => {
   const APPDATA_PATH = app.getPath('userData');
   const TEMP_DIR = app.getPath('temp');
   const config = appConfigStore;
-  const mainStore = {
-    launchWin: null,
-    win: null,
-    childWins: {},
-    ipc: null,
-    mainProcessLock: null,
-    tray: null,
-    pluginLoader: null,
-  };
-
-  const set = (key, value) => {
-    mainStore[key] = value;
-  };
-  const get = (key, defaultValue) => (typeof mainStore[key] === 'undefined' ? defaultValue : mainStore[key]);
-  const getWin = () => get('win');
-  const getChildWin = (name) => (name ? get('childWins')[name] : get('childWins'));
-  const setChildWin = (name, win) => {
-    mainStore.childWins[name] = win;
-  };
-  const removeChildWin = (name) => {
-    delete mainStore.childWins[name];
-  };
 
   return {
     APP_VERSION,
@@ -42,17 +20,11 @@ const useMainStore = () => {
     APPDATA_PATH,
     TEMP_DIR,
     config,
-    ipc: () => get('ipc'),
-    set,
-    get,
-    getWin,
-    getChildWin,
-    setChildWin,
-    removeChildWin,
   };
 };
 
 const mainStore = useMainStore();
+
 if (!global.mainStore) {
   global.mainStore = mainStore;
   global.config = mainStore.config;

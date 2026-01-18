@@ -7,19 +7,25 @@ import {
   Notification,
   shell,
 } from 'electron';
+import fs from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '../utils/createWindow';
 import mainStore from '../utils/useMainStore';
+import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
+import netHandler from './netHandler';
+import autoUpdate from './autoUpdate';
 
 const filename = fileURLToPath(import.meta.url);
 const dir = dirname(filename);
 
-const ipcHandler = (ipc) => ({
+const ipcHandler = {
+  ...netHandler,
+  ...autoUpdate,
   [ipcType.DEVTOOLS](win = 'app') {
-    const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
+    const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
     if (targetWin) {
       if (targetWin.webContents.isDevToolsOpened()) {
         targetWin.webContents.closeDevTools();
@@ -29,7 +35,7 @@ const ipcHandler = (ipc) => ({
     }
   },
   [ipcType.APP_MAXIMIZE](win = 'app') {
-    const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
+    const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
     if (targetWin) {
       if (targetWin.isMaximized()) {
         targetWin.unmaximize();
@@ -39,40 +45,39 @@ const ipcHandler = (ipc) => ({
     }
   },
   [ipcType.APP_UNMAXIMIZE](win = 'app') {
-    const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
+    const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
     if (targetWin) {
       targetWin.unmaximize();
     }
   },
   [ipcType.APP_MINIMIZE](win = 'app') {
-    const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
+    const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
     if (targetWin) {
       targetWin.minimize();
     }
   },
   [ipcType.APP_CLOSE](win = 'app') {
-    const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
+    const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
     if (targetWin) {
       targetWin.webContents.closeDevTools();
       targetWin.close();
     }
   },
   [ipcType.APP_IS_MAXIMIZE](win = 'app') {
-    const targetWin = win === 'app' ? mainStore.getWin() : mainStore.getChildWin(win);
+    const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
     if (targetWin) {
-      return Promise.resolve(targetWin.isMaximized());
+      return targetWin.isMaximized();
     }
-    return Promise.reject(new Error('targetWin is null'));
+    throw new Error('targetWin is null');
   },
-  [ipcType.APP_VERSIONS](ipcId) {
-    const versions = {
+  [ipcType.APP_VERSIONS]() {
+    return {
       app: mainStore.APP_VERSION,
       electron: process.versions.electron,
       chrome: process.versions.chrome,
       v8: process.versions.v8,
       node: process.versions.node,
     };
-    ipc.sendToClient(ipcId || ipcType.APP_VERSIONS, versions);
   },
   [ipcType.OPEN_LINK]({ url }) {
     shell.openExternal(url);
@@ -91,7 +96,7 @@ const ipcHandler = (ipc) => ({
       });
   },
   [ipcType.RELOAD]() {
-    mainStore.getWin().reload();
+    appManager.getWin().reload();
   },
   [ipcType.RELAUNCH]() {
     app.relaunch({
@@ -100,18 +105,17 @@ const ipcHandler = (ipc) => ({
     app.quit();
   },
   async [ipcType.SHOW_OPEN_DIALOG]({ electronOptions } = {}) {
-    const result = await dialog.showSaveDialog(...electronOptions);
-    ipc.sendToClient(ipcType.SHOW_OPEN_DIALOG, result);
+    return dialog.showSaveDialog(...electronOptions);
   },
   [ipcType.OPEN_NEW_WINDOW]({ name, options = {} }) {
-    if (mainStore.getChildWin(name)) {
-      if (mainStore.getChildWin(name).isMinimized()) {
-        mainStore.getChildWin(name).restore();
+    if (appManager.getChildWin(name)) {
+      if (appManager.getChildWin(name).isMinimized()) {
+        appManager.getChildWin(name).restore();
       }
-      mainStore.getChildWin(name).focus();
+      appManager.getChildWin(name).focus();
     } else {
       const minWidth = options.minWidth || 540;
-      const mainWinBound = mainStore.getWin().getBounds();
+      const mainWinBound = appManager.getWin().getBounds();
       const winBound = mainStore.config.get(`plugin.${name.replace('plugin-window-', '')}.window`, {
         x: mainWinBound.x + 10,
         y: mainWinBound.y + 10,
@@ -143,21 +147,21 @@ const ipcHandler = (ipc) => ({
           sandbox: false,
         },
       }, null);
-      mainStore.setChildWin(name, win);
+      appManager.setChildWin(name, win);
 
-      mainStore.getChildWin(name).on('maximize', () => {
-        ipc.sendToClient(`set-maximize-status:${name}`, true, mainStore.getChildWin(name).webContents);
+      appManager.getChildWin(name).on('maximize', () => {
+        appManager.getIpc().sendToClient(`set-maximize-status:${name}`, true, appManager.getChildWin(name).webContents);
       });
 
-      mainStore.getChildWin(name).on('unmaximize', () => {
-        ipc.sendToClient(`set-maximize-status:${name}`, false, mainStore.getChildWin(name).webContents);
+      appManager.getChildWin(name).on('unmaximize', () => {
+        appManager.getIpc().sendToClient(`set-maximize-status:${name}`, false, appManager.getChildWin(name).webContents);
       });
 
-      mainStore.getChildWin(name).on('close', () => {
+      appManager.getChildWin(name).on('close', () => {
         const isPluginWindow = mainStore.config.has(`plugin.${name.replace('plugin-window-', '')}`);
-        if (isPluginWindow && !mainStore.getChildWin(name).isMaximized()) {
-          const pos = mainStore.getChildWin(name).getPosition();
-          const size = mainStore.getChildWin(name).getSize();
+        if (isPluginWindow && !appManager.getChildWin(name).isMaximized()) {
+          const pos = appManager.getChildWin(name).getPosition();
+          const size = appManager.getChildWin(name).getSize();
           const [x, y, width, height] = [...pos, ...size];
           const windowProps = {
             x,
@@ -169,139 +173,117 @@ const ipcHandler = (ipc) => ({
         }
       });
 
-      mainStore.getChildWin(name).on('closed', () => {
-        mainStore.removeChildWin(name);
+      appManager.getChildWin(name).on('closed', () => {
+        appManager.removeChildWin(name);
       });
     }
   },
-  [ipcType.GET_PATH](name) {
-    return new Promise((resolve, reject) => {
+  async [ipcType.GET_PATH](name) {
+    return app.getPath(name);
+  },
+  async [ipcType.GET_PLUGINS](packageName) {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      const plugins = packageName ? await loader.getPlugin(packageName) : await loader.getPlugins();
+      return JSON.parse(JSON.stringify(plugins));
+    }
+    throw new Error('插件未初始化');
+  },
+  async [ipcType.INSTALL_PLUGIN](packageString) {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
       try {
-        const path = app.getPath(name);
-        resolve(path);
+        const [packageName, version] = packageString.split('@');
+        const result = await loader.installPlugin(packageName, version);
+        return result;
       } catch (err) {
-        reject(err);
+        throw new Error(`插件安装出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.GET_PLUGINS](packageName) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        const plugins = packageName ? await mainStore.get('pluginLoader').getPlugin(packageName) : await mainStore.get('pluginLoader').getPlugins();
-        resolve(JSON.parse(JSON.stringify(plugins)));
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.INSTALL_LOCAL_PLUGIN](packagePath) {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      try {
+        const result = await loader.installLocalPlugin(packagePath);
+        return result;
+      } catch (err) {
+        throw new Error(`插件安装出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.INSTALL_PLUGIN](packageString) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          const [packageName, version] = packageString.split('@');
-          const result = await mainStore.get('pluginLoader').installPlugin(packageName, version);
-          resolve(result);
-        } catch (err) {
-          reject(new Error(`插件安装出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.UNINSTALL_PLUGIN](packageName) {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      try {
+        const result = await loader.uninstallPlugin(packageName);
+        return result;
+      } catch (err) {
+        throw new Error(`插件卸载出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.INSTALL_LOCAL_PLUGIN](packagePath) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          const result = await mainStore.get('pluginLoader').installLocalPlugin(packagePath);
-          resolve(result);
-        } catch (err) {
-          reject(new Error(`插件安装出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.DISABLE_PLUGIN](packageName) {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      try {
+        loader.disablePlugin(packageName);
+        return true;
+      } catch (err) {
+        throw new Error(`插件停用出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.UNINSTALL_PLUGIN](packageName) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          const result = await mainStore.get('pluginLoader').uninstallPlugin(packageName);
-          resolve(result);
-        } catch (err) {
-          reject(new Error(`插件卸载出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
+  async [ipcType.ENABLE_PLUGIN](packageName) {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      try {
+        await loader.enablePlugin(packageName);
+        return true;
+      } catch (err) {
+        throw new Error(`插件启用出错: ${err.message}`);
       }
-    });
+    }
+    throw new Error('插件未初始化');
   },
-  [ipcType.DISABLE_PLUGIN](packageName) {
-    return new Promise((resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          mainStore.get('pluginLoader').disablePlugin(packageName);
-          resolve(true);
-        } catch (err) {
-          reject(new Error(`插件停用出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
-      }
-    });
+  async [ipcType.GET_PLUGIN_SETTING](packageName) {
+    const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
+    return settings;
   },
-  [ipcType.ENABLE_PLUGIN](packageName) {
-    return new Promise(async (resolve, reject) => {
-      if (mainStore.get('pluginLoader')) {
-        try {
-          await mainStore.get('pluginLoader').enablePlugin(packageName);
-          resolve(true);
-        } catch (err) {
-          reject(new Error(`插件启用出错: ${err.message}`));
-        }
-      } else {
-        reject(new Error('插件未初始化'));
-      }
-    });
-  },
-  [ipcType.GET_PLUGIN_SETTING](packageName) {
-    return new Promise(async (resolve) => {
-      const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
-      resolve(settings);
-    });
-  },
-  [ipcType.SET_PLUGIN_SETTING](packageName, key, settings = null) {
-    return new Promise(async (resolve) => {
-      if (typeof key === 'object' && !settings) {
-        mainStore.config.set(`plugin.${packageName}.settings`, key);
-      } else {
-        mainStore.config.set(`plugin.${packageName}.settings.${key}`, settings);
-      }
-      mainStore.get('pluginLoader')?.onPluginSettingSave(packageName);
-      resolve(true);
-    });
+  async [ipcType.SET_PLUGIN_SETTING](packageName, key, settings = null) {
+    if (typeof key === 'object' && !settings) {
+      mainStore.config.set(`plugin.${packageName}.settings`, key);
+    } else {
+      mainStore.config.set(`plugin.${packageName}.settings.${key}`, settings);
+    }
+    appManager.getPluginLoader()?.onPluginSettingSave(packageName);
+    return true;
   },
   [ipcType.OPEN_PLUGIN_CONTEXT_MENU](packageName) {
-    if (mainStore.get('pluginLoader')) {
-      mainStore.get('pluginLoader').popPluginMenu(packageName, ipc);
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      loader.popPluginMenu(packageName, appManager.getIpc());
     }
   },
   [ipcType.DIALOG_SHOW_OPEN_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
+      return dialog.showOpenDialog(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
     }
     return dialog.showOpenDialog(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_SAVE_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showSaveDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
+      return dialog.showSaveDialog(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
     }
     return dialog.showSaveDialog(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_MESSAGE_BOX](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showMessageBox(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
+      return dialog.showMessageBox(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
     }
     return dialog.showMessageBox(winOrOptions);
   },
@@ -310,7 +292,7 @@ const ipcHandler = (ipc) => ({
   },
   [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showCertificateTrustDialog(mainStore.getChildWin(winOrOptions) ? mainStore.get('childWins')[winOrOptions] : mainStore.getWin(), options);
+      return dialog.showCertificateTrustDialog(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
     }
     return dialog.showCertificateTrustDialog(winOrOptions);
   },
@@ -331,8 +313,7 @@ const ipcHandler = (ipc) => ({
     return Promise.reject(new Error('通知调用失败'));
   },
   [ipcType.IS_NOTIFICATION_SUPPORTED]() {
-    const isSupported = Notification.isSupported();
-    return Promise.resolve(isSupported);
+    return Notification.isSupported();
   },
   [ipcType.OPEN_AT_LOGIN]({ open }) {
     app.setLoginItemSettings({
@@ -387,19 +368,21 @@ const ipcHandler = (ipc) => ({
     menu.popup();
   },
   [ipcType.GET_NATIVE_THEME]() {
-    return Promise.resolve({
+    return {
       shouldUseDarkColors: nativeTheme.shouldUseDarkColors,
-    });
+    };
   },
   [ipcType.SET_NATIVE_THEME]({ theme }) {
     nativeTheme.themeSource = theme;
   },
   [ipcType.GET_LAUNCH_ARGV]() {
-    ipc.sendToClient(ipcType.GET_LAUNCH_ARGV, process.argv);
+    return process.argv;
   },
   [ipcType.LOGGER](level, args) {
-    console.log(level, args);
     logger[level](...args);
+  },
+  async [ipcType.LOAD_PLUGIN_UI](pluginPath) {
+    return fs.readFileSync(pluginPath, 'utf8');
   },
   ping() {
     console.log('pong', new Date());
@@ -411,6 +394,6 @@ const ipcHandler = (ipc) => ({
       }, 2000);
     });
   },
-});
+};
 
 export default ipcHandler;

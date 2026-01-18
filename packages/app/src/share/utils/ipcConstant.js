@@ -41,6 +41,18 @@ export const GET_LAUNCH_ARGV = 'get-launch-argv';
 export const DEEP_LINK_OPEN = 'deep-link-open';
 export const LOGGER = 'logger';
 export const IPC_TOAST = 'ipc-toast';
+export const LOAD_PLUGIN_UI = 'load-plugin-ui';
+export const NET_REQUEST = 'net-request';
+export const NET_ABORT = 'net-abort';
+export const UPDATE_CHECKING = 'update-checking';
+export const UPDATE_AVAILABLE = 'update-available';
+export const UPDATE_NOT_AVAILABLE = 'update-not-available';
+export const UPDATE_ERROR = 'update-error';
+export const UPDATE_DOWNLOAD_PROGRESS = 'update-download-progress';
+export const UPDATE_DOWNLOADED = 'update-downloaded';
+export const START_DOWNLOAD_UPDATE = 'start-download-update';
+export const QUIT_AND_INSTALL = 'quit-and-install';
+export const CHECK_FOR_UPDATE = 'check-for-update';
 
 export default {
   DEVTOOLS,
@@ -85,4 +97,16 @@ export default {
   DEEP_LINK_OPEN,
   LOGGER,
   IPC_TOAST,
+  LOAD_PLUGIN_UI,
+  NET_REQUEST,
+  NET_ABORT,
+  UPDATE_CHECKING: 'update-checking',
+  UPDATE_AVAILABLE: 'update-available',
+  UPDATE_NOT_AVAILABLE: 'update-not-available',
+  UPDATE_ERROR: 'update-error',
+  UPDATE_DOWNLOAD_PROGRESS: 'update-download-progress',
+  UPDATE_DOWNLOADED: 'update-downloaded',
+  START_DOWNLOAD_UPDATE: 'start-download-update',
+  QUIT_AND_INSTALL: 'quit-and-install',
+  CHECK_FOR_UPDATE: 'check-for-update',
 };

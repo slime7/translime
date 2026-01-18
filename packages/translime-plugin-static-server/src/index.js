@@ -3,7 +3,8 @@ import serveHandler from 'serve-handler';
 import detectPort from 'detect-port';
 
 const id = 'translime-plugin-static-server';
-const pluginWin = global?.childWins?.[`plugin-window-${id}`] || global.mainStore.getChildWin(`plugin-window-${id}`);
+const { appManager } = global;
+const pluginWin = () => appManager.getChildWin(`plugin-window-${id}`);
 let currentPort = 0;
 const servers = {};
 
@@ -27,13 +28,13 @@ const closeAllServer = () => {
 };
 
 // 禁用时执行
-const pluginWillUnload = () => {
+export const pluginWillUnload = () => {
   closeAllServer();
 };
 
 // 插件上下文菜单
 // https://www.electronjs.org/zh/docs/latest/api/menu-item
-const pluginMenu = [
+export const pluginMenu = [
   {
     id: 'close-all',
     label: '关闭所有服务',
@@ -44,7 +45,7 @@ const pluginMenu = [
 ];
 
 // ipc 定义
-const ipcHandlers = [
+export const ipcHandlers = [
   {
     type: 'new-server',
     handler: ({ sendToClient }) => async (path) => {
@@ -63,7 +64,7 @@ const ipcHandlers = [
       server.on('close', () => {
         sendToClient(`server-closed@${id}`, {
           port,
-        }, pluginWin);
+        }, pluginWin());
       });
       server.listen(currentPort);
       servers[+currentPort] = {
@@ -71,19 +72,21 @@ const ipcHandlers = [
         port,
         path,
       };
-      return Promise.resolve(currentPort);
+      return currentPort;
     },
   },
   {
     type: 'close-server',
     handler: () => async (port) => {
       if (servers[+port]) {
-        servers[+port].server.close(() => {
-          delete servers[+port];
-          return Promise.resolve(true);
+        return new Promise((resolve) => {
+          servers[+port].server.close(() => {
+            delete servers[+port];
+            resolve(true);
+          });
         });
       }
-      return Promise.resolve(true);
+      return true;
     },
   },
   {
@@ -93,13 +96,7 @@ const ipcHandlers = [
         port,
         path: server.path,
       }));
-      return Promise.resolve(serverList);
+      return serverList;
     },
   },
 ];
-
-export default {
-  pluginWillUnload,
-  pluginMenu,
-  ipcHandlers,
-};

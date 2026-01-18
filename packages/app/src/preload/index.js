@@ -3,12 +3,7 @@ import {
   contextBridge,
   ipcRenderer,
 } from 'electron';
-import path from 'node:path';
-import fs from 'node:fs';
-import axiosHttpAdapter from 'axios/lib/adapters/http.js';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-
-const dir = __dirname;
 
 const apiKey = 'electron';
 const ipcWhiteList = {
@@ -24,6 +19,7 @@ const ipcWhiteList = {
     'ipc-fn',
   ],
 };
+
 const callbackCache = [];
 /**
  * @see https://github.com/electron/electron/issues/21437#issuecomment-573522360
@@ -53,12 +49,15 @@ const api = {
       const validChannels = ipcWhiteList.invoke;
       if (validChannels.includes(channel)) {
         const result = await ipcRenderer.invoke(channel, ...data);
-        if (!result.err) {
-          return Promise.resolve(result.data);
+        if (channel === 'ipc-fn') {
+          if (!result.err) {
+            return result.data;
+          }
+          throw new Error(result.err);
         }
-        return Promise.reject(new Error(result.err));
+        return result;
       }
-      return Promise.reject(new Error('ipc invoke: 信号不在白名单'));
+      throw new Error(`ipc invoke: 信号 [${channel}] 不在白名单`);
     },
   },
   useIpc: (wrapped = true) => {
@@ -104,37 +103,16 @@ const api = {
   },
   clipboard,
   dialog: {
-    showOpenDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.DIALOG_SHOW_OPEN_DIALOG,
-      args,
-    }),
-    showSaveDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.DIALOG_SHOW_SAVE_DIALOG,
-      args,
-    }),
-    showMessageBox: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.DIALOG_SHOW_MESSAGE_BOX,
-      args,
-    }),
-    showErrorBox: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.DIALOG_SHOW_ERROR_BOX,
-      args,
-    }),
-    showCertificateTrustDialog: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG,
-      args,
-    }),
+    showOpenDialog: (...args) => api.useIpc().invoke(ipcType.DIALOG_SHOW_OPEN_DIALOG, ...args),
+    showSaveDialog: (...args) => api.useIpc().invoke(ipcType.DIALOG_SHOW_SAVE_DIALOG, ...args),
+    showMessageBox: (...args) => api.useIpc().invoke(ipcType.DIALOG_SHOW_MESSAGE_BOX, ...args),
+    showErrorBox: (...args) => api.useIpc().invoke(ipcType.DIALOG_SHOW_ERROR_BOX, ...args),
+    showCertificateTrustDialog: (...args) => api.useIpc().invoke(ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG, ...args),
   },
   notification: {
-    show: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.SHOW_NOTIFICATION,
-      args,
-    }),
-    isSupported: () => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.IS_NOTIFICATION_SUPPORTED,
-    }),
+    show: (...args) => api.useIpc().invoke(ipcType.SHOW_NOTIFICATION, ...args),
+    isSupported: () => api.useIpc().invoke(ipcType.IS_NOTIFICATION_SUPPORTED),
   },
-  APP_ROOT: path.resolve(dir, '../'),
 };
 api.ipcRenderer.receive('ipc-reply', (msg) => {
   console.log(`ipc-reply by ${msg.type}`, msg);
@@ -151,108 +129,46 @@ api.ipcRenderer.receive('ipc-reply', (msg) => {
  *
  * @see https://www.electronjs.org/docs/api/context-bridge
  */
-ipcRenderer.invoke('ipc-fn', {
-  type: 'get-path',
-  args: ['userData'],
-}).then((result) => {
-  api.APPDATA_PATH = result.data;
+api.useIpc().invoke(ipcType.GET_PATH, 'userData').then((result) => {
+  api.APPDATA_PATH = result;
   contextBridge.exposeInMainWorld(apiKey, api);
 });
 
 const translime = {
-  // axios
-  axiosHttpAdapter: (config) => {
-    if (config.signal && typeof config.signal === 'function') {
-      // eslint-disable-next-line no-param-reassign
-      config.signal = config.signal();
-    }
-    return axiosHttpAdapter(config);
-  },
-  createAbortController: () => {
-    const controller = new AbortController();
-    return {
-      signal: () => controller.signal,
-      abort: (reason) => controller.abort(reason),
-    };
+  net: {
+    request: (requestId, config) => api.useIpc().invoke(ipcType.NET_REQUEST, { requestId, config }),
+    abort: (requestId) => api.useIpc().invoke(ipcType.NET_ABORT, { requestId }),
   },
   // winston logger
   logger: {
-    log: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.LOGGER,
-      args: ['log', args],
-    }),
-    error: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.LOGGER,
-      args: ['error', args],
-    }),
-    warn: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.LOGGER,
-      args: ['warn', args],
-    }),
-    info: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.LOGGER,
-      args: ['info', args],
-    }),
-    debug: (...args) => ipcRenderer.invoke('ipc-fn', {
-      type: ipcType.LOGGER,
-      args: ['debug', args],
-    }),
+    log: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'log', args),
+    error: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'error', args),
+    warn: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'warn', args),
+    info: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'info', args),
+    debug: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'debug', args),
   },
 };
 // 快捷接口
 // 获取插件设置
-const getPluginSetting = async (...args) => {
-  const result = await ipcRenderer.invoke('ipc-fn', {
-    type: ipcType.GET_PLUGIN_SETTING,
-    args,
-  });
-  if (!result.err) {
-    return Promise.resolve(result.data);
-  }
-  return Promise.reject(new Error(result.err));
-};
+const getPluginSetting = async (...args) => api.useIpc().invoke(ipcType.GET_PLUGIN_SETTING, ...args);
 translime.getPluginSetting = getPluginSetting;
 
 // 设置插件设置
-const setPluginSetting = async (...args) => {
-  const result = await ipcRenderer.invoke('ipc-fn', {
-    type: ipcType.SET_PLUGIN_SETTING,
-    args,
-  });
-  if (!result.err) {
-    return Promise.resolve(result.data);
-  }
-  return Promise.reject(new Error(result.err));
-};
+const setPluginSetting = async (...args) => api.useIpc().invoke(ipcType.SET_PLUGIN_SETTING, ...args);
 translime.setPluginSetting = setPluginSetting;
 
 // 窗口控制
 const windowControl = {
-  devtools: (win) => ipcRenderer.send('ipc-msg', {
-    type: ipcType.DEVTOOLS,
-    data: win,
-  }),
-  maximize: (win) => ipcRenderer.send('ipc-msg', {
-    type: ipcType.APP_MAXIMIZE,
-    data: win,
-  }),
-  unmaximize: (win) => ipcRenderer.send('ipc-msg', {
-    type: ipcType.APP_UNMAXIMIZE,
-    data: win,
-  }),
-  minimize: (win) => ipcRenderer.send('ipc-msg', {
-    type: ipcType.APP_MINIMIZE,
-    data: win,
-  }),
-  close: (win) => ipcRenderer.send('ipc-msg', {
-    type: ipcType.APP_CLOSE,
-    data: win,
-  }),
+  devtools: (win) => api.useIpc().invoke(ipcType.DEVTOOLS, win),
+  maximize: (win) => api.useIpc().invoke(ipcType.APP_MAXIMIZE, win),
+  unmaximize: (win) => api.useIpc().invoke(ipcType.APP_UNMAXIMIZE, win),
+  minimize: (win) => api.useIpc().invoke(ipcType.APP_MINIMIZE, win),
+  close: (win) => api.useIpc().invoke(ipcType.APP_CLOSE, win),
 };
 translime.windowControl = windowControl;
 
-const loadPluginUi = (pluginPath, type = 'text/javascript') => {
-  const ui = fs.readFileSync(pluginPath, 'utf8');
+const loadPluginUi = async (pluginPath, type = 'text/javascript') => {
+  const ui = await api.useIpc().invoke(ipcType.LOAD_PLUGIN_UI, pluginPath);
   if (!type || type === true) {
     return ui;
   }
