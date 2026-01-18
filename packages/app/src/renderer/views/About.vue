@@ -3,58 +3,6 @@
     <div class="columns-1 lg:columns-2 gap-4 mx-auto max-w-204">
       <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
         <v-card
-          v-if="isDev"
-          class="rounded-2xl"
-          flat
-          rounded
-          title="开发"
-          color="surface-container"
-        >
-          <v-card-text>
-            <p class="break-all mb-4">
-              启动命令：{{ appArgv.join(' ') }}
-            </p>
-
-            <div
-              v-for="([lib, version]) in Object.entries(versions).filter(([lib]) => lib !== 'app')"
-              :key="lib"
-            >
-              <strong>{{ lib }}</strong>: v{{ version }}
-            </div>
-
-            <div class="mt-4 space-y-2">
-              <div>
-                <v-btn color="primary" @click="testAlert">
-                  发送 alert
-                </v-btn>
-              </div>
-              <div>
-                <v-btn color="primary" @click="testToast">
-                  发送 toast
-                </v-btn>
-              </div>
-              <div>
-                <v-btn color="primary" @click="testConfirm">
-                  发送 confirm
-                </v-btn>
-              </div>
-              <div>
-                <v-btn color="primary" @click="appDir">
-                  打开 app 目录
-                </v-btn>
-              </div>
-              <div>
-                <v-btn color="primary" @click="reloadApp">
-                  重载
-                </v-btn>
-              </div>
-            </div>
-          </v-card-text>
-        </v-card>
-      </div>
-
-      <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
-        <v-card
           class="rounded-2xl"
           flat
           rounded
@@ -145,6 +93,67 @@
               <div v-else>
                 <v-btn size="small" @click="checkForUpdate">
                   检查更新
+                </v-btn>
+              </div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </div>
+
+      <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
+        <v-card
+          class="rounded-2xl"
+          flat
+          rounded
+          title="开发"
+          color="surface-container"
+        >
+          <v-card-text>
+            <p class="break-all mb-4">
+              启动命令：{{ appArgv.join(' ') }}
+            </p>
+
+            <div
+              v-for="([lib, version]) in Object.entries(versions).filter(([lib]) => lib !== 'app')"
+              :key="lib"
+            >
+              <strong>{{ lib }}</strong>: v{{ version }}
+            </div>
+
+            <div
+              class="mt-4 space-y-2"
+            >
+              <div
+                v-if="isDev"
+              >
+                <v-btn color="primary" @click="testAlert">
+                  发送 alert
+                </v-btn>
+              </div>
+              <div
+                v-if="isDev"
+              >
+                <v-btn color="primary" @click="testToast">
+                  发送 toast
+                </v-btn>
+              </div>
+              <div
+                v-if="isDev"
+              >
+                <v-btn color="primary" @click="testConfirm">
+                  发送 confirm
+                </v-btn>
+              </div>
+              <div>
+                <v-btn color="primary" @click="appDir">
+                  打开 app 目录
+                </v-btn>
+              </div>
+              <div
+                v-if="isDev"
+              >
+                <v-btn color="primary" @click="reloadApp">
+                  重载
                 </v-btn>
               </div>
             </div>
