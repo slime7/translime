@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
+import tailwindcss from '@tailwindcss/vite';
 
 /**
  * @type {import('vite').UserConfig}
@@ -9,6 +10,7 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
+    tailwindcss(),
     cssInjectedByJsPlugin(),
   ],
   envDir: process.cwd(),

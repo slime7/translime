@@ -436,6 +436,13 @@ importers:
         version: 3.11.6(typescript@5.9.3)(vite-plugin-vuetify@2.1.1)(vue@3.5.13(typescript@5.9.3))
 
   packages/translime-plugin-steam-save-backup:
+    dependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.1.18
+        version: 4.1.18(vite@6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))
+      tailwindcss:
+        specifier: ^4.1.8
+        version: 4.1.18
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: ^4.6.2
@@ -7382,6 +7389,13 @@ snapshots:
       tailwindcss: 4.1.18
       vite: 6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.29.1)
 
+  '@tailwindcss/vite@4.1.18(vite@6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))':
+    dependencies:
+      '@tailwindcss/node': 4.1.18
+      '@tailwindcss/oxide': 4.1.18
+      tailwindcss: 4.1.18
+      vite: 6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0)
+
   '@tootallnate/once@1.1.2': {}
 
   '@tootallnate/once@2.0.0': {}
@@ -12389,6 +12403,18 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  vite-plugin-vuetify@2.1.1(vite@6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))(vue@3.5.13(typescript@5.9.3))(vuetify@3.11.6):
+    dependencies:
+      '@vuetify/loader-shared': 2.1.0(vue@3.5.13(typescript@5.9.3))(vuetify@3.11.6)
+      debug: 4.4.0
+      upath: 2.0.1
+      vite: 6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0)
+      vue: 3.5.13(typescript@5.9.3)
+      vuetify: 3.11.6(typescript@5.9.3)(vite-plugin-vuetify@2.1.1)(vue@3.5.13(typescript@5.9.3))
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
   vite@4.5.2(@types/node@22.14.1)(lightningcss@1.30.2)(sass@1.97.1)(terser@5.39.0):
     dependencies:
       esbuild: 0.18.20
@@ -12485,7 +12511,7 @@ snapshots:
       vue: 3.5.13(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
-      vite-plugin-vuetify: 2.1.1(vite@6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.29.1))(vue@3.5.13(typescript@5.9.3))(vuetify@3.11.6)
+      vite-plugin-vuetify: 2.1.1(vite@6.3.2(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))(vue@3.5.13(typescript@5.9.3))(vuetify@3.11.6)
 
   w3c-hr-time@1.0.2:
     dependencies:
