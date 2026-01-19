@@ -188,13 +188,6 @@ export default {
     const search = ref('');
 
     const { plugins } = storeToRefs(store);
-    const getPlugins = async () => {
-      try {
-        store.setPlugins(await ipc.invoke(ipcType.GET_PLUGINS));
-      } catch (err) {
-        alert.show(err.message, 'error');
-      }
-    };
 
     const searchResult = reactive({
       list: [],
@@ -231,6 +224,36 @@ export default {
         alert.show(err.message, 'error');
       }
       return null;
+    };
+
+    const checkPluginUpdates = async () => {
+      // 对所有非 dev 插件进行更新检查
+      plugins.value.forEach(async (p) => {
+        if (p.dev) return;
+        try {
+          const detail = await getPluginDetail(p.packageName);
+          if (detail) {
+            const searchItem = parseSearchResult(detail);
+            store.updatePlugin(p.packageName, {
+              versions: searchItem.versions,
+            });
+          }
+        } catch (err) {
+          // 单个检查失败不影响整体
+          // eslint-disable-next-line no-console
+          console.error(`Check update failed for ${p.packageName}`, err);
+        }
+      });
+    };
+
+    const getPlugins = async () => {
+      try {
+        const pluginsData = await ipc.invoke(ipcType.GET_PLUGINS);
+        store.setPlugins(pluginsData);
+        checkPluginUpdates();
+      } catch (err) {
+        alert.show(err.message, 'error');
+      }
     };
     const searchRequest = async (q = '', page = 0) => {
       if (loading.search) {
@@ -421,11 +444,13 @@ export default {
       installPluginConfirm();
     });
     onActivated(() => {
+      getPlugins();
       openPluginSettingPanel();
       installPluginConfirm();
     });
 
     onMounted(() => {
+      getPlugins();
     });
 
     return {

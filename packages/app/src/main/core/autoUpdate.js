@@ -24,10 +24,12 @@ export const checkForUpdates = () => {
 };
 
 export const init = () => {
-  const sendToWindow = (channel, ...args) => {
-    const win = appManager.getWin();
-    if (win && win.webContents) {
-      win.webContents.send(channel, ...args);
+  const sendToWindow = (type, data = null) => {
+    const ipc = appManager.getIpc();
+    if (ipc) {
+      ipc.sendToClient(type, data);
+    } else {
+      logger.warn('IPC not initialized, cannot send update status');
     }
   };
 

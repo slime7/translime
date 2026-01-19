@@ -231,7 +231,7 @@ export default {
       ipc.on(ipcType.UPDATE_AVAILABLE, (info) => {
         updateStatus.value = 'available';
         updateInfo.value = info;
-        toast.show(`发现新版本 v${info.version}`, 'info');
+        toast.show(`发现新版本 v${info.version}`);
       });
       ipc.on(ipcType.UPDATE_NOT_AVAILABLE, () => {
         updateStatus.value = 'not-available';
@@ -249,7 +249,7 @@ export default {
         updateStatus.value = 'downloaded';
         updateInfo.value = info;
         downloading.value = false;
-        toast.show('更新已下载，请重启安装', 'success');
+        toast.show('更新已下载，请重启安装');
       });
     };
 
