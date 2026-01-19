@@ -28,6 +28,12 @@ const useGlobalStore = defineStore('globalStore', {
     setPlugins(plugins) {
       this.plugins = plugins;
     },
+    updatePlugin(packageName, data) {
+      const index = this.plugins.findIndex((p) => p.packageName === packageName);
+      if (index !== -1) {
+        this.plugins[index] = { ...this.plugins[index], ...data };
+      }
+    },
     async initAppConfig() {
       this.$patch(async (state) => {
         const openAtLogin = await appConfigStore.get('setting.openAtLogin', false);

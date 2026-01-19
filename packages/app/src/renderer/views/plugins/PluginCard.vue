@@ -86,7 +86,7 @@
                 width="40px"
                 color="success"
                 title="升级"
-                @click="install()"
+                @click="install(versionList[1]?.value)"
               >
                 <v-icon>deployed_code_update</v-icon>
               </v-btn>
@@ -169,7 +169,6 @@
 import { storeToRefs } from 'pinia';
 import {
   computed,
-  reactive,
   ref,
   toRefs,
   watch,
@@ -237,14 +236,14 @@ export default {
 
     // 面板版本选择
     const selectedVersion = ref('');
-    const versionList = reactive([
+    const versionList = computed(() => [
       {
         value: '',
         title: '@latest',
       },
       ...(plugin.value.versions ?? []),
     ]);
-    const hasNewVersion = computed(() => versionList.length > 1 && verCompare(versionList[1].value, plugin.value.version) > 0);
+    const hasNewVersion = computed(() => versionList.value.length > 1 && verCompare(versionList.value[1].value, plugin.value.version) > 0);
     watch([isInstalled, canUpdated], () => {
       selectedVersion.value = '';
     });
