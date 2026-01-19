@@ -21,8 +21,12 @@ const config = {
   ],
   nsis: {
     oneClick: false,
+    // eslint-disable-next-line no-template-curly-in-string
+    artifactName: '${productName}-setup-${version}.${ext}',
   },
   win: {
+    // eslint-disable-next-line no-template-curly-in-string
+    artifactName: '${productName}-${version}.${ext}',
     target: [
       {
         target: 'nsis',
