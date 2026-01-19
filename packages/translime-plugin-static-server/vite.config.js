@@ -9,7 +9,7 @@ const config = ({ mode }) => ({
   build: {
     minify: false,
     sourcemap: mode === 'development' ? 'inline' : false,
-    target: 'node16',
+    target: 'node20',
     outDir: './dist',
     emptyOutDir: true,
     lib: {
