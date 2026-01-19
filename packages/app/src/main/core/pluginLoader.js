@@ -128,6 +128,9 @@ const readPlugin = (pluginPath, devPlugins = null) => {
   } else {
     plugin.icon = null;
   }
+  if (!devPlugins && plugin['windowUrl.dev']) {
+    plugin.windowUrl = plugin['windowUrl.dev'];
+  }
   if (plugin.windowUrl) {
     plugin.windowUrl = /^https?:\/\//i.test(plugin.windowUrl)
       ? plugin.windowUrl

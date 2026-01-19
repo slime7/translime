@@ -47,7 +47,9 @@
     "title": "插件标题",
     "description": "插件的功能描述",
     "icon": "src/icon.svg",      // 插件图标路径（相对于插件根目录）
-    "ui": "dist/ui.esm.js"       // 插件前端 UI 入口（如果包含 UI）
+    "ui": "dist/ui.esm.js",       // 插件前端 UI 入口（如果包含 UI）
+    "windowUrl": "dist/index.html", // 独立窗口模式的 HTML 入口
+    "windowUrl.dev": "http://localhost:3000" // (可选) 开发模式专用入口，此时将覆盖 windowUrl
   }
 }
 ```
