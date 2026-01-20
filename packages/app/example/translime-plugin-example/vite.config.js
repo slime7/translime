@@ -1,20 +1,23 @@
+import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+// import tailwindcss from '@tailwindcss/vite';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 
 /**
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-const config = {
+export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
+    // tailwindcss(), // 可选
     cssInjectedByJsPlugin(), // 将样式文件放入 js
   ],
   envDir: process.cwd(),
   build: {
     minify: false,
-    sourcemap: 'inline',
-    target: 'node16',
+    sourcemap: mode === 'preview' ? 'inline' : false,
+    target: 'node20',
     outDir: './dist',
     lib: {
       entry: 'ui.vue',
@@ -27,6 +30,4 @@ const config = {
     },
     emptyOutDir: true,
   },
-};
-
-export default config;
+}));
