@@ -20,11 +20,13 @@
   "peerDependencies": {
     "vue": "^3.2.0"
   },
+  # 插件信息
   "plugin": {
     "title": "plugin title",
     "description": "plugin description",
-    "icon": "./icon.png",
-    "windowUrlxx": "dist/ui/index.html",
+    "icon": "./icon.png", # 插件图标
+    # 与 ui 二选一
+    # "windowUrl": "dist/ui/index.html",
     "ui": "dist/ui.esm.js"
   }
 }
