@@ -1,11 +1,15 @@
 <script setup>
 import {
   computed,
-  ref,
   onMounted,
+  ref,
   toRaw,
 } from 'vue';
 import dayjs from 'dayjs';
+
+defineOptions({
+  name: 'UiRtmpRecorder',
+});
 
 const useStore = () => {
   const pluginId = 'translime-plugin-rtmp-recorder';
@@ -109,8 +113,8 @@ const useSelectDir = () => {
     });
     if (result.err) {
       selectDirError.value = '读取文件出错';
-    } else if (!result.data.canceled) {
-      [store.saveDir.value] = result.data.filePaths;
+    } else if (!result.canceled) {
+      [store.saveDir.value] = result.filePaths;
     }
   };
 
@@ -350,7 +354,6 @@ export default {
 
 <template>
   <v-container class="plugin-main">
-
     <v-row class="mb-2">
       <v-col
         sm="12"
@@ -359,49 +362,65 @@ export default {
         v-for="task in tasks"
         :key="task.taskId"
       >
-        <v-card rounded="xl" variant="tonal" :disabled="task.tryStop" @click="record.showDetailPanel(task.taskId)">
+        <v-card
+          class="rounded-2xl"
+          rounded
+          flat
+          :disabled="task.tryStop"
+          @click="record.showDetailPanel(task.taskId)"
+        >
           <v-list>
             <v-list-item>
-              <template v-slot:prepend>
+              <template #prepend>
                 <v-avatar color="primary">
-                  <v-progress-circular v-if="task.isProcessing" indeterminate></v-progress-circular>
-                  <v-icon v-else>done</v-icon>
+                  <v-progress-circular v-if="task.isProcessing" indeterminate />
+                  <v-icon v-else>
+                    done
+                  </v-icon>
                 </v-avatar>
               </template>
 
-              <template v-slot:append>
-                <v-btn v-if="!task.isProcessing" icon="close" variant="plain" @click.stop="record.remove(task.taskId)"></v-btn>
-                <v-btn v-else icon="stop" variant="plain" @click.stop="record.stop(task.taskId)"></v-btn>
+              <template #append>
+                <v-btn v-if="!task.isProcessing" icon="close" variant="plain" @click.stop="record.remove(task.taskId)" />
+                <v-btn v-else icon="stop" variant="plain" @click.stop="record.stop(task.taskId)" />
               </template>
 
-              <v-list-item-title :title="task.recordInfo.url">{{ task.recordInfo.url }}</v-list-item-title>
+              <v-list-item-title :title="task.recordInfo.url">
+                {{ task.recordInfo.url }}
+              </v-list-item-title>
 
               <v-list-item-subtitle v-if="!task.error">
                 <span>时长：</span>
-                <span v-text="task.currentProgress?.timemark"></span>
+                <span v-text="task.currentProgress?.timemark" />
                 <span class="ml-2">frames：</span>
-                <span v-text="task.currentProgress?.frames"></span>
+                <span v-text="task.currentProgress?.frames" />
                 <span class="ml-2">fps：</span>
-                <span v-text="task.currentProgress?.currentFps"></span>
+                <span v-text="task.currentProgress?.currentFps" />
               </v-list-item-subtitle>
-              <v-list-item-subtitle v-else :title="task.error">{{ task.error }}</v-list-item-subtitle>
+              <v-list-item-subtitle v-else :title="task.error">
+                {{ task.error }}
+              </v-list-item-subtitle>
             </v-list-item>
           </v-list>
         </v-card>
       </v-col>
     </v-row>
 
-    <v-card rounded="xl" variant="tonal">
-      <v-list>
-        <v-list-item>
-          <template v-slot:prepend>
+    <v-card
+      class="rounded-2xl"
+      rounded
+      flat
+    >
+      <div class="my-2">
+        <v-list-item bg-color="surface-container">
+          <template #prepend>
             <v-avatar color="primary">
               <v-icon>radio_button_checked</v-icon>
             </v-avatar>
           </template>
           <v-list-item-title>填写直播源开始录制</v-list-item-title>
         </v-list-item>
-      </v-list>
+      </div>
 
       <v-card-text>
         <div>
@@ -420,7 +439,7 @@ export default {
           />
         </div>
 
-        <div class="d-flex align-center mt-4">
+        <div class="flex items-center mt-4">
           <v-spacer />
 
           <v-btn
@@ -454,17 +473,17 @@ export default {
       </v-card-text>
     </v-card>
 
-    <v-card class="mt-4" rounded="xl" variant="tonal">
-      <v-list>
+    <v-card class="mt-4 rounded-2xl" rounded flat>
+      <div class="my-2">
         <v-list-item>
-          <template v-slot:prepend>
+          <template #prepend>
             <v-avatar color="primary">
               <v-icon>settings</v-icon>
             </v-avatar>
           </template>
           <v-list-item-title>设置更多录制参数</v-list-item-title>
         </v-list-item>
-      </v-list>
+      </div>
 
       <v-card-text>
         <v-row>
@@ -550,40 +569,46 @@ export default {
                 { title: 'QuickTime(.mov)', value: 'mov' },
                 { title: 'Matroska(.mkv)', value: 'mkv' },
               ]"
-            ></v-select>
+            />
           </v-col>
         </v-row>
       </v-card-text>
     </v-card>
 
     <v-bottom-sheet v-model="recordTaskPanel.visible" inset>
-      <v-sheet class="rounded-t-xl overflow-hidden d-flex flex-column">
-        <div class="flex-shrink-0">
+      <v-sheet class="rounded-t-xl overflow-hidden flex flex-col">
+        <div class="shrink-0">
           <v-list>
             <v-list-item>
-              <template v-slot:prepend>
+              <template #prepend>
                 <v-avatar color="primary">
-                  <v-progress-circular v-if="currentTaskDetail.isProcessing" indeterminate></v-progress-circular>
-                  <v-icon v-else>done</v-icon>
+                  <v-progress-circular v-if="currentTaskDetail.isProcessing" indeterminate />
+                  <v-icon v-else>
+                    done
+                  </v-icon>
                 </v-avatar>
               </template>
 
-              <v-list-item-title :title="currentTaskDetail.recordInfo.url">{{ currentTaskDetail.recordInfo.url }}</v-list-item-title>
+              <v-list-item-title :title="currentTaskDetail.recordInfo.url">
+                {{ currentTaskDetail.recordInfo.url }}
+              </v-list-item-title>
 
               <v-list-item-subtitle v-if="!currentTaskDetail.error">
                 <span>时长：</span>
-                <span v-text="currentTaskDetail.currentProgress?.timemark"></span>
+                <span v-text="currentTaskDetail.currentProgress?.timemark" />
                 <span class="ml-2">frames：</span>
-                <span v-text="currentTaskDetail.currentProgress?.frames"></span>
+                <span v-text="currentTaskDetail.currentProgress?.frames" />
                 <span class="ml-2">fps：</span>
-                <span v-text="currentTaskDetail.currentProgress?.currentFps"></span>
+                <span v-text="currentTaskDetail.currentProgress?.currentFps" />
               </v-list-item-subtitle>
-              <v-list-item-subtitle v-else :title="currentTaskDetail.error">{{ currentTaskDetail.error }}</v-list-item-subtitle>
+              <v-list-item-subtitle v-else :title="currentTaskDetail.error">
+                {{ currentTaskDetail.error }}
+              </v-list-item-subtitle>
             </v-list-item>
           </v-list>
         </div>
 
-        <div class="flex-fill overflow-auto h-min-0 pa-4">
+        <div class="grow overflow-auto min-h-0 p-4">
           <p>录制源：{{ currentTaskDetail.recordInfo.url }}</p>
           <p>保存位置：{{ currentTaskDetail.recordInfo.saveDir }}</p>
 
@@ -594,19 +619,19 @@ export default {
             rounded
           >
             <pre
-              class="log-area pa-2"
+              class="log-area p-2"
               :class="{ 'one-line': currentTaskDetail.stdLines.oneLine }"
             ><span
               v-for="(line, index) in currentTaskDetail.stdLines.logs"
               :key="index"
               v-text="`${line}\n`"
-            ></span><span
+            /><span
               class="latest-line"
               v-text="currentTaskDetail.stdLines.latest"
-            ></span></pre>
+            /></pre>
           </v-sheet>
 
-          <div class="mt-4 d-flex">
+          <div class="mt-4 flex">
             <v-spacer />
 
             <v-btn
@@ -626,18 +651,20 @@ export default {
 
     <v-dialog
       :model-value="alert.isVisible.value"
-      :update:modelValue="alert.onCancel"
       width="350"
       persistent
+      @update:model-value="alert.onCancel"
     >
-      <v-card rounded="xl">
+      <v-card class="rounded-2xl" rounded>
         <v-card-title>出错了</v-card-title>
 
         <v-card-text>{{ alert.message.value }}</v-card-text>
 
         <v-card-actions>
           <v-spacer />
-          <v-btn color="primary" rounded="pill" @click="alert.onCancel">确定</v-btn>
+          <v-btn color="primary" rounded="pill" @click="alert.onCancel">
+            确定
+          </v-btn>
           <v-spacer />
         </v-card-actions>
       </v-card>
@@ -645,19 +672,23 @@ export default {
 
     <v-dialog
       :model-value="confirm.isVisible.value"
-      :update:modelValue="confirm.onCancel"
       width="350"
       persistent
+      @update:model-value="confirm.onCancel"
     >
-      <v-card>
+      <v-card class="rounded-2xl" rounded>
         <v-card-title>提示</v-card-title>
 
         <v-card-text>{{ confirm.message.value }}</v-card-text>
 
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="confirm.onCancel">取消</v-btn>
-          <v-btn color="primary" @click="confirm.onConfirm">确定</v-btn>
+          <v-btn @click="confirm.onCancel">
+            取消
+          </v-btn>
+          <v-btn color="primary" @click="confirm.onConfirm">
+            确定
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -665,6 +696,15 @@ export default {
 </template>
 
 <style>
+/* 引入 Tailwind CSS utilities，放入 tailwind 图层以与主程序统一 */
+@layer tailwind {
+  @layer theme, utilities;
+  @import "tailwindcss/theme.css" layer(theme);
+  @import "tailwindcss/utilities.css" layer(utilities);
+}
+</style>
+
+<style scoped>
 .log-area {
   max-height: 280px;
   color: #eeeeec;
@@ -679,10 +719,6 @@ export default {
 
 .log-area.one-line span.latest-line {
   display: inline;
-}
-
-.h-min-0 {
-  min-height: 0;
 }
 
 ::-webkit-scrollbar {
