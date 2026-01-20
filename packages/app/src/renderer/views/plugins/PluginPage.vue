@@ -64,7 +64,7 @@ export default {
     watch(
       () => plugin.value,
       (v, prevV) => {
-        if (!prevV.windowMode && v.windowMode) {
+        if (!prevV?.windowMode && v?.windowMode) {
           // 从嵌入模式转为窗口模式
           if (route.name === 'PluginPage' && route.params.packageName === pluginId.value) {
             openPluginWindow(plugin.value, store.dark, store.appSetting);
@@ -74,9 +74,19 @@ export default {
           }
           loaderVisible.value = false;
         }
-        if (prevV.windowMode && !v.windowMode) {
+        if (prevV?.windowMode && !v?.windowMode) {
           // 从窗口模式转为嵌入模式
           loaderVisible.value = !!(plugin.value && plugin.value.ui);
+        } else if (prevV && !v && !prevV.windowMode) {
+          // 插件被卸载，且当前页面处于打开状态（非单独窗口模式）
+          router.push({
+            name: 'Home',
+          });
+        } else if (prevV?.enabled && !v?.enabled && !v?.windowMode) {
+          // 插件被禁用（enabled 从 true 变为 false），且当前页面处于非独立窗口模式
+          router.push({
+            name: 'Home',
+          });
         }
       },
     );

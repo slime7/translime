@@ -113,6 +113,7 @@ const api = {
     show: (...args) => api.useIpc().invoke(ipcType.SHOW_NOTIFICATION, ...args),
     isSupported: () => api.useIpc().invoke(ipcType.IS_NOTIFICATION_SUPPORTED),
   },
+  openLink: (...args) => api.useIpc().invoke(ipcType.OPEN_LINK, ...args),
 };
 api.ipcRenderer.receive('ipc-reply', (msg) => {
   console.log(`ipc-reply by ${msg.type}`, msg);

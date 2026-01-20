@@ -28,13 +28,13 @@ const closeAllServer = () => {
 };
 
 // 禁用时执行
-export const pluginWillUnload = () => {
+const pluginWillUnload = () => {
   closeAllServer();
 };
 
 // 插件上下文菜单
 // https://www.electronjs.org/zh/docs/latest/api/menu-item
-export const pluginMenu = [
+const pluginMenu = [
   {
     id: 'close-all',
     label: '关闭所有服务',
@@ -45,7 +45,7 @@ export const pluginMenu = [
 ];
 
 // ipc 定义
-export const ipcHandlers = [
+const ipcHandlers = [
   {
     type: 'new-server',
     handler: ({ sendToClient }) => async (path) => {
@@ -100,3 +100,9 @@ export const ipcHandlers = [
     },
   },
 ];
+
+export default {
+  pluginWillUnload,
+  ipcHandlers,
+  pluginMenu,
+};

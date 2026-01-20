@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     minify: false,
     sourcemap: mode === 'preview' ? 'inline' : false,
-    target: 'node14',
+    target: 'node20',
     outDir: './dist',
     lib: {
       entry: 'src/ui/ui.vue',

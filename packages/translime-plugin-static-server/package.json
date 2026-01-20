@@ -1,6 +1,6 @@
 {
   "name": "translime-plugin-static-server",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "开启一个临时的静态文件服务器。",
   "license": "MIT",
   "keywords": [
@@ -44,7 +44,12 @@
     "ui": "dist/ui.esm.js"
   },
   "peerDependencies": {
+    "electron": "~39.2.4",
     "vue": "^3.5.13",
     "vuetify": "^3.8.1"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "tailwindcss": "^4.1.8"
   }
 }
