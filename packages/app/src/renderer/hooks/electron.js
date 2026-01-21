@@ -1,13 +1,7 @@
-const {
-  clipboard,
-  dialog,
-  notification,
-} = window.electron;
+export const useClipboard = () => window.electron.clipboard;
 
-export const useClipboard = () => clipboard;
+export const useDialog = () => window.electron.dialog;
 
-export const useDialog = () => dialog;
+export const useNotify = () => window.electron.notification;
 
-export const useNotify = () => notification;
-
-export const { useIpc } = window.electron;
+export const useIpc = (wrapped) => window.electron.useIpc(wrapped);

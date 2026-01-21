@@ -11,7 +11,7 @@ export const showTextEditContextMenu = () => {
 };
 
 export const useState = (initialValue) => {
-  if (typeof initialValue === 'object') {
+  if (typeof initialValue === 'object' && initialValue !== null) {
     const state = reactive(initialValue);
     const setValue = (newValue) => {
       if (typeof newValue === 'function') {

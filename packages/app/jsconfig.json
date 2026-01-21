@@ -8,6 +8,12 @@
       ],
       "@/*": [
         "./src/renderer/*"
+      ],
+      "@share/*": [
+        "./src/share/*"
+      ],
+      "@main/*": [
+        "./src/main/*"
       ]
     },
     "lib": [
@@ -24,7 +30,8 @@
     "src/**/*.css",
     "src/**/*.scss",
     "src/**/*.less",
-    "src/**/*.json"
+    "src/**/*.json",
+    "tests/**/*.js"
   ],
   "files": [
     "eslint.config.mjs",
