@@ -1,5 +1,3 @@
-import EventEmitter from 'node:events';
-
 const useAppManager = () => {
   const state = {
     win: null,

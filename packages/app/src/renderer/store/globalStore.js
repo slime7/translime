@@ -69,7 +69,7 @@ const useGlobalStore = defineStore('globalStore', {
       this.appSetting.useNativeTitleBar = v;
     },
     setAppThemeColor(themeColor) {
-      this.appSetting.themeColor = themeColor;
+      this.appSetting.themeColor = Object.assign(this.appSetting.themeColor, themeColor);
     },
   },
 });
