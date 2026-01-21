@@ -26,7 +26,7 @@
     "build": "npm run build:plugin && npm run build:ui"
   },
   "devDependencies": {
-    "@preact/preset-vite": "^2.1.7",
+    "@preact/preset-vite": "^2.1.11",
     "@rollup/plugin-commonjs": "^24.0.1",
     "@rollup/plugin-node-resolve": "^15.0.1",
     "autoprefixer": "^10.4.4",
@@ -41,7 +41,7 @@
     "semver-compare": "^1.0.0",
     "tailwindcss": "^3.0.23",
     "tunnel": "^0.0.6",
-    "vite": "^6.3.2"
+    "vite": "^7.3.1"
   },
   "plugin": {
     "title": "google domains ddns",

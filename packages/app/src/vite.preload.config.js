@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: isDev ? 'inline' : false,
-      target: 'node18',
+      target: 'node20',
       outDir: join(PACKAGE_ROOT, '../../dist/preload'),
       minify: isDev ? false : 'terser',
       terserOptions: isDev ? undefined : {
