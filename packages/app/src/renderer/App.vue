@@ -4,7 +4,7 @@
 
 <script>
 import { onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import useMdColor from '@/hooks/useMdColor';
@@ -26,6 +26,7 @@ export default {
     const alert = useAlert();
     const toast = useToast();
     const router = useRouter();
+    const route = useRoute();
 
     const initAppConfig = () => {
       store.initAppConfig();
@@ -140,8 +141,12 @@ export default {
     handleKeyEvent();
     handleAppArgv();
 
-    onMounted(() => {
-      ipcRaw.send('main-renderer-ready');
+    onMounted(async () => {
+      await router.isReady();
+      if (route.name !== 'PluginWindow') {
+        ipcRaw.send('main-renderer-ready');
+      }
+
       getPlugins();
       onUpdatePlugins();
       onShowSettingPanel();

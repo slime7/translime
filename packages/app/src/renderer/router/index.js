@@ -43,6 +43,18 @@ const routes = [
       },
     ],
   },
+  {
+    path: '/plugin',
+    component: () => import('../views/Layout/PluginWindow.vue'),
+    children: [
+      {
+        path: ':packageName',
+        name: 'PluginWindow',
+        component: AppPluginPage,
+        props: true,
+      },
+    ],
+  },
 ];
 
 const router = createRouter({

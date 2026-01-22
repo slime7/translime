@@ -87,7 +87,6 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           main: join(RENDERER_ROOT, 'index.html'),
-          pluginIndex: join(RENDERER_ROOT, 'plugin-index.html'),
         },
         external: [
           'vue',

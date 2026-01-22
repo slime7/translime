@@ -52,7 +52,7 @@ export const selectFileDialog = (win, options = {}) => {
 export const openPluginWindow = (plugin, dark = false, appSetting = {}) => {
   const url = plugin.windowUrl
     ? plugin.windowUrl
-    : `plugin-index.html?pluginId=${plugin.packageName}&dark=${dark}&app-setting=${btoa(JSON.stringify(appSetting))}`;
+    : `index.html#/plugin/${plugin.packageName}`;
   const options = JSON.parse(JSON.stringify(plugin.windowOptions));
   delete options.windowUrl;
   if (process.env.NODE_ENV === 'development') {

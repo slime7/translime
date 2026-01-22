@@ -14,8 +14,6 @@
 <script>
 import {
   computed,
-  onMounted,
-  ref,
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -57,9 +55,14 @@ export default {
     const router = useRouter();
     const route = useRoute();
 
-    const plugin = computed(() => (props.packageName ? store.plugins[store.plugins.findIndex((p) => p.packageName === props.packageName)] : null));
+    const plugin = computed(() => (props.packageName ? store.plugin(props.packageName) : null));
     const pluginId = computed(() => (plugin.value ? plugin.value.packageName : undefined));
-    const loaderVisible = ref(false);
+    const loaderVisible = computed(() => {
+      if (route.name === 'PluginWindow') {
+        return !!(plugin.value && plugin.value.ui);
+      }
+      return !!(plugin.value && plugin.value.ui && !plugin.value.windowMode);
+    });
 
     watch(
       () => plugin.value,
@@ -72,28 +75,22 @@ export default {
               name: 'Home',
             });
           }
-          loaderVisible.value = false;
         }
-        if (prevV?.windowMode && !v?.windowMode) {
-          // 从窗口模式转为嵌入模式
-          loaderVisible.value = !!(plugin.value && plugin.value.ui);
-        } else if (prevV && !v && !prevV.windowMode) {
+        if (prevV && !v && !prevV.windowMode) {
           // 插件被卸载，且当前页面处于打开状态（非单独窗口模式）
           router.push({
             name: 'Home',
           });
         } else if (prevV?.enabled && !v?.enabled && !v?.windowMode) {
-          // 插件被禁用（enabled 从 true 变为 false），且当前页面处于非独立窗口模式
-          router.push({
-            name: 'Home',
-          });
+          // 插件被禁用，且当前处于嵌入模式
+          if (route.name === 'PluginPage' && route.params.packageName === pluginId.value) {
+            router.push({
+              name: 'Home',
+            });
+          }
         }
       },
     );
-
-    onMounted(() => {
-      loaderVisible.value = !!(plugin.value && plugin.value.ui);
-    });
 
     return {
       plugin,
