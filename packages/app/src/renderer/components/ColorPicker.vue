@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue';
 
-const model = defineModel();
+const model = defineModel({
+  type: String,
+});
 const props = defineProps({
   rounded: {
     type: Boolean,
@@ -15,6 +17,10 @@ const props = defineProps({
     type: String,
     default: 'normal',
   },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const sizeClass = computed(() => ({
@@ -26,6 +32,9 @@ const sizeClass = computed(() => ({
 const tempColor = ref(model.value);
 const dialogVisible = ref(false);
 const openDialog = () => {
+  if (props.disabled) {
+    return;
+  }
   tempColor.value = model.value;
   dialogVisible.value = true;
 };

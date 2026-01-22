@@ -222,6 +222,7 @@
             </div>
 
             <v-card
+              v-if="setColorDialog.selected === 'custom'"
               class="rounded-2xl mt-4"
               variant="flat"
               rounded
@@ -295,7 +296,7 @@
                 </v-card-text>
               </v-card>
 
-              <template v-if="setColorDialog.selected === 'custom' && setColorDialog.customThemeList?.length">
+              <template v-if="(setColorDialog.selected === 'custom' || setColorDialog.selected === 'system') && setColorDialog.customThemeList?.length">
                 <v-card
                   v-for="customThemeItem in setColorDialog.customThemeList"
                   :key="customThemeItem.variant"
@@ -303,10 +304,9 @@
                   link
                   variant="outlined"
                   rounded
-                  :color="setColorDialog.selected === 'custom'
+                  :color="(setColorDialog.selected === 'custom' || setColorDialog.selected === 'system')
                     && setColorDialog.customColorVariant === customThemeItem.variant ? 'primary' : 'outline'"
-                  :disabled="setColorDialog.selected !== 'custom'"
-                  @click="onSelectThemeColor('custom', customThemeItem.source, customThemeItem.variant)"
+                  @click="onSelectThemeColor(setColorDialog.selected, customThemeItem.source, customThemeItem.variant)"
                 >
                   <v-card-text class="relative">
                     <div class="flex flex-col items-center">
@@ -335,7 +335,7 @@
                     </div>
 
                     <div
-                      v-if="setColorDialog.selected === 'custom' && setColorDialog.customColorVariant === customThemeItem.variant"
+                      v-if="(setColorDialog.selected === 'custom' || setColorDialog.selected === 'system') && setColorDialog.customColorVariant === customThemeItem.variant"
                       class="absolute inset-0 flex items-center justify-center z-5"
                     >
                       <div
@@ -382,10 +382,12 @@
 import {
   computed,
   onMounted,
+  onUnmounted,
   reactive,
   ref,
   watch,
 } from 'vue';
+
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
@@ -559,7 +561,9 @@ const setColorDialog = reactive({
   customColor: '#000',
   customColorVariant: 'SchemeTonalSpot',
   customThemeList: [],
+  isSystemColorSupported: false,
   translimeThemeColors: {
+
     light: {
       primary: '#00639b',
       secondary: '#51606f',
@@ -579,8 +583,19 @@ const initCustomThemeColor = () => {
   setColorDialog.customColor = settings.themeColor.source;
   setColorDialog.customColorVariant = settings.themeColor.variant;
 };
-const setColorDialogOpen = () => {
+const initSystemColor = async () => {
+  const color = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
+  if (color) {
+    setColorDialog.isSystemColorSupported = true;
+    if (setColorDialog.selected === 'system') {
+      setColorDialog.customColor = color;
+    }
+  }
+};
+
+const setColorDialogOpen = async () => {
   initCustomThemeColor();
+  await initSystemColor();
   setColorDialog.customThemeList = variantList.map((v) => {
     const themeResult = mdColor.getThemeColorFromColor(setColorDialog.customColor, v.value);
     return {
@@ -592,9 +607,14 @@ const setColorDialogOpen = () => {
   });
   setColorDialog.visible = true;
 };
-const onSelectThemeColor = (name, source = null, variant = null) => {
+const onSelectThemeColor = async (name, source = null, variant = null) => {
   setColorDialog.selected = name;
-  if (source) {
+  if (name === 'system') {
+    const color = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
+    if (color) {
+      setColorDialog.customColor = color;
+    }
+  } else if (source) {
     setColorDialog.customColor = source;
   }
   if (variant) {
@@ -614,12 +634,19 @@ const setColorDialogConfirm = () => {
     source: setColorDialog.customColor,
     variant: setColorDialog.customColorVariant,
   };
-  const themeColorItem = setColorDialog.customThemeList.find((v) => v.variant === setColorDialog.customColorVariant);
+  let themeColorItem;
+  if (setColorDialog.selected === 'system' || setColorDialog.selected === 'custom') {
+    themeColorItem = setColorDialog.customThemeList.find((v) => v.variant === setColorDialog.customColorVariant);
+  } else if (setColorDialog.selected === 'translime') {
+    themeColorItem = { schemes: setColorDialog.translimeThemeColors };
+  }
+
   // 将 M3 配色转换为 Vuetify 兼容格式 (kebab-case) 并合并到主题中，同时保存配置
   const vuetifyColors = mdColor.getVuetifyColors({ schemes: themeColorItem.schemes });
   theme.setCustomTheme(vuetifyColors, themeColor);
   setColorDialog.visible = false;
 };
+
 watch(() => setColorDialog.customColor, (color) => {
   setColorDialog.customThemeList = variantList.map((v) => {
     const themeResult = mdColor.getThemeColorFromColor(color, v.value);
@@ -635,5 +662,16 @@ watch(() => setColorDialog.customColor, (color) => {
 onMounted(() => {
   initRegistryLink();
   initCustomThemeColor();
+
+  ipc.on(ipcType.SYSTEM_COLOR_CHANGED, ({ color }) => {
+    if (setColorDialog.visible && setColorDialog.selected === 'system') {
+      setColorDialog.customColor = color;
+    }
+  });
+});
+
+onUnmounted(() => {
+  ipc.detach(ipcType.SYSTEM_COLOR_CHANGED);
 });
 </script>
+

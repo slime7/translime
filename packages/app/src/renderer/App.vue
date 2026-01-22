@@ -49,11 +49,6 @@ export default {
       const { shouldUseDarkColors: dark } = await theme.getNativeTheme();
       theme.setDark(dark);
     };
-    const themeUpdated = () => {
-      ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
-        theme.setDark(dark);
-      });
-    };
     /**
      * 读取设置中的主题配色并应用
      * 如果配色名不是 'translime' (默认值)，则从 source 和 variant 生成 M3 配色并应用
@@ -66,10 +61,23 @@ export default {
       });
       // 如果不是默认配色，则应用自定义配色
       if (themeColor.name !== 'translime') {
-        const themeResult = mdColor.getThemeColorFromColor(themeColor.source, themeColor.variant);
+        let { source } = themeColor;
+        if (themeColor.name === 'system') {
+          const systemColor = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
+          if (systemColor) {
+            source = systemColor;
+          }
+        }
+        const themeResult = mdColor.getThemeColorFromColor(source, themeColor.variant);
         const vuetifyColors = mdColor.getVuetifyColors(themeResult);
         theme.setCustomTheme(vuetifyColors);
       }
+    };
+    const themeUpdated = () => {
+      ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
+        theme.setDark(dark);
+        getThemeColors();
+      });
     };
     const handleKeyEvent = () => {
       window.addEventListener('keyup', (ev) => {

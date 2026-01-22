@@ -6,6 +6,7 @@ import {
   nativeTheme,
   Notification,
   shell,
+  systemPreferences,
 } from 'electron';
 import fs from 'node:fs';
 import { dirname, join, sep } from 'node:path';
@@ -383,6 +384,19 @@ const ipcHandler = {
   },
   async [ipcType.LOAD_PLUGIN_UI](pluginPath) {
     return fs.readFileSync(pluginPath, 'utf8');
+  },
+  [ipcType.GET_SYSTEM_COLOR]() {
+    try {
+      const color = systemPreferences.getAccentColor();
+      // 如果是 Windows，返回的是 RRGGBBAA 格式，需要处理
+      if (process.platform === 'win32') {
+        return `#${color.substring(0, 6)}`;
+      }
+      return `#${color}`;
+    } catch (e) {
+      logger.error('Failed to get system accent color', e);
+      return null;
+    }
   },
   ping() {
     console.log('pong', new Date());
