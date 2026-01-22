@@ -79,6 +79,9 @@ export default {
         theme.setDark(dark);
         getThemeColors();
       });
+      ipc.on(ipcType.THEME_COLOR_UPDATED, () => {
+        getThemeColors();
+      });
     };
     const handleKeyEvent = () => {
       window.addEventListener('keyup', (ev) => {
@@ -160,6 +163,7 @@ export default {
       offShowSettingPanel();
       offDeepLink();
       offIpcToast();
+      ipc.detach(ipcType.THEME_COLOR_UPDATED);
     });
   },
 };

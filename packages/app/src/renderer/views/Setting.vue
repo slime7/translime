@@ -638,7 +638,8 @@ const setColorDialogConfirm = () => {
   if (setColorDialog.selected === 'system' || setColorDialog.selected === 'custom') {
     themeColorItem = setColorDialog.customThemeList.find((v) => v.variant === setColorDialog.customColorVariant);
   } else if (setColorDialog.selected === 'translime') {
-    themeColorItem = { schemes: setColorDialog.translimeThemeColors };
+    const themeResult = mdColor.getThemeColorFromColor('#20a6fc', 'SchemeRainbow');
+    themeColorItem = { schemes: themeResult.schemes };
   }
 
   // 将 M3 配色转换为 Vuetify 兼容格式 (kebab-case) 并合并到主题中，同时保存配置

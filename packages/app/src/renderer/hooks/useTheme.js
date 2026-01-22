@@ -50,6 +50,7 @@ const useTheme = () => {
     if (themeColor) {
       store.setAppThemeColor(themeColor);
       appConfigStore.set('setting.themeColor', themeColor);
+      ipc.send(ipcType.THEME_COLOR_UPDATED);
     }
   };
 

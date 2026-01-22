@@ -376,6 +376,9 @@ const ipcHandler = {
   [ipcType.SET_NATIVE_THEME]({ theme }) {
     nativeTheme.themeSource = theme;
   },
+  [ipcType.THEME_COLOR_UPDATED]() {
+    appManager.getIpc().sendToAllWindows(ipcType.THEME_COLOR_UPDATED);
+  },
   [ipcType.GET_LAUNCH_ARGV]() {
     return process.argv;
   },
