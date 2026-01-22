@@ -1,25 +1,108 @@
 <!DOCTYPE html>
 <html lang="zh-Hans">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>loading</title>
-    <style>
-    html, body {
-      padding: 0;
-      margin: 0;
-      -webkit-app-region: drag;
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>loading</title>
+  <style>
+  :root {
+    --bg-color: #cee5ff;
+    --wave-color: #004a76;
+  }
+
+  html, body {
+    padding: 0;
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: transparent;
+    -webkit-app-region: drag;
+  }
+
+  .container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background-color: var(--bg-color);
+    border-radius: 40px;
+    overflow: hidden;
+  }
+
+  .content {
+    position: relative;
+    z-index: 20;
+    text-align: center;
+    color: white;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .loading-text {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.4rem;
+    user-select: none;
+    text-transform: uppercase;
+  }
+
+  .waves-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .wave-wrapper {
+    position: absolute;
+    width: 200%;
+    height: 100%;
+    bottom: 0;
+    left: 0;
+    animation: wave-move 20s linear infinite;
+  }
+
+  .wave-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    fill: var(--wave-color);
+    opacity: 0.9;
+  }
+
+  @keyframes wave-move {
+    0% {
+      transform: translateX(0);
     }
-    body {
-      display: flex;
-      width: 100vw;
-      height: 100vh;
-      justify-content: center;
-      align-items: center;
+    100% {
+      transform: translateX(-50%);
     }
-    </style>
-  </head>
-  <body>
-    <div>loading...</div>
-  </body>
+  }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="content">
+    <div class="loading-text">LOADING</div>
+  </div>
+
+  <div class="waves-container">
+    <div class="wave-wrapper">
+      <svg class="wave-svg" viewBox="0 0 400 200" preserveAspectRatio="none">
+        <defs>
+          <path id="wave-path"
+                d="M 0 30 C 16.666666666666668 18, 33.333333333333336 42, 50 30 C 66.66666666666667 18, 83.33333333333334 42, 100 30 C 116.66666666666667 18, 133.33333333333334 42, 150 30 C 166.66666666666666 18, 183.33333333333334 42, 200 30 C 216.66666666666666 18, 233.33333333333334 42, 250 30 C 266.6666666666667 18, 283.3333333333333 42, 300 30 C 316.6666666666667 18, 333.3333333333333 42, 350 30 C 366.6666666666667 18, 383.3333333333333 42, 400 30 V 200 H 0 Z" />
+        </defs>
+        <use xlink:href="#wave-path" />
+        <use xlink:href="#wave-path" x="400" />
+      </svg>
+    </div>
+  </div>
+</div>
+</body>
 </html>
