@@ -542,7 +542,7 @@ class PluginLoader extends EventEmitter {
         visible: plugin.enabled,
         click() {
           self.disablePlugin(packageName);
-          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+          ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
       },
       {
@@ -551,7 +551,7 @@ class PluginLoader extends EventEmitter {
         visible: !plugin.enabled,
         click() {
           self.enablePlugin(packageName);
-          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+          ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
       },
       {
@@ -559,7 +559,7 @@ class PluginLoader extends EventEmitter {
         label: '卸载插件',
         click() {
           self.uninstallPlugin(packageName).then(() => {
-            ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+            ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
           });
         },
       },
@@ -569,7 +569,14 @@ class PluginLoader extends EventEmitter {
         visible:
           plugin.enabled && !!plugin.settingMenu && !!plugin.settingMenu.length,
         click() {
-          ipcEv.sendToClient(ipcType.OPEN_PLUGIN_SETTING_PANEL, {
+          const mainWin = appManager.getWin();
+          if (mainWin) {
+            if (mainWin.isMinimized()) {
+              mainWin.restore();
+            }
+            mainWin.focus();
+          }
+          ipcEv.sendToMain(ipcType.OPEN_PLUGIN_SETTING_PANEL, {
             packageName,
           });
         },
@@ -592,7 +599,7 @@ class PluginLoader extends EventEmitter {
           ) {
             appManager.getChildWin(`plugin-window-${packageName}`).close();
           }
-          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+          ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
       },
       {
@@ -602,7 +609,7 @@ class PluginLoader extends EventEmitter {
           clipboard.writeText(
             `https://slime7.github.io/translime/open/?install=${packageName}`,
           );
-          ipcEv.sendToClient(ipcType.IPC_TOAST, ['链接已复制']);
+          ipcEv.sendToMain(ipcType.IPC_TOAST, ['链接已复制']);
         },
       },
     ];

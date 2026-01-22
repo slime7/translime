@@ -27,7 +27,7 @@ export const init = () => {
   const sendToWindow = (type, data = null) => {
     const ipc = appManager.getIpc();
     if (ipc) {
-      ipc.sendToClient(type, data);
+      ipc.sendToMain(type, data);
     } else {
       logger.warn('IPC not initialized, cannot send update status');
     }
