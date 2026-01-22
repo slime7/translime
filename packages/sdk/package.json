@@ -1,0 +1,28 @@
+{
+  "name": "translime-sdk",
+  "version": "1.0.0",
+  "description": "SDK for Translime plugins",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./vite": {
+      "types": "./src/vite-plugin.d.ts",
+      "import": "./src/vite-plugin.js"
+    }
+  },
+  "author": "slime7",
+  "license": "MIT",
+  "keywords": [
+    "translime",
+    "sdk",
+    "plugin"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
