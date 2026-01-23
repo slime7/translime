@@ -64,47 +64,16 @@ export function useVuetify() {
  * 获取 Vuetify 组件
  * @returns {Record<string, any>}
  */
-export function useComponents() {
+export function useVuetifyComponents() {
   return useVuetify().components || {};
 }
 
 /**
- * 快捷获取常用的 Vuetify 组件
- * 方便在 Vue setup 中解构使用
+ * 获取 Vuetify 指令
+ * @returns {Record<string, any>}
  */
-export function useVuetifyComponents() {
-  const components = useComponents();
-  return {
-    VContainer: components.VContainer,
-    VRow: components.VRow,
-    VCol: components.VCol,
-    VBtn: components.VBtn,
-    VIcon: components.VIcon,
-    VCard: components.VCard,
-    VCardTitle: components.VCardTitle,
-    VCardText: components.VCardText,
-    VCardActions: components.VCardActions,
-    VTextField: components.VTextField,
-    VDialog: components.VDialog,
-    VSpacer: components.VSpacer,
-    VToolbar: components.VToolbar,
-    VToolbarTitle: components.VToolbarTitle,
-    VSnackbar: components.VSnackbar,
-    VProgressCircular: components.VProgressCircular,
-    VDivider: components.VDivider,
-    VChip: components.VChip,
-    VTooltip: components.VTooltip,
-    VExpansionPanels: components.VExpansionPanels,
-    VExpansionPanel: components.VExpansionPanel,
-    VExpansionPanelTitle: components.VExpansionPanelTitle,
-    VExpansionPanelText: components.VExpansionPanelText,
-    VList: components.VList,
-    VListItem: components.VListItem,
-    VListItemTitle: components.VListItemTitle,
-    VListItemSubtitle: components.VListItemSubtitle,
-    VAvatar: components.VAvatar,
-    VAlert: components.VAlert,
-  };
+export function useVuetifyDirectives() {
+  return useVuetify().directives || {};
 }
 
 /**
@@ -125,6 +94,64 @@ export function useDialog() {
 export function useShell() {
   if (typeof window !== 'undefined' && window.electron?.shell) {
     return window.electron.shell;
+  }
+  return null;
+}
+
+/**
+ * 获取插件设置 (仅在渲染进程环境可用)
+ * @param {...any} args
+ * @returns {Promise<any>}
+ */
+export async function getPluginSetting(...args) {
+  if (typeof window !== 'undefined' && window.ts?.getPluginSetting) {
+    return window.ts.getPluginSetting(...args);
+  }
+  return null;
+}
+
+/**
+ * 设置插件设置 (仅在渲染进程环境可用)
+ * @param {...any} args
+ * @returns {Promise<any>}
+ */
+export async function setPluginSetting(...args) {
+  if (typeof window !== 'undefined' && window.ts?.setPluginSetting) {
+    return window.ts.setPluginSetting(...args);
+  }
+  return null;
+}
+
+/**
+ * 获取窗口控制工具 (仅在渲染进程环境可用)
+ * @returns {Object}
+ */
+export function useWindowControl() {
+  if (typeof window !== 'undefined' && window.ts?.windowControl) {
+    return window.ts.windowControl;
+  }
+  return null;
+}
+
+/**
+ * 获取剪贴板工具 (仅在渲染进程环境可用)
+ * @returns {Object}
+ */
+export function useClipboard() {
+  if (typeof window !== 'undefined' && window.electron?.clipboard) {
+    return window.electron.clipboard;
+  }
+  return null;
+}
+
+/**
+ * 在浏览器中打开链接 (仅在渲染进程环境可用)
+ * @param {...any} args
+ * @returns {Promise<any>}
+ */
+export async function openLink(...args) {
+  if (typeof window !== 'undefined' && window.electron?.openLink) {
+    return window.electron.openLink(...args);
   }
   return null;
 }

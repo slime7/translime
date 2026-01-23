@@ -5,6 +5,7 @@
 export function translimeSdk() {
   return {
     name: 'translime-sdk-plugin',
+    enforce: 'pre',
     config() {
       return {
         build: {
@@ -21,22 +22,64 @@ export function translimeSdk() {
     },
     // 使用 transform 钩子实现更灵活的组件映射
     transform(code, id) {
-      // 仅处理插件源码目录下的 .js 和 .vue 文件
-      if (!/src\/.*\.(js|vue)/.test(id)) return null;
+      // 排除 node_modules 和虚拟模块
+      if (id.includes('node_modules') || id.startsWith('\0')) return null;
+      // 仅处理 .js, .ts, .vue 文件
+      if (!/\.(js|ts|vue)$/.test(id)) return null;
 
-      // 匹配以 V 开头紧跟大写字母的标识符，例如 VBtn, VCard
-      // 排除掉已经定义的变量和 import 语句中的标识符（简单处理）
-      // 这里的逻辑是将 V... 替换为 window.vuetify$?.components?.V...
-      // 为了防止破坏局部变量，我们只替换那些看起来像全局访问的 VXXX
-      const newCode = code.replace(/(?<![\w.'"\/])(V[A-Z][\w$]+)(?![\w$])/g, (match) => {
-        // 如果是在 import 语句或者属性访问中，不替换
-        // 这个正则非常简单，但在大多数 Vue setup 环境下够用
-        return `(window.vuetify$?.components?.${match} || ${match})`;
+      const matches = new Set();
+
+      // 1. 匹配 JS 中的 PascalCase 标识符 (VBtn, VCard)
+      const componentRegex = /\b(V[A-Z][\w$]+)\b/g;
+      let match;
+      while ((match = componentRegex.exec(code)) !== null) {
+        matches.add(match[1]);
+      }
+
+      // 2. 如果是 .vue 文件，额外匹配模板中的 kebab-case 标签 (<v-btn, <v-text-field)
+      if (id.endsWith('.vue')) {
+        const templateTagRegex = /<v-([a-z0-9-]+)\b/g;
+        while ((match = templateTagRegex.exec(code)) !== null) {
+          // 将 v-xxx 转换为 VXxx
+          const name = `V${match[1].split('-').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join('')}`;
+          matches.add(name);
+        }
+      }
+
+      if (matches.size === 0) return null;
+
+      // 过滤出真正需要自动导入的组件
+      const used = Array.from(matches).filter((name) => {
+        // 排除已有的显式定义或导入
+        if (new RegExp(`import\\s+{[^}]*\\b${name}\\b[^}]*}\\s+from`, 'm').test(code)) return false;
+        if (new RegExp(`(const|let|var|function|class|import)\\s+\\b${name}\\b`, 'm').test(code)) return false;
+        if (new RegExp(`\\.\\b${name}\\b`).test(code)) return false;
+        // 注意：这里移除了之前排除模板标签的限制，因为我们需要在 setup 中定义它来给模板使用
+        return true;
       });
+
+      if (used.length === 0) return null;
+
+      // 准备注入的语句
+      const injection = `\n/* auto-injected by translime-sdk */\nconst { ${used.join(', ')} } = (typeof window !== 'undefined' && window.vuetify$?.components || {});\n`;
+
+      let newCode = code;
+      if (id.endsWith('.vue')) {
+        if (code.includes('<script setup')) {
+          newCode = code.replace(/<script\s+setup[^>]*>/, `$&${injection}`);
+        } else if (code.includes('<script')) {
+          newCode = code.replace(/<script[^>]*>/, `$&${injection}`);
+        } else {
+          // 如果没有 script 块，手动创建一个以支持模板
+          newCode = `<script setup>${injection}</script>\n${code}`;
+        }
+      } else {
+        newCode = injection + code;
+      }
 
       return {
         code: newCode,
-        map: null, // 如果需要 sourcemap，这里可以生成
+        map: null,
       };
     },
   };

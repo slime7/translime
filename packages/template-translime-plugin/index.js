@@ -1,9 +1,12 @@
+import { usePluginConfig } from 'translime-sdk';
+
 const id = 'translime-plugin-example';
 
+const pluginConfig = usePluginConfig(id);
 // 加载时执行
 const pluginDidLoad = () => {
   console.log('plugin loaded');
-  const setting = global.mainStore.config.get(`plugin.${id}.settings`, {});
+  const setting = pluginConfig.get('setting', {});
   console.log('settings: ', setting);
 };
 

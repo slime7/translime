@@ -49,6 +49,12 @@ const { VBtn, VCard } = useVuetifyComponents();
 - `getMainStore()`: 获取主程序的全局 Store（仅主进程）。
 - `usePluginConfig(pluginId)`: 获取针对特定插件的配置工具。
 - `useIpc()`: 获取 IPC 工具（渲染进程）。
-- `useVuetifyComponents()`: 快捷获取 Vuetify 组件。
+- `useVuetifyComponents()`: 获取所有 Vuetify 组件。
+- `useVuetifyDirectives()`: 获取所有 Vuetify 指令。
 - `useDialog()`: 获取 Electron 对话框 API。
 - `useShell()`: 获取 Shell API。
+- `getPluginSetting(...args)`: 获取插件设置（仅渲染进程）。
+- `setPluginSetting(...args)`: 设置插件设置（仅渲染进程）。
+- `useWindowControl()`: 获取窗口控制工具（仅渲染进程）。
+- `useClipboard()`: 获取剪贴板工具（仅渲染进程）。
+- `openLink(...args)`: 在浏览器中打开链接（仅渲染进程）。

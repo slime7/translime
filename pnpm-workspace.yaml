@@ -1,5 +1,11 @@
 packages:
   - packages/**
 
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - playwright
+
 onlyBuiltDependencies:
   - electron
+  - esbuild
+  - vue-demi

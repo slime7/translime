@@ -2,6 +2,7 @@
   "name": "translime-sdk",
   "version": "1.0.0",
   "description": "SDK for Translime plugins",
+  "type": "module",
   "main": "src/index.js",
   "module": "src/index.js",
   "types": "src/index.d.ts",
@@ -22,7 +23,13 @@
     "sdk",
     "plugin"
   ],
+  "scripts": {
+    "generate:types": "node scripts/generate-types.js"
+  },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "vuetify": "^3.11.6"
   }
 }

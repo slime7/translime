@@ -8,7 +8,7 @@ transform 和 slime 的组合词，意为像史莱姆一样拟态。即每个插
 
 ### 插件示例
 
-[插件示例](./example/translime-plugin-example/readme.md)
+[插件示例](./packages/template-translime-plugin/readme.md)
 
 ### 致谢
 
