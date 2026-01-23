@@ -208,6 +208,58 @@ export default {
 
 ---
 
+## 使用 Translime SDK (推荐)
+
+`translime-sdk` 是官方提供的开发工具包，它提供了完善的类型提示并简化了对主进程与渲染进程 API 的访问。
+
+### 安装
+
+```bash
+pnpm add translime-sdk
+```
+
+### 使用 Vite 插件
+
+在插件的 `vite.config.js` 中使用内置插件，可以自动处理 `electron` 等依赖的外部化：
+
+```javascript
+import { defineConfig } from 'vite';
+import { translimeSdk } from 'translime-sdk/vite';
+
+export default defineConfig({
+  plugins: [
+    translimeSdk(),
+    // ... 其他插件
+  ]
+});
+```
+
+### 代码示例
+
+#### 主进程逻辑 (src/index.js)
+
+```javascript
+import { usePluginConfig } from 'translime-sdk';
+
+const config = usePluginConfig('my-plugin-id');
+const myValue = config.get('settingsKey', 'default');
+```
+
+#### 渲染进程 UI (src/ui/ui.vue)
+
+```javascript
+import { useIpc, useVuetifyComponents } from 'translime-sdk';
+
+const ipc = useIpc();
+const { VBtn, VCard } = useVuetifyComponents();
+```
+
+### 核心 API
+
+更多 API 详细说明请参阅 [Translime SDK 文档](../sdk/README.md)。
+
+---
+
 ## UI 端开发 (Frontend UI)
 
 如果你的插件包含 UI（通过 `ui` 或 `windowUrl` 定义），你可以使用 Translime 注入的全局 API 与主进程或系统进行交互。

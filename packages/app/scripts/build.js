@@ -40,20 +40,12 @@ const buildVitePackages = async () => {
   const totalTimeLabel = 'Total bundling time';
   console.time(totalTimeLabel);
 
-  // eslint-disable-next-line no-restricted-syntax
-  for (const configPath of VITE_CONFIG_PATHS) {
-    console.group(configPath);
-
-    const timeLabel = 'Bundling time';
+  await Promise.all(VITE_CONFIG_PATHS.map(async (configPath) => {
+    const timeLabel = `Bundling time [${configPath}]`;
     console.time(timeLabel);
-
-    // eslint-disable-next-line no-await-in-loop
     await buildWithConfig(configPath);
-
     console.timeEnd(timeLabel);
-    console.groupEnd();
-    console.log('\n'); // 用于美化输出
-  }
+  }));
 
   console.timeEnd(totalTimeLabel);
 };
