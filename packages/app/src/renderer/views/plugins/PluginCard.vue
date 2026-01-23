@@ -10,7 +10,7 @@
       rounded="xl"
       color="tertiary-container"
     >
-      <div class="flex flex-nowrap justify-between relative h-full">
+      <div class="relative h-full">
         <div class="min-w-0 relative z-10 flex flex-col h-full">
           <v-tooltip :text="cardTitle" location="top">
             <template #activator="{ props: titleProps }">
@@ -149,12 +149,11 @@
           </v-card-actions>
         </div>
 
-        <v-img
+        <img
           v-if="plugin.icon"
           class="plugin-bg-icon"
           :src="plugin.icon"
-          cover
-        />
+        >
       </div>
 
       <plugin-setting-panel
@@ -284,10 +283,12 @@ export default {
 
   .plugin-bg-icon {
     position: absolute;
-    right: -24px;
-    bottom: -24px;
+    display: block;
+    right: -28px;
+    bottom: -28px;
     width: 240px;
     height: 240px;
+    border-radius: 108px;
     opacity: .3;
     transform: rotate(-45deg);
     pointer-events: none;
