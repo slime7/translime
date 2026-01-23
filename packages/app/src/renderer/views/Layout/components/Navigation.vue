@@ -46,9 +46,10 @@
 
           <v-avatar
             class="transition-radius"
+            :class="[isHovering ? 'rounded-3xl' : 'rounded-full']"
             size="56"
             :color="isHovering ? 'primary-container' : 'secondary-container'"
-            :rounded="isHovering ? 'xl' : 'full'"
+            rounded
           >
             <v-icon :color="isHovering ? 'on-primary-container' : 'on-secondary-container'">notifications</v-icon>
           </v-avatar>

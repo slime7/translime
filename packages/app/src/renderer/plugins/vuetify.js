@@ -144,9 +144,7 @@ const vuetify = createVuetify({
       color: 'surface-container',
     },
     global: {
-      style: [{
-        fontFamily: '"Roboto", "Noto Sans SC", "Microsoft YaHei", "微软雅黑", sans-serif',
-      }],
+      style: [{}],
     },
   },
   blueprint: md3,
