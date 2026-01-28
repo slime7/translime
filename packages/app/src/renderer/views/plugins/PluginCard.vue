@@ -289,7 +289,7 @@ export default {
     width: 240px;
     height: 240px;
     border-radius: 108px;
-    opacity: .3;
+    opacity: .12;
     transform: rotate(-45deg);
     pointer-events: none;
     z-index: 0;
@@ -301,7 +301,7 @@ export default {
   &:hover {
     .plugin-bg-icon {
       transform: rotate(-45deg) scale(1.15);
-      opacity: .55;
+      opacity: .3;
     }
   }
 }
