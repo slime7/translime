@@ -1,4 +1,8 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import ipcHandler from './ipcHandler';
+import appManager from '../utils/useAppManager';
+
+const asyncLocalStorage = new AsyncLocalStorage();
 
 export default class Ipc {
   /**
@@ -11,15 +15,17 @@ export default class Ipc {
     this.handlerList = ipcHandler;
 
     // 注册通用处理通道
-    this.listener.handle('ipc-fn', async (ev, { type, args }) => {
+    this.listener.handle('ipc-fn', (ev, { type, args }) => {
       const handler = this.handlerList[type];
       if (handler) {
-        try {
-          const data = await handler(...(args || []));
-          return { data, err: null };
-        } catch (err) {
-          return { data: null, err: err.message };
-        }
+        return asyncLocalStorage.run(ev.sender, async () => {
+          try {
+            const data = await handler(...(args || []));
+            return { data, err: null };
+          } catch (err) {
+            return { data: null, err: err.message };
+          }
+        });
       }
       return { data: null, err: `IPC handler [${type}] not found` };
     });
@@ -27,7 +33,9 @@ export default class Ipc {
     this.listener.on('ipc-msg', (ev, { type, data }) => {
       const handler = this.handlerList[type];
       if (handler) {
-        handler(data);
+        asyncLocalStorage.run(ev.sender, () => {
+          handler(data);
+        });
       }
     });
   }
@@ -36,13 +44,47 @@ export default class Ipc {
    * 发送消息到客户端 (仅用于主动推送)
    * @param {string} type 消息类型
    * @param {any} data 消息数据
-   * @param {import('electron').BrowserWindow|import('electron').WebContents} clientWin 目标窗口
+   * @param {import('electron').BrowserWindow|import('electron').WebContents|'all'} clientWin 目标窗口
    */
   sendToClient(type, data, clientWin = null) {
-    const target = clientWin || this.sender;
+    if (clientWin === 'all') {
+      this.sendToAllWindows(type, data);
+      return;
+    }
+    const target = clientWin || asyncLocalStorage.getStore() || this.sender;
     if (target && !target.isDestroyed()) {
       const webContents = target.webContents || target;
       webContents.send('ipc-reply', { type, data });
+    }
+  }
+
+  /**
+   * 发送消息到所有已打开的窗口
+   * @param {string} type 消息类型
+   * @param {any} data 消息数据
+   */
+  sendToAllWindows(type, data) {
+    // 发送到主窗口
+    if (this.sender && !this.sender.isDestroyed()) {
+      this.sender.send('ipc-reply', { type, data });
+    }
+    // 发送到所有子窗口
+    const childWins = appManager.getChildWin();
+    Object.values(childWins).forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('ipc-reply', { type, data });
+      }
+    });
+  }
+
+  /**
+   * 发送消息到主窗口
+   * @param {string} type 消息类型
+   * @param {any} data 消息数据
+   */
+  sendToMain(type, data) {
+    if (this.sender && !this.sender.isDestroyed()) {
+      this.sender.send('ipc-reply', { type, data });
     }
   }
 
@@ -52,7 +94,11 @@ export default class Ipc {
    * @param {Function} handlerFn 处理函数工厂
    */
   appendHandler(type, handlerFn) {
-    const handler = handlerFn({ sendToClient: this.sendToClient.bind(this) });
+    const handler = handlerFn({
+      sendToClient: this.sendToClient.bind(this),
+      sendToMain: this.sendToMain.bind(this),
+      sendToAllWindows: this.sendToAllWindows.bind(this),
+    });
     this.handlerList[type] = handler;
     return true;
   }

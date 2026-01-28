@@ -205,3 +205,101 @@ export default {
   ipcHandlers,
 };
 ```
+
+---
+
+## 使用 Translime SDK (推荐)
+
+`translime-sdk` 是官方提供的开发工具包，它提供了完善的类型提示并简化了对主进程与渲染进程 API 的访问。
+
+### 安装
+
+```bash
+pnpm add translime-sdk
+```
+
+### 使用 Vite 插件
+
+在插件的 `vite.config.js` 中使用内置插件，可以自动处理 `electron` 等依赖的外部化：
+
+```javascript
+import { defineConfig } from 'vite';
+import { translimeSdk } from 'translime-sdk/vite';
+
+export default defineConfig({
+  plugins: [
+    translimeSdk(),
+    // ... 其他插件
+  ]
+});
+```
+
+### 代码示例
+
+#### 主进程逻辑 (src/index.js)
+
+```javascript
+import { usePluginConfig } from 'translime-sdk';
+
+const config = usePluginConfig('my-plugin-id');
+const myValue = config.get('settingsKey', 'default');
+```
+
+#### 渲染进程 UI (src/ui/ui.vue)
+
+```javascript
+import { useIpc, useVuetifyComponents } from 'translime-sdk';
+
+const ipc = useIpc();
+const { VBtn, VCard } = useVuetifyComponents();
+```
+
+### 核心 API
+
+更多 API 详细说明请参阅 [Translime SDK 文档](../sdk/README.md)。
+
+---
+
+## UI 端开发 (Frontend UI)
+
+如果你的插件包含 UI（通过 `ui` 或 `windowUrl` 定义），你可以使用 Translime 注入的全局 API 与主进程或系统进行交互。
+
+Translime 在全局对象中注入了两个主要的 API 命名空间：`window.electron` 和 `window.ts`。
+
+### 1. 全局变量 `window.ts` (常用业务接口)
+
+`window.ts` 提供了一系列用于处理插件业务逻辑的便捷方法：
+
+- **设置管理**
+  - `ts.getPluginSetting(pluginId: string)`: 获取指定插件的设置。
+  - `ts.setPluginSetting(pluginId: string, settings: object)`: 更新指定插件的设置。
+- **网络请求**
+  - `ts.net.request(requestId, config)`: 通过主进程发送网络请求（避开跨域问题）。
+  - `ts.net.abort(requestId)`: 中止请求。
+- **日志记录**
+  - `ts.logger.info(...args)`: 记录日志到系统的日志文件。支持 `log`, `info`, `warn`, `error`, `debug`。
+- **窗口控制**
+  - `ts.windowControl.close(win?)`: 关闭当前窗口（或指定窗口）。
+  - `ts.windowControl.maximize(win?)`: 最大化。
+  - `ts.windowControl.minimize(win?)`: 最小化。
+  - `ts.windowControl.devtools(win?)`: 打开开发者工具。
+- **UI 加载**
+  - `ts.loadPluginUi(pluginPath, type?)`: 加载指定路径的插件 UI 资源。
+
+### 2. 全局变量 `window.electron` (底层与 IPC)
+
+`window.electron` 提供了更底层的 Electron 接口访问：
+
+- **IPC 通信**
+  - `electron.useIpc().invoke(type, ...args)`: **最常用的方法**，用于调用插件在 `index.js` 的 `ipcHandlers` 中定义的接口。
+    > 注意：调用时 `type` 格式通常为 `handlerName@pluginId`。
+  - `electron.useIpc().on(type, callback)`: 监听来自主进程的消息（如 `sendToClient` 发送的消息）。
+  - `electron.useIpc().send(type, data)`: 向主进程发送异步消息。
+- **系统功能**
+  - `electron.clipboard`: 访问系统剪贴板（`readText`, `writeText` 等）。
+  - `electron.dialog`: 访问系统对话框（`showOpenDialog` 等）。
+  - `electron.notification`: 显示系统通知。
+  - `electron.openLink(url)`: 在默认浏览器中打开链接。
+  - `electron.APPDATA_PATH`: 获取应用的数据存储路径。
+- **版本信息**
+  - `electron.versions`: 包含应用依赖的版本信息（electron, node, chrome 等）。

@@ -18,6 +18,12 @@
             @click="onOpenAtLogin(!settings.openAtLogin)"
           />
           <mde-list-item
+            title="关闭时最小化到托盘"
+            item-type="switch"
+            :is-active="settings.minimizeToTrayOnClose"
+            @click="onMinimizeToTrayOnClose(!settings.minimizeToTrayOnClose)"
+          />
+          <mde-list-item
             title="显示开发中插件(重启后生效)"
             item-type="switch"
             :is-active="settings.showDevPlugin"
@@ -190,14 +196,68 @@
           <v-card-title>选择颜色</v-card-title>
 
           <v-card-text>
+            <div class="mt-4 space-x-0.5">
+              <v-btn
+                rounded
+                class="rounded-s-4xl"
+                :class="[setColorDialog.selected === 'translime' ? 'rounded-e-4xl' : 'rounded-e-sm']"
+                :color="setColorDialog.selected === 'translime' ? 'primary' : 'surface-variant'"
+                @click="onSelectThemeColor('translime')"
+              >
+                默认
+              </v-btn>
+
+              <v-btn
+                rounded
+                :class="[setColorDialog.selected === 'system' ? 'rounded-4xl' : 'rounded-sm']"
+                :color="setColorDialog.selected === 'system' ? 'primary' : 'surface-variant'"
+                @click="onSelectThemeColor('system')"
+              >
+                系统
+              </v-btn>
+
+              <v-btn
+                rounded
+                class="rounded-e-4xl"
+                :class="[setColorDialog.selected === 'custom' ? 'rounded-s-4xl' : 'rounded-s-sm']"
+                :color="setColorDialog.selected === 'custom' ? 'primary' : 'surface-variant'"
+                @click="onSelectThemeColor('custom')"
+              >
+                自定义
+              </v-btn>
+            </div>
+
+            <v-card
+              v-if="setColorDialog.selected === 'custom'"
+              class="rounded-2xl mt-4"
+              variant="flat"
+              rounded
+              title="颜色来源"
+            >
+              <template #prepend>
+                <color-picker
+                  v-model="setColorDialog.customColor"
+                  rounded
+                />
+              </template>
+              <template #append>
+                <v-btn
+                  icon="shuffle"
+                  variant="plain"
+                  @click="generateRandomColor"
+                />
+              </template>
+            </v-card>
+
             <div class="mt-4 flex flex-wrap gap-2">
               <v-card
+                v-if="setColorDialog.selected === 'translime'"
                 class="rounded-2xl"
                 link
                 variant="outlined"
                 rounded
                 :color="setColorDialog.selected === 'translime' ? 'primary' : 'outline'"
-                @click="onSelectThemeColor('translime', '#20a6fc', 'SchemeRainbow')"
+                @click="onSelectThemeColor('translime')"
               >
                 <v-card-text class="relative">
                   <div class="flex flex-col items-center">
@@ -229,7 +289,11 @@
                     v-if="setColorDialog.selected === 'translime'"
                     class="absolute inset-0 flex items-center justify-center z-5"
                   >
-                    <div class="w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] bg-[rgb(var(--v-theme-primary-container))] rounded-full flex items-center justify-center">
+                    <div
+                      class="w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))]
+                        bg-[rgb(var(--v-theme-primary-container))] rounded-full flex items-center
+                        justify-center"
+                    >
                       <v-icon class="text-[rgb(var(--v-theme-on-primary-container))]">
                         check
                       </v-icon>
@@ -237,78 +301,62 @@
                   </div>
                 </v-card-text>
               </v-card>
-            </div>
 
-            <v-card
-              class="rounded-2xl mt-4"
-              variant="flat"
-              rounded
-              title="颜色来源"
-            >
-              <template #prepend>
-                <color-picker
-                  v-model="setColorDialog.customColor"
+              <template v-if="(setColorDialog.selected === 'custom' || setColorDialog.selected === 'system') && setColorDialog.customThemeList?.length">
+                <v-card
+                  v-for="customThemeItem in setColorDialog.customThemeList"
+                  :key="customThemeItem.variant"
+                  class="rounded-2xl"
+                  link
+                  variant="outlined"
                   rounded
-                />
+                  :color="(setColorDialog.selected === 'custom' || setColorDialog.selected === 'system')
+                    && setColorDialog.customColorVariant === customThemeItem.variant ? 'primary' : 'outline'"
+                  @click="onSelectThemeColor(setColorDialog.selected, customThemeItem.source, customThemeItem.variant)"
+                >
+                  <v-card-text class="relative">
+                    <div class="flex flex-col items-center">
+                      <div class="flex">
+                        <div
+                          class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] z-4"
+                          :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].primary }"
+                        />
+                        <div
+                          class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-3"
+                          :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].secondary }"
+                        />
+                        <div
+                          class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-2"
+                          :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].tertiary }"
+                        />
+                        <div
+                          class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-1"
+                          :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].error }"
+                        />
+                      </div>
+
+                      <div class="mt-2 text-primary select-none">
+                        {{ customThemeItem.variantTitle }}
+                      </div>
+                    </div>
+
+                    <div
+                      v-if="(setColorDialog.selected === 'custom' || setColorDialog.selected === 'system') && setColorDialog.customColorVariant === customThemeItem.variant"
+                      class="absolute inset-0 flex items-center justify-center z-5"
+                    >
+                      <div
+                        class="w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))]
+                        bg-[rgb(var(--v-theme-primary-container))] rounded-full flex items-center
+                        justify-center"
+                      >
+                        <v-icon class="text-[rgb(var(--v-theme-on-primary-container))]">
+                          check
+                        </v-icon>
+                      </div>
+                    </div>
+                  </v-card-text>
+                </v-card>
               </template>
-              <template #append>
-                <v-btn
-                  icon="shuffle"
-                  variant="plain"
-                  @click="generateRandomColor"
-                />
-              </template>
-            </v-card>
-
-            <div v-if="setColorDialog.customThemeList?.length" class="mt-4 flex flex-wrap gap-2">
-              <v-card
-                v-for="customThemeItem in setColorDialog.customThemeList"
-                :key="customThemeItem.variant"
-                class="rounded-2xl"
-                link
-                variant="outlined"
-                rounded
-                :color="setColorDialog.selected === 'custom' && setColorDialog.customColorVariant === customThemeItem.variant ? 'primary' : 'outline'"
-                @click="onSelectThemeColor('custom', customThemeItem.source, customThemeItem.variant)"
-              >
-                <v-card-text class="relative">
-                  <div class="flex flex-col items-center">
-                    <div class="flex">
-                      <div
-                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] z-4"
-                        :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].primary }"
-                      />
-                      <div
-                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-3"
-                        :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].secondary }"
-                      />
-                      <div
-                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-2"
-                        :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].tertiary }"
-                      />
-                      <div
-                        class="rounded-full w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] -ml-4 z-1"
-                        :style="{ 'background-color': customThemeItem.schemes[store.dark ? 'dark' : 'light'].error }"
-                      />
-                    </div>
-
-                    <div class="mt-2 text-primary select-none">
-                      {{ customThemeItem.variantTitle }}
-                    </div>
-                  </div>
-
-                  <div
-                    v-if="setColorDialog.selected === 'custom' && setColorDialog.customColorVariant === customThemeItem.variant"
-                    class="absolute inset-0 flex items-center justify-center z-5"
-                  >
-                    <div class="w-12 h-12 border-2 border-[rgb(var(--v-theme-surface-container-high))] bg-[rgb(var(--v-theme-primary-container))] rounded-full flex items-center justify-center">
-                      <v-icon class="text-[rgb(var(--v-theme-on-primary-container))]">
-                        check
-                      </v-icon>
-                    </div>
-                  </div>
-                </v-card-text>
-              </v-card>
             </div>
           </v-card-text>
 
@@ -340,10 +388,12 @@
 import {
   computed,
   onMounted,
+  onUnmounted,
   reactive,
   ref,
   watch,
 } from 'vue';
+
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import { useIpc } from '@/hooks/electron';
@@ -428,6 +478,14 @@ const onOpenAtLogin = (value) => {
   setAppOpenAtLogin(value);
 };
 
+const setAppMinimizeToTrayOnClose = (value) => {
+  store.setAppMinimizeToTrayOnClose(value);
+};
+const onMinimizeToTrayOnClose = (value) => {
+  appConfigStore.set('setting.minimizeToTrayOnClose', !!value);
+  setAppMinimizeToTrayOnClose(!!value);
+};
+
 const onShowDevPlugin = (isShow) => {
   ipc.send(ipcType.SHOW_DEV_PLUGIN, {
     isShow: !!isShow,
@@ -501,6 +559,9 @@ const themeColorName = computed(() => {
   case 'translime':
     name = '默认';
     break;
+  case 'system':
+    name = '跟随系统';
+    break;
   case 'custom':
   default:
     name = `${settings.themeColor.source} - ${variantList.find((v) => v.value === settings.themeColor.variant).title}`;
@@ -514,7 +575,9 @@ const setColorDialog = reactive({
   customColor: '#000',
   customColorVariant: 'SchemeTonalSpot',
   customThemeList: [],
+  isSystemColorSupported: false,
   translimeThemeColors: {
+
     light: {
       primary: '#00639b',
       secondary: '#51606f',
@@ -534,8 +597,19 @@ const initCustomThemeColor = () => {
   setColorDialog.customColor = settings.themeColor.source;
   setColorDialog.customColorVariant = settings.themeColor.variant;
 };
-const setColorDialogOpen = () => {
+const initSystemColor = async () => {
+  const color = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
+  if (color) {
+    setColorDialog.isSystemColorSupported = true;
+    if (setColorDialog.selected === 'system') {
+      setColorDialog.customColor = color;
+    }
+  }
+};
+
+const setColorDialogOpen = async () => {
   initCustomThemeColor();
+  await initSystemColor();
   setColorDialog.customThemeList = variantList.map((v) => {
     const themeResult = mdColor.getThemeColorFromColor(setColorDialog.customColor, v.value);
     return {
@@ -547,10 +621,19 @@ const setColorDialogOpen = () => {
   });
   setColorDialog.visible = true;
 };
-const onSelectThemeColor = (name, source, variant) => {
+const onSelectThemeColor = async (name, source = null, variant = null) => {
   setColorDialog.selected = name;
-  setColorDialog.customColor = source;
-  setColorDialog.customColorVariant = variant;
+  if (name === 'system') {
+    const color = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
+    if (color) {
+      setColorDialog.customColor = color;
+    }
+  } else if (source) {
+    setColorDialog.customColor = source;
+  }
+  if (variant) {
+    setColorDialog.customColorVariant = variant;
+  }
 };
 const generateRandomColor = () => {
   const randomColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
@@ -565,12 +648,20 @@ const setColorDialogConfirm = () => {
     source: setColorDialog.customColor,
     variant: setColorDialog.customColorVariant,
   };
-  const themeColorItem = setColorDialog.customThemeList.find((v) => v.variant === setColorDialog.customColorVariant);
+  let themeColorItem;
+  if (setColorDialog.selected === 'system' || setColorDialog.selected === 'custom') {
+    themeColorItem = setColorDialog.customThemeList.find((v) => v.variant === setColorDialog.customColorVariant);
+  } else if (setColorDialog.selected === 'translime') {
+    const themeResult = mdColor.getThemeColorFromColor('#20a6fc', 'SchemeRainbow');
+    themeColorItem = { schemes: themeResult.schemes };
+  }
+
   // 将 M3 配色转换为 Vuetify 兼容格式 (kebab-case) 并合并到主题中，同时保存配置
   const vuetifyColors = mdColor.getVuetifyColors({ schemes: themeColorItem.schemes });
   theme.setCustomTheme(vuetifyColors, themeColor);
   setColorDialog.visible = false;
 };
+
 watch(() => setColorDialog.customColor, (color) => {
   setColorDialog.customThemeList = variantList.map((v) => {
     const themeResult = mdColor.getThemeColorFromColor(color, v.value);
@@ -586,5 +677,16 @@ watch(() => setColorDialog.customColor, (color) => {
 onMounted(() => {
   initRegistryLink();
   initCustomThemeColor();
+
+  ipc.on(ipcType.SYSTEM_COLOR_CHANGED, ({ color }) => {
+    if (setColorDialog.visible && setColorDialog.selected === 'system') {
+      setColorDialog.customColor = color;
+    }
+  });
+});
+
+onUnmounted(() => {
+  ipc.detach(ipcType.SYSTEM_COLOR_CHANGED);
 });
 </script>
+

@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { app } from 'electron';
-import path from 'node:path';
+import * as path from 'node:path';
 import pkg from '@pkg/../package.json' with { type: 'json' };
 import appConfigStore from './appConfigStore';
 

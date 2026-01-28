@@ -1,5 +1,3 @@
-import EventEmitter from 'node:events';
-
 const useAppManager = () => {
   const state = {
     win: null,
@@ -9,6 +7,7 @@ const useAppManager = () => {
     pluginLoader: null,
     tray: null,
     mainProcessLock: null,
+    isQuitting: false,
   };
 
   const setWin = (win) => {

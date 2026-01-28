@@ -3,15 +3,15 @@
     v-slot="{ isHovering, props }"
   >
     <v-card
-      class="plugin-item-card ease-animation h-full"
+      class="plugin-item-card ease-animation h-full overflow-hidden"
       v-bind="props"
       :elevation="isHovering ? 10 : 2"
       :disabled="disabled"
       rounded="xl"
       color="tertiary-container"
     >
-      <div class="flex flex-nowrap justify-between">
-        <div class="min-w-0">
+      <div class="relative h-full">
+        <div class="min-w-0 relative z-10 flex flex-col h-full">
           <v-tooltip :text="cardTitle" location="top">
             <template #activator="{ props: titleProps }">
               <v-card-title
@@ -22,6 +22,7 @@
                   v-if="plugin.dev"
                   size="small"
                   label
+                  class="mr-2"
                 >
                   DEV
                 </v-chip>
@@ -35,7 +36,9 @@
             <a v-else @click="authLink">{{ cardSubTitle }}</a>
           </v-card-subtitle>
 
-          <v-card-text>{{ plugin.description }}</v-card-text>
+          <v-card-text class="grow">
+            {{ plugin.description }}
+          </v-card-text>
 
           <v-card-actions>
             <template v-if="!plugin.searchResultItem">
@@ -146,15 +149,11 @@
           </v-card-actions>
         </div>
 
-        <v-avatar
-          class="m-3"
-          size="125"
-          tile
-          variant="text"
+        <img
           v-if="plugin.icon"
+          class="plugin-bg-icon"
+          :src="plugin.icon"
         >
-          <v-img :src="plugin.icon" />
-        </v-avatar>
       </div>
 
       <plugin-setting-panel
@@ -277,4 +276,34 @@ export default {
 .version-selector {
   max-width: 135px;
 }
+
+.plugin-item-card {
+  position: relative;
+  transition: all .3s cubic-bezier(.4, 0, .2, 1);
+
+  .plugin-bg-icon {
+    position: absolute;
+    display: block;
+    right: -28px;
+    bottom: -28px;
+    width: 240px;
+    height: 240px;
+    border-radius: 108px;
+    opacity: .12;
+    transform: rotate(-45deg);
+    pointer-events: none;
+    z-index: 0;
+    transition: all .4s ease-in-out;
+    filter: grayscale(.2);
+    mask-image: radial-gradient(closest-side, black 0%, transparent 75%);
+  }
+
+  &:hover {
+    .plugin-bg-icon {
+      transform: rotate(-45deg) scale(1.15);
+      opacity: .3;
+    }
+  }
+}
+
 </style>

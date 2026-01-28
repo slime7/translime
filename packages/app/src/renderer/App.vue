@@ -4,7 +4,7 @@
 
 <script>
 import { onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 import useMdColor from '@/hooks/useMdColor';
@@ -26,6 +26,7 @@ export default {
     const alert = useAlert();
     const toast = useToast();
     const router = useRouter();
+    const route = useRoute();
 
     const initAppConfig = () => {
       store.initAppConfig();
@@ -49,11 +50,6 @@ export default {
       const { shouldUseDarkColors: dark } = await theme.getNativeTheme();
       theme.setDark(dark);
     };
-    const themeUpdated = () => {
-      ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
-        theme.setDark(dark);
-      });
-    };
     /**
      * 读取设置中的主题配色并应用
      * 如果配色名不是 'translime' (默认值)，则从 source 和 variant 生成 M3 配色并应用
@@ -66,10 +62,26 @@ export default {
       });
       // 如果不是默认配色，则应用自定义配色
       if (themeColor.name !== 'translime') {
-        const themeResult = mdColor.getThemeColorFromColor(themeColor.source, themeColor.variant);
+        let { source } = themeColor;
+        if (themeColor.name === 'system') {
+          const systemColor = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
+          if (systemColor) {
+            source = systemColor;
+          }
+        }
+        const themeResult = mdColor.getThemeColorFromColor(source, themeColor.variant);
         const vuetifyColors = mdColor.getVuetifyColors(themeResult);
         theme.setCustomTheme(vuetifyColors);
       }
+    };
+    const themeUpdated = () => {
+      ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
+        theme.setDark(dark);
+        getThemeColors();
+      });
+      ipc.on(ipcType.THEME_COLOR_UPDATED, () => {
+        getThemeColors();
+      });
     };
     const handleKeyEvent = () => {
       window.addEventListener('keyup', (ev) => {
@@ -132,8 +144,12 @@ export default {
     handleKeyEvent();
     handleAppArgv();
 
-    onMounted(() => {
-      ipcRaw.send('main-renderer-ready');
+    onMounted(async () => {
+      await router.isReady();
+      if (route.name !== 'PluginWindow') {
+        ipcRaw.send('main-renderer-ready');
+      }
+
       getPlugins();
       onUpdatePlugins();
       onShowSettingPanel();
@@ -147,6 +163,7 @@ export default {
       offShowSettingPanel();
       offDeepLink();
       offIpcToast();
+      ipc.detach(ipcType.THEME_COLOR_UPDATED);
     });
   },
 };

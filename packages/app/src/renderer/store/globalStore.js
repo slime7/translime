@@ -6,6 +6,7 @@ const useGlobalStore = defineStore('globalStore', {
     versions: null,
     appSetting: {
       openAtLogin: false,
+      minimizeToTrayOnClose: false,
       registry: '',
       theme: 'system',
       showDevPlugin: false,
@@ -37,8 +38,10 @@ const useGlobalStore = defineStore('globalStore', {
     async initAppConfig() {
       this.$patch(async (state) => {
         const openAtLogin = await appConfigStore.get('setting.openAtLogin', false);
+        const minimizeToTrayOnClose = await appConfigStore.get('setting.minimizeToTrayOnClose', false);
         const registry = await appConfigStore.get('setting.registry', 'https://registry.npmmirror.com/');
         state.appSetting.openAtLogin = openAtLogin;
+        state.appSetting.minimizeToTrayOnClose = minimizeToTrayOnClose;
         state.appSetting.registry = registry;
         state.appSetting.theme = await appConfigStore.get('setting.theme', 'system');
         state.appSetting.showDevPlugin = await appConfigStore.get('setting.showDevPlugin', false);
@@ -52,6 +55,9 @@ const useGlobalStore = defineStore('globalStore', {
     },
     setAppOpenAtLogin(open) {
       this.appSetting.openAtLogin = open;
+    },
+    setAppMinimizeToTrayOnClose(value) {
+      this.appSetting.minimizeToTrayOnClose = value;
     },
     setAppRegistry(registry) {
       this.appSetting.registry = registry;
@@ -69,7 +75,7 @@ const useGlobalStore = defineStore('globalStore', {
       this.appSetting.useNativeTitleBar = v;
     },
     setAppThemeColor(themeColor) {
-      this.appSetting.themeColor = themeColor;
+      this.appSetting.themeColor = Object.assign(this.appSetting.themeColor, themeColor);
     },
   },
 });

@@ -298,9 +298,7 @@ class PluginLoader extends EventEmitter {
     const showDevPlugin = mainStore.config.get('setting.showDevPlugin', false);
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
-    const devDeps = showDevPlugin
-      ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV)
-      : [];
+
     const filterFn = (isDev = false) => (name) => {
       if (!/^translime-plugin-/.test(name)) {
         return false;
@@ -313,10 +311,15 @@ class PluginLoader extends EventEmitter {
         return false;
       }
     };
-    // 读取插件
-    const devModules = devDeps
-      .filter(filterFn(true))
-      .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true)));
+
+    // 如果开启了开发插件选项，优先读取开发插件目录
+    const devModules = showDevPlugin
+      ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV)
+        .filter(filterFn(true))
+        .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true)))
+      : [];
+
+    // 读取普通插件，如果同名的开发插件已存在（无论是否启用），则跳过普通插件
     const modules = deps
       .filter(filterFn())
       .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath), devModules))
@@ -371,6 +374,12 @@ class PluginLoader extends EventEmitter {
       } catch (err) {
         // todo: handle error
         logger.error('[plugin] enable error: ', err);
+        this.emit('plugin:error', {
+          plugin: plugin || null,
+          pluginId: packageName,
+          error: err,
+          operation: 'enable',
+        });
       }
     }
     pluginMain.enabled = true;
@@ -400,6 +409,12 @@ class PluginLoader extends EventEmitter {
     if (!init) {
       processPlugin(mergedPlugin);
     }
+
+    this.emit('plugin:enabled', {
+      plugin: mergedPlugin,
+      pluginId: mergedPlugin.packageName,
+      isInit: init,
+    });
 
     return mergedPlugin;
   }
@@ -459,6 +474,12 @@ class PluginLoader extends EventEmitter {
       this.plugins.push(p);
       mainStore.config.set(`plugin.${plugin.packageName}.enabled`, false);
     }
+
+    this.emit('plugin:disabled', {
+      plugin,
+      pluginId: packageName,
+      isUninstall,
+    });
   }
 
   async doInstallCommand(packageName, module) {
@@ -467,11 +488,18 @@ class PluginLoader extends EventEmitter {
       logger.error(`[plugin] 安装插件 ${packageName} 失败`, {
         error: result.data,
       });
+      this.emit('plugin:error', {
+        plugin: null,
+        pluginId: packageName,
+        error: new Error(result.data),
+        operation: 'install',
+      });
       throw new Error(result.data);
     }
     // 启用新插件并加入到 this.plugins
     const plugin = this.enablePlugin(packageName);
     this.plugins.push(plugin);
+    this.emit('plugin:installed', { plugin, pluginId: packageName });
     return result.data;
   }
 
@@ -525,8 +553,15 @@ class PluginLoader extends EventEmitter {
     this.disablePlugin(packageName, true);
     const result = await execNpmCommand('uninstall', packageName);
     if (!result.code) {
+      this.emit('plugin:uninstalled', { plugin: null, pluginId: packageName });
       return result.data;
     }
+    this.emit('plugin:error', {
+      plugin: null,
+      pluginId: packageName,
+      error: new Error(result.data),
+      operation: 'uninstall',
+    });
     throw new Error(result.data);
   }
 
@@ -542,7 +577,7 @@ class PluginLoader extends EventEmitter {
         visible: plugin.enabled,
         click() {
           self.disablePlugin(packageName);
-          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+          ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
       },
       {
@@ -551,7 +586,7 @@ class PluginLoader extends EventEmitter {
         visible: !plugin.enabled,
         click() {
           self.enablePlugin(packageName);
-          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+          ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
       },
       {
@@ -559,7 +594,7 @@ class PluginLoader extends EventEmitter {
         label: '卸载插件',
         click() {
           self.uninstallPlugin(packageName).then(() => {
-            ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+            ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
           });
         },
       },
@@ -569,7 +604,14 @@ class PluginLoader extends EventEmitter {
         visible:
           plugin.enabled && !!plugin.settingMenu && !!plugin.settingMenu.length,
         click() {
-          ipcEv.sendToClient(ipcType.OPEN_PLUGIN_SETTING_PANEL, {
+          const mainWin = appManager.getWin();
+          if (mainWin) {
+            if (mainWin.isMinimized()) {
+              mainWin.restore();
+            }
+            mainWin.focus();
+          }
+          ipcEv.sendToMain(ipcType.OPEN_PLUGIN_SETTING_PANEL, {
             packageName,
           });
         },
@@ -592,7 +634,7 @@ class PluginLoader extends EventEmitter {
           ) {
             appManager.getChildWin(`plugin-window-${packageName}`).close();
           }
-          ipcEv.sendToClient(ipcType.PLUGINS_CHANGED);
+          ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
       },
       {
@@ -602,7 +644,7 @@ class PluginLoader extends EventEmitter {
           clipboard.writeText(
             `https://slime7.github.io/translime/open/?install=${packageName}`,
           );
-          ipcEv.sendToClient(ipcType.IPC_TOAST, ['链接已复制']);
+          ipcEv.sendToMain(ipcType.IPC_TOAST, ['链接已复制']);
         },
       },
     ];
@@ -635,6 +677,7 @@ class PluginLoader extends EventEmitter {
     if (plugin && typeof plugin.pluginSettingSaved === 'function') {
       plugin.pluginSettingSaved();
     }
+    this.emit('plugin:setting-changed', { plugin: plugin || null, pluginId });
   }
 }
 

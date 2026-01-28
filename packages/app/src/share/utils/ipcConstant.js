@@ -53,6 +53,9 @@ export const UPDATE_DOWNLOADED = 'update-downloaded';
 export const START_DOWNLOAD_UPDATE = 'start-download-update';
 export const QUIT_AND_INSTALL = 'quit-and-install';
 export const CHECK_FOR_UPDATE = 'check-for-update';
+export const GET_SYSTEM_COLOR = 'get-system-color';
+export const SYSTEM_COLOR_CHANGED = 'system-color-changed';
+export const THEME_COLOR_UPDATED = 'theme-color-updated';
 
 export default {
   DEVTOOLS,
@@ -109,4 +112,8 @@ export default {
   START_DOWNLOAD_UPDATE: 'start-download-update',
   QUIT_AND_INSTALL: 'quit-and-install',
   CHECK_FOR_UPDATE: 'check-for-update',
+  GET_SYSTEM_COLOR: 'get-system-color',
+  SYSTEM_COLOR_CHANGED: 'system-color-changed',
+  THEME_COLOR_UPDATED: 'theme-color-updated',
 };
+

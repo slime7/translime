@@ -83,13 +83,6 @@ export const pluginDidLoad = async () => {
   if (settings.customSteamPath) {
     steamPath = settings.customSteamPath;
     console.log('使用自定义 Steam 路径：', steamPath);
-  } else {
-    steamPath = await getSteamPath();
-    if (!steamPath) {
-      console.warn('未找到 Steam 路径！');
-    } else {
-      console.log('自动发现 Steam 路径：', steamPath);
-    }
   }
 };
 

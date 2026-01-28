@@ -83,11 +83,10 @@ export default defineConfig(({ mode }) => {
       minify: false,
       commonjsOptions: {},
       sourcemap: isDev ? 'inline' : false,
-      target: 'modules',
+      target: 'chrome134',
       rollupOptions: {
         input: {
           main: join(RENDERER_ROOT, 'index.html'),
-          pluginIndex: join(RENDERER_ROOT, 'plugin-index.html'),
         },
         external: [
           'vue',

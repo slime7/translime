@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { createServer, build, createLogger } from 'vite';
+import { build, createLogger, createServer } from 'vite';
 import electronPath from 'electron';
 import { spawn } from 'node:child_process';
 import waitOn from 'wait-on';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const filename = fileURLToPath(import.meta.url);
@@ -15,7 +15,7 @@ const dir = dirname(filename);
  * @type {BuildMode}
  */
 // eslint-disable-next-line no-multi-assign
-const mode = process.env.MODE = process.env.MODE || 'development';
+const mode = (process.env.MODE = process.env.MODE || 'development');
 
 /** @type {import('vite').LogLevel} */
 const LOG_LEVEL = 'info';
@@ -136,6 +136,16 @@ const startDevServer = async () => {
 const startDevEnvironment = async () => {
   try {
     const viteDevServer = await startDevServer();
+
+    const protocol = `http${viteDevServer.config.server.https ? 's' : ''}:`;
+    const host = viteDevServer.config.server.host || 'localhost';
+    const { port } = viteDevServer.config.server;
+    const serverUrl = `${protocol}//${host}:${port}/`;
+
+    await waitOn({
+      resources: [serverUrl],
+      timeout: 10000,
+    });
 
     await setupPreloadWatcher(viteDevServer);
     await waitOn({

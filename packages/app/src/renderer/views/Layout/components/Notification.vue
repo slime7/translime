@@ -38,7 +38,7 @@ import {
   ref,
   watch,
 } from 'vue';
-import { myDate } from '@pkg/share/utils';
+import dayjs from 'dayjs';
 import useAlert from '@/hooks/useAlert';
 
 export default {
@@ -46,11 +46,7 @@ export default {
 
   filters: {
     alertTime(time) {
-      return myDate(Math.round(time / 1000), {
-        format: '-',
-        showTime: true,
-        showSecond: true,
-      });
+      return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
     },
   },
 
@@ -94,11 +90,7 @@ export default {
       },
     );
 
-    const parseAlertTime = (time) => myDate(Math.round(time / 1000), {
-      format: '-',
-      showTime: true,
-      showSecond: true,
-    });
+    const parseAlertTime = (time) => dayjs(time).format('YYYY-MM-DD HH:mm:ss');
 
     return {
       keepBottom,

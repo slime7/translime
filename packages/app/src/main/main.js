@@ -4,6 +4,7 @@ import {
   ipcMain,
   nativeTheme,
   screen,
+  systemPreferences,
 } from 'electron';
 import Store from 'electron-store';
 import { dirname, join } from 'node:path';
@@ -99,9 +100,13 @@ export default () => {
 
   nativeTheme.on('updated', () => {
     if (appManager.getIpc()) {
-      appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors });
+      const themeAndColor = {
+        dark: nativeTheme.shouldUseDarkColors,
+        color: `#${systemPreferences.getAccentColor().substring(0, 6)}`,
+      };
+      appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, themeAndColor);
       Object.keys(appManager.getChildWin()).forEach((windowKey) => {
-        appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, { dark: nativeTheme.shouldUseDarkColors }, appManager.getChildWin(windowKey).webContents);
+        appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, themeAndColor, appManager.getChildWin(windowKey).webContents);
       });
     }
   });
@@ -119,7 +124,13 @@ export default () => {
   }
   appManager.getWin().setMenu(null);
 
-  appManager.getWin().on('close', () => {
+  appManager.getWin().on('close', (event) => {
+    const minimizeToTrayOnClose = mainStore.config.get('setting.minimizeToTrayOnClose', false);
+    if (minimizeToTrayOnClose && !appManager.state.isQuitting) {
+      event.preventDefault();
+      appManager.getWin().hide();
+    }
+
     if (!maximize) {
       const pos = appManager.getWin().getPosition();
       const size = appManager.getWin().getSize();

@@ -98,7 +98,6 @@ const api = {
       on,
       invoke,
       detach,
-      callbackCache,
     };
   },
   clipboard,

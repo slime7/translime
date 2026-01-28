@@ -13,7 +13,7 @@ export const linkHandler = (url) => {
 
   switch (link.main) {
   case 'open':
-    global.mainStore.ipc().sendToClient(ipcType.DEEP_LINK_OPEN, link.params);
+    global.mainStore.ipc().sendToMain(ipcType.DEEP_LINK_OPEN, link.params);
     break;
   case 'plugin':
     // todo: 插件扩展

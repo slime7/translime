@@ -1,36 +1,32 @@
 <template>
   <v-app>
-    <v-system-bar app class="system-bar p-0" v-if="!appSetting.useNativeTitleBar">
-      <div v-if="!plugin" class="px-4">
-        translime
-      </div>
-      <div v-else class="px-4">
-        {{ plugin.title }} - translime
+    <v-system-bar class="system-bar p-0" v-if="!appSetting.useNativeTitleBar">
+      <div class="px-4">
+        {{ plugin ? `${plugin.title} - translime` : 'translime' }}
       </div>
 
       <v-spacer />
 
       <window-controls
         :is-maximize="isMaximize"
-        :win="`plugin-window-${pluginId}`"
+        :win="`plugin-window-${packageName}`"
         @window-maximize="getIsMaximize"
         @window-unmaximize="getIsMaximize"
       />
     </v-system-bar>
 
-    <v-main class="h-full">
+    <v-main class="h-screen">
       <div class="flex flex-col h-full" id="app-main-container">
-        <div class="scroll-content flex-auto">
-          <div class="plugin-container">
-            <plugin-title-bar :plugin="plugin" :visible="appBarVisible" v-if="plugin" />
-
-            <plugin-ui-loader
-              v-if="loaderVisible"
-              :key="`${plugin.packageName}-${plugin.loadTime}`"
-              :plugin-path="plugin.ui"
-              :plugin-id="plugin.packageName"
-            />
-          </div>
+        <div class="scroll-content">
+          <router-view v-slot="{ Component, route }">
+            <v-fade-transition
+              mode="out-in"
+              @after-enter="onEnter"
+              @before-leave="onLeave"
+            >
+              <component :is="Component" :key="route.path" />
+            </v-fade-transition>
+          </router-view>
         </div>
       </div>
     </v-main>
@@ -38,16 +34,22 @@
 </template>
 
 <script>
-import { onMounted, onUnmounted, ref } from 'vue';
-import { useTheme as useVTheme } from 'vuetify';
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue';
+import { useRoute } from 'vue-router';
 import * as components from 'vuetify/components';
 import * as labsComponents from 'vuetify/labs/components';
 import * as directives from 'vuetify/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import WindowControls from '@/components/WindowControls.vue';
 import { useIpc } from '@/hooks/electron';
-import PluginUiLoader from '@/views/plugins/PluginUiLoader.vue';
-import PluginTitleBar from '@/views/Layout/components/PluginTitleBar.vue';
+import globalStore from '@/store/globalStore';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
@@ -63,81 +65,65 @@ export default {
   name: 'LayoutPluginWindow',
 
   components: {
-    PluginTitleBar,
     WindowControls,
-    PluginUiLoader,
   },
 
   setup() {
+    const route = useRoute();
     const ipc = useIpc();
-    const pluginId = ref('');
-    const isMaximize = ref(false);
-    const plugin = ref(null);
-    const loaderVisible = ref(false);
-    const appBarVisible = ref(false);
-    const vTheme = useVTheme();
+    const store = globalStore();
 
-    const getPluginId = () => {
-      const params = new URLSearchParams(window.location.search);
-      pluginId.value = params.get('pluginId');
-    };
+    const packageName = computed(() => route.params.packageName);
+    const plugin = computed(() => store.plugin(packageName.value));
+    const isMaximize = ref(false);
+    const appSetting = computed(() => store.appSetting);
+
     const onMaximizeStatusChange = () => {
-      ipc.on(`set-maximize-status:plugin-window-${pluginId.value}`, (maximize) => {
+      ipc.on(`set-maximize-status:plugin-window-${packageName.value}`, (maximize) => {
         isMaximize.value = maximize;
       });
     };
-    const getIsMaximize = async () => {
-      isMaximize.value = await ipc.invoke(ipcType.APP_IS_MAXIMIZE, `plugin-window-${pluginId.value}`);
-    };
-    const getPlugin = async () => {
-      try {
-        plugin.value = await ipc.invoke(ipcType.GET_PLUGINS, pluginId.value);
-      } catch (err) {
-        //
-      }
-    };
-    const appSetting = ref({});
-    const getAppSettings = () => {
-      const params = new URLSearchParams(window.location.search);
-      const darkParam = params.get('dark');
-      vTheme.change(!!darkParam && darkParam !== 'false' && darkParam !== '0' ? 'dark' : 'light');
 
-      appSetting.value = JSON.parse(atob(params.get('app-setting')));
-      if (appSetting.value.useNativeTitleBar) {
+    const getIsMaximize = async () => {
+      isMaximize.value = await ipc.invoke(ipcType.APP_IS_MAXIMIZE, `plugin-window-${packageName.value}`);
+    };
+
+    watch(() => appSetting.value.useNativeTitleBar, (useNative) => {
+      if (useNative) {
         document.body.className = '';
       } else {
         document.body.className = 'custom-title-bar';
       }
-    };
-    const themeUpdated = () => {
-      ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {
-        vTheme.change(dark ? 'dark' : 'light');
+    }, { immediate: true });
+
+    const onEnter = () => {
+      nextTick(() => {
+        store.pageTransitionActive = false;
       });
     };
+    const onLeave = () => {
+      store.pageTransitionActive = true;
+    };
 
-    onMounted(async () => {
-      getPluginId();
-      getAppSettings();
+    onMounted(() => {
       onMaximizeStatusChange();
-      themeUpdated();
-      await getIsMaximize();
-      await getPlugin();
-      loaderVisible.value = plugin.value && plugin.value.ui;
-      appBarVisible.value = true;
+      getIsMaximize();
+      store.pageTransitionActive = false;
     });
 
     onUnmounted(() => {
-      ipc.detach(`set-maximize-status:plugin-window-${pluginId.value}`);
+      ipc.detach(`set-maximize-status:plugin-window-${packageName.value}`);
+      store.pageTransitionActive = false;
     });
 
     return {
-      pluginId,
-      isMaximize,
+      packageName,
       plugin,
+      isMaximize,
       getIsMaximize,
-      loaderVisible,
-      appBarVisible,
       appSetting,
+      onEnter,
+      onLeave,
     };
   },
 };

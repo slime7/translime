@@ -3,7 +3,7 @@ import { builtinModules } from 'node:module';
 import { defineConfig } from 'vite';
 import { external } from '../package.json';
 
-const PACKAGE_ROOT = join(__dirname, 'main');
+const PACKAGE_ROOT = join(import.meta.dirname, 'main');
 
 /**
  * @see https://vitejs.dev/config/
@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: isDev ? 'inline' : false,
-      target: 'node18',
+      target: 'node20',
       outDir: join(PACKAGE_ROOT, '../../dist/main'),
       assetsDir: '.',
       minify: isDev ? false : 'terser',
