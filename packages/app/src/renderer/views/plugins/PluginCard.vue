@@ -295,6 +295,7 @@ export default {
     z-index: 0;
     transition: all .4s ease-in-out;
     filter: grayscale(.2);
+    mask-image: radial-gradient(closest-side, black 0%, transparent 75%);
   }
 
   &:hover {
