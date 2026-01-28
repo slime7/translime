@@ -18,6 +18,12 @@
             @click="onOpenAtLogin(!settings.openAtLogin)"
           />
           <mde-list-item
+            title="关闭时最小化到托盘"
+            item-type="switch"
+            :is-active="settings.minimizeToTrayOnClose"
+            @click="onMinimizeToTrayOnClose(!settings.minimizeToTrayOnClose)"
+          />
+          <mde-list-item
             title="显示开发中插件(重启后生效)"
             item-type="switch"
             :is-active="settings.showDevPlugin"
@@ -470,6 +476,14 @@ const onOpenAtLogin = (value) => {
     });
   }
   setAppOpenAtLogin(value);
+};
+
+const setAppMinimizeToTrayOnClose = (value) => {
+  store.setAppMinimizeToTrayOnClose(value);
+};
+const onMinimizeToTrayOnClose = (value) => {
+  appConfigStore.set('setting.minimizeToTrayOnClose', !!value);
+  setAppMinimizeToTrayOnClose(!!value);
 };
 
 const onShowDevPlugin = (isShow) => {

@@ -124,7 +124,13 @@ export default () => {
   }
   appManager.getWin().setMenu(null);
 
-  appManager.getWin().on('close', () => {
+  appManager.getWin().on('close', (event) => {
+    const minimizeToTrayOnClose = mainStore.config.get('setting.minimizeToTrayOnClose', false);
+    if (minimizeToTrayOnClose && !appManager.state.isQuitting) {
+      event.preventDefault();
+      appManager.getWin().hide();
+    }
+
     if (!maximize) {
       const pos = appManager.getWin().getPosition();
       const size = appManager.getWin().getSize();

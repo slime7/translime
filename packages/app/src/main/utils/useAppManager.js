@@ -7,6 +7,7 @@ const useAppManager = () => {
     pluginLoader: null,
     tray: null,
     mainProcessLock: null,
+    isQuitting: false,
   };
 
   const setWin = (win) => {

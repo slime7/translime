@@ -25,9 +25,7 @@ const createTray = () => {
     {
       label: '退出',
       click() {
-        if (appManager.getWin()) {
-          appManager.getWin().close();
-        }
+        app.quit();
       },
     },
   ];

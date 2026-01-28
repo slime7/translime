@@ -23,6 +23,10 @@ class CreateElectronApp extends EventEmitter {
     this.base();
     this.onAppReady();
     this.onAppQuit();
+
+    app.on('before-quit', () => {
+      appManager.state.isQuitting = true;
+    });
   }
 
   // eslint-disable-next-line class-methods-use-this
