@@ -125,53 +125,6 @@ export const toneMap = async (hdrBuffer, width, height, options = {}) => await n
 export const encodeImage = async (buffer, width, height, format = 'png') => await nativeAddon.encodeImage(buffer, width, height, format);
 
 /**
- * 从缓存中裁剪并保存
- * @param {Array} sessionData
- * @param {Rect} rect
- * @param {Object} options
- */
-export const cropAndSaveFromBuffer = async (sessionData, rect, options = {}) => {
-  const { format = 'png', savePath, preserveHdr = false } = options;
-
-  // 1. 找到包含选区中心点的缓存显示器
-  const centerX = rect.x + rect.width / 2;
-  const centerY = rect.y + rect.height / 2;
-  const display = sessionData.find((d) => centerX >= d.bounds.x && centerX <= d.bounds.x + d.bounds.width
-    && centerY >= d.bounds.y && centerY <= d.bounds.y + d.bounds.height) || sessionData[0];
-
-  // 2. 转换选区坐标为相对于显示器的坐标
-  const localRect = {
-    x: Math.round(rect.x - display.bounds.x),
-    y: Math.round(rect.y - display.bounds.y),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height),
-  };
-
-  // 3. 裁剪
-  const croppedBuffer = await cropImage(display.rawBuffer, display.width, display.height, localRect);
-
-  // 4. Tone Mapping
-  let finalBuffer = croppedBuffer;
-  if (preserveHdr) {
-    finalBuffer = await toneMap(croppedBuffer, localRect.width, localRect.height, { preserveHdrMetadata: true });
-  }
-
-  // 5. 编码
-  const encodedData = await encodeImage(finalBuffer, localRect.width, localRect.height, format);
-
-  // 6. 写入磁盘
-  if (savePath) {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const fileName = `screenshot_${Date.now()}.${format}`;
-    const fullPath = path.join(savePath, fileName);
-    await fs.writeFile(fullPath, encodedData);
-    return fullPath;
-  }
-  return null;
-};
-
-/**
  * 从缓存中裁剪并获取 PNG Buffer (用于复制)
  * @param {Array} sessionData
  * @param {Rect} rect

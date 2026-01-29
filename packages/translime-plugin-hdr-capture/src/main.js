@@ -247,7 +247,6 @@ const startCapture = async () => {
         id: d.id,
         bounds: d.bounds,
       })),
-      buildTime: new Date().toLocaleString(),
     };
 
     logger.info(`[${PLUGIN_ID}] 发送初始化数据, 截图数量: ${capturedScreens.length}`);

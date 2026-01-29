@@ -68,7 +68,6 @@ pub fn get_window_at_point(x: i32, y: i32) -> Option<WindowInfo> {
     window::get_window_at_point(x, y)
 }
 
-
 // ==================== 屏幕捕获 API ====================
 
 /// 捕获指定显示器的屏幕 (返回 RGBA Buffer)

@@ -3,7 +3,7 @@
 //! 提供裁剪、Tone Mapping、编码等功能
 
 use crate::{Rect, ToneMappingOptions};
-use image::{ImageBuffer, ImageFormat, RgbImage, RgbaImage, DynamicImage};
+use image::{ImageFormat, RgbImage, RgbaImage, DynamicImage};
 use std::io::Cursor;
 
 /// 图像包装函数：将 Buffer 转换为 DynamicImage，支持 RGB 和 RGBA

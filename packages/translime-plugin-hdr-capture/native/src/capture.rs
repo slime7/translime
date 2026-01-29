@@ -9,11 +9,14 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_MAP_READ, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
 use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_UNKNOWN;
+use windows::Win32::Graphics::Dxgi::Common::{
+    DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DXGI_FORMAT_R16G16B16A16_FLOAT,
+    DXGI_SAMPLE_DESC,
+};
 use windows::Win32::Graphics::Dxgi::{
     CreateDXGIFactory1, IDXGIAdapter, IDXGIFactory1, IDXGIOutput, IDXGIOutput1, IDXGIResource,
     DXGI_OUTDUPL_FRAME_INFO,
 };
-use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::core::Interface;
 
 /// 显示器信息
@@ -143,7 +146,7 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
             MipLevels: 1,
             ArraySize: 1,
             Format: pixel_format,
-            SampleDesc: windows::Win32::Graphics::Dxgi::Common::DXGI_SAMPLE_DESC {
+            SampleDesc: DXGI_SAMPLE_DESC {
                 Count: 1,
                 Quality: 0,
             },
@@ -179,11 +182,6 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
                         
                         let row_pitch = mapped.RowPitch as usize;
                         let mut temp_buffer = Vec::with_capacity((width * height * 4) as usize);
-
-                        use windows::Win32::Graphics::Dxgi::Common::{
-                            DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R16G16B16A16_FLOAT,
-                            DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
-                        };
 
                         for row in 0..height {
                             let src = (mapped.pData as *const u8).add(row as usize * row_pitch);

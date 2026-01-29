@@ -65,7 +65,7 @@ onMounted(() => {
 
       clearBlobUrls();
       state.capturedScreens = (data.capturedScreens || []).map((s) => {
-        const blob = new Blob([s.data], { type: 'image/jpeg' });
+        const blob = new Blob([s.data], { type: 'image/webp' });
         const url = URL.createObjectURL(blob);
         blobUrls.push(url);
         return { ...s, url };
