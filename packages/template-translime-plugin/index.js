@@ -115,7 +115,7 @@ const ipcHandlers = [
   },
 ];
 
-module.exports = {
+export default {
   pluginDidLoad,
   pluginWillUnload,
   pluginSettingSaved,
