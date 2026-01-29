@@ -11,11 +11,11 @@ use windows::Win32::Graphics::Direct3D11::{
 use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_UNKNOWN;
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DXGI_FORMAT_R16G16B16A16_FLOAT,
-    DXGI_SAMPLE_DESC,
+    DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_SAMPLE_DESC,
 };
 use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory1, IDXGIAdapter, IDXGIFactory1, IDXGIOutput, IDXGIOutput1, IDXGIResource,
-    DXGI_OUTDUPL_FRAME_INFO,
+    CreateDXGIFactory1, IDXGIAdapter, IDXGIFactory1, IDXGIOutput, IDXGIOutput1, IDXGIOutput6,
+    IDXGIResource, DXGI_OUTDUPL_FRAME_INFO,
 };
 use windows::core::Interface;
 
@@ -128,16 +128,43 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
         let device = device.ok_or("Failed to create D3D11 device")?;
         let context = context.ok_or("Failed to get device context")?;
 
-        // 获取 Output Duplication
-        let output1: IDXGIOutput1 = output.cast()?;
-        let duplication = output1.DuplicateOutput(&device)?;
-
-        // 获取输出描述
+        // 获取描述（由于后续 cast 可能移动，先执行）
         let output_desc = output.GetDesc()?;
+        
+        let (duplication, is_output6) = {
+            // 尝试 IDXGIOutput6
+            if let Ok(output6) = output.clone().cast::<IDXGIOutput6>() {
+                let formats = [
+                    DXGI_FORMAT_R16G16B16A16_FLOAT,
+                    DXGI_FORMAT_B8G8R8A8_UNORM,
+                    DXGI_FORMAT_R10G10B10A2_UNORM,
+                ];
+                match output6.DuplicateOutput1(&device, 0, &formats) {
+                    Ok(dupl) => (dupl, true),
+                    Err(_) => {
+                        let output1: IDXGIOutput1 = output.clone().cast()?;
+                        (output1.DuplicateOutput(&device)?, false)
+                    }
+                }
+            } else {
+                let output1: IDXGIOutput1 = output.clone().cast()?;
+                (output1.DuplicateOutput(&device)?, false)
+            }
+        };
+
+        println!("[HDR-Native] Display {} using Output6 (scRGB supported): {}", display_id, is_output6);
+        let mut duplication = duplication;
+
         let dupl_desc = duplication.GetDesc();
         let pixel_format = dupl_desc.ModeDesc.Format;
         let width = (output_desc.DesktopCoordinates.right - output_desc.DesktopCoordinates.left) as u32;
         let height = (output_desc.DesktopCoordinates.bottom - output_desc.DesktopCoordinates.top) as u32;
+
+        println!("[HDR-Native] Display {} Format: {:?}, Size: {}x{}", display_id, pixel_format, width, height);
+
+        // 判断是否为 HDR 格式
+        let is_hdr_format = pixel_format == DXGI_FORMAT_R16G16B16A16_FLOAT || pixel_format == DXGI_FORMAT_R10G10B10A2_UNORM;
+        println!("[HDR-Native] Display {} is HDR: {}", display_id, is_hdr_format);
 
         // 创建 staging texture
         let staging_desc = D3D11_TEXTURE2D_DESC {
@@ -165,16 +192,21 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
         let mut final_buffer = Vec::new();
         let mut retry_count = 0;
         
-        while retry_count < 10 {
+        while retry_count < 30 {
             let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
             let mut desktop_resource: Option<IDXGIResource> = None;
             
-            // AcquireNextFrame (适度的轮询间隔)
-            match duplication.AcquireNextFrame(40, &mut frame_info, &mut desktop_resource) {
+            // 阶梯式轮询：前 15 次快速 (10ms)，后 10 次深度 (100ms)
+            let timeout = if retry_count < 15 { 10 } else { 100 };
+            
+            match duplication.AcquireNextFrame(timeout, &mut frame_info, &mut desktop_resource) {
                 Ok(_) => {
                     if let Some(resource) = desktop_resource {
                         let desktop_texture: ID3D11Texture2D = resource.cast()?;
                         context.CopyResource(&staging_resource, &desktop_texture.cast::<ID3D11Resource>()?);
+                        
+                        // 强制刷新指令流，确保数据从 GPU 写入 Staging Texture
+                        context.Flush();
                         
                         // 映射并读取
                         let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
@@ -192,6 +224,19 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
                                     temp_buffer.push(f16_to_u8(pixel[0])); // R
                                     temp_buffer.push(f16_to_u8(pixel[1])); // G
                                     temp_buffer.push(f16_to_u8(pixel[2])); // B
+                                    temp_buffer.push(255);
+                                }
+                            } else if pixel_format == DXGI_FORMAT_R10G10B10A2_UNORM {
+                                let row_data = std::slice::from_raw_parts(src as *const u32, width as usize);
+                                for &pixel in row_data {
+                                    // 10 bits R, G, B, 2 bits A
+                                    // 虽然简单位移会丢失精度，但在预览阶段足够
+                                    let r = ((pixel & 0x3FF) >> 2) as u8;
+                                    let g = (((pixel >> 10) & 0x3FF) >> 2) as u8;
+                                    let b = (((pixel >> 20) & 0x3FF) >> 2) as u8;
+                                    temp_buffer.push(r);
+                                    temp_buffer.push(g);
+                                    temp_buffer.push(b);
                                     temp_buffer.push(255);
                                 }
                             } else if pixel_format == DXGI_FORMAT_B8G8R8A8_UNORM || pixel_format == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB {
@@ -217,19 +262,41 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
                         context.Unmap(&staging_resource, 0);
                         let _ = duplication.ReleaseFrame();
 
-                        // 核心修正：只检查 RGB 分量是否全为 0，跳过 Alpha (每 4 字节的最后一个)
-                        let is_black = !temp_buffer.chunks(4).take(2000).any(|p| p[0] != 0 || p[1] != 0 || p[2] != 0);
+                        // 增强判定：全屏均匀采样 100 个点，防止因为局部黑边导致误判
+                        let total_pixels = temp_buffer.len() / 4;
+                        let sample_step = (total_pixels / 100).max(1);
+                        let has_content = (0..100).any(|i| {
+                            let idx = i * sample_step * 4;
+                            if idx + 2 < temp_buffer.len() {
+                                temp_buffer[idx] > 0 || temp_buffer[idx+1] > 0 || temp_buffer[idx+2] > 0
+                            } else {
+                                false
+                            }
+                        });
                         
-                        if !is_black || retry_count == 7 {
+                        if has_content || retry_count >= 25 {
+                            if retry_count > 0 {
+                                println!("[HDR-Native] Display {} recovered at retry {}", display_id, retry_count);
+                            }
                             final_buffer = temp_buffer;
                             break;
+                        } else {
+                            // 如果重试次数过多依然全黑，尝试重置下 duplication
+                            // 此时不进行复杂的重新 API 获取，仅执行 ReleaseFrame 并等待
+                            // 下一次循环会自动进行 AcquireNextFrame
                         }
                     } else {
                         let _ = duplication.ReleaseFrame();
                     }
                 }
-                Err(_) => {
-                    // Timeout, continue retrying
+                Err(e) => {
+                    let err_code = e.code();
+                    // 仅在关键错误（访问丢失）时重新初始化
+                    if err_code == windows::Win32::Graphics::Dxgi::DXGI_ERROR_ACCESS_LOST {
+                         if let Ok(new_dupl) = output.clone().cast::<IDXGIOutput1>().and_then(|o| o.DuplicateOutput(&device)) {
+                             duplication = new_dupl;
+                         }
+                    }
                 }
             }
             retry_count += 1;
@@ -260,6 +327,20 @@ fn f16_to_u8(val: u16) -> u8 {
         (1.0 + (frac as f32) / 1024.0) * 2.0f32.powi(exp as i32 - 15)
     };
 
-    // 映射到 0-255，并进行简单的伽马校正
-    (f.max(0.0).min(1.0).powf(1.0 / 2.2) * 255.0) as u8
+    // 映射到 0-255，并进行伽马校正
+    let val_f = f.max(0.0);
+    if val_f < 0.0001 { return 0; }
+    
+    // 改良的映射算法，增加对比度平衡
+    // 假设 Windows SDR 参照白为 200 nits (scRGB 2.5)
+    let exposure = 0.45; 
+    let x = val_f * exposure;
+    
+    // 使用带“白点”的 Reinhard 公式，允许高光部分有更好的对比度
+    // 并添加一个简单的幂次调整来压深暗部 (Toe)
+    let reinhard = x * (1.0 + x / 25.0) / (1.0 + x);
+    
+    // 应用 Gamma 2.2 转换，并微调 Gamma 值 (从 0.45 降至 0.5) 进一步压实黑色
+    let gamma = 0.50; 
+    (reinhard.powf(gamma).min(1.0) * 255.0) as u8
 }

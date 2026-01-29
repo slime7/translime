@@ -171,6 +171,7 @@ const preCaptureAllScreens = async () => {
         height: nd.height,
         scaleFactor: ed.scaleFactor,
         bounds: ed.bounds,
+        isHdr: true, // 标记为 HDR 画面
       };
     } catch (err) {
       logger.error(`[${PLUGIN_ID}] 显示器 ID=${nd.id} 捕获发生异常:`, err);
@@ -197,6 +198,9 @@ const startCapture = async () => {
     return;
   }
 
+  // 适当减少宁静时间。阶梯轮询逻辑已移至 native 层，此处仅做最小化 DWM 稳定缓冲
+  await new Promise((resolve) => { setTimeout(resolve, 100); });
+
   // 预先捕获所有屏幕画面（冻结画面）
   const sessionData = await preCaptureAllScreens();
 
@@ -209,6 +213,7 @@ const startCapture = async () => {
   currentCaptureSession = sessionData;
 
   // 并行地为 UI 准备编码后的画面 (WebP)
+  // [重要修改] Native 已经完成了预览所需的 SDR 转换，此处不再调用冗余的 toneMap
   const capturedScreens = await Promise.all(sessionData.map(async (s) => ({
     displayId: s.displayId,
     bounds: s.bounds,
