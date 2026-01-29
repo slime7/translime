@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+@theme {
+  /* 这里可以添加自定义主题色或变量 */
+}
+
+/* 基础全局样式 */
+html,
+ body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
+}

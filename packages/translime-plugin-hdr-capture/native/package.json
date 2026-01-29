@@ -1,0 +1,14 @@
+{
+  "name": "hdr-capture-native",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "napi": {
+    "binaryName": "hdr-capture-native",
+    "package": {
+      "name": "hdr-capture-native"
+    },
+    "js": false,
+    "dts": "index.d.ts"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nickel-org/napi-rs/main/packages/cli/napi-packages.schema.json",
+  "targets": [
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "platform": "win32",
+      "arch": "x64"
+    }
+  ]
+}

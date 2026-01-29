@@ -1,0 +1,61 @@
+{
+  "name": "translime-plugin-hdr-capture",
+  "version": "1.0.0",
+  "description": "轻松获取 HDR 截图",
+  "license": "MIT",
+  "keywords": [
+    "translime",
+    "translime-plugin"
+  ],
+  "main": "./dist/main.cjs.js",
+  "exports": {
+    ".": {
+      "require": "./dist/main.cjs.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src/assets/icon.png"
+  ],
+  "scripts": {
+    "dev": "vite build -c ui.vite.config.mjs --watch",
+    "build:native": "cd native && napi build --platform --release ../dist/bin",
+    "build:plugin": "vite build",
+    "build:ui": "vite build -c ui.vite.config.mjs",
+    "build:overlay": "vite build -c overlay.vite.config.mjs --mode preload && vite build -c overlay.vite.config.mjs",
+    "build:main": "pnpm run build:ui && pnpm run build:plugin && pnpm run build:overlay",
+    "build": "rimraf dist && pnpm run build:main && pnpm build:native"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "cross-env": "7.0.3",
+    "electron": "~39.2.4",
+    "eslint": "~9.24.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-vue": "^10.0.0",
+    "rimraf": "^4.4.1",
+    "translime-sdk": "workspace:*",
+    "vite": "^7.3.1",
+    "vite-plugin-css-injected-by-js": "^3.4.0",
+    "vue": "^3.5.13",
+    "vuetify": "^3.11.6"
+  },
+  "peerDependencies": {
+    "electron": "~39.2.4",
+    "vue": "^3.5.13",
+    "vuetify": "^3.11.6"
+  },
+  "plugin": {
+    "title": "hdr截图",
+    "description": "轻松获取 HDR 截图",
+    "icon": "src/assets/icon.png",
+    "ui": "dist/ui.esm.js"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "tailwindcss": "^4.1.18"
+  }
+}
