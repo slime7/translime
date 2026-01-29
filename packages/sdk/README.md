@@ -63,3 +63,7 @@ const { VBtn, VCard } = useVuetifyComponents();
 - `useWindowControl()`: 获取窗口控制工具。
 - `useClipboard()`: 获取剪贴板工具。
 - `openLink(...args)`: 在浏览器中打开链接。
+
+### 通用 (Common)
+
+- `useLogger()`: 获取标准日志工具，支持 `log`, `info`, `warn`, `error`, `debug`。在渲染进程中会自动通过 IPC 发送到主进程记录，在主进程中则直接写入日志文件。

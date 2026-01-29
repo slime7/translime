@@ -155,3 +155,15 @@ export async function openLink(...args) {
   }
   return null;
 }
+/**
+ * 获取日志工具 (多端适配)
+ * @returns {Record<'log'|'info'|'warn'|'error'|'debug', Function>}
+ */
+export function useLogger() {
+  if (typeof window !== 'undefined') {
+    return window.ts?.logger || console;
+  }
+  return console;
+}
+
+
