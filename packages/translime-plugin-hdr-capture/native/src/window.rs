@@ -120,4 +120,3 @@ pub fn get_window_at_point(x: i32, y: i32) -> Option<WindowInfo> {
         })
     }
 }
-

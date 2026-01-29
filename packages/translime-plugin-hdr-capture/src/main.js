@@ -91,6 +91,9 @@ const createOverlayWindow = () => {
     movable: false,
     maximizable: true,
     fullscreen: true,
+    thickFrame: false, // 核心：禁用 Win10/11 的窗口管理（包括动画）
+    hasShadow: false, // 禁用阴影，让边缘更干脆
+    type: 'toolbar', // 某些版本的 Windows 建议将其设为 toolbar 以减少窗口特效
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
