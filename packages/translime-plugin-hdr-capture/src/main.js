@@ -1,4 +1,5 @@
 import {
+  app,
   BrowserWindow,
   globalShortcut,
   screen,
@@ -13,7 +14,8 @@ const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
-const logger = useLogger();
+const baseLogger = useLogger();
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Main' }) : baseLogger;
 
 /**
  * 这是一个本地实现的配置代理，不依赖外部模块，
@@ -36,7 +38,7 @@ let currentCaptureSession = null;
  * 按照 SDK 规范，通过 config.get 获取单个配置项
  */
 const getShortcut = () => pluginConfig.get('shortcut', '');
-const getSavePath = () => pluginConfig.get('savePath', '');
+const getSavePath = () => pluginConfig.get('savePath') || app.getPath('pictures');
 const getSaveFormat = () => pluginConfig.get('saveFormat', 'png');
 const getPreserveHdr = () => pluginConfig.get('preserveHdr', false);
 
@@ -46,7 +48,7 @@ const getPreserveHdr = () => pluginConfig.get('preserveHdr', false);
 const unregisterShortcut = () => {
   if (registeredShortcut) {
     globalShortcut.unregister(registeredShortcut);
-    // 已注销快捷键
+    logger.info(`快捷键已注销: ${registeredShortcut}`);
     registeredShortcut = null;
   }
 };
@@ -54,8 +56,10 @@ const unregisterShortcut = () => {
 /**
  * 创建透明叠加层窗口
  */
-const createOverlayWindow = () => {
-  // 获取所有显示器的总边界
+/**
+ * 获取所有显示器的组合边界
+ */
+const getAllDisplaysBounds = () => {
   const displays = screen.getAllDisplays();
   let minX = Infinity;
   let minY = Infinity;
@@ -75,25 +79,39 @@ const createOverlayWindow = () => {
     maxY = Math.max(maxY, y + height);
   });
 
-  const totalWidth = maxX - minX;
-  const totalHeight = maxY - minY;
+  return {
+    displays,
+    minX,
+    minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+};
+
+/**
+ * 创建透明叠加层窗口
+ */
+const createOverlayWindow = (isDebug = false) => {
+  const {
+    minX, minY, width, height,
+  } = getAllDisplaysBounds();
 
   overlayWindow = new BrowserWindow({
     x: minX,
     y: minY,
-    width: totalWidth,
-    height: totalHeight,
+    width,
+    height,
     frame: false,
     transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
+    alwaysOnTop: !isDebug, // Debug 模式下不置顶
+    skipTaskbar: !isDebug,
+    resizable: isDebug,
+    movable: isDebug,
     maximizable: true,
-    fullscreen: true,
-    thickFrame: false, // 核心：禁用 Win10/11 的窗口管理（包括动画）
-    hasShadow: false, // 禁用阴影，让边缘更干脆
-    type: 'toolbar', // 某些版本的 Windows 建议将其设为 toolbar 以减少窗口特效
+    fullscreen: !isDebug, // Debug 模式下不强制全屏
+    thickFrame: false,
+    hasShadow: false,
+    type: 'toolbar',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -105,13 +123,17 @@ const createOverlayWindow = () => {
   overlayWindow.setBounds({
     x: minX,
     y: minY,
-    width: totalWidth,
-    height: totalHeight,
+    width,
+    height,
   });
 
   // 加载叠加层 HTML
   const overlayPath = path.join(dirname, '../dist/overlay.html');
   overlayWindow.loadFile(overlayPath);
+
+  if (isDebug) {
+    overlayWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 
   // 注意: 初始化数据发送由 startCapture 中的 did-finish-load 处理
 
@@ -141,15 +163,15 @@ const preCaptureAllScreens = async () => {
   const electronDisplays = screen.getAllDisplays();
   const nativeDisplays = capture.getDisplays();
 
-  logger.info(`[${PLUGIN_ID}] 开始预捕获。检测到原生显示器数量: ${nativeDisplays.length}`);
+  logger.info('开始预捕获。检测到原生显示器数量:', nativeDisplays.length);
 
   const capturePromises = nativeDisplays.map(async (nd) => {
     try {
-      logger.info(`[${PLUGIN_ID}] 正在捕获显示器 ID=${nd.id} (${nd.width}x${nd.height})`);
+      logger.info(`正在捕获显示器 ID=${nd.id} (${nd.width}x${nd.height})`);
       const buffer = await capture.captureDisplay(nd.id);
 
       if (!buffer || buffer.length === 0) {
-        logger.warn(`[${PLUGIN_ID}] 显示器 ID=${nd.id} 返回的 Buffer 为空`);
+        logger.warn(`显示器 ID=${nd.id} 返回的 Buffer 为空`);
         return null;
       }
 
@@ -162,7 +184,7 @@ const preCaptureAllScreens = async () => {
                && centerY >= b.y && centerY <= b.y + b.height;
       }) || electronDisplays[0];
 
-      logger.info(`[${PLUGIN_ID}] 显示器 ID=${nd.id} 匹配到 Electron 显示器: scale=${ed.scaleFactor}`);
+      logger.info(`显示器 ID=${nd.id} 匹配到 Electron 显示器: scale=${ed.scaleFactor}`);
 
       return {
         displayId: nd.id,
@@ -174,7 +196,7 @@ const preCaptureAllScreens = async () => {
         isHdr: true, // 标记为 HDR 画面
       };
     } catch (err) {
-      logger.error(`[${PLUGIN_ID}] 显示器 ID=${nd.id} 捕获发生异常:`, err);
+      logger.error(`显示器 ID=${nd.id} 捕获发生异常:`, err);
       return null;
     }
   });
@@ -184,14 +206,14 @@ const preCaptureAllScreens = async () => {
     .filter((result) => result.status === 'fulfilled' && result.value !== null)
     .map((result) => result.value);
 
-  logger.info(`[${PLUGIN_ID}] 预捕获完成，成功获取到 ${finalResults.length} 张屏幕画面`);
+  logger.info(`预捕获完成，成功获取到 ${finalResults.length} 张屏幕画面`);
   return finalResults;
 };
 
 /**
  * 启动截图流程
  */
-const startCapture = async () => {
+const startCapture = async (isDebug = false) => {
   if (overlayWindow) {
     // 已有窗口，聚焦
     overlayWindow.focus();
@@ -199,56 +221,53 @@ const startCapture = async () => {
   }
 
   // 适当减少宁静时间。阶梯轮询逻辑已移至 native 层，此处仅做最小化 DWM 稳定缓冲
-  await new Promise((resolve) => { setTimeout(resolve, 100); });
+  await new Promise((resolve) => {
+    setTimeout(resolve, 100);
+  });
 
   // 预先捕获所有屏幕画面（冻结画面）
-  const sessionData = await preCaptureAllScreens();
-
-  if (!sessionData || sessionData.length === 0) {
-    logger.error(`[${PLUGIN_ID}] 启动失败: 未能捕获到任何屏幕画面。请检查原生模块加载状态及录屏权限。`);
-    // 可以考虑这里弹出一个对话框通知用户
-    return;
-  }
-
-  currentCaptureSession = sessionData;
-
+  let sessionData = [];
   // 并行地为 UI 准备编码后的画面 (WebP)
-  // [重要修改] Native 已经完成了预览所需的 SDR 转换，此处不再调用冗余的 toneMap
-  const capturedScreens = await Promise.all(sessionData.map(async (s) => ({
-    displayId: s.displayId,
-    bounds: s.bounds,
-    data: await capture.encodeImage(s.rawBuffer, s.width, s.height, 'webp'),
-  })));
+  let capturedScreens = [];
+
+  if (!isDebug) {
+    sessionData = await preCaptureAllScreens();
+
+    if (!sessionData || sessionData.length === 0) {
+      logger.error('启动失败: 未能捕获到任何屏幕画面。请检查原生模块加载状态及录屏权限。');
+      // 可以考虑这里弹出一个对话框通知用户
+      return;
+    }
+
+    currentCaptureSession = sessionData;
+
+    // [重要修改] Native 已经完成了预览所需的 SDR 转换，此处不再调用冗余的 toneMap
+    capturedScreens = await Promise.all(sessionData.map(async (s) => ({
+      displayId: s.displayId,
+      bounds: s.bounds,
+      data: await capture.encodeImage(s.rawBuffer, s.width, s.height, 'webp'),
+    })));
+  } else {
+    logger.info('Debug 模式：跳过实际截屏，提供空数据以启动 UI');
+  }
 
   // 获取鼠标当前位置，用于判断初始应高亮哪个屏幕
   const cursorPos = screen.getCursorScreenPoint();
 
-  createOverlayWindow();
+  createOverlayWindow(isDebug);
 
   // 发送完整的初始化数据
   overlayWindow.webContents.on('did-finish-load', () => {
-    // 获取所有显示器的总边界
-    const displays = screen.getAllDisplays();
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    displays.forEach((display) => {
-      const {
-        x, y, width, height,
-      } = display.bounds;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + width);
-      maxY = Math.max(maxY, y + height);
-    });
+    const {
+      displays, minX, minY, width, height,
+    } = getAllDisplaysBounds();
 
     const initData = {
+      isDebug,
       minX,
       minY,
-      width: maxX - minX,
-      height: maxY - minY,
+      width,
+      height,
       capturedScreens,
       cursorPos,
       displays: displays.map((d) => ({
@@ -257,7 +276,7 @@ const startCapture = async () => {
       })),
     };
 
-    logger.info(`[${PLUGIN_ID}] 发送初始化数据, 截图数量: ${capturedScreens.length}`);
+    logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, isDebug: ${isDebug}`);
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
   });
 };
@@ -266,25 +285,33 @@ const startCapture = async () => {
  * 注册全局快捷键
  */
 const registerShortcut = (accelerator) => {
-  const finalAccelerator = accelerator || getShortcut();
+  let finalAccelerator = accelerator || getShortcut();
   if (!finalAccelerator) return false;
+
+  // 基础归一化：将 Win 转换为 Super (Electron 规范)
+  finalAccelerator = finalAccelerator.replace(/Win/g, 'Super');
 
   // 先注销已有快捷键
   unregisterShortcut();
 
   try {
     const success = globalShortcut.register(finalAccelerator, () => {
-      startCapture();
+      logger.info(`触发快捷键: ${finalAccelerator}`);
+      startCapture().catch((err) => {
+        logger.error('快捷键触发 startCapture 失败:', err);
+      });
     });
 
     if (success) {
+      logger.info(`快捷键注册成功: ${finalAccelerator}`);
       registeredShortcut = finalAccelerator;
     } else {
-      // 注册失败
+      logger.error(`快捷键注册失败: ${finalAccelerator} (可能已被占用)`);
     }
 
     return success;
   } catch (e) {
+    logger.error(`注册快捷键时发生错误: ${finalAccelerator}`, e);
     return false;
   }
 };
@@ -305,7 +332,7 @@ const closeOverlay = () => {
  * 插件加载时执行
  */
 export const pluginDidLoad = () => {
-  logger.info(`[${PLUGIN_ID}] 插件已加载`);
+  logger.info('插件已加载');
 
   // 如果设置了快捷键，则注册
   const shortcut = getShortcut();
@@ -318,7 +345,7 @@ export const pluginDidLoad = () => {
  * 插件卸载时执行
  */
 export const pluginWillUnload = () => {
-  logger.info(`[${PLUGIN_ID}] 插件正在卸载`);
+  logger.info('插件正在卸载');
 
   // 注销快捷键
   unregisterShortcut();
@@ -331,7 +358,7 @@ export const pluginWillUnload = () => {
  * 设置保存时执行
  */
 export const pluginSettingSaved = () => {
-  logger.info(`[${PLUGIN_ID}] 设置已保存`);
+  logger.info('设置已保存');
 
   // 重新注册快捷键
   const shortcut = getShortcut();
@@ -345,8 +372,8 @@ export const pluginSettingSaved = () => {
 export const ipcHandlers = [
   {
     type: 'start-capture',
-    handler: () => async () => {
-      await startCapture();
+    handler: () => async ({ isDebug = false }) => {
+      await startCapture(isDebug);
     },
   },
   {
@@ -374,19 +401,28 @@ export const ipcHandlers = [
   {
     type: 'save-capture',
     handler: () => async (rect) => {
-      if (!currentCaptureSession) return null;
+      if (!currentCaptureSession) {
+        return null;
+      }
       const format = getSaveFormat();
       const savePath = getSavePath();
       const preserveHdr = getPreserveHdr();
+      logger.info('保存截图', {
+        saveINfo: {
+          format,
+          savePath,
+          preserveHdr,
+        },
+      });
       return capture.cropAndSaveScaledFromBuffer(currentCaptureSession, rect, { format, savePath, preserveHdr });
     },
   },
   {
     type: 'copy-capture',
     handler: () => async (rect) => {
-      logger.info(`[${PLUGIN_ID}] 收到 copy-capture 请求, rect:`, rect);
+      logger.info('收到 copy-capture 请求, rect:', rect);
       if (!currentCaptureSession) {
-        logger.error(`[${PLUGIN_ID}] copy-capture 失败: 没有当前的截图会话`);
+        logger.error('copy-capture 失败: 没有当前的截图会话');
         return null;
       }
 
@@ -394,28 +430,32 @@ export const ipcHandlers = [
         const preserveHdr = getPreserveHdr();
 
         if (!rect || rect.width <= 0 || rect.height <= 0) {
-          logger.error(`[${PLUGIN_ID}] copy-capture 失败: 无效的选区尺寸`, rect);
+          logger.error('copy-capture 失败: 无效的选区尺寸', rect);
           return false;
         }
 
         // 在主进程处理复制逻辑，绕过沙盒限制
-        logger.info(`[${PLUGIN_ID}] 开始进行裁剪编码...`);
+        logger.info('开始进行裁剪编码...');
         const pngBuffer = await capture.cropAndGetPngFromBuffer(currentCaptureSession, rect, { preserveHdr });
 
         if (pngBuffer && pngBuffer.length > 0) {
-          logger.info(`[${PLUGIN_ID}] 编码成功, Buffer 长度: ${pngBuffer.length}, 开始写入剪贴板`);
+          logger.info(`编码成功, Buffer 长度: ${pngBuffer.length}, 开始写入剪贴板`);
           const { clipboard, nativeImage } = await import('electron');
           const image = nativeImage.createFromBuffer(pngBuffer);
           clipboard.writeImage(image);
-          logger.info(`[${PLUGIN_ID}] 写入剪贴板完成`);
+          logger.info('写入剪贴板完成');
           return true;
         }
-        logger.error(`[${PLUGIN_ID}] copy-capture 失败: 编码返回的 Buffer 为空`);
+        logger.error('copy-capture 失败: 编码返回的 Buffer 为空');
         return false;
       } catch (err) {
-        logger.error(`[${PLUGIN_ID}] copy-capture 发生异常:`, err);
+        logger.error('copy-capture 发生异常:', err);
         return false;
       }
     },
+  },
+  {
+    type: 'get-default-save-path',
+    handler: () => async () => app.getPath('pictures'),
   },
 ];

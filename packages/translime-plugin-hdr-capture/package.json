@@ -22,7 +22,7 @@
     "package": {
       "name": "hdr-capture-native"
     },
-    "js": false,
+    "js": true,
     "dts": "index.d.ts"
   },
   "scripts": {

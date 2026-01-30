@@ -14,6 +14,7 @@ const create = () => {
       format: 'YYYY-MM-DD HH:mm:ss',
     }),
     format.errors({ stack: true }),
+    format.splat(),
     format.json(),
   );
   return createLogger({
@@ -37,5 +38,6 @@ const create = () => {
   });
 };
 const logger = create();
+mainStore.logger = logger;
 
 export default logger;

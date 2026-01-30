@@ -2,8 +2,18 @@
 import { computed, ref, watchEffect } from 'vue';
 
 const props = defineProps({
-  state: Object,
-  bounds: Object,
+  state: {
+    type: Object,
+    default: () => ({
+      isSelecting: false, hasSelection: false, highlightedWindow: null, offsetX: 0, offsetY: 0,
+    }),
+  },
+  bounds: {
+    type: Object,
+    default: () => ({
+      x: 0, y: 0, w: 0, h: 0,
+    }),
+  },
 });
 
 const canvasRef = ref(null);

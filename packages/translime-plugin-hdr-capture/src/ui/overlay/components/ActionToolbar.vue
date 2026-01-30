@@ -2,7 +2,12 @@
 import { computed, inject } from 'vue';
 
 const props = defineProps({
-  bounds: Object,
+  bounds: {
+    type: Object,
+    default: () => ({
+      x: 0, y: 0, w: 0, h: 0,
+    }),
+  },
 });
 
 const { handleAction } = inject('actions');
@@ -28,7 +33,7 @@ const toolbarStyle = computed(() => {
 
 <template>
   <div
-    class="absolute flex gap-2.5 p-2 bg-[#1e1e1e]/95 rounded-xl shadow-2xl backdrop-blur-md z-[100] border border-white/10 pointer-events-auto"
+    class="absolute flex gap-2.5 p-2 bg-[#1e1e1e]/95 rounded-xl shadow-2xl backdrop-blur-md z-100 border border-white/10 pointer-events-auto"
     :style="toolbarStyle"
   >
     <button

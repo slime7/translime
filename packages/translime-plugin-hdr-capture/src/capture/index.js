@@ -2,7 +2,9 @@ import { createRequire } from 'node:module';
 import { useLogger } from 'translime-sdk';
 
 const require = createRequire(import.meta.url);
-const logger = useLogger();
+const PLUGIN_ID = 'translime-plugin-hdr-capture';
+const baseLogger = useLogger();
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Capture' }) : baseLogger;
 
 // 加载 native addon
 // NAPI-RS 生成的 index.js 已内置完整的跨平台加载逻辑
@@ -87,7 +89,7 @@ export const captureDisplay = async (displayId = 0) => {
   try {
     return await nativeAddon.captureDisplay(displayId);
   } catch (e) {
-    logger.error(`[Capture] captureDisplay 失败 (ID=${displayId}):`, e);
+    logger.error(`captureDisplay 失败 (ID=${displayId}):`, e);
     throw e;
   }
 };
@@ -100,7 +102,7 @@ export const captureDisplay = async (displayId = 0) => {
  * @param {Rect} rect - 裁剪区域
  * @returns {Buffer} 裁剪后的 RGBA 数据
  */
-export const cropImage = async (buffer, width, height, rect) => await nativeAddon.cropImage(buffer, width, height, rect);
+export const cropImage = async (buffer, width, height, rect) => nativeAddon.cropImage(buffer, width, height, rect);
 
 /**
  * HDR 到 SDR 的 Tone Mapping
@@ -112,7 +114,7 @@ export const cropImage = async (buffer, width, height, rect) => await nativeAddo
  * @param {boolean} [options.preserveHdrMetadata=false] - 是否保留 HDR 元数据
  * @returns {Buffer} SDR 图像数据
  */
-export const toneMap = async (hdrBuffer, width, height, options = {}) => await nativeAddon.toneMap(hdrBuffer, width, height, options);
+export const toneMap = async (hdrBuffer, width, height, options = {}) => nativeAddon.toneMap(hdrBuffer, width, height, options);
 
 /**
  * 编码图像为指定格式
@@ -122,7 +124,7 @@ export const toneMap = async (hdrBuffer, width, height, options = {}) => await n
  * @param {string} format - 输出格式 (png, jpg, webp)
  * @returns {Buffer} 编码后的图像数据
  */
-export const encodeImage = async (buffer, width, height, format = 'png') => await nativeAddon.encodeImage(buffer, width, height, format);
+export const encodeImage = async (buffer, width, height, format = 'png') => nativeAddon.encodeImage(buffer, width, height, format);
 
 /**
  * 从缓存中裁剪并获取 PNG Buffer (用于复制)
@@ -133,14 +135,14 @@ export const encodeImage = async (buffer, width, height, format = 'png') => awai
 export const cropAndGetPngFromBuffer = async (sessionData, rect, options = {}) => {
   const { preserveHdr = false } = options;
 
-  logger.info('[Capture] 开始裁剪, 选区:', rect);
+  logger.info('开始裁剪, 选区:', rect);
 
   if (!sessionData || sessionData.length === 0) {
-    logger.error('[Capture] 裁剪失败: sessionData 为空！');
+    logger.error('裁剪失败: sessionData 为空！');
     throw new Error('截屏会话数据为空，请重启截图。');
   }
 
-  logger.info(`[Capture] 当前会话包含 ${sessionData.length} 个屏幕捕获记录`);
+  logger.info(`当前会话包含 ${sessionData.length} 个屏幕捕获记录`);
   sessionData.forEach((d, i) => {
     if (d && d.bounds) {
       logger.info(`  [${i}] 显示器 ID: ${d.displayId}, 边界: (${d.bounds.x}, ${d.bounds.y}, ${d.bounds.width}, ${d.bounds.height})`);
@@ -161,11 +163,11 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect, options = {}) =
   }) || sessionData[0];
 
   if (!display) {
-    logger.error('[Capture] 裁剪失败: 无法定位到显示器且无默认回退');
+    logger.error('裁剪失败: 无法定位到显示器且无默认回退');
     throw new Error('无法匹配到对应的显示器选区。');
   }
 
-  logger.info('[Capture] 匹配到显示器:', display.displayId, '缩放率:', display.scaleFactor);
+  logger.info('匹配到显示器:', display.displayId, '缩放率:', display.scaleFactor);
 
   // 关键：将逻辑坐标转换为物理像素
   const scale = display.scaleFactor || 1.0;
@@ -176,24 +178,24 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect, options = {}) =
     height: Math.round(rect.height * scale),
   };
 
-  logger.info('[Capture] 物理像素转换结果:', localRect);
+  logger.info('物理像素转换结果:', localRect);
 
   try {
     const croppedBuffer = await cropImage(display.rawBuffer, display.width, display.height, localRect);
-    logger.info('[Capture] 裁剪完成, Buffer 长度:', croppedBuffer?.length);
+    logger.info('裁剪完成, Buffer 长度:', croppedBuffer?.length);
 
     let finalBuffer = croppedBuffer;
     if (preserveHdr) {
-      logger.info('[Capture] 执行 ToneMapping...');
+      logger.info('执行 ToneMapping...');
       finalBuffer = await toneMap(croppedBuffer, localRect.width, localRect.height, { preserveHdrMetadata: true });
     }
 
-    logger.info('[Capture] 开始进行 PNG 编码...');
+    logger.info('开始进行 PNG 编码...');
     const result = await encodeImage(finalBuffer, localRect.width, localRect.height, 'png');
-    logger.info('[Capture] 编码完成');
+    logger.info('编码完成');
     return result;
   } catch (err) {
-    logger.error('[Capture] 核心处理过程发生错误:', err);
+    logger.error('核心处理过程发生错误:', err);
     throw err;
   }
 };
@@ -229,7 +231,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
   if (savePath) {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
-    const fileName = `screenshot_${Date.now()}.${format}`;
+    const fileName = `HDR_Capture_${Date.now()}.${format}`;
     const fullPath = path.join(savePath, fileName);
     await fs.writeFile(fullPath, encodedData);
     return fullPath;

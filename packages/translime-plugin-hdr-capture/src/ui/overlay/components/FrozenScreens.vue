@@ -1,8 +1,17 @@
 <script setup>
 defineProps({
-  screens: Array,
-  offsetX: Number,
-  offsetY: Number,
+  screens: {
+    type: Array,
+    default: () => [],
+  },
+  offsetX: {
+    type: Number,
+    default: 0,
+  },
+  offsetY: {
+    type: Number,
+    default: 0,
+  },
 });
 </script>
 

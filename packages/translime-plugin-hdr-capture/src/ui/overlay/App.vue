@@ -31,7 +31,11 @@ const state = reactive({
   rectAtStartMove: null,
 
   // 探测到的窗口
+  // 探测到的窗口
   highlightedWindow: null,
+
+  // 调试模式
+  isDebug: false,
 });
 
 // 计算选区边界 (逻辑坐标)
@@ -42,12 +46,35 @@ const selectionBounds = computed(() => {
   const h = Math.abs(state.endY - state.startY);
 
   return {
-    x: isNaN(x) ? 0 : x,
-    y: isNaN(y) ? 0 : y,
-    w: isNaN(w) ? 0 : w,
-    h: isNaN(h) ? 0 : h,
+    x: Number.isNaN(x) ? 0 : x,
+    y: Number.isNaN(y) ? 0 : y,
+    w: Number.isNaN(w) ? 0 : w,
+    h: Number.isNaN(h) ? 0 : h,
   };
 });
+
+// ==================== 交互逻辑 (Helpers) ====================
+function closeOverlay() {
+  window.hdrCapture?.close?.();
+}
+
+function handleCancel() {
+  if (state.hasSelection) {
+    state.hasSelection = false;
+    state.isSelecting = false;
+    state.isDragging = false;
+    state.isMoving = false;
+    state.highlightedWindow = null;
+  } else {
+    closeOverlay();
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape') {
+    handleCancel();
+  }
+}
 
 // ==================== 初始化与清理 ====================
 const blobUrls = [];
@@ -59,6 +86,7 @@ function clearBlobUrls() {
 onMounted(() => {
   if (window.hdrCapture?.onInit) {
     window.hdrCapture.onInit((data) => {
+      state.isDebug = !!data.isDebug;
       state.offsetX = data.minX;
       state.offsetY = data.minY;
       state.displays = data.displays || [];
@@ -89,28 +117,6 @@ onUnmounted(() => {
 });
 
 // ==================== 交互逻辑 ====================
-
-const onKeyDown = (e) => {
-  if (e.key === 'Escape') {
-    handleCancel();
-  }
-};
-
-const handleCancel = () => {
-  if (state.hasSelection) {
-    state.hasSelection = false;
-    state.isSelecting = false;
-    state.isDragging = false;
-    state.isMoving = false;
-    state.highlightedWindow = null;
-  } else {
-    closeOverlay();
-  }
-};
-
-const closeOverlay = () => {
-  window.hdrCapture?.close?.();
-};
 
 const findDisplayAtLocalPoint = (lx, ly) => {
   const gx = lx + state.offsetX;
@@ -220,11 +226,7 @@ const onMouseUp = (e) => {
     } else {
       // 检查选区大小，太小则取消
       const b = selectionBounds.value;
-      if (b.w < 2 && b.h < 2) {
-        state.hasSelection = false;
-      } else {
-        state.hasSelection = true;
-      }
+      state.hasSelection = !(b.w < 2 && b.h < 2);
     }
   }
 };
@@ -244,19 +246,29 @@ const handleAction = async (type) => {
     height: b.h,
   };
 
-  const logger = window.ts?.logger || console;
-  logger.info(`[Overlay] 执行操作: ${type}, 选区:`, rect);
+  const baseLogger = window.ts?.logger || console;
+  const logger = baseLogger.child ? baseLogger.child({ plugin_id: 'translime-plugin-hdr-capture', context: 'Overlay' }) : baseLogger;
+
+  logger.info(`执行操作: ${type}, 选区:`, { rect });
 
   try {
     if (type === 'save') {
-      const res = await window.hdrCapture.saveCapture(rect);
-      logger.info('[Overlay] 保存操作返回:', res);
+      if (state.isDebug) {
+        logger.info('Debug模式: 跳过 save 操作');
+      } else {
+        const res = await window.hdrCapture.saveCapture(rect);
+        logger.info('保存操作返回:', { res });
+      }
     } else if (type === 'copy') {
-      const res = await window.hdrCapture.copyCapture(rect);
-      logger.info('[Overlay] 复制操作返回:', res);
+      if (state.isDebug) {
+        logger.info('Debug模式: 跳过 copy 操作');
+      } else {
+        const res = await window.hdrCapture.copyCapture(rect);
+        logger.info('复制操作返回:', { res });
+      }
     }
   } catch (err) {
-    logger.error(`[Overlay] 操作 ${type} 失败:`, err);
+    logger.error(`操作 ${type} 失败:`, err);
   }
   closeOverlay();
 };
@@ -276,8 +288,13 @@ provide('utils', { findDisplayAtLocalPoint });
     @mouseup="onMouseUp"
     @contextmenu="onContextMenu"
   >
-    <!-- 冻结画面背景 -->
-    <FrozenScreens :screens="state.capturedScreens" :offset-x="state.offsetX" :offset-y="state.offsetY" />
+    <!-- 冻结画面背景 (Debug 模式下不显示) -->
+    <FrozenScreens
+      v-if="!state.isDebug"
+      :screens="state.capturedScreens"
+      :offset-x="state.offsetX"
+      :offset-y="state.offsetY"
+    />
 
     <!-- 遮罩与高亮 -->
     <SelectionRect :state="state" :bounds="selectionBounds" />
@@ -285,7 +302,7 @@ provide('utils', { findDisplayAtLocalPoint });
     <!-- 信息提示 -->
     <HintBox :cursor-pos="state.cursorPos" />
 
-    <!-- 操作工具栏 : 使用 @mousedown.stop 阻止点击工具栏导致背景开始重选 -->
+    <!-- 操作工具栏 : (Debug 模式下依然显示，功能有 mock) -->
     <ActionToolbar
       v-if="state.hasSelection && !state.isSelecting && !state.isMoving"
       :bounds="selectionBounds"

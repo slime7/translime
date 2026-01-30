@@ -160,6 +160,9 @@ export async function openLink(...args) {
  * @returns {Record<'log'|'info'|'warn'|'error'|'debug', Function>}
  */
 export function useLogger() {
+  if (typeof global !== 'undefined' && global.mainStore) {
+    return global.mainStore?.logger || console;
+  }
   if (typeof window !== 'undefined') {
     return window.ts?.logger || console;
   }

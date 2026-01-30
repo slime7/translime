@@ -2,7 +2,10 @@
 import { computed, inject, ref } from 'vue';
 
 const props = defineProps({
-  cursorPos: Object,
+  cursorPos: {
+    type: Object,
+    default: () => ({ x: 0, y: 0 }),
+  },
 });
 
 const { findDisplayAtLocalPoint } = inject('utils');
@@ -46,7 +49,7 @@ const hintStyle = computed(() => {
     :style="hintStyle"
     @mouseenter="onMouseEnter"
   >
-    <div class="bg-black/75 text-white px-4 py-2 rounded-xl text-[13px] backdrop-blur-[4px] border border-white/10 shadow-lg">
+    <div class="bg-black/75 text-white px-4 py-2 rounded-xl text-[13px] backdrop-blur-xs border border-white/10 shadow-lg">
       点击探测到的窗口，或拖拽选择 · 拖放移动选区 · 右键取消
     </div>
   </div>

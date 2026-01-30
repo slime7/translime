@@ -82,17 +82,27 @@
         <v-divider class="my-4" />
 
         <!-- 操作按钮 -->
-        <div class="action-buttons">
+        <div class="action-buttons mt-6 flex gap-x-2">
           <v-btn
+            class="grow"
             color="primary"
             size="large"
-            block
-            @click="startCapture"
+            @click="startCapture()"
           >
             <v-icon start>
               camera
             </v-icon>
             开始截图
+          </v-btn>
+
+          <v-btn
+            v-if="showDebugUi"
+            class="shrink-none"
+            color="primary"
+            size="large"
+            @click="startCapture(true)"
+          >
+            overlay debug
           </v-btn>
         </div>
       </v-card-text>
@@ -118,6 +128,7 @@ defineOptions({
 });
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
+const showDebugUi = true;
 
 // 设置状态
 const settings = reactive({
@@ -140,6 +151,20 @@ onMounted(async () => {
   if (savedSettings) {
     Object.assign(settings, savedSettings);
   }
+
+  // 如果保存路径为空，获取默认路径并填入（但不强制保存，除非用户修改了其他设置）
+  if (!settings.savePath) {
+    const ipc = useIpc();
+    try {
+      const defaultPath = await ipc.invoke(`get-default-save-path@${PLUGIN_ID}`);
+      if (defaultPath) {
+        settings.savePath = defaultPath;
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('获取默认保存路径失败:', err);
+    }
+  }
 });
 
 // 监听设置变化，自动保存
@@ -155,7 +180,7 @@ const onShortcutKeyDown = (e) => {
   if (e.ctrlKey) keys.push('Ctrl');
   if (e.altKey) keys.push('Alt');
   if (e.shiftKey) keys.push('Shift');
-  if (e.metaKey) keys.push('Win');
+  if (e.metaKey) keys.push('Super');
 
   // 获取主键
   if (e.key && !['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
@@ -190,15 +215,25 @@ const selectSavePath = async () => {
 };
 
 // 开始截图
-const startCapture = async () => {
+const startCapture = async (isDebug = false) => {
   const ipc = useIpc();
   try {
-    await ipc.invoke(`start-capture@${PLUGIN_ID}`);
+    await ipc.invoke(`start-capture@${PLUGIN_ID}`, { isDebug });
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error(err);
   }
 };
 </script>
+
+<style>
+/* 引入 Tailwind CSS utilities，放入 tailwind 图层以与主程序统一 */
+@layer tailwind {
+  @layer theme, utilities;
+  @import "tailwindcss/theme.css" layer(theme);
+  @import "tailwindcss/utilities.css" layer(utilities);
+}
+</style>
 
 <style scoped>
 .hdr-capture-settings {
@@ -207,9 +242,5 @@ const startCapture = async () => {
 
 .setting-section {
   margin-bottom: 16px;
-}
-
-.action-buttons {
-  margin-top: 24px;
 }
 </style>

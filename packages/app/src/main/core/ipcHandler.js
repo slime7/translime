@@ -382,8 +382,28 @@ const ipcHandler = {
   [ipcType.GET_LAUNCH_ARGV]() {
     return process.argv;
   },
-  [ipcType.LOGGER](level, args) {
-    logger[level](...args);
+  [ipcType.LOGGER](level, payload) {
+    if (payload && typeof payload === 'object' && !Array.isArray(payload) && payload.args) {
+      const { args, meta } = payload;
+
+      if (meta && Object.keys(meta).length > 0) {
+        // 如果有额外的 metadata (来自 child logger)
+        // 合并策略：如果最后一个参数是对象，则合并；否则作为一个新参数追加
+        const lastArg = args[args.length - 1];
+        if (lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg)) {
+          const combinedMeta = { ...meta, ...lastArg };
+          logger[level](...args.slice(0, -1), combinedMeta);
+        } else {
+          logger[level](...args, meta);
+        }
+      } else {
+        logger[level](...args);
+      }
+    } else {
+      // 兼容旧版调用
+      const args = Array.isArray(payload) ? payload : [payload];
+      logger[level](...args);
+    }
   },
   async [ipcType.LOAD_PLUGIN_UI](pluginPath) {
     return fs.readFileSync(pluginPath, 'utf8');

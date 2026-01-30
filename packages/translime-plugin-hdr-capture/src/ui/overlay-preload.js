@@ -12,14 +12,19 @@ const translime = {
   /**
    * 日志记录
    */
-  logger: {
-    log: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['log', args] }),
-    error: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['error', args] }),
-    warn: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['warn', args] }),
-    info: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['info', args] }),
-    debug: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['debug', args] }),
-  },
+  logger: createLoggerBase(),
 };
+
+function createLoggerBase(defaultMeta = {}) {
+  return {
+    log: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['log', { args, meta: defaultMeta }] }),
+    error: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['error', { args, meta: defaultMeta }] }),
+    warn: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['warn', { args, meta: defaultMeta }] }),
+    info: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['info', { args, meta: defaultMeta }] }),
+    debug: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['debug', { args, meta: defaultMeta }] }),
+    child: (childMeta) => createLoggerBase({ ...defaultMeta, ...childMeta }),
+  };
+}
 
 contextBridge.exposeInMainWorld('ts', translime);
 contextBridge.exposeInMainWorld('hdrCapture', {
