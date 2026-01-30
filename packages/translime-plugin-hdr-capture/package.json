@@ -17,9 +17,17 @@
     "dist",
     "src/assets/icon.png"
   ],
+  "napi": {
+    "binaryName": "hdr-capture-native",
+    "package": {
+      "name": "hdr-capture-native"
+    },
+    "js": false,
+    "dts": "index.d.ts"
+  },
   "scripts": {
     "dev": "vite build -c ui.vite.config.mjs --watch",
-    "build:native": "cd native && napi build --platform --release ../dist/bin",
+    "build:native": "napi build --platform --release dist/bin",
     "build:plugin": "vite build",
     "build:ui": "vite build -c ui.vite.config.mjs",
     "build:overlay": "vite build -c overlay.vite.config.mjs --mode preload && vite build -c overlay.vite.config.mjs",
