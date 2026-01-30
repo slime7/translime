@@ -12,7 +12,9 @@ const dirname = path.dirname(filename);
  */
 export default defineConfig(({ mode }) => {
   const isPreloadBuild = mode === 'preload';
+  const isPreview = mode === 'preview';
 
+  // Preload 构建模式
   if (isPreloadBuild) {
     return {
       build: {
@@ -32,6 +34,27 @@ export default defineConfig(({ mode }) => {
     };
   }
 
+  // Preview 模式 - 使用 preview.html 作为入口
+  if (isPreview) {
+    return {
+      root: path.resolve(dirname, 'src/ui/overlay'),
+      base: './',
+      plugins: [
+        vue(),
+        tailwindcss(),
+      ],
+      server: {
+        open: '/preview.html',
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(dirname, 'src'),
+        },
+      },
+    };
+  }
+
+  // 正常构建模式
   return {
     root: path.resolve(dirname, 'src/ui/overlay'),
     base: './',

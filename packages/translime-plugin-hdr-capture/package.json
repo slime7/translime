@@ -27,6 +27,8 @@
   },
   "scripts": {
     "dev": "vite build -c ui.vite.config.mjs --watch",
+    "preview:ui": "vite -c ui.vite.config.mjs --mode preview",
+    "preview:overlay": "vite -c overlay.vite.config.mjs --mode preview",
     "build:native": "napi build --platform --release dist/bin",
     "build:plugin": "vite build",
     "build:ui": "vite build -c ui.vite.config.mjs",
@@ -48,6 +50,7 @@
     "translime-sdk": "workspace:*",
     "vite": "^7.3.1",
     "vite-plugin-css-injected-by-js": "^3.4.0",
+    "vite-plugin-vuetify": "^2.1.1",
     "vue": "^3.5.13",
     "vuetify": "^3.11.6"
   },

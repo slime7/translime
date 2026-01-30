@@ -3,6 +3,25 @@
  * 提供插件开发所需的标准 API 和类型提示
  */
 
+import {
+  initPreviewMock,
+  isPreviewMode as checkPreviewMode,
+} from './preview-mock.js';
+
+// 在模块加载时自动检测并初始化 preview 模式
+// 这样插件代码无需任何修改即可在 preview 模式下运行
+if (typeof window !== 'undefined' && checkPreviewMode()) {
+  initPreviewMock();
+}
+
+/**
+ * 检查当前是否为 preview 模式
+ * @returns {boolean}
+ */
+export function isPreviewMode() {
+  return checkPreviewMode();
+}
+
 /**
  * @typedef {Object} MainStore
  * @property {Object} config
@@ -155,6 +174,7 @@ export async function openLink(...args) {
   }
   return null;
 }
+
 /**
  * 获取日志工具 (多端适配)
  * @returns {Record<'log'|'info'|'warn'|'error'|'debug', Function>}
@@ -168,5 +188,3 @@ export function useLogger() {
   }
   return console;
 }
-
-
