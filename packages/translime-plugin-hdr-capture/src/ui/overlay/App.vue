@@ -31,8 +31,10 @@ const state = reactive({
   rectAtStartMove: null,
 
   // 探测到的窗口
-  // 探测到的窗口
   highlightedWindow: null,
+  allWindows: [], // 所有预捕获的窗口信息
+  candidates: [], // 当前坐标下的候选窗口列表
+  candidateIndex: 0, // 当前选中的候选窗口索引
 
   // 调试模式
   isDebug: false,
@@ -105,6 +107,8 @@ onMounted(() => {
           y: data.cursorPos.y - state.offsetY,
         };
       }
+
+      state.allWindows = data.windows || [];
     });
   }
 
@@ -127,15 +131,48 @@ const findDisplayAtLocalPoint = (lx, ly) => {
   }) || state.displays[0];
 };
 
-const detectWindow = async (lx, ly) => {
+const detectWindow = (lx, ly) => {
   if (state.isSelecting || state.isMoving || state.hasSelection) return;
 
-  try {
-    const win = await window.hdrCapture.getWindowAtPoint(lx + state.offsetX, ly + state.offsetY);
-    state.highlightedWindow = win;
-  } catch (e) {
-    state.highlightedWindow = null;
+  const gx = lx + state.offsetX;
+  const gy = ly + state.offsetY;
+
+  // 找出包含该点的所有窗口
+  const newCandidates = state.allWindows.filter((win) => (
+    gx >= win.left && gx < win.right && gy >= win.top && gy < win.bottom
+  ));
+
+  // 按面积升序排序 (从小到大)
+  newCandidates.sort((a, b) => (a.width * a.height) - (b.width * b.height));
+
+  // 比较候选列表是否发生变化（通过句柄判断）
+  const candidatesChanged = newCandidates.length !== state.candidates.length
+    || newCandidates.some((c, i) => c.handle !== state.candidates[i]?.handle);
+
+  if (candidatesChanged) {
+    state.candidates = newCandidates;
+    state.candidateIndex = 0;
+    state.highlightedWindow = newCandidates.length > 0 ? newCandidates[0] : null;
   }
+};
+
+const onWheel = (e) => {
+  // 仅在未选择、未移动、有候选窗口时响应
+  if (state.isSelecting || state.isMoving || state.hasSelection) return;
+  if (state.candidates.length <= 1) return;
+
+  // 阻止默认滚动行为
+  e.preventDefault();
+
+  // 滚轮向上 (deltaY < 0) 切换到更小的窗口？通常习惯上滚是往“上”层，即面积更小
+  // 这里我们统一定义：向下滚切换到更大的（底层）窗口，向上滚切换到更小的（顶层）窗口
+  if (e.deltaY > 0) {
+    state.candidateIndex = (state.candidateIndex + 1) % state.candidates.length;
+  } else {
+    state.candidateIndex = (state.candidateIndex - 1 + state.candidates.length) % state.candidates.length;
+  }
+
+  state.highlightedWindow = state.candidates[state.candidateIndex];
 };
 
 const onMouseDown = (e) => {
@@ -224,9 +261,9 @@ const onMouseUp = (e) => {
         state.hasSelection = false;
       }
     } else {
-      // 检查选区大小，太小则取消
+      // 检查选区大小，太小则取消 (过滤 1x1 及以下的误操作)
       const b = selectionBounds.value;
-      state.hasSelection = !(b.w < 2 && b.h < 2);
+      state.hasSelection = b.w > 1 && b.h > 1;
     }
   }
 };
@@ -286,6 +323,7 @@ provide('utils', { findDisplayAtLocalPoint });
     @mousedown="onMouseDown"
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
+    @wheel="onWheel"
     @contextmenu="onContextMenu"
   >
     <!-- 冻结画面背景 (Debug 模式下不显示) -->

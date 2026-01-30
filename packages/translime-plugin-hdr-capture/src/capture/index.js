@@ -72,7 +72,7 @@ export const getTopLevelWindows = () => nativeAddon.getTopLevelWindows();
  * @param {number} y - Y 坐标
  * @returns {WindowInfo|null}
  */
-export const getWindowAtPoint = (x, y) => nativeAddon.getWindowAtPoint(x, y);
+export const getWindowAtPoint = (x, y, ignoreHandle = null) => nativeAddon.getWindowAtPoint(x, y, ignoreHandle);
 
 /**
  * 获取所有显示器信息

@@ -12,7 +12,7 @@
         <!-- 快捷键设置 -->
         <div class="setting-section">
           <v-text-field
-            v-model="settings.shortcut"
+            v-model="tempShortcut"
             label="截图快捷键"
             placeholder="例如: Ctrl+Shift+S（留空则通过按钮触发）"
             variant="outlined"
@@ -21,6 +21,8 @@
             persistent-hint
             clearable
             @keydown="onShortcutKeyDown"
+            @blur="onShortcutBlur"
+            @click:clear="onShortcutClear"
           >
             <template #append>
               <v-btn
@@ -114,6 +116,7 @@
 import {
   onMounted,
   reactive,
+  ref,
   watch,
 } from 'vue';
 import {
@@ -138,6 +141,9 @@ const settings = reactive({
   preserveHdr: false,
 });
 
+// 用于 UI 显示的临时快捷键状态，避免输入过程中频繁触发保存
+const tempShortcut = ref('');
+
 // 保存格式选项
 const formatOptions = [
   { title: 'PNG（无损）', value: 'png' },
@@ -150,6 +156,7 @@ onMounted(async () => {
   const savedSettings = await getPluginSetting(PLUGIN_ID);
   if (savedSettings) {
     Object.assign(settings, savedSettings);
+    tempShortcut.value = settings.shortcut; // Initialize tempShortcut
   }
 
   // 如果保存路径为空，获取默认路径并填入（但不强制保存，除非用户修改了其他设置）
@@ -182,14 +189,31 @@ const onShortcutKeyDown = (e) => {
   if (e.shiftKey) keys.push('Shift');
   if (e.metaKey) keys.push('Super');
 
+  const isModifierOnly = ['Control', 'Alt', 'Shift', 'Meta'].includes(e.key);
+
   // 获取主键
-  if (e.key && !['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+  if (e.key && !isModifierOnly) {
     keys.push(e.key.toUpperCase());
   }
 
-  if (keys.length > 1) {
-    settings.shortcut = keys.join('+');
+  const currentDisplay = keys.join('+');
+  tempShortcut.value = currentDisplay;
+
+  // 只有当包含非修饰键或者是有效的组合键时，才尝试更新到正式设置
+  // 单独按修饰键时不更新正式设置，防止主进程注册失败
+  if (keys.length > 0 && !isModifierOnly) {
+    settings.shortcut = currentDisplay;
   }
+};
+
+const onShortcutBlur = () => {
+  // 失去焦点时，确保显示的内容与实际保存的内容同步
+  tempShortcut.value = settings.shortcut;
+};
+
+const onShortcutClear = () => {
+  settings.shortcut = '';
+  tempShortcut.value = '';
 };
 
 // 测试快捷键

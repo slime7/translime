@@ -108,7 +108,7 @@ const createOverlayWindow = (isDebug = false) => {
     resizable: isDebug,
     movable: isDebug,
     maximizable: true,
-    fullscreen: !isDebug, // Debug 模式下不强制全屏
+    fullscreen: false,
     thickFrame: false,
     hasShadow: false,
     type: 'toolbar',
@@ -254,6 +254,35 @@ const startCapture = async (isDebug = false) => {
   // 获取鼠标当前位置，用于判断初始应高亮哪个屏幕
   const cursorPos = screen.getCursorScreenPoint();
 
+  // 获取所有顶层窗口信息用于点击识别
+  const nativeWindows = capture.getTopLevelWindows();
+  logger.info(`原生模块返回 ${nativeWindows.length} 个窗口`);
+
+  const windows = nativeWindows.map((win) => {
+    try {
+      const topLeft = screen.screenToDipPoint({ x: win.left, y: win.top });
+      const bottomRight = screen.screenToDipPoint({ x: win.right, y: win.bottom });
+      return {
+        ...win,
+        left: topLeft.x,
+        top: topLeft.y,
+        right: bottomRight.x,
+        bottom: bottomRight.y,
+        width: Math.abs(bottomRight.x - topLeft.x),
+        height: Math.abs(bottomRight.y - topLeft.y),
+      };
+    } catch (e) {
+      logger.error(`转换窗口坐标失败 [${win.title}]:`, e);
+      return null;
+    }
+  }).filter(Boolean);
+
+  if (windows.length > 0) {
+    logger.info(`坐标转换后保留 ${windows.length} 个窗口. 第一个窗口: ${windows[0].title}`);
+  } else {
+    logger.warn('未能成功转换任何窗口坐标或搜索结果为空');
+  }
+
   createOverlayWindow(isDebug);
 
   // 发送完整的初始化数据
@@ -270,13 +299,14 @@ const startCapture = async (isDebug = false) => {
       height,
       capturedScreens,
       cursorPos,
+      windows, // 发送窗口数据
       displays: displays.map((d) => ({
         id: d.id,
         bounds: d.bounds,
       })),
     };
 
-    logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, isDebug: ${isDebug}`);
+    logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
   });
 };
@@ -290,6 +320,15 @@ const registerShortcut = (accelerator) => {
 
   // 基础归一化：将 Win 转换为 Super (Electron 规范)
   finalAccelerator = finalAccelerator.replace(/Win/g, 'Super');
+
+  // 基础校验：不能以 '+' 结尾，且最后一位不能是修饰键（如 "Ctrl+Alt" 是非法的）
+  const parts = finalAccelerator.split('+');
+  const lastPart = parts[parts.length - 1];
+  const modifiers = ['Ctrl', 'Control', 'Alt', 'Shift', 'Super', 'Meta', 'Cmd', 'Command'];
+  if (!lastPart || modifiers.includes(lastPart)) {
+    // 这是一个不完整的快捷键，忽略注册过程
+    return false;
+  }
 
   // 先注销已有快捷键
   unregisterShortcut();
@@ -392,7 +431,40 @@ export const ipcHandlers = [
   },
   {
     type: 'get-window-at-point',
-    handler: () => (x, y) => capture.getWindowAtPoint(x, y),
+    handler: () => (x, y) => {
+      let ignoreHandle = null;
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        try {
+          const handleBuf = overlayWindow.getNativeWindowHandle();
+          // Windows HWND is 8 bytes on x64, 4 bytes on x86 but Electron usually returns 8 bytes buffer on x64
+          if (handleBuf.length === 8) {
+            ignoreHandle = handleBuf.readBigInt64LE(0);
+          } else if (handleBuf.length === 4) {
+            ignoreHandle = BigInt(handleBuf.readInt32LE(0));
+          }
+        } catch (e) {
+          logger.error('获取 Overlay 窗口句柄失败:', e);
+        }
+      }
+
+      const physicalPoint = screen.dipToScreenPoint({ x: Math.round(x), y: Math.round(y) });
+      logger.debug(`Window detection: Logical(${x}, ${y}) -> Physical(${physicalPoint.x}, ${physicalPoint.y})`);
+
+      const win = capture.getWindowAtPoint(physicalPoint.x, physicalPoint.y, ignoreHandle);
+
+      if (win) {
+        const topLeft = screen.screenToDipPoint({ x: win.left, y: win.top });
+        const bottomRight = screen.screenToDipPoint({ x: win.right, y: win.bottom });
+
+        win.left = topLeft.x;
+        win.top = topLeft.y;
+        win.right = bottomRight.x;
+        win.bottom = bottomRight.y;
+        win.width = Math.abs(bottomRight.x - topLeft.x);
+        win.height = Math.abs(bottomRight.y - topLeft.y);
+      }
+      return win;
+    },
   },
   {
     type: 'get-top-level-windows',

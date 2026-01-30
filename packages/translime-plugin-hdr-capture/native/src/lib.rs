@@ -64,8 +64,8 @@ pub fn get_top_level_windows() -> Vec<WindowInfo> {
 
 /// 获取指定坐标处的窗口
 #[napi]
-pub fn get_window_at_point(x: i32, y: i32) -> Option<WindowInfo> {
-    window::get_window_at_point(x, y)
+pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option<WindowInfo> {
+    window::get_window_at_point(x, y, ignore_handle)
 }
 
 // ==================== 屏幕捕获 API ====================
