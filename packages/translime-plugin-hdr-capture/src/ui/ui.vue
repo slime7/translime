@@ -70,15 +70,101 @@
           />
         </div>
 
-        <!-- HDR 设置 -->
+        <!-- HDR 映射设置组 -->
         <div class="setting-section">
           <v-switch
-            v-model="settings.preserveHdr"
-            label="保留 HDR 数据"
+            v-model="settings.enableHdrMapping"
+            label="启用 HDR 映射"
             color="primary"
-            hint="保存时额外生成包含 HDR 元数据的文件"
+            hint="对 HDR 屏幕应用自定义的色调映射参数"
             persistent-hint
           />
+
+          <!-- HDR 映射子设置，仅在启用时显示 -->
+          <v-expand-transition>
+            <div
+              v-show="settings.enableHdrMapping"
+              class="hdr-mapping-options mt-4 ml-4"
+            >
+              <!-- SDR 白点设置 -->
+              <div class="slider-setting mb-4">
+                <div class="slider-header">
+                  <span class="slider-label">SDR 白点亮度</span>
+                  <v-chip
+                    size="small"
+                    color="primary"
+                    variant="tonal"
+                  >
+                    {{ settings.sdrWhiteNits }} nits
+                  </v-chip>
+                </div>
+                <v-slider
+                  v-model="settings.sdrWhiteNits"
+                  :min="80"
+                  :max="400"
+                  :step="1"
+                  color="primary"
+                  track-color="grey"
+                  thumb-label
+                  hide-details
+                >
+                  <template #prepend>
+                    <span class="slider-range-label">80</span>
+                  </template>
+                  <template #append>
+                    <span class="slider-range-label">400</span>
+                  </template>
+                </v-slider>
+                <div class="slider-hint text-caption text-grey">
+                  Windows 默认 SDR 白点约为 203 nits
+                </div>
+              </div>
+
+              <!-- HDR 峰值亮度设置 -->
+              <div class="slider-setting mb-4">
+                <div class="slider-header">
+                  <span class="slider-label">HDR 峰值亮度</span>
+                  <v-chip
+                    size="small"
+                    color="secondary"
+                    variant="tonal"
+                  >
+                    {{ settings.hdrMaxNits }} nits
+                  </v-chip>
+                </div>
+                <v-slider
+                  v-model="settings.hdrMaxNits"
+                  :min="400"
+                  :max="2000"
+                  :step="10"
+                  color="secondary"
+                  track-color="grey"
+                  thumb-label
+                  hide-details
+                >
+                  <template #prepend>
+                    <span class="slider-range-label">400</span>
+                  </template>
+                  <template #append>
+                    <span class="slider-range-label">2000</span>
+                  </template>
+                </v-slider>
+                <div class="slider-hint text-caption text-grey">
+                  HDR 内容的最大输入亮度，通常为 1000 nits
+                </div>
+              </div>
+
+              <!-- 保存 HDR 原始文件 -->
+              <v-switch
+                v-model="settings.preserveHdr"
+                label="保存 HDR 原始文件"
+                color="primary"
+                density="compact"
+                hint="截图时额外保存一份未经色调映射的 HDR 原始文件"
+                persistent-hint
+              />
+            </div>
+          </v-expand-transition>
         </div>
 
         <v-divider class="my-4" />
@@ -138,7 +224,11 @@ const settings = reactive({
   shortcut: '',
   savePath: '',
   saveFormat: 'png',
-  preserveHdr: false,
+  // HDR 映射设置
+  enableHdrMapping: true, // 是否启用自定义 HDR 映射
+  sdrWhiteNits: 203, // SDR 白点亮度 (默认 Windows 标准)
+  hdrMaxNits: 1000, // HDR 峰值亮度 (默认 1000 nits)
+  preserveHdr: false, // 是否保存 HDR 原始文件
 });
 
 // 用于 UI 显示的临时快捷键状态，避免输入过程中频繁触发保存
@@ -254,8 +344,8 @@ const startCapture = async (isDebug = false) => {
 /* 引入 Tailwind CSS utilities，放入 tailwind 图层以与主程序统一 */
 @layer tailwind {
   @layer theme, utilities;
-  @import "tailwindcss/theme.css" layer(theme);
-  @import "tailwindcss/utilities.css" layer(utilities);
+  @import 'tailwindcss/theme.css' layer(theme);
+  @import 'tailwindcss/utilities.css' layer(utilities);
 }
 </style>
 
@@ -266,5 +356,39 @@ const startCapture = async (isDebug = false) => {
 
 .setting-section {
   margin-bottom: 16px;
+}
+
+/* HDR 映射设置样式 */
+.hdr-mapping-options {
+  border-left: 2px solid rgb(var(--v-theme-primary) / 30%);
+  padding-left: 16px;
+}
+
+.slider-setting {
+  padding: 8px 0;
+}
+
+.slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.slider-label {
+  font-size: .875rem;
+  font-weight: 500;
+}
+
+.slider-range-label {
+  font-size: .75rem;
+  color: rgb(var(--v-theme-on-surface) / 60%);
+  min-width: 32px;
+  text-align: center;
+}
+
+.slider-hint {
+  margin-top: 4px;
+  opacity: .7;
 }
 </style>

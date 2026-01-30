@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: 当开发 packages 目录下以 translime-plugin- 开头的插件时必须遵循此文档。
 ---
 

@@ -81,7 +81,8 @@ pub fn get_displays() -> Vec<DisplayInfo> {
 }
 
 /// 捕获指定显示器的屏幕
-pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn std::error::Error>> {
+#[allow(clippy::collapsible_if)]
+pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOptions>) -> Result<crate::CaptureResult, Box<dyn std::error::Error>> {
     unsafe {
         // 创建 DXGI Factory
         let factory: IDXGIFactory1 = CreateDXGIFactory1()?;
@@ -163,8 +164,8 @@ pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn 
         let mut height = dupl_desc.ModeDesc.Height;
         
         if width == 0 || height == 0 {
-            width = (output_desc.DesktopCoordinates.right - output_desc.DesktopCoordinates.left).abs() as u32;
-            height = (output_desc.DesktopCoordinates.bottom - output_desc.DesktopCoordinates.top).abs() as u32;
+            width = (output_desc.DesktopCoordinates.right - output_desc.DesktopCoordinates.left).unsigned_abs();
+            height = (output_desc.DesktopCoordinates.bottom - output_desc.DesktopCoordinates.top).unsigned_abs();
         }
 
         println!("[HDR-Native] Display {} Format: {:?}, Buffer Size: {}x{}", display_id, pixel_format, width, height);
@@ -197,7 +198,13 @@ pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn 
 
         // 捕获循环：尝试获取一个非空帧
         let mut final_buffer = Vec::new();
+        let mut raw_hdr_data: Option<Vec<u8>> = None;
         let mut retry_count = 0;
+        
+        // 判断是否需要保留原始 HDR 数据
+        let preserve_raw = hdr_options.as_ref()
+            .and_then(|o| o.preserve_raw)
+            .unwrap_or(false) && is_hdr_format;
         
         while retry_count < 30 {
             let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
@@ -221,39 +228,35 @@ pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn 
                         
                         let row_pitch = mapped.RowPitch as usize;
                         let mut temp_buffer = Vec::with_capacity((width * height * 4) as usize);
+                        let mut temp_raw_buffer: Vec<u8> = if preserve_raw {
+                            Vec::with_capacity((width * height * 8) as usize) // F16 需要 8 bytes per pixel
+                        } else {
+                            Vec::new()
+                        };
 
                         for row in 0..height {
                             let src = (mapped.pData as *const u8).add(row as usize * row_pitch);
                             
                             if pixel_format == DXGI_FORMAT_R16G16B16A16_FLOAT {
                                 let row_data = std::slice::from_raw_parts(src as *const u16, (width * 4) as usize);
-                                for pixel in row_data.chunks(4) {
-                                    temp_buffer.push(f16_to_u8(pixel[0])); // R
-                                    temp_buffer.push(f16_to_u8(pixel[1])); // G
-                                    temp_buffer.push(f16_to_u8(pixel[2])); // B
-                                    temp_buffer.push(255);
+                                
+                                // 如果需要保留原始数据，复制原始字节
+                                if preserve_raw {
+                                    let raw_bytes = std::slice::from_raw_parts(src, (width * 8) as usize);
+                                    temp_raw_buffer.extend_from_slice(raw_bytes);
                                 }
+                                
+                                crate::image_proc::process_f16_row(row_data, &mut temp_buffer, hdr_options.as_ref());
                             } else if pixel_format == DXGI_FORMAT_R10G10B10A2_UNORM {
                                 let row_data = std::slice::from_raw_parts(src as *const u32, width as usize);
-                                for &pixel in row_data {
-                                    // 10 bits R, G, B, 2 bits A
-                                    let r_raw = (pixel & 0x3FF) as f32;
-                                    let g_raw = ((pixel >> 10) & 0x3FF) as f32;
-                                    let b_raw = ((pixel >> 20) & 0x3FF) as f32;
-                                    
-                                    // 简单修复: 如果是 HDR 模式下的 10bit，通常不能直接线性映射
-                                    // 这里简单地做 2 倍增益以提升亮度 (防止发灰)，并转换到 8bit
-                                    let nm = 255.0 / 1023.0 * if is_hdr_format { 2.5 } else { 1.0 };
-                                    
-                                    let r = (r_raw * nm).min(255.0) as u8;
-                                    let g = (g_raw * nm).min(255.0) as u8;
-                                    let b = (b_raw * nm).min(255.0) as u8;
-                                    
-                                    temp_buffer.push(r);
-                                    temp_buffer.push(g);
-                                    temp_buffer.push(b);
-                                    temp_buffer.push(255);
+                                
+                                // 如果需要保留原始数据，复制原始字节
+                                if preserve_raw {
+                                    let raw_bytes = std::slice::from_raw_parts(src, (width * 4) as usize);
+                                    temp_raw_buffer.extend_from_slice(raw_bytes);
                                 }
+                                
+                                crate::image_proc::process_10bit_row(row_data, &mut temp_buffer, is_hdr_format, hdr_options.as_ref());
                             } else if pixel_format == DXGI_FORMAT_B8G8R8A8_UNORM || pixel_format == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB {
                                 let row_data = std::slice::from_raw_parts(src, (width * 4) as usize);
                                 for pixel in row_data.chunks(4) {
@@ -274,7 +277,7 @@ pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn 
                             }
                         }
                         
-                        }
+
                         context.Unmap(&staging_resource, 0);
                         let _ = duplication.ReleaseFrame();
 
@@ -295,6 +298,9 @@ pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn 
                                 println!("[HDR-Native] Display {} recovered at retry {}", display_id, retry_count);
                             }
                             final_buffer = temp_buffer;
+                            if !temp_raw_buffer.is_empty() {
+                                raw_hdr_data = Some(temp_raw_buffer);
+                            }
                             break;
                         } else {
                             // 如果重试次数过多依然全黑，尝试重置下 duplication
@@ -308,10 +314,9 @@ pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn 
                 Err(e) => {
                     let err_code = e.code();
                     // 仅在关键错误（访问丢失）时重新初始化
-                    if err_code == windows::Win32::Graphics::Dxgi::DXGI_ERROR_ACCESS_LOST {
-                         if let Ok(new_dupl) = output.clone().cast::<IDXGIOutput1>().and_then(|o| o.DuplicateOutput(&device)) {
+                    if err_code == windows::Win32::Graphics::Dxgi::DXGI_ERROR_ACCESS_LOST 
+                        && let Ok(new_dupl) = output.clone().cast::<IDXGIOutput1>().and_then(|o| o.DuplicateOutput(&device)) {
                              duplication = new_dupl;
-                         }
                     }
                 }
             }
@@ -329,47 +334,9 @@ pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn 
             width,
             height,
             is_hdr: is_hdr_format,
+            raw_hdr_buffer: raw_hdr_data.map(|v| v.into()),
         })
     }
 }
 
-/// 极简的 F16 到 U8 转换逻辑 (用于 HDR 预览)
-fn f16_to_u8(val: u16) -> u8 {
-    // 提取符号、指数、尾数 (IEEE 754 binary16)
-    let sign = (val >> 15) & 0x1;
-    let exp = (val >> 10) & 0x1F;
-    let frac = val & 0x3FF;
 
-    let f = if exp == 0 {
-        if frac == 0 { 0.0 } else { (frac as f32) * 2.0f32.powi(-14 - 10) }
-    } else if exp == 0x1F {
-        if frac == 0 { if sign == 0 { 1.0 } else { 0.0 } } else { 1.0 }
-    } else {
-        (1.0 + (frac as f32) / 1024.0) * 2.0f32.powi(exp as i32 - 15)
-    };
-
-    let val_f = f.max(0.0);
-    if val_f < 0.0001 { return 0; }
-    
-    // 修复 scRGB 映射:
-    // scRGB 1.0 = 80 nits.
-    // SDR White (Windows) 通常在此之上 (e.g. 200 nits = 2.5).
-    // 为了让截图看起来正常（不发灰也不过曝），我们需要一个合适的 Tone Map。
-    // 简单的 Reinhard 曲线: x / (x + 1) 会压暗中间调。
-    // 我们采用 Extended Reinhard 或简单归一化。
-    // 假设 SDR White Level 为 200 nits (2.5), 我们希望 2.5 -> 1.0 (255).
-    // 同时为了保留 80 nits (1.0) 不至于太暗，我们允许一点 clipping。
-    
-    // 这里设置 Reference White 为 200 nits (2.5 scRGB units)
-    // 凡是大于 2.5 的都会被压缩或 Clip。小于 2.5 的线性映射。
-    // 80 nits (1.0) -> 1.0/2.5 = 0.4. Gamma(0.4) = 0.66 (168). 有点暗。
-    // 也许折中一下，Reference White = 120 nits (1.5).
-    // 1.0/1.5 = 0.66. Gamma(0.66) = 0.83 (211). 比较接近白色。
-    // 2.5/1.5 = 1.66. Clip -> 255.
-    
-    let max_white = 1.5; 
-    let mapped = (val_f / max_white).min(1.0);
-    
-    // 应用 Gamma 2.2
-    (mapped.powf(0.4545) * 255.0) as u8
-}

@@ -54,10 +54,24 @@ pub struct ToneMappingOptions {
     pub preserve_hdr_metadata: Option<bool>,
 }
 
+/// HDR 映射配置选项
+#[napi(object)]
+#[derive(Clone)]
+pub struct HdrMappingOptions {
+    /// 是否启用自定义 HDR 映射
+    pub enabled: Option<bool>,
+    /// SDR 白点亮度 (nits)，默认 203
+    pub sdr_white_nits: Option<f64>,
+    /// HDR 峰值亮度 (nits)，默认 1000
+    pub hdr_max_nits: Option<f64>,
+    /// 是否同时保留原始 HDR 数据（用于后续保存 HDR 原始文件）
+    pub preserve_raw: Option<bool>,
+}
+
 /// 屏幕捕获结果
 #[napi(object)]
 pub struct CaptureResult {
-    /// 图像数据 (RGBA)
+    /// 图像数据 (RGBA，经过 Tone Mapping)
     pub buffer: napi::bindgen_prelude::Buffer,
     /// 实际图像宽度 (物理像素)
     pub width: u32,
@@ -65,6 +79,9 @@ pub struct CaptureResult {
     pub height: u32,
     /// 是否为 HDR 源数据（经过 Tonemap）
     pub is_hdr: bool,
+    /// 原始 HDR 数据 (可选，仅当 preserve_raw 为 true 且为 HDR 屏幕时存在)
+    /// 保存为 RGBA Float16 或 10bit 原始格式的字节流
+    pub raw_hdr_buffer: Option<napi::bindgen_prelude::Buffer>,
 }
 
 // ==================== 窗口检测 API ====================
@@ -84,9 +101,11 @@ pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option
 // ==================== 屏幕捕获 API ====================
 
 /// 捕获指定显示器的屏幕 (返回 RGBA 结果对象)
+/// 
+/// `hdr_options` - 可选的 HDR 映射配置，用于自定义色调映射参数
 #[napi]
-pub async fn capture_display(display_id: u32) -> napi::Result<CaptureResult> {
-    capture::capture_display(display_id).map_err(|e| napi::Error::from_reason(e.to_string()))
+pub async fn capture_display(display_id: u32, hdr_options: Option<HdrMappingOptions>) -> napi::Result<CaptureResult> {
+    capture::capture_display(display_id, hdr_options).map_err(|e| napi::Error::from_reason(e.to_string()))
 }
 
 /// 获取显示器列表
@@ -143,5 +162,36 @@ pub async fn resize_image(
     new_height: u32,
 ) -> napi::Result<napi::bindgen_prelude::Buffer> {
     image_proc::resize_image(&buffer, width, height, new_width, new_height)
+        .map_err(|e| napi::Error::from_reason(e.to_string()))
+}
+
+/// 将原始 HDR F16 数据编码为 EXR 格式
+/// 
+/// 输入: RGBA F16 格式的原始 HDR 数据 (每像素 8 字节)
+/// 输出: OpenEXR 文件字节流
+#[napi]
+pub async fn encode_hdr_to_exr(
+    raw_buffer: napi::bindgen_prelude::Buffer,
+    width: u32,
+    height: u32,
+) -> napi::Result<napi::bindgen_prelude::Buffer> {
+    image_proc::encode_hdr_to_exr(&raw_buffer, width, height)
+        .map(|v| v.into())
+        .map_err(|e| napi::Error::from_reason(e.to_string()))
+}
+
+/// 裁剪 HDR F16 格式的原始数据
+/// 
+/// 输入: RGBA F16 格式的原始 HDR 数据 (每像素 8 字节)
+/// 输出: 裁剪后的 RGBA F16 数据
+#[napi]
+pub async fn crop_hdr_f16(
+    raw_buffer: napi::bindgen_prelude::Buffer,
+    width: u32,
+    height: u32,
+    rect: Rect,
+) -> napi::Result<napi::bindgen_prelude::Buffer> {
+    image_proc::crop_hdr_f16(&raw_buffer, width, height, &rect)
+        .map(|v| v.into())
         .map_err(|e| napi::Error::from_reason(e.to_string()))
 }

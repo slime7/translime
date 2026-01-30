@@ -8,13 +8,11 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 
-const translime = {
-  /**
-   * 日志记录
-   */
-  logger: createLoggerBase(),
-};
-
+/**
+ * 创建日志记录器基础对象
+ * @param {Object} defaultMeta - 默认元数据
+ * @returns {Object} 日志记录器对象
+ */
 function createLoggerBase(defaultMeta = {}) {
   return {
     log: (...args) => ipcRenderer.invoke('ipc-fn', { type: 'logger', args: ['log', { args, meta: defaultMeta }] }),
@@ -25,6 +23,10 @@ function createLoggerBase(defaultMeta = {}) {
     child: (childMeta) => createLoggerBase({ ...defaultMeta, ...childMeta }),
   };
 }
+
+const translime = {
+  logger: createLoggerBase(),
+};
 
 contextBridge.exposeInMainWorld('ts', translime);
 contextBridge.exposeInMainWorld('hdrCapture', {

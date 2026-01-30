@@ -41,6 +41,10 @@ const getShortcut = () => pluginConfig.get('shortcut', '');
 const getSavePath = () => pluginConfig.get('savePath') || app.getPath('pictures');
 const getSaveFormat = () => pluginConfig.get('saveFormat', 'png');
 const getPreserveHdr = () => pluginConfig.get('preserveHdr', false);
+// HDR 映射设置
+const getEnableHdrMapping = () => pluginConfig.get('enableHdrMapping', true);
+const getSdrWhiteNits = () => pluginConfig.get('sdrWhiteNits', 203);
+const getHdrMaxNits = () => pluginConfig.get('hdrMaxNits', 1000);
 
 /**
  * 注销全局快捷键
@@ -165,19 +169,38 @@ const preCaptureAllScreens = async () => {
 
   logger.info('开始预捕获。检测到原生显示器数量:', nativeDisplays.length);
 
+  // 读取 HDR 映射配置
+  const enableHdrMapping = getEnableHdrMapping();
+  const sdrWhiteNits = getSdrWhiteNits();
+  const hdrMaxNits = getHdrMaxNits();
+  const preserveHdr = getPreserveHdr();
+
+  // 构建 HDR 映射选项（仅在启用时传递）
+  const hdrOptions = enableHdrMapping ? {
+    enabled: true,
+    sdrWhiteNits,
+    hdrMaxNits,
+    // 当用户启用了 HDR 映射且勾选了保存 HDR 原始文件时，请求原始数据
+    preserveRaw: preserveHdr,
+  } : null;
+
+  logger.info('HDR 映射配置:', {
+    enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr,
+  });
+
   const capturePromises = nativeDisplays.map(async (nd) => {
     try {
       logger.info(`正在捕获显示器 ID=${nd.id} (预期 ${nd.width}x${nd.height})`);
       const {
-        buffer, width, height, is_hdr: isHdr,
-      } = await capture.captureDisplay(nd.id);
+        buffer, width, height, isHdr, rawHdrBuffer,
+      } = await capture.captureDisplay(nd.id, hdrOptions);
 
       if (!buffer || buffer.length === 0) {
         logger.warn(`显示器 ID=${nd.id} 返回的 Buffer 为空`);
         return null;
       }
 
-      logger.info(`显示器 ID=${nd.id} 捕获成功: 实际尺寸 ${width}x${height}, Buffer 长度 ${buffer.length}, IS_HDR: ${isHdr}`);
+      logger.info(`显示器 ID=${nd.id} 捕获成功: 实际尺寸 ${width}x${height}, Buffer 长度 ${buffer.length}, IS_HDR: ${isHdr}, 原始 HDR 数据: ${rawHdrBuffer ? rawHdrBuffer.length : 'N/A'}`);
 
       // 找到包含该 native 显示器中心点的 Electron 显示器，以获取 scaleFactor
       const centerX = nd.x + nd.width / 2;
@@ -198,6 +221,7 @@ const preCaptureAllScreens = async () => {
         scaleFactor: ed.scaleFactor,
         bounds: ed.bounds,
         isHdr,
+        rawHdrBuffer, // 保存原始 HDR 数据 (如果有)
       };
     } catch (err) {
       logger.error(`显示器 ID=${nd.id} 捕获发生异常:`, err);
@@ -518,8 +542,6 @@ export const ipcHandlers = [
       }
 
       try {
-        const preserveHdr = getPreserveHdr();
-
         if (!rect || rect.width <= 0 || rect.height <= 0) {
           logger.error('copy-capture 失败: 无效的选区尺寸', rect);
           return false;
@@ -527,7 +549,7 @@ export const ipcHandlers = [
 
         // 在主进程处理复制逻辑，绕过沙盒限制
         logger.info('开始进行裁剪编码...');
-        const pngBuffer = await capture.cropAndGetPngFromBuffer(currentCaptureSession, rect, { preserveHdr });
+        const pngBuffer = await capture.cropAndGetPngFromBuffer(currentCaptureSession, rect);
 
         if (pngBuffer && pngBuffer.length > 0) {
           logger.info(`编码成功, Buffer 长度: ${pngBuffer.length}, 开始写入剪贴板`);

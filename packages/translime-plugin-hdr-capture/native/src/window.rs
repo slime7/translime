@@ -167,6 +167,7 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
 }
 
 /// 获取指定坐标处的窗口
+#[allow(clippy::collapsible_if)]
 pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option<WindowInfo> {
     unsafe {
         if let Some(ignore) = ignore_handle {
@@ -176,11 +177,9 @@ pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option
                 let hwnd_val = current_hwnd.0 as i64;
                 if IsWindowVisible(current_hwnd).as_bool() && hwnd_val != ignore && !is_cloaked(current_hwnd) {
                     if let Some(rect) = get_extended_frame_bounds(current_hwnd) {
-                        if x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom {
-                            let ex_style = GetWindowLongW(current_hwnd, GWL_EXSTYLE);
-                            if (ex_style as u32 & WS_EX_TRANSPARENT.0) == 0 {
-                                return get_window_info(current_hwnd);
-                            }
+                        if x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom 
+                            && (GetWindowLongW(current_hwnd, GWL_EXSTYLE) as u32 & WS_EX_TRANSPARENT.0) == 0 {
+                            return get_window_info(current_hwnd);
                         }
                     }
                 }
@@ -214,20 +213,16 @@ unsafe fn get_window_info(hwnd: HWND) -> Option<WindowInfo> {
             .to_string_lossy()
             .to_string();
 
-        if let Some(rect) = get_extended_frame_bounds(hwnd) {
-            Some(WindowInfo {
-                handle: hwnd.0 as i64,
-                title,
-                class_name,
-                left: rect.left,
-                top: rect.top,
-                right: rect.right,
-                bottom: rect.bottom,
-                width: rect.right - rect.left,
-                height: rect.bottom - rect.top,
-            })
-        } else {
-            None
-        }
+        get_extended_frame_bounds(hwnd).map(|rect| WindowInfo {
+            handle: hwnd.0 as i64,
+            title,
+            class_name,
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.right - rect.left,
+            height: rect.bottom - rect.top,
+        })
     }
 }
