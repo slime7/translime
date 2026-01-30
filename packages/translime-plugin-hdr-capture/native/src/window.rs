@@ -83,46 +83,47 @@ pub fn get_top_level_windows() -> Vec<WindowInfo> {
 
 /// EnumWindows 回调函数
 unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let context = unsafe { &mut *(lparam.0 as *mut WindowEnumContext) };
-
-    // 1. 基础可见性检查
-    if unsafe { !IsWindowVisible(hwnd).as_bool() } {
-        return BOOL(1);
-    }
-
-    // 2. 检查 DWM Cloaked 属性
-    if is_cloaked(hwnd) {
-        return BOOL(1);
-    }
-
-    // 3. 过滤器：仅排除明确的透明穿透窗口（如 Overlay 自身）
-    let ex_style = unsafe { GetWindowLongW(hwnd, GWL_EXSTYLE) };
-    if (ex_style as u32 & WS_EX_TRANSPARENT.0) != 0 {
-        return BOOL(1);
-    }
-
-    // 4. 获取窗口类名
-    let mut class_buf: Vec<u16> = vec![0; 256];
-    let class_len = unsafe { GetClassNameW(hwnd, &mut class_buf) };
-    let class_name = OsString::from_wide(&class_buf[..class_len as usize])
-        .to_string_lossy()
-        .to_string();
-
-    // 5. 获取窗口实际矩形 (尝试排除阴影)
-    let rect = match get_extended_frame_bounds(hwnd) {
-        Some(r) => r,
-        None => return BOOL(1),
-    };
-    
-    let width = rect.right - rect.left;
-    let height = rect.bottom - rect.top;
-
-    if width <= 0 || height <= 0 {
-        return BOOL(1);
-    }
-
-    // 6. 遮挡检测
     unsafe {
+        // 1. 获取上下文
+        let context = &mut *(lparam.0 as *mut WindowEnumContext);
+
+        // 2. 基础可见性检查
+        if !IsWindowVisible(hwnd).as_bool() {
+            return BOOL(1);
+        }
+
+        // 3. 检查 DWM Cloaked 属性
+        if is_cloaked(hwnd) {
+            return BOOL(1);
+        }
+
+        // 4. 过滤器：仅排除明确的透明穿透窗口（如 Overlay 自身）
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        if (ex_style as u32 & WS_EX_TRANSPARENT.0) != 0 {
+            return BOOL(1);
+        }
+
+        // 5. 获取窗口类名
+        let mut class_buf: Vec<u16> = vec![0; 256];
+        let class_len = GetClassNameW(hwnd, &mut class_buf);
+        let class_name = OsString::from_wide(&class_buf[..class_len as usize])
+            .to_string_lossy()
+            .to_string();
+
+        // 6. 获取窗口实际矩形 (尝试排除阴影)
+        let rect = match get_extended_frame_bounds(hwnd) {
+            Some(r) => r,
+            None => return BOOL(1),
+        };
+        
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
+
+        if width <= 0 || height <= 0 {
+            return BOOL(1);
+        }
+
+        // 7. 遮挡检测
         let win_rgn = CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
         let visible_part = CreateRectRgn(0, 0, 0, 0);
 
@@ -130,9 +131,9 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
 
         if rgn_type != GDI_REGION_TYPE(1) && rgn_type != GDI_REGION_TYPE(0) {
             // 获取标题
-            let title_len = unsafe { GetWindowTextLengthW(hwnd) };
+            let title_len = GetWindowTextLengthW(hwnd);
             let mut title_buf: Vec<u16> = vec![0; (title_len + 1).max(1) as usize];
-            unsafe { GetWindowTextW(hwnd, &mut title_buf) };
+            let _ = GetWindowTextW(hwnd, &mut title_buf);
             let title = OsString::from_wide(&title_buf[..title_len.max(0) as usize])
                 .to_string_lossy()
                 .to_string();
@@ -160,9 +161,9 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
 
         let _ = DeleteObject(win_rgn);
         let _ = DeleteObject(visible_part);
-    }
 
-    BOOL(1) // 继续枚举
+        BOOL(1) // 继续枚举
+    }
 }
 
 /// 获取指定坐标处的窗口
@@ -199,32 +200,34 @@ pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option
 
 /// 辅助函数
 unsafe fn get_window_info(hwnd: HWND) -> Option<WindowInfo> {
-    let title_len = unsafe { GetWindowTextLengthW(hwnd) };
-    let mut title_buf: Vec<u16> = vec![0; (title_len + 1).max(1) as usize];
-    unsafe { GetWindowTextW(hwnd, &mut title_buf) };
-    let title = OsString::from_wide(&title_buf[..title_len.max(0) as usize])
-        .to_string_lossy()
-        .to_string();
+    unsafe {
+        let title_len = GetWindowTextLengthW(hwnd);
+        let mut title_buf: Vec<u16> = vec![0; (title_len + 1).max(1) as usize];
+        let _ = GetWindowTextW(hwnd, &mut title_buf);
+        let title = OsString::from_wide(&title_buf[..title_len.max(0) as usize])
+            .to_string_lossy()
+            .to_string();
 
-    let mut class_buf: Vec<u16> = vec![0; 256];
-    let class_len = unsafe { GetClassNameW(hwnd, &mut class_buf) };
-    let class_name = OsString::from_wide(&class_buf[..class_len as usize])
-        .to_string_lossy()
-        .to_string();
+        let mut class_buf: Vec<u16> = vec![0; 256];
+        let class_len = GetClassNameW(hwnd, &mut class_buf);
+        let class_name = OsString::from_wide(&class_buf[..class_len as usize])
+            .to_string_lossy()
+            .to_string();
 
-    if let Some(rect) = get_extended_frame_bounds(hwnd) {
-        Some(WindowInfo {
-            handle: hwnd.0 as i64,
-            title,
-            class_name,
-            left: rect.left,
-            top: rect.top,
-            right: rect.right,
-            bottom: rect.bottom,
-            width: rect.right - rect.left,
-            height: rect.bottom - rect.top,
-        })
-    } else {
-        None
+        if let Some(rect) = get_extended_frame_bounds(hwnd) {
+            Some(WindowInfo {
+                handle: hwnd.0 as i64,
+                title,
+                class_name,
+                left: rect.left,
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+                width: rect.right - rect.left,
+                height: rect.bottom - rect.top,
+            })
+        } else {
+            None
+        }
     }
 }
