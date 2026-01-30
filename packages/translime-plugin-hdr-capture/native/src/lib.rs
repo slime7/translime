@@ -54,6 +54,19 @@ pub struct ToneMappingOptions {
     pub preserve_hdr_metadata: Option<bool>,
 }
 
+/// 屏幕捕获结果
+#[napi(object)]
+pub struct CaptureResult {
+    /// 图像数据 (RGBA)
+    pub buffer: napi::bindgen_prelude::Buffer,
+    /// 实际图像宽度 (物理像素)
+    pub width: u32,
+    /// 实际图像高度 (物理像素)
+    pub height: u32,
+    /// 是否为 HDR 源数据（经过 Tonemap）
+    pub is_hdr: bool,
+}
+
 // ==================== 窗口检测 API ====================
 
 /// 获取所有顶层窗口
@@ -70,9 +83,9 @@ pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option
 
 // ==================== 屏幕捕获 API ====================
 
-/// 捕获指定显示器的屏幕 (返回 RGBA Buffer)
+/// 捕获指定显示器的屏幕 (返回 RGBA 结果对象)
 #[napi]
-pub async fn capture_display(display_id: u32) -> napi::Result<napi::bindgen_prelude::Buffer> {
+pub async fn capture_display(display_id: u32) -> napi::Result<CaptureResult> {
     capture::capture_display(display_id).map_err(|e| napi::Error::from_reason(e.to_string()))
 }
 
@@ -117,5 +130,18 @@ pub async fn encode_image(
     format: String,
 ) -> napi::Result<napi::bindgen_prelude::Buffer> {
     image_proc::encode_image(&buffer, width, height, &format)
+        .map_err(|e| napi::Error::from_reason(e.to_string()))
+}
+
+/// 调整图像大小
+#[napi]
+pub async fn resize_image(
+    buffer: napi::bindgen_prelude::Buffer,
+    width: u32,
+    height: u32,
+    new_width: u32,
+    new_height: u32,
+) -> napi::Result<napi::bindgen_prelude::Buffer> {
+    image_proc::resize_image(&buffer, width, height, new_width, new_height)
         .map_err(|e| napi::Error::from_reason(e.to_string()))
 }

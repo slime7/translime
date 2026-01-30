@@ -12,6 +12,7 @@ const props = defineProps({
 
 const state = inject('state');
 const { findDisplayAtLocalPoint } = inject('utils');
+const actions = inject('actions');
 
 const toolbarPos = computed(() => {
   const {
@@ -113,21 +114,21 @@ const debugLine = computed(() => {
       <button
         class="w-9 h-9 border-none rounded-lg cursor-pointer flex items-center justify-center text-lg transition-all duration-200 hover:scale-115 hover:-translate-y-0.5 active:scale-95 bg-[#4CAF50] text-white hover:shadow-[0_0_15px_rgba(76,175,80,0.5)]"
         title="保存"
-        @click.stop="handleAction('save')"
+        @click.stop="actions.handleAction('save')"
       >
         💾
       </button>
       <button
         class="w-9 h-9 border-none rounded-lg cursor-pointer flex items-center justify-center text-lg transition-all duration-200 hover:scale-115 hover:-translate-y-0.5 active:scale-95 bg-[#2196F3] text-white hover:shadow-[0_0_15px_rgba(33,150,243,0.5)]"
         title="复制"
-        @click.stop="handleAction('copy')"
+        @click.stop="actions.handleAction('copy')"
       >
         📋
       </button>
       <button
         class="w-9 h-9 border-none rounded-lg cursor-pointer flex items-center justify-center text-lg transition-all duration-200 hover:scale-115 hover:-translate-y-0.5 active:scale-95 bg-[#F44336] text-white hover:shadow-[0_0_15px_rgba(244,67,54,0.5)]"
         title="取消"
-        @click.stop="handleAction('cancel')"
+        @click.stop="actions.handleAction('cancel')"
       >
         ✕
       </button>

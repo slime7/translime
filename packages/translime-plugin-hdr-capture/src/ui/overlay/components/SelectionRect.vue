@@ -87,7 +87,10 @@ const windowHighlightStyle = computed(() => {
         height: bounds.h + 'px'
       }"
     >
-      <div class="absolute -top-7 left-0 bg-[#2196F3] text-white px-2 py-0.5 rounded text-xs whitespace-nowrap shadow-md">
+      <div
+        v-if="bounds.w > 0 && bounds.h > 0"
+        class="absolute -top-7 left-0 bg-[#2196F3] text-white px-2 py-0.5 rounded text-xs whitespace-nowrap shadow-md"
+      >
         {{ Math.round(bounds.w) }} × {{ Math.round(bounds.h) }}
       </div>
     </div>

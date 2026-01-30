@@ -275,6 +275,14 @@ const onContextMenu = (e) => {
 
 // ==================== 操作处理 ====================
 const handleAction = async (type) => {
+  if (type === 'cancel') {
+    handleCancel();
+    return;
+  }
+
+  // 立即关闭选区显示，防止截图抓取到 Overlay 的黑色遮罩
+  state.hasSelection = false;
+
   const b = selectionBounds.value;
   const rect = {
     x: b.x + state.offsetX,

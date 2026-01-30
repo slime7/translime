@@ -81,7 +81,7 @@ pub fn get_displays() -> Vec<DisplayInfo> {
 }
 
 /// 捕获指定显示器的屏幕
-pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer, Box<dyn std::error::Error>> {
+pub fn capture_display(display_id: u32) -> Result<crate::CaptureResult, Box<dyn std::error::Error>> {
     unsafe {
         // 创建 DXGI Factory
         let factory: IDXGIFactory1 = CreateDXGIFactory1()?;
@@ -157,10 +157,17 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
 
         let dupl_desc = duplication.GetDesc();
         let pixel_format = dupl_desc.ModeDesc.Format;
-        let width = (output_desc.DesktopCoordinates.right - output_desc.DesktopCoordinates.left) as u32;
-        let height = (output_desc.DesktopCoordinates.bottom - output_desc.DesktopCoordinates.top) as u32;
+        
+        // 优先使用 duplication desc 的物理尺寸，如果为 0 则通过 DesktopCoordinates 兜底
+        let mut width = dupl_desc.ModeDesc.Width;
+        let mut height = dupl_desc.ModeDesc.Height;
+        
+        if width == 0 || height == 0 {
+            width = (output_desc.DesktopCoordinates.right - output_desc.DesktopCoordinates.left).abs() as u32;
+            height = (output_desc.DesktopCoordinates.bottom - output_desc.DesktopCoordinates.top).abs() as u32;
+        }
 
-        println!("[HDR-Native] Display {} Format: {:?}, Size: {}x{}", display_id, pixel_format, width, height);
+        println!("[HDR-Native] Display {} Format: {:?}, Buffer Size: {}x{}", display_id, pixel_format, width, height);
 
         // 判断是否为 HDR 格式
         let is_hdr_format = pixel_format == DXGI_FORMAT_R16G16B16A16_FLOAT || pixel_format == DXGI_FORMAT_R10G10B10A2_UNORM;
@@ -230,10 +237,18 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
                                 let row_data = std::slice::from_raw_parts(src as *const u32, width as usize);
                                 for &pixel in row_data {
                                     // 10 bits R, G, B, 2 bits A
-                                    // 虽然简单位移会丢失精度，但在预览阶段足够
-                                    let r = ((pixel & 0x3FF) >> 2) as u8;
-                                    let g = (((pixel >> 10) & 0x3FF) >> 2) as u8;
-                                    let b = (((pixel >> 20) & 0x3FF) >> 2) as u8;
+                                    let r_raw = (pixel & 0x3FF) as f32;
+                                    let g_raw = ((pixel >> 10) & 0x3FF) as f32;
+                                    let b_raw = ((pixel >> 20) & 0x3FF) as f32;
+                                    
+                                    // 简单修复: 如果是 HDR 模式下的 10bit，通常不能直接线性映射
+                                    // 这里简单地做 2 倍增益以提升亮度 (防止发灰)，并转换到 8bit
+                                    let nm = 255.0 / 1023.0 * if is_hdr_format { 2.5 } else { 1.0 };
+                                    
+                                    let r = (r_raw * nm).min(255.0) as u8;
+                                    let g = (g_raw * nm).min(255.0) as u8;
+                                    let b = (b_raw * nm).min(255.0) as u8;
+                                    
                                     temp_buffer.push(r);
                                     temp_buffer.push(g);
                                     temp_buffer.push(b);
@@ -259,6 +274,7 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
                             }
                         }
                         
+                        }
                         context.Unmap(&staging_resource, 0);
                         let _ = duplication.ReleaseFrame();
 
@@ -308,7 +324,12 @@ pub fn capture_display(display_id: u32) -> Result<napi::bindgen_prelude::Buffer,
             return Err("Failed to capture a valid frame (all black or timeout)".into());
         }
 
-        Ok(final_buffer.into())
+        Ok(crate::CaptureResult {
+            buffer: final_buffer.into(),
+            width,
+            height,
+            is_hdr: is_hdr_format,
+        })
     }
 }
 
@@ -327,20 +348,28 @@ fn f16_to_u8(val: u16) -> u8 {
         (1.0 + (frac as f32) / 1024.0) * 2.0f32.powi(exp as i32 - 15)
     };
 
-    // 映射到 0-255，并进行伽马校正
     let val_f = f.max(0.0);
     if val_f < 0.0001 { return 0; }
     
-    // 改良的映射算法，增加对比度平衡
-    // 假设 Windows SDR 参照白为 200 nits (scRGB 2.5)
-    let exposure = 0.45; 
-    let x = val_f * exposure;
+    // 修复 scRGB 映射:
+    // scRGB 1.0 = 80 nits.
+    // SDR White (Windows) 通常在此之上 (e.g. 200 nits = 2.5).
+    // 为了让截图看起来正常（不发灰也不过曝），我们需要一个合适的 Tone Map。
+    // 简单的 Reinhard 曲线: x / (x + 1) 会压暗中间调。
+    // 我们采用 Extended Reinhard 或简单归一化。
+    // 假设 SDR White Level 为 200 nits (2.5), 我们希望 2.5 -> 1.0 (255).
+    // 同时为了保留 80 nits (1.0) 不至于太暗，我们允许一点 clipping。
     
-    // 使用带“白点”的 Reinhard 公式，允许高光部分有更好的对比度
-    // 并添加一个简单的幂次调整来压深暗部 (Toe)
-    let reinhard = x * (1.0 + x / 25.0) / (1.0 + x);
+    // 这里设置 Reference White 为 200 nits (2.5 scRGB units)
+    // 凡是大于 2.5 的都会被压缩或 Clip。小于 2.5 的线性映射。
+    // 80 nits (1.0) -> 1.0/2.5 = 0.4. Gamma(0.4) = 0.66 (168). 有点暗。
+    // 也许折中一下，Reference White = 120 nits (1.5).
+    // 1.0/1.5 = 0.66. Gamma(0.66) = 0.83 (211). 比较接近白色。
+    // 2.5/1.5 = 1.66. Clip -> 255.
     
-    // 应用 Gamma 2.2 转换，并微调 Gamma 值 (从 0.45 降至 0.5) 进一步压实黑色
-    let gamma = 0.50; 
-    (reinhard.powf(gamma).min(1.0) * 255.0) as u8
+    let max_white = 1.5; 
+    let mapped = (val_f / max_white).min(1.0);
+    
+    // 应用 Gamma 2.2
+    (mapped.powf(0.4545) * 255.0) as u8
 }

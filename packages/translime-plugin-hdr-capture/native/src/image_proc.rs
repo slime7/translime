@@ -68,8 +68,9 @@ pub fn tone_map(
 
 /// 应用 Reinhard Tone Curve
 fn apply_tone_curve(value: f32, exposure: f64) -> f32 {
-    let v = value * exposure as f32;
-    v / (1.0 + v) // Reinhard operator
+    let x = value * exposure as f32;
+    // 使用更高白点的 Reinhard，使 1.0 映射到约 0.8 以上
+    (x * (1.0 + x / 16.0)) / (1.0 + x)
 }
 
 /// 编码图像为指定格式
@@ -101,3 +102,15 @@ pub fn encode_image(
 
 
 
+/// 调整图像大小
+pub fn resize_image(
+    buffer: &[u8],
+    width: u32,
+    height: u32,
+    new_width: u32,
+    new_height: u32,
+) -> Result<napi::bindgen_prelude::Buffer, Box<dyn std::error::Error>> {
+    let img = get_image(buffer, width, height)?;
+    let resized = img.resize_exact(new_width, new_height, image::imageops::FilterType::Lanczos3);
+    Ok(resized.to_rgba8().into_raw().into())
+}

@@ -27,6 +27,7 @@ try {
     cropImage: () => { throw new Error('Native addon not loaded'); },
     toneMap: () => { throw new Error('Native addon not loaded'); },
     encodeImage: () => { throw new Error('Native addon not loaded'); },
+    resizeImage: () => { throw new Error('Native addon not loaded'); },
   };
 }
 
@@ -83,7 +84,7 @@ export const getDisplays = () => nativeAddon.getDisplays();
 /**
  * 捕获指定显示器的屏幕
  * @param {number} displayId - 显示器 ID
- * @returns {Promise<Buffer>} RGBA 格式的图像数据
+ * @returns {Promise<{buffer: Buffer, width: number, height: number}>} 图像数据与实际尺寸
  */
 export const captureDisplay = async (displayId = 0) => {
   try {
@@ -127,6 +128,17 @@ export const toneMap = async (hdrBuffer, width, height, options = {}) => nativeA
 export const encodeImage = async (buffer, width, height, format = 'png') => nativeAddon.encodeImage(buffer, width, height, format);
 
 /**
+ * 调整图像大小
+ * @param {Buffer} buffer - RGBA 图像数据
+ * @param {number} width - 原图宽度
+ * @param {number} height - 原图高度
+ * @param {number} newWidth - 新宽度
+ * @param {number} newHeight - 新高度
+ * @returns {Buffer} 调整后的 RGBA 数据
+ */
+export const resizeImage = async (buffer, width, height, newWidth, newHeight) => nativeAddon.resizeImage(buffer, width, height, newWidth, newHeight);
+
+/**
  * 从缓存中裁剪并获取 PNG Buffer (用于复制)
  * @param {Array} sessionData
  * @param {Rect} rect
@@ -135,67 +147,101 @@ export const encodeImage = async (buffer, width, height, format = 'png') => nati
 export const cropAndGetPngFromBuffer = async (sessionData, rect, options = {}) => {
   const { preserveHdr = false } = options;
 
-  logger.info('开始裁剪, 选区:', rect);
+  logger.info('开始多屏幕混合裁剪, 选区:', { rect });
 
   if (!sessionData || sessionData.length === 0) {
     logger.error('裁剪失败: sessionData 为空！');
     throw new Error('截屏会话数据为空，请重启截图。');
   }
 
-  logger.info(`当前会话包含 ${sessionData.length} 个屏幕捕获记录`);
-  sessionData.forEach((d, i) => {
-    if (d && d.bounds) {
-      logger.info(`  [${i}] 显示器 ID: ${d.displayId}, 边界: (${d.bounds.x}, ${d.bounds.y}, ${d.bounds.width}, ${d.bounds.height})`);
-    } else {
-      logger.warn(`  [${i}] 坏数据项:`, d);
+  // 1. 找出所有包含选区部分的显示器，并计算重叠面积
+  const overlaps = sessionData.map((d) => {
+    const x = Math.max(rect.x, d.bounds.x);
+    const y = Math.max(rect.y, d.bounds.y);
+    const w = Math.min(rect.x + rect.width, d.bounds.x + d.bounds.width) - x;
+    const h = Math.min(rect.y + rect.height, d.bounds.y + d.bounds.height) - y;
+    if (w > 0 && h > 0) {
+      return {
+        display: d,
+        inter: {
+          x, y, width: w, height: h,
+        },
+        area: w * h,
+      };
     }
-  });
+    return null;
+  }).filter(Boolean);
 
-  const centerX = rect.x + rect.width / 2;
-  const centerY = rect.y + rect.height / 2;
-
-  const display = sessionData.find((d) => {
-    if (!d || !d.bounds) return false;
-    const {
-      x, y, width, height,
-    } = d.bounds;
-    return centerX >= x && centerX <= x + width && centerY >= y && centerY <= y + height;
-  }) || sessionData[0];
-
-  if (!display) {
-    logger.error('裁剪失败: 无法定位到显示器且无默认回退');
-    throw new Error('无法匹配到对应的显示器选区。');
+  if (overlaps.length === 0) {
+    logger.error('裁剪失败: 无法匹配到任何显示器选区。');
+    throw new Error('选区超出了显示范围。');
   }
 
-  logger.info('匹配到显示器:', display.displayId, '缩放率:', display.scaleFactor);
+  // 2. 确定目标比例 (采用重叠面积最大的显示器的缩放率，保证大部分内容的清晰度)
+  overlaps.sort((a, b) => b.area - a.area);
+  const targetScale = overlaps[0].display.scaleFactor || 1.0;
+  const targetWidth = Math.round(rect.width * targetScale);
+  const targetHeight = Math.round(rect.height * targetScale);
 
-  // 关键：将逻辑坐标转换为物理像素
-  const scale = display.scaleFactor || 1.0;
-  const localRect = {
-    x: Math.round((rect.x - display.bounds.x) * scale),
-    y: Math.round((rect.y - display.bounds.y) * scale),
-    width: Math.round(rect.width * scale),
-    height: Math.round(rect.height * scale),
-  };
+  logger.info(`目标比例: ${targetScale}, 物理尺寸: ${targetWidth}x${targetHeight}, 涉及屏幕数: ${overlaps.length}`);
 
-  logger.info('物理像素转换结果:', localRect);
+  // 3. 创建目标 Buffer (初始透明)
+  const finalBuffer = Buffer.alloc(targetWidth * targetHeight * 4);
+
+  // 4. 逐个屏幕提取并合入
+  for (const { display, inter } of overlaps) {
+    const scale = display.scaleFactor || 1.0;
+
+    // A. 计算该屏幕内的物理裁剪区域
+    const srcRect = {
+      x: Math.round((inter.x - display.bounds.x) * scale),
+      y: Math.round((inter.y - display.bounds.y) * scale),
+      width: Math.round(inter.width * scale),
+      height: Math.round(inter.height * scale),
+    };
+
+    try {
+      // 提取物理切片
+      let chunk = await nativeAddon.cropImage(display.buffer, display.width, display.height, srcRect);
+      let chunkWidth = srcRect.width;
+      let chunkHeight = srcRect.height;
+
+      // B. 如果该屏幕缩放率与目标缩放率不一致，需要进行物理缩放对齐
+      if (Math.abs(scale - targetScale) > 0.01) {
+        const resizedWidth = Math.round(inter.width * targetScale);
+        const resizedHeight = Math.round(inter.height * targetScale);
+        logger.info(`屏幕比例不一致 (${scale} vs ${targetScale}), 正在执行物理缩放: ${chunkWidth}x${chunkHeight} -> ${resizedWidth}x${resizedHeight}`);
+        chunk = await nativeAddon.resizeImage(chunk, chunkWidth, chunkHeight, resizedWidth, resizedHeight);
+        chunkWidth = resizedWidth;
+        chunkHeight = resizedHeight;
+      }
+
+      // C. 将切片 Blit 到目标 Buffer
+      const destX = Math.round((inter.x - rect.x) * targetScale);
+      const destY = Math.round((inter.y - rect.y) * targetScale);
+
+      for (let row = 0; row < chunkHeight; row++) {
+        const targetRow = destY + row;
+        if (targetRow >= targetHeight) break;
+
+        const srcOffset = row * chunkWidth * 4;
+        const destOffset = (targetRow * targetWidth + destX) * 4;
+        const rowLength = Math.min(chunkWidth, targetWidth - destX) * 4;
+
+        if (rowLength > 0 && destOffset + rowLength <= finalBuffer.length) {
+          chunk.copy(finalBuffer, destOffset, srcOffset, srcOffset + rowLength);
+        }
+      }
+    } catch (e) {
+      logger.error(`合并屏幕 ${display.displayId} 失败:`, e);
+    }
+  }
 
   try {
-    const croppedBuffer = await cropImage(display.rawBuffer, display.width, display.height, localRect);
-    logger.info('裁剪完成, Buffer 长度:', croppedBuffer?.length);
-
-    let finalBuffer = croppedBuffer;
-    if (preserveHdr) {
-      logger.info('执行 ToneMapping...');
-      finalBuffer = await toneMap(croppedBuffer, localRect.width, localRect.height, { preserveHdrMetadata: true });
-    }
-
-    logger.info('开始进行 PNG 编码...');
-    const result = await encodeImage(finalBuffer, localRect.width, localRect.height, 'png');
-    logger.info('编码完成');
+    const result = await encodeImage(finalBuffer, targetWidth, targetHeight, 'png');
     return result;
   } catch (err) {
-    logger.error('核心处理过程发生错误:', err);
+    logger.error('后期处理过程发生错误:', err);
     throw err;
   }
 };
@@ -206,27 +252,73 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect, options = {}) =
 export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {}) => {
   const { format = 'png', savePath, preserveHdr = false } = options;
 
-  const centerX = rect.x + rect.width / 2;
-  const centerY = rect.y + rect.height / 2;
-  const display = sessionData.find((d) => centerX >= d.bounds.x && centerX <= d.bounds.x + d.bounds.width
-    && centerY >= d.bounds.y && centerY <= d.bounds.y + d.bounds.height) || sessionData[0];
+  logger.info('开始多屏幕混合裁剪并保存, 选区:', { rect });
 
-  const scale = display.scaleFactor || 1.0;
-  const localRect = {
-    x: Math.round((rect.x - display.bounds.x) * scale),
-    y: Math.round((rect.y - display.bounds.y) * scale),
-    width: Math.round(rect.width * scale),
-    height: Math.round(rect.height * scale),
-  };
+  // 1. 找出所有重叠显示器
+  const overlaps = sessionData.map((d) => {
+    const x = Math.max(rect.x, d.bounds.x);
+    const y = Math.max(rect.y, d.bounds.y);
+    const w = Math.min(rect.x + rect.width, d.bounds.x + d.bounds.width) - x;
+    const h = Math.min(rect.y + rect.height, d.bounds.y + d.bounds.height) - y;
+    if (w > 0 && h > 0) {
+      return {
+        display: d,
+        inter: {
+          x, y, width: w, height: h,
+        },
+        area: w * h,
+      };
+    }
+    return null;
+  }).filter(Boolean);
 
-  const croppedBuffer = await cropImage(display.rawBuffer, display.width, display.height, localRect);
+  if (overlaps.length === 0) throw new Error('选区超出了显示范围。');
 
-  let finalBuffer = croppedBuffer;
-  if (preserveHdr) {
-    finalBuffer = await toneMap(croppedBuffer, localRect.width, localRect.height, { preserveHdrMetadata: true });
+  // 2. 目标比例
+  overlaps.sort((a, b) => b.area - a.area);
+  const targetScale = overlaps[0].display.scaleFactor || 1.0;
+  const targetWidth = Math.round(rect.width * targetScale);
+  const targetHeight = Math.round(rect.height * targetScale);
+
+  const finalBuffer = Buffer.alloc(targetWidth * targetHeight * 4);
+
+  // 3. 混合
+  for (const { display, inter } of overlaps) {
+    const scale = display.scaleFactor || 1.0;
+    const srcRect = {
+      x: Math.round((inter.x - display.bounds.x) * scale),
+      y: Math.round((inter.y - display.bounds.y) * scale),
+      width: Math.round(inter.width * scale),
+      height: Math.round(inter.height * scale),
+    };
+
+    let chunk = await nativeAddon.cropImage(display.buffer, display.width, display.height, srcRect);
+    let chunkWidth = srcRect.width;
+    let chunkHeight = srcRect.height;
+
+    if (Math.abs(scale - targetScale) > 0.01) {
+      const resizedWidth = Math.round(inter.width * targetScale);
+      const resizedHeight = Math.round(inter.height * targetScale);
+      chunk = await nativeAddon.resizeImage(chunk, chunkWidth, chunkHeight, resizedWidth, resizedHeight);
+      chunkWidth = resizedWidth;
+      chunkHeight = resizedHeight;
+    }
+
+    const destX = Math.round((inter.x - rect.x) * targetScale);
+    const destY = Math.round((inter.y - rect.y) * targetScale);
+
+    for (let row = 0; row < chunkHeight; row++) {
+      const targetRow = destY + row;
+      if (targetRow >= targetHeight) break;
+      const srcOffset = row * chunkWidth * 4;
+      const destOffset = (targetRow * targetWidth + destX) * 4;
+      const rowLength = Math.min(chunkWidth, targetWidth - destX) * 4;
+      if (rowLength > 0) chunk.copy(finalBuffer, destOffset, srcOffset, srcOffset + rowLength);
+    }
   }
 
-  const encodedData = await encodeImage(finalBuffer, localRect.width, localRect.height, format);
+  // 4. 后处理 - 直接编码，跳过 ToneMap 因为输入已经是 SDR
+  const encodedData = await encodeImage(finalBuffer, targetWidth, targetHeight, format);
 
   if (savePath) {
     const fs = await import('node:fs/promises');

@@ -167,13 +167,17 @@ const preCaptureAllScreens = async () => {
 
   const capturePromises = nativeDisplays.map(async (nd) => {
     try {
-      logger.info(`正在捕获显示器 ID=${nd.id} (${nd.width}x${nd.height})`);
-      const buffer = await capture.captureDisplay(nd.id);
+      logger.info(`正在捕获显示器 ID=${nd.id} (预期 ${nd.width}x${nd.height})`);
+      const {
+        buffer, width, height, is_hdr: isHdr,
+      } = await capture.captureDisplay(nd.id);
 
       if (!buffer || buffer.length === 0) {
         logger.warn(`显示器 ID=${nd.id} 返回的 Buffer 为空`);
         return null;
       }
+
+      logger.info(`显示器 ID=${nd.id} 捕获成功: 实际尺寸 ${width}x${height}, Buffer 长度 ${buffer.length}, IS_HDR: ${isHdr}`);
 
       // 找到包含该 native 显示器中心点的 Electron 显示器，以获取 scaleFactor
       const centerX = nd.x + nd.width / 2;
@@ -188,12 +192,12 @@ const preCaptureAllScreens = async () => {
 
       return {
         displayId: nd.id,
-        rawBuffer: buffer,
-        width: nd.width,
-        height: nd.height,
+        buffer,
+        width,
+        height,
         scaleFactor: ed.scaleFactor,
         bounds: ed.bounds,
-        isHdr: true, // 标记为 HDR 画面
+        isHdr,
       };
     } catch (err) {
       logger.error(`显示器 ID=${nd.id} 捕获发生异常:`, err);
@@ -245,7 +249,7 @@ const startCapture = async (isDebug = false) => {
     capturedScreens = await Promise.all(sessionData.map(async (s) => ({
       displayId: s.displayId,
       bounds: s.bounds,
-      data: await capture.encodeImage(s.rawBuffer, s.width, s.height, 'webp'),
+      data: await capture.encodeImage(s.buffer, s.width, s.height, 'webp'),
     })));
   } else {
     logger.info('Debug 模式：跳过实际截屏，提供空数据以启动 UI');
@@ -277,8 +281,27 @@ const startCapture = async (isDebug = false) => {
     }
   }).filter(Boolean);
 
+  const {
+    displays: allDisplays, minX, minY, width: totalWidth, height: totalHeight,
+  } = getAllDisplaysBounds();
+
+  // 为每个显示器添加独立的自动选区候选
+  allDisplays.forEach((d, idx) => {
+    windows.push({
+      handle: 0,
+      title: `显示器 ${idx + 1} (${d.bounds.width}x${d.bounds.height})`,
+      class_name: 'Display',
+      left: d.bounds.x,
+      top: d.bounds.y,
+      right: d.bounds.x + d.bounds.width,
+      bottom: d.bounds.y + d.bounds.height,
+      width: d.bounds.width,
+      height: d.bounds.height,
+    });
+  });
+
   if (windows.length > 0) {
-    logger.info(`坐标转换后保留 ${windows.length} 个窗口. 第一个窗口: ${windows[0].title}`);
+    logger.info(`坐标转换后保留 ${windows.length} 个项 (含窗口和显示器)`);
   } else {
     logger.warn('未能成功转换任何窗口坐标或搜索结果为空');
   }
@@ -287,20 +310,16 @@ const startCapture = async (isDebug = false) => {
 
   // 发送完整的初始化数据
   overlayWindow.webContents.on('did-finish-load', () => {
-    const {
-      displays, minX, minY, width, height,
-    } = getAllDisplaysBounds();
-
     const initData = {
       isDebug,
       minX,
       minY,
-      width,
-      height,
+      width: totalWidth,
+      height: totalHeight,
       capturedScreens,
       cursorPos,
       windows, // 发送窗口数据
-      displays: displays.map((d) => ({
+      displays: allDisplays.map((d) => ({
         id: d.id,
         bounds: d.bounds,
       })),
