@@ -157,9 +157,12 @@ pub fn resize_image(
     Ok(resized.to_rgba8().into_raw().into())
 }
 
-/// 处理 F16 格式的一行数据 (使用 OBS 风格的 maxRGB Tone Mapping)
+/// 处理 F16 格式的一行数据 (根据配置决定使用 Tone Mapping 或简单 Clip)
 pub fn process_f16_row(src: &[u16], dest: &mut Vec<u8>, hdr_options: Option<&crate::HdrMappingOptions>) {
     // 从配置中提取 nits 参数，使用默认值作为回退
+    let mapping_enabled = hdr_options
+        .and_then(|o| o.enabled)
+        .unwrap_or(true);
     let sdr_white_nits = hdr_options
         .and_then(|o| o.sdr_white_nits)
         .unwrap_or(203.0) as f32;
@@ -173,8 +176,13 @@ pub fn process_f16_row(src: &[u16], dest: &mut Vec<u8>, hdr_options: Option<&cra
         let g_linear = f16_to_linear(pixel[1]);
         let b_linear = f16_to_linear(pixel[2]);
         
-        // 使用 OBS 风格的 maxRGB Tone Mapping，传入可配置的 nits 参数
-        let (r_sdr, g_sdr, b_sdr) = hdr_to_sdr_maxrgb_with_params(r_linear, g_linear, b_linear, sdr_white_nits, hdr_max_nits);
+        let (r_sdr, g_sdr, b_sdr) = if mapping_enabled {
+            // 使用 OBS 风格的 maxRGB Tone Mapping
+            hdr_to_sdr_maxrgb_with_params(r_linear, g_linear, b_linear, sdr_white_nits, hdr_max_nits)
+        } else {
+            // 不进行 Tone Mapping，仅根据 SDR 白点进行简单的裁剪
+            hdr_to_sdr_simple_clamp(r_linear, g_linear, b_linear, sdr_white_nits)
+        };
         
         dest.push(r_sdr);
         dest.push(g_sdr);
@@ -186,6 +194,9 @@ pub fn process_f16_row(src: &[u16], dest: &mut Vec<u8>, hdr_options: Option<&cra
 /// 处理 10bit (R10G10B10A2) 格式的一行数据
 pub fn process_10bit_row(src: &[u32], dest: &mut Vec<u8>, is_hdr: bool, hdr_options: Option<&crate::HdrMappingOptions>) {
     // 从配置中提取 nits 参数
+    let mapping_enabled = hdr_options
+        .and_then(|o| o.enabled)
+        .unwrap_or(true);
     let sdr_white_nits = hdr_options
         .and_then(|o| o.sdr_white_nits)
         .unwrap_or(203.0) as f32;
@@ -200,9 +211,12 @@ pub fn process_10bit_row(src: &[u32], dest: &mut Vec<u8>, is_hdr: bool, hdr_opti
         let b_raw = ((pixel >> 20) & 0x3FF) as f32 / 1023.0;
         
         if is_hdr {
-            // HDR 模式：10bit 数据通常是 PQ 或线性编码
-            // 进行 HDR -> SDR 映射，使用可配置的 nits 参数
-            let (r_sdr, g_sdr, b_sdr) = hdr_to_sdr_maxrgb_with_params(r_raw, g_raw, b_raw, sdr_white_nits, hdr_max_nits);
+            // HDR 模式
+            let (r_sdr, g_sdr, b_sdr) = if mapping_enabled {
+                hdr_to_sdr_maxrgb_with_params(r_raw, g_raw, b_raw, sdr_white_nits, hdr_max_nits)
+            } else {
+                hdr_to_sdr_simple_clamp(r_raw, g_raw, b_raw, sdr_white_nits)
+            };
             dest.push(r_sdr);
             dest.push(g_sdr);
             dest.push(b_sdr);
@@ -214,6 +228,22 @@ pub fn process_10bit_row(src: &[u32], dest: &mut Vec<u8>, is_hdr: bool, hdr_opti
         }
         dest.push(255);
     }
+}
+
+/// 简单的 HDR 到 SDR 裁剪转换 (不使用 Tone Mapping)
+/// 仅根据 SDR 白点缩放并截断超过部分
+fn hdr_to_sdr_simple_clamp(r: f32, g: f32, b: f32, sdr_white_nits: f32) -> (u8, u8, u8) {
+    let sdr_white = sdr_white_nits / 80.0;
+    
+    let r_mapped = (r / sdr_white).clamp(0.0, 1.0);
+    let g_mapped = (g / sdr_white).clamp(0.0, 1.0);
+    let b_mapped = (b / sdr_white).clamp(0.0, 1.0);
+    
+    let r_srgb = linear_to_srgb(r_mapped);
+    let g_srgb = linear_to_srgb(g_mapped);
+    let b_srgb = linear_to_srgb(b_mapped);
+    
+    ((r_srgb * 255.0) as u8, (g_srgb * 255.0) as u8, (b_srgb * 255.0) as u8)
 }
 
 /// OBS 风格的 maxRGB HDR 到 SDR 色调映射 (使用可配置的 nits 参数)
