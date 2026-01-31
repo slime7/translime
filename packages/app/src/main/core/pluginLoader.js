@@ -1,14 +1,16 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import zlib from 'node:zlib';
+import { pipeline } from 'node:stream/promises';
 import {
   app,
   clipboard,
   Menu,
-  utilityProcess,
+  net,
 } from 'electron';
 import EventEmitter from 'node:events';
-import { createRequire } from 'node:module';
+import Module, { createRequire } from 'node:module';
 import * as tar from 'tar';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../utils/useMainStore';
@@ -16,6 +18,7 @@ import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
 
 const requireFresh = createRequire(import.meta.url);
+
 const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
 const PLUGIN_DIR_DEV = path.join(APPDATA_PATH, 'plugins_dev');
@@ -23,17 +26,7 @@ const PLUGIN_JSON_PATH = path.join(PLUGIN_DIR, 'package.json');
 const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
 const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
 const PLUGIN_PACKAGE_DIR = path.join(PLUGIN_DIR, 'package');
-const NPM_EXEC_PATH = import.meta.env.DEV
-  ? path.join(mainStore.ROOT, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')
-  : path.join(
-    mainStore.ROOT,
-    '..',
-    'app.asar.unpacked',
-    'node_modules',
-    'npm',
-    'bin',
-    'npm-cli.js',
-  );
+const TEMP_NODE_DIR = path.join(app.getPath('temp'), 'translime-node-cache');
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(
   isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH,
@@ -158,77 +151,152 @@ const readPlugin = (pluginPath, devPlugins = null) => {
   return plugin;
 };
 
-const execNpmCommand = (cmd, module, options = {}) => {
-  const internalOptions = {
-    ...{
-      registry: mainStore.config.get(
-        'setting.registry',
-        'https://registry.npmmirror.com/',
-      ),
-    },
-    ...options,
-  };
-  const args = [cmd];
-  if (cmd === 'install') {
-    args.push(
-      ...[
-        '--no-progress',
-        '--no-prune',
-        '--install-strategy=shallow',
-        '--ignore-scripts',
-        '--legacy-peer-deps',
-      ],
-    );
-  }
-  if (cmd === 'uninstall') {
-    args.push(
-      ...[
-        '--no-progress',
-        '--no-prune',
-        '--install-strategy=shallow',
-        '--ignore-scripts',
-        '--legacy-peer-deps',
-      ],
-    );
-  }
-  if (internalOptions.registry) {
-    args.push(`--registry=${internalOptions.registry}`);
-  }
-  if (internalOptions.proxy) {
-    args.push(`--proxy=${internalOptions.proxy}`);
-  }
-  args.push(module);
-  return new Promise((resolve) => {
-    const npm = utilityProcess.fork(NPM_EXEC_PATH, args, {
-      cwd: PLUGIN_DIR,
-      stdio: 'pipe',
-      serviceName: 'npm',
-    });
+/**
+ * 获取当前配置的 npm registry 地址
+ * @returns {string} registry URL
+ */
+const getRegistry = () => mainStore.config.get(
+  'setting.registry',
+  'https://registry.npmmirror.com/',
+).replace(/\/$/, '');
 
-    let output = '';
-    npm.stdout?.on('data', (data) => {
-      const text = data.toString();
-      output += text;
-      process.stdout.write(text);
-    });
+/**
+ * 从 npm registry 获取包的元数据
+ * @param {string} packageName - 包名
+ * @param {string} [version] - 可选版本号，默认获取 latest
+ * @returns {Promise<{version: string, tarball: string}>} 包版本和 tarball URL
+ */
+const fetchPackageMetadata = (packageName, version) => new Promise((resolve, reject) => {
+  const registry = getRegistry();
+  const url = version
+    ? `${registry}/${packageName}/${version}`
+    : `${registry}/${packageName}/latest`;
 
-    npm.stderr?.on('data', (data) => {
-      const text = data.toString();
-      output += text;
-      process.stderr.write(text);
-    });
+  logger.debug('[plugin] 获取包元数据', { url });
 
-    npm.on('exit', (code) => {
-      if (!code) {
-        resolve({ code: 0, data: output });
-      } else if (code && output.indexOf('code E404') > -1) {
-        resolve({ code, data: `插件"${module}"不存在` });
-      } else {
-        resolve({ code, data: output });
+  const request = net.request({ method: 'GET', url });
+
+  request.on('response', (response) => {
+    if (response.statusCode === 404) {
+      reject(new Error(`插件"${packageName}"不存在`));
+      return;
+    }
+    if (response.statusCode !== 200) {
+      reject(new Error(`获取包信息失败: HTTP ${response.statusCode}`));
+      return;
+    }
+
+    const chunks = [];
+    response.on('data', (chunk) => chunks.push(chunk));
+    response.on('end', () => {
+      try {
+        const data = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+        resolve({
+          version: data.version,
+          tarball: data.dist?.tarball,
+        });
+      } catch (err) {
+        reject(new Error('解析包元数据失败'));
       }
     });
-    logger.debug('[plugin] npm 执行参数', { args: [NPM_EXEC_PATH, ...args] });
+    response.on('error', reject);
   });
+
+  request.on('error', reject);
+  request.end();
+});
+
+/**
+ * 下载 tarball 文件到指定路径
+ * @param {string} tarballUrl - tarball 下载地址
+ * @param {string} destPath - 目标文件路径
+ * @returns {Promise<void>}
+ */
+const downloadTarball = (tarballUrl, destPath) => new Promise((resolve, reject) => {
+  logger.debug('[plugin] 下载 tarball', { url: tarballUrl, dest: destPath });
+
+  const request = net.request({ method: 'GET', url: tarballUrl });
+
+  request.on('response', (response) => {
+    // 处理重定向
+    if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+      const redirectUrl = Array.isArray(response.headers.location)
+        ? response.headers.location[0]
+        : response.headers.location;
+      downloadTarball(redirectUrl, destPath).then(resolve).catch(reject);
+      return;
+    }
+
+    if (response.statusCode !== 200) {
+      reject(new Error(`下载失败: HTTP ${response.statusCode}`));
+      return;
+    }
+
+    const writeStream = fs.createWriteStream(destPath);
+    response.on('data', (chunk) => writeStream.write(chunk));
+    response.on('end', () => {
+      writeStream.end();
+      writeStream.on('finish', resolve);
+    });
+    response.on('error', (err) => {
+      writeStream.destroy();
+      reject(err);
+    });
+  });
+
+  request.on('error', reject);
+  request.end();
+});
+
+/**
+ * 解压 tarball 到 node_modules 目录
+ * npm 包的 tarball 内容在 package/ 目录下，需要解压到 node_modules/{packageName}/
+ * @param {string} tarballPath - tarball 文件路径
+ * @param {string} packageName - 包名
+ * @returns {Promise<void>}
+ */
+const extractTarball = async (tarballPath, packageName) => {
+  const destDir = path.join(PLUGIN_MODULES_PATH, packageName);
+
+  // 确保目标目录存在
+  await fsp.mkdir(destDir, { recursive: true });
+
+  logger.debug('[plugin] 解压 tarball', { src: tarballPath, dest: destDir });
+
+  // 使用 pipeline 处理流
+  await pipeline(
+    fs.createReadStream(tarballPath),
+    zlib.createGunzip(),
+    tar.extract({
+      cwd: destDir,
+      strip: 1, // 去掉 tarball 中的 package/ 前缀
+    }),
+  );
+};
+
+/**
+ * 更新 package.json 中的 dependencies
+ * @param {string} packageName - 包名
+ * @param {string} version - 版本号
+ * @param {'add' | 'remove'} action - 操作类型
+ * @returns {Promise<void>}
+ */
+const updatePluginDependency = async (packageName, version, action) => {
+  const pkgContent = await fsp.readFile(PLUGIN_JSON_PATH, 'utf-8');
+  const pkg = JSON.parse(pkgContent);
+
+  if (!pkg.dependencies) {
+    pkg.dependencies = {};
+  }
+
+  if (action === 'add') {
+    pkg.dependencies[packageName] = version;
+  } else if (action === 'remove') {
+    delete pkg.dependencies[packageName];
+  }
+
+  await fsp.writeFile(PLUGIN_JSON_PATH, JSON.stringify(pkg, null, 2), 'utf-8');
+  logger.debug('[plugin] 更新 package.json', { packageName, version, action });
 };
 
 const processPlugin = (plugin) => {
@@ -238,8 +306,77 @@ const processPlugin = (plugin) => {
   }
 };
 
+/**
+ * 递归安装依赖
+ * 注意：由于缺乏 semver 解析，目前仅支持安装依赖的 latest 版本
+ * 且采用扁平化安装到 plugins/node_modules
+ * @param {object} dependencies - 依赖对象 { name: version }
+ * @param {Set<string>} installed - 已安装的包集合，防止循环依赖
+ */
+const installDependencies = async (dependencies, installed = new Set()) => {
+  if (!dependencies) return;
+  const deps = Object.keys(dependencies);
+
+  // 串行安装以避免并发冲突
+  /* eslint-disable no-restricted-syntax, no-await-in-loop, no-continue */
+  for (const name of deps) {
+    if (installed.has(name)) continue;
+
+    const destDir = path.join(PLUGIN_MODULES_PATH, name);
+    installed.add(name); // 标记为已处理，防止循环
+
+    try {
+      await fsp.access(destDir);
+      // 如果已存在，继续递归检查其依赖（可能是之前安装的）
+      const pkgPath = path.join(destDir, 'package.json');
+      try {
+        const pkgContent = await fsp.readFile(pkgPath, 'utf8');
+        const pkg = JSON.parse(pkgContent);
+        await installDependencies(pkg.dependencies, installed);
+      } catch (e) {
+        // ignore
+      }
+      continue;
+    } catch {
+      // 目录不存在，需要安装
+    }
+
+    try {
+      logger.debug(`[plugin] 正在安装依赖: ${name}`);
+      // 默认获取 latest
+      const metadata = await fetchPackageMetadata(name);
+      if (metadata.tarball) {
+        const tarballPath = path.join(PLUGIN_PACKAGE_DIR, `${name}-${metadata.version}.tgz`);
+
+        // 如果 tarball 不存在则下载
+        try {
+          await fsp.access(tarballPath);
+        } catch {
+          await downloadTarball(metadata.tarball, tarballPath);
+        }
+
+        await extractTarball(tarballPath, name);
+
+        // 递归安装子依赖
+        const depPkgPath = path.join(destDir, 'package.json');
+        try {
+          const depPkgContent = await fsp.readFile(depPkgPath, 'utf8');
+          const depPkg = JSON.parse(depPkgContent);
+          await installDependencies(depPkg.dependencies, installed);
+        } catch (e) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      logger.warn(`[plugin] 依赖 ${name} 安装失败: ${e.message}`);
+    }
+  }
+};
+
 class PluginLoader extends EventEmitter {
   init() {
+    this.cleanTempNodeFiles();
+    this.setupNodeLoaderHack();
     this.plugins = [];
     fs.access(PLUGIN_JSON_PATH, fs.constants.F_OK, (err) => {
       if (err) {
@@ -254,11 +391,6 @@ class PluginLoader extends EventEmitter {
         } catch (aErr) {
           fs.mkdirSync(PLUGIN_DIR);
         }
-        try {
-          fs.accessSync(PLUGIN_PACKAGE_DIR);
-        } catch (aErr) {
-          fs.mkdirSync(PLUGIN_PACKAGE_DIR);
-        }
         fs.writeFileSync(
           PLUGIN_JSON_PATH,
           JSON.stringify(pkg, null, 2),
@@ -266,6 +398,12 @@ class PluginLoader extends EventEmitter {
         );
       }
     });
+
+    try {
+      fs.accessSync(PLUGIN_PACKAGE_DIR);
+    } catch (err) {
+      fs.mkdirSync(PLUGIN_PACKAGE_DIR);
+    }
 
     try {
       fs.accessSync(PLUGIN_DIR_DEV);
@@ -331,7 +469,6 @@ class PluginLoader extends EventEmitter {
   }
 
   enablePlugins(plugins) {
-    // eslint-disable-next-line no-restricted-syntax
     for (const plugin of plugins) {
       this.plugins.push(plugin);
       if (plugin.enabled) {
@@ -482,33 +619,66 @@ class PluginLoader extends EventEmitter {
     });
   }
 
-  async doInstallCommand(packageName, module) {
-    const result = await execNpmCommand('install', module);
-    if (result.code) {
-      logger.error(`[plugin] 安装插件 ${packageName} 失败`, {
-        error: result.data,
-      });
+  /**
+   * 执行本地 tarball 安装
+   * @param {string} packageName - 包名
+   * @param {string} tarballPath - tarball 文件路径
+   * @param {string} version - 版本号
+   * @returns {Promise<object>} 安装结果
+   */
+  async doInstallFromTarball(packageName, tarballPath, version) {
+    try {
+      // 解压 tarball 到 node_modules
+      await extractTarball(tarballPath, packageName);
+
+      // 读取插件 package.json 并安装依赖
+      const pluginDir = path.join(PLUGIN_MODULES_PATH, packageName);
+      const pkgPath = path.join(pluginDir, 'package.json');
+      try {
+        const pkgContent = await fsp.readFile(pkgPath, 'utf8');
+        const pkg = JSON.parse(pkgContent);
+        // 开始安装依赖，传入新的 Set
+        logger.info(`[plugin] 开始安装 ${packageName} 的依赖...`);
+        await installDependencies(pkg.dependencies, new Set([packageName]));
+      } catch (e) {
+        logger.warn(`[plugin] 读取插件 ${packageName} 信息或安装依赖失败: ${e.message}`);
+      }
+
+      // 更新 package.json
+      await updatePluginDependency(packageName, version, 'add');
+
+      // 启用新插件并加入到 this.plugins
+      const plugin = this.enablePlugin(packageName);
+      this.plugins.push(plugin);
+      this.emit('plugin:installed', { plugin, pluginId: packageName });
+
+      logger.info(`[plugin] 安装插件 ${packageName}@${version} 成功`);
+      return { success: true, version };
+    } catch (err) {
+      logger.error(`[plugin] 安装插件 ${packageName} 失败`, { error: err.message });
       this.emit('plugin:error', {
         plugin: null,
         pluginId: packageName,
-        error: new Error(result.data),
+        error: err,
         operation: 'install',
       });
-      throw new Error(result.data);
+      throw err;
     }
-    // 启用新插件并加入到 this.plugins
-    const plugin = this.enablePlugin(packageName);
-    this.plugins.push(plugin);
-    this.emit('plugin:installed', { plugin, pluginId: packageName });
-    return result.data;
   }
 
+  /**
+   * 从 npm registry 安装插件
+   * @param {string} packageName - 包名
+   * @param {string} [version] - 可选版本号
+   * @returns {Promise<object>} 安装结果
+   */
   async installPlugin(packageName, version) {
     if (!/^translime-plugin-/.test(packageName)) {
       return Promise.reject(new Error('该包不是这个软件的插件'));
     }
+
+    // 如果已存在相同插件，先卸载
     const prevPlugin = this.getPlugin(packageName);
-    const module = version ? `${packageName}@${version}` : packageName;
     if (prevPlugin) {
       try {
         await this.uninstallPlugin(packageName);
@@ -516,27 +686,51 @@ class PluginLoader extends EventEmitter {
         return Promise.reject(err);
       }
     }
-    return this.doInstallCommand(packageName, module);
+
+    try {
+      // 获取包元数据
+      const metadata = await fetchPackageMetadata(packageName, version);
+      if (!metadata.tarball) {
+        throw new Error('无法获取插件下载地址');
+      }
+
+      // 下载 tarball
+      const tarballFileName = `${packageName}-${metadata.version}.tgz`;
+      const tarballPath = path.join(PLUGIN_PACKAGE_DIR, tarballFileName);
+      await downloadTarball(metadata.tarball, tarballPath);
+
+      // 安装
+      return this.doInstallFromTarball(packageName, tarballPath, metadata.version);
+    } catch (err) {
+      return Promise.reject(err);
+    }
   }
 
+  /**
+   * 从本地 tarball 文件安装插件
+   * @param {string} file - 本地 tarball 文件路径
+   * @returns {Promise<object>} 安装结果
+   */
   async installLocalPlugin(file) {
-    // file 复制到 package 目录内，然后进行安装
+    // 复制 tarball 到 package 目录
     const fileParsed = path.parse(file);
     const pluginPackagePath = path.join(PLUGIN_PACKAGE_DIR, fileParsed.base);
     try {
-      await fs.copyFileSync(file, pluginPackagePath);
+      await fsp.copyFile(file, pluginPackagePath);
     } catch (err) {
       return Promise.reject(err);
     }
 
+    // 读取包信息
     const pluginPackageInfo = await readPluginPackageInfo(pluginPackagePath);
 
     const packageName = pluginPackageInfo.name;
     if (!/^translime-plugin-/.test(packageName)) {
       return Promise.reject(new Error('该包不是这个软件的插件'));
     }
+
+    // 如果已存在相同插件，先卸载
     const prevPlugin = this.getPlugin(packageName);
-    const module = pluginPackagePath;
     if (prevPlugin) {
       try {
         await this.uninstallPlugin(packageName);
@@ -545,24 +739,43 @@ class PluginLoader extends EventEmitter {
       }
     }
 
-    // return Promise.resolve(pluginPackageInfo);
-    return this.doInstallCommand(packageName, module);
+    // 安装
+    return this.doInstallFromTarball(
+      packageName,
+      pluginPackagePath,
+      pluginPackageInfo.version,
+    );
   }
 
+  /**
+   * 卸载插件
+   * @param {string} packageName - 包名
+   * @returns {Promise<void>}
+   */
   async uninstallPlugin(packageName) {
     this.disablePlugin(packageName, true);
-    const result = await execNpmCommand('uninstall', packageName);
-    if (!result.code) {
+
+    try {
+      const pluginDir = path.join(PLUGIN_MODULES_PATH, packageName);
+
+      // 删除插件目录
+      await fsp.rm(pluginDir, { recursive: true, force: true });
+
+      // 更新 package.json
+      await updatePluginDependency(packageName, null, 'remove');
+
       this.emit('plugin:uninstalled', { plugin: null, pluginId: packageName });
-      return result.data;
+      logger.info(`[plugin] 卸载插件 ${packageName} 成功`);
+    } catch (err) {
+      logger.error(`[plugin] 卸载插件 ${packageName} 失败`, { error: err.message });
+      this.emit('plugin:error', {
+        plugin: null,
+        pluginId: packageName,
+        error: err,
+        operation: 'uninstall',
+      });
+      throw err;
     }
-    this.emit('plugin:error', {
-      plugin: null,
-      pluginId: packageName,
-      error: new Error(result.data),
-      operation: 'uninstall',
-    });
-    throw new Error(result.data);
   }
 
   popPluginMenu(packageName, ipcEv) {
@@ -585,6 +798,16 @@ class PluginLoader extends EventEmitter {
         label: '启用插件',
         visible: !plugin.enabled,
         click() {
+          self.enablePlugin(packageName);
+          ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
+        },
+      },
+      {
+        id: 'restart-plugin',
+        label: '重启插件',
+        visible: plugin.enabled,
+        click() {
+          self.disablePlugin(packageName);
           self.enablePlugin(packageName);
           ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
@@ -678,6 +901,54 @@ class PluginLoader extends EventEmitter {
       plugin.pluginSettingSaved();
     }
     this.emit('plugin:setting-changed', { plugin: plugin || null, pluginId });
+  }
+
+  /* eslint-disable class-methods-use-this, no-underscore-dangle */
+  setupNodeLoaderHack() {
+    const originalLoader = Module._extensions['.node'];
+    Module._extensions['.node'] = (module, filename) => {
+      // 仅针对插件目录下的 .node 文件进行处理
+      const lowerFilename = filename.toLowerCase();
+      if (
+        lowerFilename.startsWith(PLUGIN_DIR.toLowerCase())
+        || lowerFilename.startsWith(PLUGIN_DIR_DEV.toLowerCase())
+      ) {
+        try {
+          // 生成唯一临时文件名，防止冲突
+          const tempFileName = `${path.basename(filename, '.node')}.${Date.now()}.${Math.random().toString(36).slice(2)}.node`;
+          const tempPath = path.join(TEMP_NODE_DIR, tempFileName);
+
+          if (!fs.existsSync(TEMP_NODE_DIR)) {
+            fs.mkdirSync(TEMP_NODE_DIR, { recursive: true });
+          }
+
+          fs.copyFileSync(filename, tempPath);
+          logger.debug(`[plugin] Shadow loaded .node module: ${filename} -> ${tempPath}`);
+          return originalLoader(module, tempPath);
+        } catch (e) {
+          logger.warn(`[plugin] Failed to shadow load .node module: ${filename}`, e);
+        }
+      }
+      return originalLoader(module, filename);
+    };
+  }
+
+  cleanTempNodeFiles() {
+    try {
+      if (fs.existsSync(TEMP_NODE_DIR)) {
+        // 尝试清理旧文件
+        const files = fs.readdirSync(TEMP_NODE_DIR);
+        files.forEach((file) => {
+          try {
+            fs.rmSync(path.join(TEMP_NODE_DIR, file), { force: true });
+          } catch (e) {
+            // ignore
+          }
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 }
 
