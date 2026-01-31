@@ -3,29 +3,48 @@
   "version": "1.0.1",
   "description": "SDK for Translime plugins",
   "type": "module",
-  "main": "src/index.js",
-  "module": "src/index.js",
-  "types": "src/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
-      "types": "./src/index.d.ts",
-      "import": "./src/index.js",
-      "require": "./src/index.js",
-      "default": "./src/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./vite": {
-      "types": "./src/vite-plugin.d.ts",
-      "import": "./src/vite-plugin.js",
-      "require": "./src/vite-plugin.js",
-      "default": "./src/vite-plugin.js"
+      "import": {
+        "types": "./dist/vite-plugin.d.ts",
+        "default": "./dist/vite-plugin.js"
+      },
+      "require": {
+        "types": "./dist/vite-plugin.d.cts",
+        "default": "./dist/vite-plugin.cjs"
+      }
     },
     "./preview": {
-      "import": "./src/preview/main.js",
-      "default": "./src/preview/main.js"
+      "import": {
+        "default": "./dist/preview.js"
+      },
+      "require": {
+        "default": "./dist/preview.cjs"
+      }
     },
     "./preview-mock": {
-      "import": "./src/preview-mock.js",
-      "default": "./src/preview-mock.js"
+      "import": {
+        "default": "./dist/preview-mock.js"
+      },
+      "require": {
+        "default": "./dist/preview-mock.cjs"
+      }
     }
   },
   "author": "slime7",
@@ -37,9 +56,10 @@
     "preview"
   ],
   "scripts": {
-    "generate:types": "node scripts/generate-types.js",
     "lint": "eslint src --ext .js,.vue --fix",
-    "lint:style": "stylelint src/**/*.{vue,scss} --fix"
+    "lint:style": "stylelint src/**/*.{vue,scss} --fix",
+    "build": "vite build && node scripts/post-build.mjs",
+    "prepublishOnly": "npm run build"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -60,6 +80,7 @@
     "@eslint/eslintrc": "^3.0.0",
     "@eslint/js": "^9.0.0",
     "@stylistic/stylelint-plugin": "^3.0.0",
+    "@vitejs/plugin-vue": "^6.0.3",
     "eslint": "^9.0.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.31.0",
@@ -71,6 +92,8 @@
     "stylelint-config-recommended-vue": "^1.5.0",
     "stylelint-config-standard-scss": "^14.0.0",
     "stylelint-scss": "^6.0.0",
+    "vite": "^7.3.1",
+    "vite-plugin-vuetify": "^2.1.1",
     "vuetify": "^3.11.6"
   }
 }

@@ -26,10 +26,10 @@ import PreviewApp from './App.vue';
 export async function startPreview(pluginComponent, options = {}) {
   const { mountId = 'app' } = options;
 
-  // 1. 初始化 mock 环境
+  // 初始化 mock 环境
   initPreviewMock();
 
-  // 2. 创建 Vuetify 实例（与主程序保持一致）
+  // 创建 Vuetify 实例（与主程序保持一致）
   const vuetify = createVuetify({
     components,
     directives,
@@ -173,17 +173,17 @@ export async function startPreview(pluginComponent, options = {}) {
     blueprint: md3,
   });
 
-  // 3. 将 Vuetify 组件和指令注入到 window，供 SDK 使用
+  // 将 Vuetify 组件和指令注入到 window，供 SDK 使用
   window.vuetify$ = {
     instance: vuetify,
     components,
     directives,
   };
 
-  // 4. 设置插件组件到全局变量
+  // 设置插件组件到全局变量
   window.__PREVIEW_PLUGIN_COMPONENT__ = pluginComponent;
 
-  // 5. 创建并挂载应用
+  // 创建并挂载应用
   const app = createApp(PreviewApp);
   app.use(vuetify);
 

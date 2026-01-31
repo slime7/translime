@@ -1,6 +1,7 @@
 /**
  * Translime SDK
- * 提供插件开发所需的标准 API 和类型提示
+ * 提供插件开发所需的标准 API 和类型提示。
+ * 包含主进程 (Main Process) 和渲染进程 (Renderer Process) 的通用接口。
  */
 
 import {
@@ -8,14 +9,22 @@ import {
   initPreviewMock,
 } from './preview-mock.js';
 
-// 在模块加载时自动检测并初始化 preview 模式
-// 这样插件代码无需任何修改即可在 preview 模式下运行
+// ----------------------------------------------------------------------
+// Initialization (Side Effect)
+// ----------------------------------------------------------------------
+
+// 在模块加载时检测并初始化 Preview Mock 环境
+// 确保在 Preview 模式下直接导入 SDK 也能获得 Mock 支持
 if (typeof window !== 'undefined' && checkPreviewMode()) {
   initPreviewMock();
 }
 
+// ----------------------------------------------------------------------
+// Core / Store APIs (Main Process Only)
+// ----------------------------------------------------------------------
+
 /**
- * 检查当前是否为 preview 模式
+ * 检查当前是否为 Preview 模式
  * @returns {boolean}
  */
 export function isPreviewMode() {
@@ -27,11 +36,13 @@ export function isPreviewMode() {
  * @property {Object} config
  * @property {function(string, *): *} config.get
  * @property {function(string, *): void} config.set
+ * @property {Object} [logger]
  */
 
 /**
- * 获取主程序 Store (仅在主进程环境可用)
- * @returns {MainStore|null}
+ * 获取主程序 Store
+ * @description 仅在 **主进程 (Main Process)** 环境可用
+ * @returns {MainStore|null} 若在非主进程环境调用，返回 null
  */
 export function getMainStore() {
   if (typeof global !== 'undefined' && global.mainStore) {
@@ -41,8 +52,9 @@ export function getMainStore() {
 }
 
 /**
- * 获取插件配置代理
- * @param {string} pluginId 插件 ID
+ * 使用插件配置代理
+ * @description 获取针对特定插件的配置读写对象
+ * @param {string} pluginId 插件 ID (通常与 package.json 中的 name 一致)
  * @returns {{ get: function(string, *): *, set: function(string, *): void }}
  */
 export function usePluginConfig(pluginId) {
@@ -57,9 +69,14 @@ export function usePluginConfig(pluginId) {
   };
 }
 
+// ----------------------------------------------------------------------
+// UI & Renderer APIs (Renderer Process Only)
+// ----------------------------------------------------------------------
+
 /**
- * 获取 IPC 工具 (仅在渲染进程环境可用)
- * @returns {Object}
+ * 获取 IPC 通信工具
+ * @description 仅在 **渲染进程 (Renderer Process)** 环境可用
+ * @returns {Object|null} 包含 invoke, send, on 等方法的对象
  */
 export function useIpc() {
   if (typeof window !== 'undefined' && window.electron?.useIpc) {
@@ -69,8 +86,9 @@ export function useIpc() {
 }
 
 /**
- * 获取 Vuetify 实例和组件 (仅在渲染进程环境可用)
- * @returns {Object}
+ * 获取 Vuetify 实例
+ * @description 仅在 **渲染进程** 环境可用，用于访问 Vuetify 的全局配置
+ * @returns {Object} Vuetify 实例对象
  */
 export function useVuetify() {
   if (typeof window !== 'undefined' && window.vuetify$) {
@@ -80,7 +98,7 @@ export function useVuetify() {
 }
 
 /**
- * 获取 Vuetify 组件
+ * 获取全局注册的 Vuetify 组件
  * @returns {Record<string, any>}
  */
 export function useVuetifyComponents() {
@@ -88,7 +106,7 @@ export function useVuetifyComponents() {
 }
 
 /**
- * 获取 Vuetify 指令
+ * 获取全局注册的 Vuetify 指令
  * @returns {Record<string, any>}
  */
 export function useVuetifyDirectives() {
@@ -96,8 +114,9 @@ export function useVuetifyDirectives() {
 }
 
 /**
- * 助手函数：获取 Electron 提供的对话框 API
- * @returns {Object}
+ * 获取 Dialog API
+ * @description 类似于 Electron 的 dialog 模块 (showOpenDialog, showSaveDialog 等)
+ * @returns {Object|null}
  */
 export function useDialog() {
   if (typeof window !== 'undefined' && window.electron?.dialog) {
@@ -107,8 +126,9 @@ export function useDialog() {
 }
 
 /**
- * 助手函数：获取 Shell API
- * @returns {Object}
+ * 获取 Shell API
+ * @description 类似于 Electron 的 shell 模块 (openExternal, showItemInFolder 等)
+ * @returns {Object|null}
  */
 export function useShell() {
   if (typeof window !== 'undefined' && window.electron?.shell) {
@@ -118,7 +138,8 @@ export function useShell() {
 }
 
 /**
- * 获取插件设置 (仅在渲染进程环境可用)
+ * 获取插件自身设置 (IPC 封装)
+ * @description 仅在 **渲染进程** 环境可用。这是 `plugin.settings` 的前端读取接口。
  * @param {...any} args
  * @returns {Promise<any>}
  */
@@ -130,7 +151,8 @@ export async function getPluginSetting(...args) {
 }
 
 /**
- * 设置插件设置 (仅在渲染进程环境可用)
+ * 更新插件自身设置 (IPC 封装)
+ * @description 仅在 **渲染进程** 环境可用。
  * @param {...any} args
  * @returns {Promise<any>}
  */
@@ -142,8 +164,9 @@ export async function setPluginSetting(...args) {
 }
 
 /**
- * 获取窗口控制工具 (仅在渲染进程环境可用)
- * @returns {Object}
+ * 获取窗口控制工具
+ * @description 包含 minimize, maximize, close 等窗口操作
+ * @returns {Object|null}
  */
 export function useWindowControl() {
   if (typeof window !== 'undefined' && window.ts?.windowControl) {
@@ -152,9 +175,13 @@ export function useWindowControl() {
   return null;
 }
 
+// ----------------------------------------------------------------------
+// Utilities (Shared)
+// ----------------------------------------------------------------------
+
 /**
- * 获取剪贴板工具 (仅在渲染进程环境可用)
- * @returns {Object}
+ * 获取剪贴板工具
+ * @returns {Object|null}
  */
 export function useClipboard() {
   if (typeof window !== 'undefined' && window.electron?.clipboard) {
@@ -164,9 +191,9 @@ export function useClipboard() {
 }
 
 /**
- * 在浏览器中打开链接 (仅在渲染进程环境可用)
- * @param {...any} args
- * @returns {Promise<any>}
+ * 在默认浏览器中打开链接
+ * @param {string} url 要打开的链接
+ * @returns {Promise<void>}
  */
 export async function openLink(...args) {
   if (typeof window !== 'undefined' && window.electron?.openLink) {
@@ -176,8 +203,9 @@ export async function openLink(...args) {
 }
 
 /**
- * 获取日志工具 (多端适配)
- * @returns {Record<'log'|'info'|'warn'|'error'|'debug', Function>}
+ * 获取日志工具
+ * @description 自动适配 Node.js 环境 (Main) 或浏览器环境 (Renderer)
+ * @returns {Record<'log'|'info'|'warn'|'error'|'debug', Function>} Console-like logger
  */
 export function useLogger() {
   if (typeof global !== 'undefined' && global.mainStore) {
@@ -188,3 +216,4 @@ export function useLogger() {
   }
   return console;
 }
+
