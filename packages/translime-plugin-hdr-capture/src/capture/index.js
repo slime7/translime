@@ -7,6 +7,73 @@ const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Capture' }) : baseLogger;
 
+/**
+ * 对应 RGBA Buffer 应用圆角遮罩 (原地修改)
+ * @param {Buffer} buffer - RGBA 图像数据
+ * @param {number} width - 图像宽度
+ * @param {number} height - 图像高度
+ * @param {number} radius - 圆角半径 (像素)
+ */
+
+function applyBorderRadius(buffer, width, height, radius) {
+  if (radius <= 0) return;
+
+  // 限制半径不超过最小边的一半
+  const r = Math.min(radius, Math.floor(width / 2), Math.floor(height / 2));
+  if (r <= 0) return;
+
+  // 检查像素是否在圆角外 (相对于圆心)
+  // 如果 dist > r，则在外侧 -> 透明
+  // 如果 dist 在 r-0.5 到 r+0.5 之间 -> 抗锯齿 alpha
+  const processPixel = (x, y, cx, cy) => {
+    const distSq = (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2;
+    // 快速检查
+    if (distSq < (r - 1) ** 2) return; // 肯定在圆内
+
+    const dist = Math.sqrt(distSq);
+    const offset = (y * width + x) * 4;
+
+    if (dist > r + 0.5) {
+      // 完全透明
+      // eslint-disable-next-line no-param-reassign
+      buffer[offset + 3] = 0;
+    } else if (dist > r - 0.5) {
+      // 边缘抗锯齿
+      const alpha = 1 - (dist - (r - 0.5));
+      // eslint-disable-next-line no-param-reassign
+      buffer[offset + 3] = Math.round(buffer[offset + 3] * alpha);
+    }
+  };
+
+  // 左上
+  for (let y = 0; y < r; y += 1) {
+    for (let x = 0; x < r; x += 1) {
+      processPixel(x, y, r, r);
+    }
+  }
+
+  // 右上
+  for (let y = 0; y < r; y += 1) {
+    for (let x = width - r; x < width; x += 1) {
+      processPixel(x, y, width - r, r);
+    }
+  }
+
+  // 左下
+  for (let y = height - r; y < height; y += 1) {
+    for (let x = 0; x < r; x += 1) {
+      processPixel(x, y, r, height - r);
+    }
+  }
+
+  // 右下
+  for (let y = height - r; y < height; y += 1) {
+    for (let x = width - r; x < width; x += 1) {
+      processPixel(x, y, width - r, height - r);
+    }
+  }
+}
+
 // 加载 native addon
 // NAPI-RS 生成的 index.js 已内置完整的跨平台加载逻辑
 let nativeAddon;
@@ -293,6 +360,12 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
     }
   });
 
+  // 应用圆角 (如果有)
+  if (rect.borderRadius && rect.borderRadius > 0) {
+    const radius = Math.round(rect.borderRadius * targetScale);
+    applyBorderRadius(finalBuffer, targetWidth, targetHeight, radius);
+  }
+
   try {
     const result = await encodeImage(finalBuffer, targetWidth, targetHeight, 'png');
     return result;
@@ -394,6 +467,12 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
       }
     }
   });
+
+  // 应用圆角 (如果有)
+  if (rect.borderRadius && rect.borderRadius > 0) {
+    const radius = Math.round(rect.borderRadius * targetScale);
+    applyBorderRadius(finalBuffer, targetWidth, targetHeight, radius);
+  }
 
   // 后处理 - 直接编码，跳过 ToneMap 因为输入已经是 SDR
   const encodedData = await encodeImage(finalBuffer, targetWidth, targetHeight, format);
@@ -501,3 +580,4 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
   }
   return null;
 };
+

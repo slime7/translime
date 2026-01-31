@@ -50,7 +50,38 @@ watchEffect(() => {
   }
 
   if (hole) {
-    ctx.clearRect(hole.x, hole.y, hole.w, hole.h);
+    const {
+      x, y, w, h,
+    } = hole;
+    // Use borderRadius from state only if it matches current selection
+    // Note: highlightedWindow doesn't support radius yet unless we want it to
+    const r = (props.state.isSelecting || props.state.hasSelection)
+      ? (props.state.borderRadius || 0)
+      : 0;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+
+    // Use standard roundRect if available (Chrome 99+)
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      // Fallback
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+
+    ctx.fillStyle = 'black';
+    ctx.fill();
+    ctx.restore();
   }
 });
 
@@ -90,7 +121,8 @@ const onHandleMouseDown = (direction) => {
         left: bounds.x + 'px',
         top: bounds.y + 'px',
         width: bounds.w + 'px',
-        height: bounds.h + 'px'
+        height: bounds.h + 'px',
+        borderRadius: (state.borderRadius || 0) + 'px'
       }"
     >
       <div

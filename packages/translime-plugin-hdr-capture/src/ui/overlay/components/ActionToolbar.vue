@@ -25,6 +25,10 @@ const showSizeSettings = ref(false);
 const widthInput = ref(0);
 const heightInput = ref(0);
 
+// 圆角设置相关状态
+const showRadiusSettings = ref(false);
+const radiusInput = ref(0);
+
 // 监听选区变化，同步到输入框
 watch(() => props.bounds, (newBounds) => {
   if (!newBounds) return;
@@ -34,12 +38,36 @@ watch(() => props.bounds, (newBounds) => {
   heightInput.value = Math.round(newBounds.h || 0);
 }, { immediate: true });
 
+// 同步圆角设置
+watch(() => state.borderRadius, (val) => {
+  radiusInput.value = val || 0;
+}, { immediate: true });
+
+// 监听 radiusInput 变化并应用到 state (实时预览)
+watch(radiusInput, (val) => {
+  const r = Math.max(0, Math.min(120, parseInt(val, 10) || 0));
+  if (state.borderRadius !== r) {
+    state.borderRadius = r;
+  }
+});
+
 const toggleSizeSettings = () => {
   showSizeSettings.value = !showSizeSettings.value;
+  if (showSizeSettings.value) {
+    showRadiusSettings.value = false; // 互斥
+  }
   if (showSizeSettings.value && props.bounds) {
     // 重新从 bounds 获取一次，确保是最新的
     widthInput.value = Math.round(props.bounds.w || 0);
     heightInput.value = Math.round(props.bounds.h || 0);
+  }
+};
+
+const toggleRadiusSettings = () => {
+  showRadiusSettings.value = !showRadiusSettings.value;
+  if (showRadiusSettings.value) {
+    showSizeSettings.value = false; // 互斥
+    radiusInput.value = state.borderRadius || 0;
   }
 };
 
@@ -76,8 +104,9 @@ const handleKeydown = (e) => {
   // Esc 取消 (全局有效，用于关闭截图或清除选区)
   if (e.key === 'Escape') {
     // 如果正在输入尺寸，先关闭尺寸栏或失去焦点
-    if (showSizeSettings.value) {
+    if (showSizeSettings.value || showRadiusSettings.value) {
       showSizeSettings.value = false;
+      showRadiusSettings.value = false;
       e.preventDefault();
       return;
     }
@@ -121,13 +150,17 @@ const toolbarPos = computed(() => {
   };
 
   // 基础工具栏尺寸
+  // 基础工具栏尺寸
   const tbWidth = 140;
-  let tbHeight = 36;
+  // 始终预留次级菜单的高度 (36 + 40)，防止展开时主菜单位置跳动
+  const tbHeight = 76;
 
+  /*
   // 如果显示尺寸设置栏，高度增加
-  if (showSizeSettings.value) {
+  if (showSizeSettings.value || showRadiusSettings.value) {
     tbHeight += 40;
   }
+  */
 
   const spacing = 8;
   const margin = 12;
@@ -258,6 +291,35 @@ const debugLine = computed(() => {
             </svg>
           </button>
 
+          <!-- 设置圆角按钮 -->
+          <button
+            class="btn btn-settings"
+            :class="{ 'active': showRadiusSettings }"
+            title="设置圆角"
+            @click.stop="toggleRadiusSettings"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect
+                x="3"
+                y="3"
+                width="18"
+                height="18"
+                rx="5"
+                ry="5"
+              />
+            </svg>
+          </button>
+
           <!-- 分割线 -->
           <div class="divider" />
 
@@ -358,6 +420,29 @@ const debugLine = computed(() => {
         <button class="btn-confirm" @click.stop="applySizeSettings">
           确定
         </button>
+      </div>
+
+      <!-- 圆角设置栏 -->
+      <div v-if="showRadiusSettings" class="size-settings-bar">
+        <div class="radius-settings">
+          <span class="radius-label">圆角半径:</span>
+          <input
+            v-model="radiusInput"
+            type="range"
+            min="0"
+            max="120"
+            class="radius-slider"
+            @mousedown.stop
+          >
+          <input
+            v-model="radiusInput"
+            type="number"
+            class="size-input"
+            style="width: 50px;"
+            @mousedown.stop
+          >
+          <span class="size-unit">px</span>
+        </div>
       </div>
     </div>
   </Teleport>
@@ -508,6 +593,7 @@ const debugLine = computed(() => {
   height: 22px;
   line-height: 18px;
   transition: background .15s;
+  white-space: nowrap;
 }
 
 .btn-confirm:hover {
@@ -516,5 +602,31 @@ const debugLine = computed(() => {
 
 .btn-confirm:active {
   background: #1976d2;
+}
+
+.radius-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  color: #eee;
+  font-size: 13px;
+}
+
+.radius-label {
+  font-size: 12px;
+  color: rgb(255 255 255 / 70%);
+  white-space: nowrap;
+}
+
+.radius-slider {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 30%);
+  outline: none;
+  cursor: pointer;
+  accent-color: #2196f3;
+  width: 100px; /* Force width */
 }
 </style>

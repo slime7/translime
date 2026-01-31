@@ -43,6 +43,9 @@ const state = reactive({
 
   // 调试模式
   isDebug: false,
+
+  // 截图设置
+  borderRadius: 0,
 });
 
 // 计算选区边界 (逻辑坐标)
@@ -147,7 +150,7 @@ const onWheel = (e) => {
 const onResizeStart = (direction) => {
   state.isResizing = true;
   state.resizeDirection = direction;
-
+  // ... (rest of the function is handled by existing code, just use a known anchor)
   const isLeft = state.startX < state.endX;
   const isTop = state.startY < state.endY;
 
@@ -160,6 +163,19 @@ const onResizeStart = (direction) => {
   if (direction.includes('e')) state.resizeActiveX = isLeft ? 'endX' : 'startX';
   if (direction.includes('n')) state.resizeActiveY = isTop ? 'startY' : 'endY';
   if (direction.includes('s')) state.resizeActiveY = isTop ? 'endY' : 'startY';
+};
+
+const onDoubleClick = (e) => {
+  if (e.button !== 0) return;
+  if (state.hasSelection) {
+    const b = selectionBounds.value;
+    const mx = e.clientX;
+    const my = e.clientY;
+    // Check if double click is within selection bounds
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      handleAction('copy');
+    }
+  }
 };
 
 const onMouseDown = (e) => {
@@ -337,6 +353,7 @@ const handleAction = async (type) => {
     y: b.y + state.offsetY,
     width: b.w,
     height: b.h,
+    borderRadius: state.borderRadius,
   };
 
   const baseLogger = window.ts?.logger || console;
@@ -389,6 +406,7 @@ const rootCursor = computed(() => {
     @mousedown="onMouseDown"
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
+    @dblclick="onDoubleClick"
     @wheel="onWheel"
     @contextmenu="onContextMenu"
   >
