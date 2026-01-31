@@ -8,6 +8,11 @@ export interface MainStore {
 }
 
 /**
+ * 检查当前是否为 Preview 模式
+ */
+export function isPreviewMode(): boolean;
+
+/**
  * 获取主程序 Store (仅在主进程环境可用)
  */
 export function getMainStore(): MainStore | null;
@@ -74,3 +79,15 @@ export function useClipboard(): any;
  * 在浏览器中打开链接 (仅在渲染进程环境可用)
  */
 export function openLink(...args: any[]): Promise<any>;
+
+/**
+ * 获取日志工具
+ */
+export function useLogger(): {
+  log(...args: any[]): void;
+  info(...args: any[]): void;
+  warn(...args: any[]): void;
+  error(...args: any[]): void;
+  debug(...args: any[]): void;
+};
+

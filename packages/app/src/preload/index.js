@@ -134,20 +134,25 @@ api.useIpc().invoke(ipcType.GET_PATH, 'userData').then((result) => {
   contextBridge.exposeInMainWorld(apiKey, api);
 });
 
+function createLoggerBase(defaultMeta = {}) {
+  return {
+    log: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'log', { args, meta: defaultMeta }),
+    error: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'error', { args, meta: defaultMeta }),
+    warn: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'warn', { args, meta: defaultMeta }),
+    info: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'info', { args, meta: defaultMeta }),
+    debug: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'debug', { args, meta: defaultMeta }),
+    child: (childMeta) => createLoggerBase({ ...defaultMeta, ...childMeta }),
+  };
+}
 const translime = {
   net: {
     request: (requestId, config) => api.useIpc().invoke(ipcType.NET_REQUEST, { requestId, config }),
     abort: (requestId) => api.useIpc().invoke(ipcType.NET_ABORT, { requestId }),
   },
   // winston logger
-  logger: {
-    log: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'log', args),
-    error: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'error', args),
-    warn: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'warn', args),
-    info: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'info', args),
-    debug: (...args) => api.useIpc().invoke(ipcType.LOGGER, 'debug', args),
-  },
+  logger: createLoggerBase(),
 };
+
 // 快捷接口
 // 获取插件设置
 const getPluginSetting = async (...args) => api.useIpc().invoke(ipcType.GET_PLUGIN_SETTING, ...args);

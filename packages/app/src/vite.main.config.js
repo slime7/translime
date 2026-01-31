@@ -1,7 +1,9 @@
 import { join } from 'node:path';
 import { builtinModules } from 'node:module';
 import { defineConfig } from 'vite';
-import { external } from '../package.json';
+import pkg from '../package.json';
+
+const { external = [] } = pkg;
 
 const PACKAGE_ROOT = join(import.meta.dirname, 'main');
 

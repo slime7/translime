@@ -31,7 +31,6 @@
     "dayjs": "^1.11.9",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.7.3",
-    "npm": "^9.8.0",
     "pinia": "^2.3.1",
     "semver-compare": "^1.0.0",
     "tailwindcss": "^4.1.18",
@@ -73,8 +72,5 @@
     "vite-plugin-vuetify": "^2.1.1",
     "vitest": "^4.0.17",
     "wait-on": "^7.0.1"
-  },
-  "external": [
-    "npm"
-  ]
+  }
 }

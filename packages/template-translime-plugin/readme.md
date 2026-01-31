@@ -262,44 +262,53 @@ const { VBtn, VCard } = useVuetifyComponents();
 
 ## UI 端开发 (Frontend UI)
 
-如果你的插件包含 UI（通过 `ui` 或 `windowUrl` 定义），你可以使用 Translime 注入的全局 API 与主进程或系统进行交互。
+如果你的插件包含 UI（通过 `ui` 或 `windowUrl` 定义），推荐使用 `translime-sdk` 提供的 Hooks 与主进程或系统进行交互。虽然 Translime 在全局对象中注入了 `window.ts` 和 `window.electron`，但使用 SDK 可以获得更好的开发体验和完善的类型支持。
 
-Translime 在全局对象中注入了两个主要的 API 命名空间：`window.electron` 和 `window.ts`。
+### 使用 SDK 开发
 
-### 1. 全局变量 `window.ts` (常用业务接口)
+在 Vue 组件中，你可以通过 `translime-sdk` 轻松访问各种功能。
 
-`window.ts` 提供了一系列用于处理插件业务逻辑的便捷方法：
+#### 1. IPC 通信
+使用 `useIpc()` 来与主进程定义的 `ipcHandlers` 进行交互。这是插件前后端通信的核心。
 
-- **设置管理**
-  - `ts.getPluginSetting(pluginId: string)`: 获取指定插件的设置。
-  - `ts.setPluginSetting(pluginId: string, settings: object)`: 更新指定插件的设置。
-- **网络请求**
-  - `ts.net.request(requestId, config)`: 通过主进程发送网络请求（避开跨域问题）。
-  - `ts.net.abort(requestId)`: 中止请求。
-- **日志记录**
-  - `ts.logger.info(...args)`: 记录日志到系统的日志文件。支持 `log`, `info`, `warn`, `error`, `debug`。
-- **窗口控制**
-  - `ts.windowControl.close(win?)`: 关闭当前窗口（或指定窗口）。
-  - `ts.windowControl.maximize(win?)`: 最大化。
-  - `ts.windowControl.minimize(win?)`: 最小化。
-  - `ts.windowControl.devtools(win?)`: 打开开发者工具。
-- **UI 加载**
-  - `ts.loadPluginUi(pluginPath, type?)`: 加载指定路径的插件 UI 资源。
+```javascript
+import { useIpc } from 'translime-sdk';
 
-### 2. 全局变量 `window.electron` (底层与 IPC)
+const ipc = useIpc();
 
-`window.electron` 提供了更底层的 Electron 接口访问：
+// 调用主进程定义的接口，格式为 'handlerName@pluginId'
+// 注意：必须带上 @pluginId 后缀，以便系统准确路由到对应插件
+const result = await ipc.invoke('test-ipc@my-plugin-id', arg1, arg2);
+```
 
-- **IPC 通信**
-  - `electron.useIpc().invoke(type, ...args)`: **最常用的方法**，用于调用插件在 `index.js` 的 `ipcHandlers` 中定义的接口。
-    > 注意：调用时 `type` 格式通常为 `handlerName@pluginId`。
-  - `electron.useIpc().on(type, callback)`: 监听来自主进程的消息（如 `sendToClient` 发送的消息）。
-  - `electron.useIpc().send(type, data)`: 向主进程发送异步消息。
-- **系统功能**
-  - `electron.clipboard`: 访问系统剪贴板（`readText`, `writeText` 等）。
-  - `electron.dialog`: 访问系统对话框（`showOpenDialog` 等）。
-  - `electron.notification`: 显示系统通知。
-  - `electron.openLink(url)`: 在默认浏览器中打开链接。
-  - `electron.APPDATA_PATH`: 获取应用的数据存储路径。
-- **版本信息**
-  - `electron.versions`: 包含应用依赖的版本信息（electron, node, chrome 等）。
+#### 2. 插件设置管理
+使用 SDK 函数即可读写当前插件的配置。
+
+```javascript
+import { getPluginSetting, setPluginSetting } from 'translime-sdk';
+
+// 获取插件设置
+const settings = await getPluginSetting('my-plugin-id');
+
+// 更新插件设置
+await setPluginSetting('my-plugin-id', { someKey: 'newValue' });
+```
+
+#### 3. 系统原生能力
+SDK 封装了常用的系统操作：
+
+- **窗口控制**：`useWindowControl()` 提供 `close()`, `maximize()`, `minimize()`, `devtools()` 等。
+- **对话框**：`useDialog()` 提供 `showOpenDialog()` 等 Electron 原生对话框。
+- **剪贴板**：`useClipboard()` 提供 `readText()`, `writeText(text)`。
+- **外部链接**：`openLink(url)` 在用户默认浏览器中打开 URL。
+
+---
+
+### 底层 API (可选)
+
+在少数 SDK 未涵盖的情况下，你仍可以访问 Translime 注入的原始接口：
+
+- **`window.ts`**: 提供业务相关的底层接口，如 `ts.net.request` (绕过跨域的网络请求) 和 `ts.logger` (系统日志打印)。
+- **`window.electron`**: 提供 Electron 底层属性，如 `electron.versions` 和 `electron.APPDATA_PATH`。
+
+有关 API 的完整列表和详细参数，请参阅 [Translime SDK 文档](../sdk/README.md)。

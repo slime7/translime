@@ -1,4 +1,9 @@
-import { Menu, nativeImage, Tray } from 'electron';
+import {
+  app,
+  Menu,
+  nativeImage,
+  Tray,
+} from 'electron';
 import icon from '@pkg/share/static/icon.png';
 import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';

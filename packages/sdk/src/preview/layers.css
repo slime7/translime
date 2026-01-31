@@ -1,0 +1,28 @@
+/**
+ * Preview 模式的 CSS layer 顺序声明
+ * 必须在所有其他样式之前导入
+ */
+
+/* 顶层 layer 顺序：vuetify 优先，然后是 tailwind */
+@layer vuetify, tailwind;
+
+/* Vuetify 内部子层级顺序声明 */
+@layer vuetify {
+  @layer reset, base, components, transitions, overrides, theme, utilities;
+}
+
+/* Tailwind 内部子层级顺序声明 */
+@layer tailwind {
+  @layer theme, base, components, utilities;
+}
+
+/* 基础字体大小，Tailwind 的 rem 单位依赖此值 */
+html {
+  font-size: 16px;
+  overflow-y: auto !important;
+}
+
+#app {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
