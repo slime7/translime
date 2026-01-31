@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref, watchEffect } from 'vue';
 
+const emit = defineEmits(['resize-start']);
+
 const props = defineProps({
   state: {
     type: Object,
@@ -63,6 +65,10 @@ const windowHighlightStyle = computed(() => {
     height: `${win.height}px`,
   };
 });
+
+const onHandleMouseDown = (direction) => {
+  emit('resize-start', direction);
+};
 </script>
 
 <template>
@@ -72,14 +78,14 @@ const windowHighlightStyle = computed(() => {
 
     <!-- 窗口探测高亮 -->
     <div
-      class="absolute border-2 border-[#2196F3] bg-[#2196F3]/10 shadow-[0_0_15px_rgba(33,150,243,0.5)] transition-all duration-100 ease-out box-border"
+      class="absolute border border-dashed border-[#2196F3] bg-[#2196F3]/10 transition-all duration-100 ease-out box-border"
       :style="windowHighlightStyle"
     />
 
     <!-- 选区矩形 -->
     <div
       v-if="state.isSelecting || state.hasSelection"
-      class="absolute border-2 border-[#2196F3] shadow-[0_0_0_2px_rgba(33,150,243,0.3)] box-border"
+      class="absolute border border-dashed border-[#2196F3] box-border pointer-events-auto cursor-move"
       :style="{
         left: bounds.x + 'px',
         top: bounds.y + 'px',
@@ -88,11 +94,55 @@ const windowHighlightStyle = computed(() => {
       }"
     >
       <div
-        v-if="bounds.w > 0 && bounds.h > 0"
-        class="absolute -top-7 left-0 bg-[#2196F3] text-white px-2 py-0.5 rounded text-xs whitespace-nowrap shadow-md"
+        v-if="bounds.w > 80 && bounds.h > 24"
+        class="absolute top-1 left-1 bg-[#2196F3] text-white px-2 py-0.5 rounded text-xs whitespace-nowrap shadow-md pointer-events-none"
       >
         {{ Math.round(bounds.w) }} × {{ Math.round(bounds.h) }}
       </div>
+
+      <!-- Resize Handles -->
+      <template v-if="!state.isMoving && state.hasSelection">
+        <!-- Top Left -->
+        <div
+          class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-nw-resize z-20"
+          @mousedown.stop="onHandleMouseDown('nw')"
+        />
+        <!-- Top -->
+        <div
+          class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-n-resize z-20"
+          @mousedown.stop="onHandleMouseDown('n')"
+        />
+        <!-- Top Right -->
+        <div
+          class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-ne-resize z-20"
+          @mousedown.stop="onHandleMouseDown('ne')"
+        />
+        <!-- Right -->
+        <div
+          class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-e-resize z-20"
+          @mousedown.stop="onHandleMouseDown('e')"
+        />
+        <!-- Bottom Right -->
+        <div
+          class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-se-resize z-20"
+          @mousedown.stop="onHandleMouseDown('se')"
+        />
+        <!-- Bottom -->
+        <div
+          class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-s-resize z-20"
+          @mousedown.stop="onHandleMouseDown('s')"
+        />
+        <!-- Bottom Left -->
+        <div
+          class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-sw-resize z-20"
+          @mousedown.stop="onHandleMouseDown('sw')"
+        />
+        <!-- Left -->
+        <div
+          class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-w-resize z-20"
+          @mousedown.stop="onHandleMouseDown('w')"
+        />
+      </template>
     </div>
   </div>
 </template>

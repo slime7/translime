@@ -14,7 +14,7 @@ import { aliases, md } from 'vuetify/iconsets/md';
 import { md3 } from 'vuetify/blueprints';
 import 'vuetify/styles';
 
-import { initPreviewMock } from '../preview-mock.js';
+import { initPreviewMock } from '../preview-mock';
 import PreviewApp from './App.vue';
 
 /**

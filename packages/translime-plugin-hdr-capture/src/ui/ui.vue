@@ -1,6 +1,9 @@
 <template>
-  <div class="hdr-capture-settings">
-    <v-card flat>
+  <v-container class="plugin-main hdr-capture-settings">
+    <v-card
+      class="rounded-3xl"
+      rounded
+    >
       <v-card-title class="text-h6">
         <v-icon start>
           camera
@@ -14,8 +17,9 @@
           <v-text-field
             v-model="tempShortcut"
             label="截图快捷键"
-            placeholder="例如: Ctrl+Shift+S（留空则通过按钮触发）"
+            placeholder="例如: Ctrl+Alt+A（留空则通过按钮触发）"
             variant="outlined"
+            color="primary"
             density="comfortable"
             hint="设置全局快捷键，在任意应用中触发截图"
             persistent-hint
@@ -23,19 +27,7 @@
             @keydown="onShortcutKeyDown"
             @blur="onShortcutBlur"
             @click:clear="onShortcutClear"
-          >
-            <template #append>
-              <v-btn
-                v-if="settings.shortcut"
-                color="primary"
-                variant="tonal"
-                size="small"
-                @click="testShortcut"
-              >
-                测试
-              </v-btn>
-            </template>
-          </v-text-field>
+          />
         </div>
 
         <!-- 保存路径 -->
@@ -45,6 +37,7 @@
             label="保存路径"
             placeholder="默认为系统图片文件夹"
             variant="outlined"
+            color="primary"
             density="comfortable"
             readonly
             @click="selectSavePath"
@@ -53,8 +46,54 @@
               <v-btn
                 icon="folder_open"
                 variant="text"
-                @click="selectSavePath"
+                @click.stop="selectSavePath"
               />
+            </template>
+          </v-text-field>
+        </div>
+
+        <!-- 保存文件名 -->
+        <div class="setting-section">
+          <v-text-field
+            v-model="settings.saveFilenameTemplate"
+            label="保存文件名"
+            placeholder="例如: [DD]_YYYY-MM-DD_HH-mm-ss"
+            variant="outlined"
+            color="primary"
+            density="comfortable"
+            :hint="`预览：${previewFilenameResult}`"
+            persistent-hint
+            clearable
+          >
+            <template #append-inner>
+              <v-tooltip
+                location="bottom"
+                open-on-click
+              >
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="priority_high"
+                    size="small"
+                    class="mr-2 cursor-pointer"
+                  />
+                </template>
+                <div class="text-caption">
+                  <div class="mb-2">
+                    日期变量说明：
+                  </div>
+                  <div>使用 dayjs 日期格式</div>
+                  <div>YYYY - 年份 (e.g. 2024)</div>
+                  <div>MM - 月份 (01-12)</div>
+                  <div>DD - 日期 (01-31)</div>
+                  <div>HH - 小时 (00-23)</div>
+                  <div>mm - 分钟 (00-59)</div>
+                  <div>ss - 秒 (00-59)</div>
+                  <div class="mt-2">
+                    留空则使用默认时间戳格式
+                  </div>
+                </div>
+              </v-tooltip>
             </template>
           </v-text-field>
         </div>
@@ -66,6 +105,7 @@
             :items="formatOptions"
             label="保存格式"
             variant="outlined"
+            color="primary"
             density="comfortable"
           />
         </div>
@@ -86,10 +126,10 @@
               v-show="settings.enableHdrMapping"
               class="hdr-mapping-options mt-4 ml-4"
             >
-              <!-- SDR 白点设置 -->
+              <!-- SDR 输出最大值 -->
               <div class="slider-setting mb-4">
                 <div class="slider-header">
-                  <span class="slider-label">SDR 白点亮度</span>
+                  <span class="slider-label">SDR 输出最大值</span>
                   <v-chip
                     size="small"
                     color="primary"
@@ -104,7 +144,6 @@
                   :max="400"
                   :step="1"
                   color="primary"
-                  track-color="grey"
                   thumb-label
                   hide-details
                 >
@@ -120,13 +159,13 @@
                 </div>
               </div>
 
-              <!-- HDR 峰值亮度设置 -->
+              <!-- HDR 输入最大值 -->
               <div class="slider-setting mb-4">
                 <div class="slider-header">
-                  <span class="slider-label">HDR 峰值亮度</span>
+                  <span class="slider-label">HDR 输入最大值</span>
                   <v-chip
                     size="small"
-                    color="secondary"
+                    color="primary"
                     variant="tonal"
                   >
                     {{ settings.hdrMaxNits }} nits
@@ -137,8 +176,7 @@
                   :min="400"
                   :max="2000"
                   :step="10"
-                  color="secondary"
-                  track-color="grey"
+                  color="primary"
                   thumb-label
                   hide-details
                 >
@@ -160,15 +198,12 @@
                 label="保存 HDR 原始文件"
                 color="primary"
                 density="compact"
-                hint="截图时额外保存一份未经色调映射的 HDR 原始文件"
-                persistent-hint
               />
             </div>
           </v-expand-transition>
         </div>
 
         <v-divider class="my-4" />
-
         <!-- 操作按钮 -->
         <div class="action-buttons mt-6 flex gap-x-2">
           <v-btn
@@ -195,16 +230,18 @@
         </div>
       </v-card-text>
     </v-card>
-  </div>
+  </v-container>
 </template>
 
 <script setup>
 import {
+  computed,
   onMounted,
   reactive,
   ref,
   watch,
 } from 'vue';
+import dayjs from 'dayjs';
 import {
   getPluginSetting,
   setPluginSetting,
@@ -217,12 +254,13 @@ defineOptions({
 });
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
-const showDebugUi = true;
+const showDebugUi = false;
 
 // 设置状态
 const settings = reactive({
   shortcut: '',
   savePath: '',
+  saveFilenameTemplate: '[HDR_Capture]_YYYY-MM-DD_HH-mm-ss', // 保存文件名模板
   saveFormat: 'png',
   // HDR 映射设置
   enableHdrMapping: true, // 是否启用自定义 HDR 映射
@@ -240,6 +278,17 @@ const formatOptions = [
   { title: 'JPEG（有损压缩）', value: 'jpg' },
   { title: 'WebP（高效压缩）', value: 'webp' },
 ];
+
+const previewFilenameResult = computed(() => {
+  if (!settings.saveFilenameTemplate) {
+    return `默认: ${dayjs().format('[HDR_Capture]_YYYY-MM-DD_HH-mm-ss')}.${settings.saveFormat}`;
+  }
+  try {
+    return `${dayjs().format(settings.saveFilenameTemplate)}.${settings.saveFormat}`;
+  } catch (e) {
+    return '格式错误';
+  }
+});
 
 // 加载设置
 onMounted(async () => {
@@ -306,15 +355,6 @@ const onShortcutClear = () => {
   tempShortcut.value = '';
 };
 
-// 测试快捷键
-const testShortcut = () => {
-  // 通过 IPC 注册快捷键
-  const ipc = useIpc();
-  if (ipc) {
-    ipc.send(`register-shortcut@${PLUGIN_ID}`, settings.shortcut);
-  }
-};
-
 // 选择保存路径
 const selectSavePath = async () => {
   const dialog = useDialog();
@@ -360,7 +400,6 @@ const startCapture = async (isDebug = false) => {
 
 /* HDR 映射设置样式 */
 .hdr-mapping-options {
-  border-left: 2px solid rgb(var(--v-theme-primary) / 30%);
   padding-left: 16px;
 }
 

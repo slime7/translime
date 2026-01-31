@@ -347,6 +347,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(vite@7.3.1(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))
+      dayjs:
+        specifier: ^1.11.10
+        version: 1.11.10
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18
@@ -13083,7 +13086,7 @@ snapshots:
       vue: 3.5.13(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
-      vite-plugin-vuetify: 2.1.1(vite@7.3.1(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.29.1))(vue@3.5.13(typescript@5.9.3))(vuetify@3.11.6)
+      vite-plugin-vuetify: 2.1.1(vite@7.3.1(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))(vue@3.5.13(typescript@5.9.3))(vuetify@3.11.6)
 
   w3c-hr-time@1.0.2:
     dependencies:

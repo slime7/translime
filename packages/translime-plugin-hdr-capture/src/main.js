@@ -45,6 +45,7 @@ const getPreserveHdr = () => pluginConfig.get('preserveHdr', false);
 const getEnableHdrMapping = () => pluginConfig.get('enableHdrMapping', true);
 const getSdrWhiteNits = () => pluginConfig.get('sdrWhiteNits', 203);
 const getHdrMaxNits = () => pluginConfig.get('hdrMaxNits', 1000);
+const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
 
 /**
  * 注销全局快捷键
@@ -522,14 +523,18 @@ export const ipcHandlers = [
       const format = getSaveFormat();
       const savePath = getSavePath();
       const preserveHdr = getPreserveHdr();
+      const saveFilenameTemplate = getSaveFilenameTemplate();
       logger.info('保存截图', {
         saveINfo: {
           format,
           savePath,
           preserveHdr,
+          saveFilenameTemplate,
         },
       });
-      return capture.cropAndSaveScaledFromBuffer(currentCaptureSession, rect, { format, savePath, preserveHdr });
+      return capture.cropAndSaveScaledFromBuffer(currentCaptureSession, rect, {
+        format, savePath, preserveHdr, saveFilenameTemplate,
+      });
     },
   },
   {

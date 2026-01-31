@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { useLogger } from 'translime-sdk';
+import dayjs from 'dayjs';
 
 const require = createRequire(import.meta.url);
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
@@ -197,7 +198,7 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
     throw new Error('截屏会话数据为空，请重启截图。');
   }
 
-  // 1. 找出所有包含选区部分的显示器，并计算重叠面积
+  // 找出所有包含选区部分的显示器，并计算重叠面积
   const overlaps = sessionData.map((d) => {
     const x = Math.max(rect.x, d.bounds.x);
     const y = Math.max(rect.y, d.bounds.y);
@@ -220,7 +221,7 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
     throw new Error('选区超出了显示范围。');
   }
 
-  // 2. 确定目标比例 (采用重叠面积最大的显示器的缩放率，保证大部分内容的清晰度)
+  // 确定目标比例 (采用重叠面积最大的显示器的缩放率，保证大部分内容的清晰度)
   overlaps.sort((a, b) => b.area - a.area);
   const targetScale = overlaps[0].display.scaleFactor || 1.0;
   const targetWidth = Math.round(rect.width * targetScale);
@@ -228,14 +229,14 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
 
   logger.info(`目标比例: ${targetScale}, 物理尺寸: ${targetWidth}x${targetHeight}, 涉及屏幕数: ${overlaps.length}`);
 
-  // 3. 创建目标 Buffer (初始透明)
+  // 创建目标 Buffer (初始透明)
   const finalBuffer = Buffer.alloc(targetWidth * targetHeight * 4);
 
-  // 4. 并行处理所有屏幕的裁剪和缩放，然后合并结果
+  // 并行处理所有屏幕的裁剪和缩放，然后合并结果
   const processedChunks = await Promise.all(overlaps.map(async ({ display, inter }) => {
     const scale = display.scaleFactor || 1.0;
 
-    // A. 计算该屏幕内的物理裁剪区域
+    // 计算该屏幕内的物理裁剪区域
     const srcRect = {
       x: Math.round((inter.x - display.bounds.x) * scale),
       y: Math.round((inter.y - display.bounds.y) * scale),
@@ -249,7 +250,7 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
       let chunkWidth = srcRect.width;
       let chunkHeight = srcRect.height;
 
-      // B. 如果该屏幕缩放率与目标缩放率不一致，需要进行物理缩放对齐
+      // 如果该屏幕缩放率与目标缩放率不一致，需要进行物理缩放对齐
       if (Math.abs(scale - targetScale) > 0.01) {
         const resizedWidth = Math.round(inter.width * targetScale);
         const resizedHeight = Math.round(inter.height * targetScale);
@@ -259,7 +260,7 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
         chunkHeight = resizedHeight;
       }
 
-      // C. 计算目标偏移
+      // 计算目标偏移
       const destX = Math.round((inter.x - rect.x) * targetScale);
       const destY = Math.round((inter.y - rect.y) * targetScale);
 
@@ -272,7 +273,7 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
     }
   }));
 
-  // 5. 将所有切片合并到目标 Buffer
+  // 将所有切片合并到目标 Buffer
   processedChunks.filter(Boolean).forEach(({
     chunk, chunkWidth, chunkHeight, destX, destY,
   }) => {
@@ -308,14 +309,17 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
  * @param {Object} options - 保存选项
  * @param {string} options.format - 图像格式
  * @param {string} options.savePath - 保存路径
+ * @param {string} [options.saveFilenameTemplate] - 保存文件名模板
  * @param {boolean} options.preserveHdr - 是否保存 HDR 原始文件
  */
 export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {}) => {
-  const { format = 'png', savePath, preserveHdr = false } = options;
+  const {
+    format = 'png', savePath, preserveHdr = false, saveFilenameTemplate,
+  } = options;
 
   logger.info('开始多屏幕混合裁剪并保存, 选区:', { data: { ...rect, preserveHdr } });
 
-  // 1. 找出所有重叠显示器
+  // 找出所有重叠显示器
   const overlaps = sessionData.map((d) => {
     const x = Math.max(rect.x, d.bounds.x);
     const y = Math.max(rect.y, d.bounds.y);
@@ -335,7 +339,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
 
   if (overlaps.length === 0) throw new Error('选区超出了显示范围。');
 
-  // 2. 目标比例
+  // 目标比例
   overlaps.sort((a, b) => b.area - a.area);
   const targetScale = overlaps[0].display.scaleFactor || 1.0;
   const targetWidth = Math.round(rect.width * targetScale);
@@ -343,7 +347,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
 
   const finalBuffer = Buffer.alloc(targetWidth * targetHeight * 4);
 
-  // 3. 并行处理所有屏幕的裁剪和缩放，然后合并结果
+  // 并行处理所有屏幕的裁剪和缩放，然后合并结果
   const processedChunks = await Promise.all(overlaps.map(async ({ display, inter }) => {
     const scale = display.scaleFactor || 1.0;
     const srcRect = {
@@ -373,7 +377,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
     };
   }));
 
-  // 4. 将所有切片合并到目标 Buffer
+  // 将所有切片合并到目标 Buffer
   processedChunks.forEach(({
     chunk, chunkWidth, chunkHeight, destX, destY,
   }) => {
@@ -391,19 +395,31 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
     }
   });
 
-  // 5. 后处理 - 直接编码，跳过 ToneMap 因为输入已经是 SDR
+  // 后处理 - 直接编码，跳过 ToneMap 因为输入已经是 SDR
   const encodedData = await encodeImage(finalBuffer, targetWidth, targetHeight, format);
 
   if (savePath) {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
-    const timestamp = Date.now();
-    const fileName = `HDR_Capture_${timestamp}.${format}`;
+    const timestamp = dayjs().format('HDR_Capture_YYYY-MM-DD_HH-mm-ss');
+    let fileName;
+
+    if (saveFilenameTemplate) {
+      try {
+        fileName = `${dayjs().format(saveFilenameTemplate)}.${format}`;
+      } catch (e) {
+        logger.error('文件名模板格式化失败，回退到默认格式:', e);
+        fileName = `HDR_Capture_${timestamp}.${format}`;
+      }
+    } else {
+      fileName = `HDR_Capture_${timestamp}.${format}`;
+    }
+
     const fullPath = path.join(savePath, fileName);
     await fs.writeFile(fullPath, encodedData);
     logger.info(`SDR 图像已保存: ${fullPath}`);
 
-    // 6. 如果启用了保存 HDR 原始文件，保存裁剪后的 HDR 数据为 EXR 格式
+    // 如果启用了保存 HDR 原始文件，保存裁剪后的 HDR 数据为 EXR 格式
     if (preserveHdr) {
       // 检查是否有 HDR 屏幕且包含原始数据
       const hdrDisplays = overlaps.filter(({ display }) => display.isHdr && display.rawHdrBuffer);
@@ -443,7 +459,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
             hdrCropRect.height,
           );
 
-          const exrFileName = `HDR_Capture_${timestamp}.exr`;
+          const exrFileName = fileName.replace(`.${format}`, '.exr');
           const exrFullPath = path.join(savePath, exrFileName);
           await fs.writeFile(exrFullPath, exrData);
           logger.info(`HDR EXR 文件已保存: ${exrFullPath} (${hdrCropRect.width}x${hdrCropRect.height}, ${exrData.length} bytes)`);
@@ -485,4 +501,3 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
   }
   return null;
 };
-

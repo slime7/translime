@@ -4,8 +4,8 @@
  */
 
 import {
-  initPreviewMock,
   isPreviewMode as checkPreviewMode,
+  initPreviewMock,
 } from './preview-mock.js';
 
 // 在模块加载时自动检测并初始化 preview 模式

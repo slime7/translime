@@ -6,6 +6,7 @@ import FrozenScreens from './components/FrozenScreens.vue';
 import SelectionRect from './components/SelectionRect.vue';
 import ActionToolbar from './components/ActionToolbar.vue';
 import HintBox from './components/HintBox.vue';
+import Magnifier from './components/Magnifier.vue';
 
 // ==================== 状态属性 ====================
 const state = reactive({
@@ -18,6 +19,10 @@ const state = reactive({
   isSelecting: false,
   isDragging: false,
   isMoving: false,
+  isResizing: false,
+  resizeDirection: null,
+  resizeActiveX: null,
+  resizeActiveY: null,
   hasSelection: false,
 
   startX: 0,
@@ -55,6 +60,21 @@ const selectionBounds = computed(() => {
   };
 });
 
+// 控制放大镜显示
+const showMagnifier = computed(() => {
+  // 1. 如果正在移动整个选区，不显示
+  if (state.isMoving) return false;
+
+  // 2. 如果正在拖拽选取 (isSelecting) 或者正在调整大小 (isResizing) -> 显示
+  if (state.isSelecting || state.isResizing) return true;
+
+  // 3. 如果还没有选区，且不在移动状态 -> 显示 (用于辅助定位起始点)
+  if (!state.hasSelection) return true;
+
+  // 其他情况（也就是：有选区，且静止，且没在调整大小）-> 不显示
+  return false;
+});
+
 // ==================== 交互逻辑 (Helpers) ====================
 function closeOverlay() {
   window.hdrCapture?.close?.();
@@ -72,55 +92,7 @@ function handleCancel() {
   }
 }
 
-function onKeyDown(e) {
-  if (e.key === 'Escape') {
-    handleCancel();
-  }
-}
-
-// ==================== 初始化与清理 ====================
-const blobUrls = [];
-function clearBlobUrls() {
-  blobUrls.forEach((url) => URL.revokeObjectURL(url));
-  blobUrls.length = 0;
-}
-
-onMounted(() => {
-  if (window.hdrCapture?.onInit) {
-    window.hdrCapture.onInit((data) => {
-      state.isDebug = !!data.isDebug;
-      state.offsetX = data.minX;
-      state.offsetY = data.minY;
-      state.displays = data.displays || [];
-
-      clearBlobUrls();
-      state.capturedScreens = (data.capturedScreens || []).map((s) => {
-        const blob = new Blob([s.data], { type: 'image/webp' });
-        const url = URL.createObjectURL(blob);
-        blobUrls.push(url);
-        return { ...s, url };
-      });
-
-      if (data.cursorPos) {
-        state.cursorPos = {
-          x: data.cursorPos.x - state.offsetX,
-          y: data.cursorPos.y - state.offsetY,
-        };
-      }
-
-      state.allWindows = data.windows || [];
-    });
-  }
-
-  window.addEventListener('keydown', onKeyDown);
-});
-
-onUnmounted(() => {
-  clearBlobUrls();
-  window.removeEventListener('keydown', onKeyDown);
-});
-
-// ==================== 交互逻辑 ====================
+// ==================== 交互逻辑 (Helpers) ====================
 
 const findDisplayAtLocalPoint = (lx, ly) => {
   const gx = lx + state.offsetX;
@@ -161,11 +133,8 @@ const onWheel = (e) => {
   if (state.isSelecting || state.isMoving || state.hasSelection) return;
   if (state.candidates.length <= 1) return;
 
-  // 阻止默认滚动行为
   e.preventDefault();
 
-  // 滚轮向上 (deltaY < 0) 切换到更小的窗口？通常习惯上滚是往“上”层，即面积更小
-  // 这里我们统一定义：向下滚切换到更大的（底层）窗口，向上滚切换到更小的（顶层）窗口
   if (e.deltaY > 0) {
     state.candidateIndex = (state.candidateIndex + 1) % state.candidates.length;
   } else {
@@ -175,8 +144,25 @@ const onWheel = (e) => {
   state.highlightedWindow = state.candidates[state.candidateIndex];
 };
 
+const onResizeStart = (direction) => {
+  state.isResizing = true;
+  state.resizeDirection = direction;
+
+  const isLeft = state.startX < state.endX;
+  const isTop = state.startY < state.endY;
+
+  // Reset active axes
+  state.resizeActiveX = null;
+  state.resizeActiveY = null;
+
+  // Map direction to variable
+  if (direction.includes('w')) state.resizeActiveX = isLeft ? 'startX' : 'endX';
+  if (direction.includes('e')) state.resizeActiveX = isLeft ? 'endX' : 'startX';
+  if (direction.includes('n')) state.resizeActiveY = isTop ? 'startY' : 'endY';
+  if (direction.includes('s')) state.resizeActiveY = isTop ? 'endY' : 'startY';
+};
+
 const onMouseDown = (e) => {
-  // 仅响应左键
   if (e.button !== 0) return;
 
   const mx = e.clientX;
@@ -196,7 +182,6 @@ const onMouseDown = (e) => {
       };
       return;
     }
-    // 点击选区外，取消当前选区重画
     state.hasSelection = false;
   }
 
@@ -209,62 +194,81 @@ const onMouseDown = (e) => {
 };
 
 const onMouseMove = (e) => {
-  const mx = e.clientX;
-  const my = e.clientY;
-  state.cursorPos = { x: mx, y: my };
+  try {
+    const mx = e.clientX;
+    const my = e.clientY;
+    state.cursorPos = { x: mx, y: my };
 
-  if (state.isMoving) {
-    const dx = mx - state.moveOriginX;
-    const dy = my - state.moveOriginY;
-    state.startX = state.rectAtStartMove.startX + dx;
-    state.startY = state.rectAtStartMove.startY + dy;
-    state.endX = state.rectAtStartMove.endX + dx;
-    state.endY = state.rectAtStartMove.endY + dy;
-    return;
-  }
-
-  if (state.isSelecting) {
-    const dx = mx - state.startX;
-    const dy = my - state.startY;
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-      state.isDragging = true;
-      state.highlightedWindow = null;
-      state.endX = mx;
-      state.endY = my;
+    if (state.isResizing) {
+      if (state.resizeActiveX) state[state.resizeActiveX] = mx;
+      if (state.resizeActiveY) state[state.resizeActiveY] = my;
+      return;
     }
-    return;
-  }
 
-  detectWindow(mx, my);
+    if (state.isMoving) {
+      const dx = mx - state.moveOriginX;
+      const dy = my - state.moveOriginY;
+      state.startX = state.rectAtStartMove.startX + dx;
+      state.startY = state.rectAtStartMove.startY + dy;
+      state.endX = state.rectAtStartMove.endX + dx;
+      state.endY = state.rectAtStartMove.endY + dy;
+      return;
+    }
+
+    if (state.isSelecting) {
+      const dx = mx - state.startX;
+      const dy = my - state.startY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        state.isDragging = true;
+        state.highlightedWindow = null;
+        state.endX = mx;
+        state.endY = my;
+      }
+      return;
+    }
+
+    detectWindow(mx, my);
+  } catch (err) {
+    console.error('onMouseMove error', err);
+  }
 };
 
 const onMouseUp = (e) => {
-  if (e.button !== 0) return;
+  try {
+    if (e.button !== 0) return;
 
-  if (state.isMoving) {
-    state.isMoving = false;
-    return;
-  }
-
-  if (state.isSelecting) {
-    state.isSelecting = false;
-    // 如果没有真正的拖拽（即单击）
-    if (!state.isDragging) {
-      if (state.highlightedWindow) {
-        state.startX = state.highlightedWindow.left - state.offsetX;
-        state.startY = state.highlightedWindow.top - state.offsetY;
-        state.endX = state.startX + state.highlightedWindow.width;
-        state.endY = state.startY + state.highlightedWindow.height;
-        state.hasSelection = true;
-      } else {
-        // 单击空白处，什么都不选
-        state.hasSelection = false;
-      }
-    } else {
-      // 检查选区大小，太小则取消 (过滤 1x1 及以下的误操作)
-      const b = selectionBounds.value;
-      state.hasSelection = b.w > 1 && b.h > 1;
+    if (state.isResizing) {
+      state.isResizing = false;
+      state.resizeDirection = null;
+      state.resizeActiveX = null;
+      state.resizeActiveY = null;
+      return;
     }
+
+    if (state.isMoving) {
+      state.isMoving = false;
+      return;
+    }
+
+    if (state.isSelecting) {
+      state.isSelecting = false;
+      if (!state.isDragging) {
+        if (state.highlightedWindow) {
+          state.startX = state.highlightedWindow.left - state.offsetX;
+          state.startY = state.highlightedWindow.top - state.offsetY;
+          state.endX = state.startX + state.highlightedWindow.width;
+          state.endY = state.startY + state.highlightedWindow.height;
+          state.hasSelection = true;
+        } else {
+          state.hasSelection = false;
+        }
+      } else {
+        const b = selectionBounds.value;
+        state.hasSelection = b.w > 1 && b.h > 1;
+      }
+    }
+  } catch (err) {
+    console.error('onMouseUp error', err);
   }
 };
 
@@ -272,6 +276,50 @@ const onContextMenu = (e) => {
   e.preventDefault();
   handleCancel();
 };
+
+// ==================== 初始化与清理 ====================
+const blobUrls = [];
+function clearBlobUrls() {
+  blobUrls.forEach((url) => URL.revokeObjectURL(url));
+  blobUrls.length = 0;
+}
+
+onMounted(() => {
+  if (window.hdrCapture?.onInit) {
+    window.hdrCapture.onInit((data) => {
+      state.isDebug = !!data.isDebug;
+      state.offsetX = data.minX;
+      state.offsetY = data.minY;
+      state.displays = data.displays || [];
+
+      clearBlobUrls();
+      state.capturedScreens = (data.capturedScreens || []).map((s) => {
+        const blob = new Blob([s.data], { type: 'image/webp' });
+        const url = URL.createObjectURL(blob);
+        blobUrls.push(url);
+        return { ...s, url };
+      });
+
+      if (data.cursorPos) {
+        state.cursorPos = {
+          x: data.cursorPos.x - state.offsetX,
+          y: data.cursorPos.y - state.offsetY,
+        };
+      }
+
+      state.allWindows = data.windows || [];
+    });
+  }
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+});
+
+onUnmounted(() => {
+  clearBlobUrls();
+  window.removeEventListener('mousemove', onMouseMove);
+  window.removeEventListener('mouseup', onMouseUp);
+});
 
 // ==================== 操作处理 ====================
 const handleAction = async (type) => {
@@ -323,11 +371,21 @@ provide('selectionBounds', selectionBounds);
 provide('actions', { handleAction, closeOverlay });
 provide('utils', { findDisplayAtLocalPoint });
 
+const rootCursor = computed(() => {
+  if (state.isResizing && state.resizeDirection) {
+    return `${state.resizeDirection}-resize`;
+  }
+  if (state.isMoving) {
+    return 'move';
+  }
+  return 'crosshair';
+});
 </script>
 
 <template>
   <div
-    class="relative w-screen h-screen overflow-hidden select-none cursor-crosshair"
+    class="relative w-screen h-screen overflow-hidden select-none"
+    :style="{ cursor: rootCursor }"
     @mousedown="onMouseDown"
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
@@ -343,16 +401,30 @@ provide('utils', { findDisplayAtLocalPoint });
     />
 
     <!-- 遮罩与高亮 -->
-    <SelectionRect :state="state" :bounds="selectionBounds" />
+    <SelectionRect
+      :state="state"
+      :bounds="selectionBounds"
+      @resize-start="onResizeStart"
+    />
 
     <!-- 信息提示 -->
     <HintBox :cursor-pos="state.cursorPos" />
 
     <!-- 操作工具栏 : (Debug 模式下依然显示，功能有 mock) -->
+    <!-- 操作工具栏 : (Debug 模式下依然显示，功能有 mock) -->
     <ActionToolbar
-      v-if="state.hasSelection && !state.isSelecting && !state.isMoving"
+      :visible="state.hasSelection && !state.isSelecting && !state.isMoving && !state.isResizing"
       :bounds="selectionBounds"
       @mousedown.stop
+    />
+
+    <!-- 放大镜 (High Priority Z-Index) -->
+    <Magnifier
+      v-if="showMagnifier"
+      :cursor-pos="state.cursorPos"
+      :screens="state.capturedScreens"
+      :offset-x="state.offsetX"
+      :offset-y="state.offsetY"
     />
   </div>
 </template>

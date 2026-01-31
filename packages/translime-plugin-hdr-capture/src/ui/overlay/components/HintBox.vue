@@ -49,8 +49,11 @@ const hintStyle = computed(() => {
     :style="hintStyle"
     @mouseenter="onMouseEnter"
   >
-    <div class="bg-black/75 text-white px-4 py-2 rounded-xl text-[13px] backdrop-blur-xs border border-white/10 shadow-lg">
-      点击探测到的窗口，或拖拽选择 · 拖放移动选区 · 右键取消
+    <div class="bg-black/75 text-white px-4 py-2 rounded-xl text-xs backdrop-blur-xs border border-white/10 shadow-lg">
+      <p>点击探测到的窗口</p>
+      <p>滚轮切换窗口层次</p>
+      <p>拖放移动选区</p>
+      <p>右键、esc 取消</p>
     </div>
   </div>
 </template>
