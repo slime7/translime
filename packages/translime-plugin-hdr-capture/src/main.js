@@ -354,6 +354,15 @@ const startCapture = async (isDebug = false) => {
     updateOverlayBounds();
   }
 
+  // 立即显示窗口但设为全透明，让系统动画在数据加载期间完成，或者完全绕过动画感观
+  if (!overlayWindow.isVisible()) {
+    overlayWindow.setOpacity(0);
+    overlayWindow.show();
+  } else if (overlayWindow.getOpacity() === 0) {
+    // 已经是 show 状态但透明（例如之前 closeOverlay 只是设为透明）
+    // 保持透明，直到数据通过
+  }
+
   // 准备初始化数据
   const initData = {
     isDebug,
@@ -373,7 +382,9 @@ const startCapture = async (isDebug = false) => {
   const sendDataAndShow = () => {
     logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
-    overlayWindow.show();
+
+    // 数据就绪，瞬间显示
+    overlayWindow.setOpacity(1);
     overlayWindow.focus();
     overlayWindow.setIgnoreMouseEvents(false);
   };
