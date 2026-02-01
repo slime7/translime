@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "dev": "vite build -c ui.vite.config.mjs --watch",
+    "preview:ui": "vite -c ui.vite.config.mjs --mode preview",
     "build:plugin": "vite build",
     "build:ui": "vite build -c ui.vite.config.mjs",
     "build": "pnpm run build:plugin && pnpm run build:ui"
