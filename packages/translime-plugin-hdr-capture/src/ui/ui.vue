@@ -73,7 +73,7 @@
                 <template #activator="{ props }">
                   <v-icon
                     v-bind="props"
-                    icon="priority_high"
+                    icon="help_outline"
                     size="small"
                     class="mr-2 cursor-pointer"
                   />
@@ -110,15 +110,54 @@
           />
         </div>
 
+        <!-- 响应速度设置 -->
+        <div class="setting-section">
+          <v-switch
+            v-model="settings.fastResponse"
+            label="快速响应模式"
+            color="primary"
+          >
+            <template #append>
+              <v-tooltip
+                location="bottom"
+                text="开启后常驻后台，极大缩短截图响应时间 (推荐)"
+              >
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="help_outline"
+                    size="small"
+                    class="ml-2"
+                  />
+                </template>
+              </v-tooltip>
+            </template>
+          </v-switch>
+        </div>
+
         <!-- HDR 映射设置组 -->
         <div class="setting-section">
           <v-switch
             v-model="settings.enableHdrMapping"
             label="启用 HDR 映射"
             color="primary"
-            hint="对 HDR 屏幕应用自定义的色调映射参数"
-            persistent-hint
-          />
+          >
+            <template #append>
+              <v-tooltip
+                location="bottom"
+                text="对 HDR 屏幕应用自定义的色调映射参数"
+              >
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="help_outline"
+                    size="small"
+                    class="ml-2"
+                  />
+                </template>
+              </v-tooltip>
+            </template>
+          </v-switch>
 
           <!-- HDR 映射子设置，仅在启用时显示 -->
           <v-expand-transition>
@@ -247,6 +286,7 @@ import {
   setPluginSetting,
   useDialog,
   useIpc,
+  useLogger,
 } from 'translime-sdk';
 
 defineOptions({
@@ -255,6 +295,8 @@ defineOptions({
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const showDebugUi = false;
+const baseLogger = useLogger();
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'SettingsUI' }) : baseLogger;
 
 // 设置状态
 const settings = reactive({
@@ -262,6 +304,7 @@ const settings = reactive({
   savePath: '',
   saveFilenameTemplate: '[HDR_Capture]_YYYY-MM-DD_HH-mm-ss', // 保存文件名模板
   saveFormat: 'png',
+  fastResponse: true, // 快速响应模式 (Keep-Alive)
   // HDR 映射设置
   enableHdrMapping: true, // 是否启用自定义 HDR 映射
   sdrWhiteNits: 203, // SDR 白点亮度 (默认 Windows 标准)
@@ -307,8 +350,7 @@ onMounted(async () => {
         settings.savePath = defaultPath;
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('获取默认保存路径失败:', err);
+      logger.error('获取默认保存路径失败:', err);
     }
   }
 });
@@ -374,8 +416,7 @@ const startCapture = async (isDebug = false) => {
   try {
     await ipc.invoke(`start-capture@${PLUGIN_ID}`, { isDebug });
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error(err);
+    logger.error(err);
   }
 };
 </script>

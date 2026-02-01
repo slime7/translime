@@ -2,11 +2,16 @@
 import {
   computed, onMounted, onUnmounted, provide, reactive,
 } from 'vue';
+import { useLogger } from 'translime-sdk';
 import FrozenScreens from './components/FrozenScreens.vue';
 import SelectionRect from './components/SelectionRect.vue';
 import ActionToolbar from './components/ActionToolbar.vue';
 import HintBox from './components/HintBox.vue';
 import Magnifier from './components/Magnifier.vue';
+
+const PLUGIN_ID = 'translime-plugin-hdr-capture';
+const baseLogger = useLogger();
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Overlay' }) : baseLogger;
 
 // ==================== 状态属性 ====================
 const state = reactive({
@@ -165,6 +170,49 @@ const onResizeStart = (direction) => {
   if (direction.includes('s')) state.resizeActiveY = isTop ? 'endY' : 'startY';
 };
 
+// ==================== 操作处理 ====================
+const handleAction = async (type) => {
+  if (type === 'cancel') {
+    handleCancel();
+    return;
+  }
+
+  // 立即关闭选区显示，防止截图抓取到 Overlay 的黑色遮罩
+  state.hasSelection = false;
+
+  const b = selectionBounds.value;
+  const rect = {
+    x: b.x + state.offsetX,
+    y: b.y + state.offsetY,
+    width: b.w,
+    height: b.h,
+    borderRadius: state.borderRadius,
+  };
+
+  logger.info(`执行操作: ${type}, 选区:`, { rect });
+
+  try {
+    if (type === 'save') {
+      if (state.isDebug) {
+        logger.info('Debug模式: 跳过 save 操作');
+      } else {
+        const res = await window.hdrCapture.saveCapture(rect);
+        logger.info('保存操作返回:', { res });
+      }
+    } else if (type === 'copy') {
+      if (state.isDebug) {
+        logger.info('Debug模式: 跳过 copy 操作');
+      } else {
+        const res = await window.hdrCapture.copyCapture(rect);
+        logger.info('复制操作返回:', { res });
+      }
+    }
+  } catch (err) {
+    logger.error(`操作 ${type} 失败:`, err);
+  }
+  closeOverlay();
+};
+
 const onDoubleClick = (e) => {
   if (e.button !== 0) return;
   if (state.hasSelection) {
@@ -245,7 +293,7 @@ const onMouseMove = (e) => {
 
     detectWindow(mx, my);
   } catch (err) {
-    console.error('onMouseMove error', err);
+    logger.error('onMouseMove error', err);
   }
 };
 
@@ -284,7 +332,7 @@ const onMouseUp = (e) => {
       }
     }
   } catch (err) {
-    console.error('onMouseUp error', err);
+    logger.error('onMouseUp error', err);
   }
 };
 
@@ -307,6 +355,19 @@ onMounted(() => {
       state.offsetX = data.minX;
       state.offsetY = data.minY;
       state.displays = data.displays || [];
+
+      // 重置交互状态
+      state.hasSelection = false;
+      state.isSelecting = false;
+      state.isDragging = false;
+      state.isMoving = false;
+      state.isResizing = false;
+      state.highlightedWindow = null;
+      state.startX = 0;
+      state.startY = 0;
+      state.endX = 0;
+      state.endY = 0;
+      state.candidates = [];
 
       clearBlobUrls();
       state.capturedScreens = (data.capturedScreens || []).map((s) => {
@@ -336,52 +397,6 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove);
   window.removeEventListener('mouseup', onMouseUp);
 });
-
-// ==================== 操作处理 ====================
-const handleAction = async (type) => {
-  if (type === 'cancel') {
-    handleCancel();
-    return;
-  }
-
-  // 立即关闭选区显示，防止截图抓取到 Overlay 的黑色遮罩
-  state.hasSelection = false;
-
-  const b = selectionBounds.value;
-  const rect = {
-    x: b.x + state.offsetX,
-    y: b.y + state.offsetY,
-    width: b.w,
-    height: b.h,
-    borderRadius: state.borderRadius,
-  };
-
-  const baseLogger = window.ts?.logger || console;
-  const logger = baseLogger.child ? baseLogger.child({ plugin_id: 'translime-plugin-hdr-capture', context: 'Overlay' }) : baseLogger;
-
-  logger.info(`执行操作: ${type}, 选区:`, { rect });
-
-  try {
-    if (type === 'save') {
-      if (state.isDebug) {
-        logger.info('Debug模式: 跳过 save 操作');
-      } else {
-        const res = await window.hdrCapture.saveCapture(rect);
-        logger.info('保存操作返回:', { res });
-      }
-    } else if (type === 'copy') {
-      if (state.isDebug) {
-        logger.info('Debug模式: 跳过 copy 操作');
-      } else {
-        const res = await window.hdrCapture.copyCapture(rect);
-        logger.info('复制操作返回:', { res });
-      }
-    }
-  } catch (err) {
-    logger.error(`操作 ${type} 失败:`, err);
-  }
-  closeOverlay();
-};
 
 provide('state', state);
 provide('selectionBounds', selectionBounds);
@@ -429,9 +444,9 @@ const rootCursor = computed(() => {
     <HintBox :cursor-pos="state.cursorPos" />
 
     <!-- 操作工具栏 : (Debug 模式下依然显示，功能有 mock) -->
-    <!-- 操作工具栏 : (Debug 模式下依然显示，功能有 mock) -->
     <ActionToolbar
-      :visible="state.hasSelection && !state.isSelecting && !state.isMoving && !state.isResizing"
+      v-if="state.hasSelection && !state.isSelecting && !state.isMoving && !state.isResizing"
+      :visible="true"
       :bounds="selectionBounds"
       @mousedown.stop
     />

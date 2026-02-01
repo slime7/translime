@@ -43,11 +43,24 @@ watch(() => state.borderRadius, (val) => {
   radiusInput.value = val || 0;
 }, { immediate: true });
 
-// 监听 radiusInput 变化并应用到 state (实时预览)
+// 监听 radiusInput 变化并应用到 state (实时预览，并保存到 localStorage)
 watch(radiusInput, (val) => {
   const r = Math.max(0, Math.min(120, parseInt(val, 10) || 0));
   if (state.borderRadius !== r) {
     state.borderRadius = r;
+    localStorage.setItem('translime.hdr-capture.borderRadius', r);
+  }
+});
+
+onMounted(() => {
+  // 读取上次保存的圆角设置, 默认 0
+  const savedRadius = localStorage.getItem('translime.hdr-capture.borderRadius');
+  if (savedRadius !== null) {
+    const r = parseInt(savedRadius, 10) || 0;
+    radiusInput.value = r; // 这会触发上面的 watch(radiusInput) 进而更新 state.borderRadius
+    if (state.borderRadius !== r) {
+      state.borderRadius = r;
+    }
   }
 });
 
@@ -112,7 +125,7 @@ const handleKeydown = (e) => {
     }
 
     e.preventDefault();
-    actions.handleAction('cancel');
+    actions.closeOverlay();
     return;
   }
 
@@ -375,7 +388,7 @@ const debugLine = computed(() => {
           <button
             class="btn btn-cancel"
             title="取消 (Esc)"
-            @click.stop="actions.handleAction('cancel')"
+            @click.stop="actions.closeOverlay()"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -45,22 +45,7 @@ const getPreserveHdr = () => pluginConfig.get('preserveHdr', false);
 const getEnableHdrMapping = () => pluginConfig.get('enableHdrMapping', true);
 const getSdrWhiteNits = () => pluginConfig.get('sdrWhiteNits', 203);
 const getHdrMaxNits = () => pluginConfig.get('hdrMaxNits', 1000);
-const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
 
-/**
- * 注销全局快捷键
- */
-const unregisterShortcut = () => {
-  if (registeredShortcut) {
-    globalShortcut.unregister(registeredShortcut);
-    logger.info(`快捷键已注销: ${registeredShortcut}`);
-    registeredShortcut = null;
-  }
-};
-
-/**
- * 创建透明叠加层窗口
- */
 /**
  * 获取所有显示器的组合边界
  */
@@ -93,6 +78,43 @@ const getAllDisplaysBounds = () => {
   };
 };
 
+const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
+const getFastResponse = () => pluginConfig.get('fastResponse', true);
+
+/**
+ * 更新 Overlay 窗口的边界（用于响应屏幕变化）
+ */
+const updateOverlayBounds = () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+
+  const {
+    minX, minY, width, height,
+  } = getAllDisplaysBounds();
+
+  overlayWindow.setBounds({
+    x: minX,
+    y: minY,
+    width,
+    height,
+  });
+  logger.info(`屏幕变动，已更新 Overlay 边界: ${width}x${height} at (${minX}, ${minY})`);
+};
+
+/**
+ * 注销全局快捷键
+ */
+const unregisterShortcut = () => {
+  if (registeredShortcut) {
+    globalShortcut.unregister(registeredShortcut);
+    logger.info(`快捷键已注销: ${registeredShortcut}`);
+    registeredShortcut = null;
+  }
+};
+
+/**
+ * 创建透明叠加层窗口
+ */
+
 /**
  * 创建透明叠加层窗口
  */
@@ -116,6 +138,8 @@ const createOverlayWindow = (isDebug = false) => {
     fullscreen: false,
     thickFrame: false,
     hasShadow: false,
+    // 初始不显示，等待数据准备就绪
+    show: false,
     type: 'toolbar',
     webPreferences: {
       nodeIntegration: false,
@@ -140,17 +164,8 @@ const createOverlayWindow = (isDebug = false) => {
     overlayWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
-  // 注意: 初始化数据发送由 startCapture 中的 did-finish-load 处理
-
   // 设置窗口忽略鼠标事件（初始状态）
-  // 后续通过 IPC 在需要时启用鼠标事件
   overlayWindow.setIgnoreMouseEvents(false);
-
-  // 确保窗口获得焦点以接收键盘事件
-  overlayWindow.on('ready-to-show', () => {
-    overlayWindow.show();
-    overlayWindow.focus();
-  });
 
   overlayWindow.on('closed', () => {
     overlayWindow = null;
@@ -243,8 +258,8 @@ const preCaptureAllScreens = async () => {
  * 启动截图流程
  */
 const startCapture = async (isDebug = false) => {
-  if (overlayWindow) {
-    // 已有窗口，聚焦
+  // 如果窗口已存在且可见，说明正在截图中，直接聚焦
+  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
     overlayWindow.focus();
     return;
   }
@@ -331,28 +346,45 @@ const startCapture = async (isDebug = false) => {
     logger.warn('未能成功转换任何窗口坐标或搜索结果为空');
   }
 
-  createOverlayWindow(isDebug);
+  // 确保窗口已创建
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    createOverlayWindow(isDebug);
+  } else {
+    // 如果窗口已存在（常驻模式），确保边界正确
+    updateOverlayBounds();
+  }
 
-  // 发送完整的初始化数据
-  overlayWindow.webContents.on('did-finish-load', () => {
-    const initData = {
-      isDebug,
-      minX,
-      minY,
-      width: totalWidth,
-      height: totalHeight,
-      capturedScreens,
-      cursorPos,
-      windows, // 发送窗口数据
-      displays: allDisplays.map((d) => ({
-        id: d.id,
-        bounds: d.bounds,
-      })),
-    };
+  // 准备初始化数据
+  const initData = {
+    isDebug,
+    minX,
+    minY,
+    width: totalWidth,
+    height: totalHeight,
+    capturedScreens,
+    cursorPos,
+    windows, // 发送窗口数据
+    displays: allDisplays.map((d) => ({
+      id: d.id,
+      bounds: d.bounds,
+    })),
+  };
 
+  const sendDataAndShow = () => {
     logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
-  });
+    overlayWindow.show();
+    overlayWindow.focus();
+    overlayWindow.setIgnoreMouseEvents(false);
+  };
+
+  // 如果页面正在加载，等待加载完成
+  if (overlayWindow.webContents.isLoading()) {
+    overlayWindow.webContents.once('did-finish-load', sendDataAndShow);
+  } else {
+    // 页面已加载，直接发送数据并显示
+    sendDataAndShow();
+  }
 };
 
 /**
@@ -403,9 +435,24 @@ const registerShortcut = (accelerator) => {
  * 关闭截图叠加层
  */
 const closeOverlay = () => {
-  if (overlayWindow) {
-    overlayWindow.close();
-    overlayWindow = null;
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    if (getFastResponse()) {
+      // 快速响应模式：隐藏窗口而不是销毁
+      overlayWindow.hide();
+      overlayWindow.setIgnoreMouseEvents(true); // 隐藏时忽略鼠标，以防万一
+      // 可选：通知 UI 重置状态，避免下次打开时看到旧画面一闪而过
+      // overlayWindow.webContents.send(`overlay-reset@${PLUGIN_ID}`);
+      logger.info('快速响应模式: Overlay 已隐藏');
+    } else {
+      // 普通模式：销毁窗口
+      overlayWindow.close();
+      overlayWindow = null;
+      logger.info('Overlay 已关闭');
+    }
+    // 无论哪种模式，这里可以清理一下当前的 session 数据，释放内存
+    // 但如果在 fastResponse 模式下，保留它也没关系，毕竟下次 startCapture 会覆盖
+    // 为了节省内存，建议清理
+    currentCaptureSession = null;
   }
 };
 
@@ -422,6 +469,11 @@ export const pluginDidLoad = () => {
   if (shortcut) {
     registerShortcut(shortcut);
   }
+
+  // 监听屏幕变化
+  screen.on('display-metrics-changed', updateOverlayBounds);
+  screen.on('display-added', updateOverlayBounds);
+  screen.on('display-removed', updateOverlayBounds);
 };
 
 /**
@@ -433,8 +485,16 @@ export const pluginWillUnload = () => {
   // 注销快捷键
   unregisterShortcut();
 
-  // 关闭叠加层窗口
-  closeOverlay();
+  // 移除屏幕监听
+  screen.removeListener('display-metrics-changed', updateOverlayBounds);
+  screen.removeListener('display-added', updateOverlayBounds);
+  screen.removeListener('display-removed', updateOverlayBounds);
+
+  // 关闭叠加层窗口 (强制关闭，不考虑 fastResponse)
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.close();
+    overlayWindow = null;
+  }
 };
 
 /**
@@ -449,6 +509,15 @@ export const pluginSettingSaved = () => {
     registerShortcut(shortcut);
   } else {
     unregisterShortcut();
+  }
+
+  // 检查快速响应模式设置
+  // 如果用户关闭了快速响应模式，且当前有隐藏的常驻窗口，则将其销毁以释放内存
+  const isFastResponse = getFastResponse();
+  if (!isFastResponse && overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) {
+    overlayWindow.close();
+    overlayWindow = null;
+    logger.info('快速响应模式已关闭，清理后台常驻窗口');
   }
 };
 
