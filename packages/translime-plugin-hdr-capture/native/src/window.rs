@@ -84,33 +84,33 @@ pub fn get_top_level_windows() -> Vec<WindowInfo> {
 /// EnumWindows 回调函数
 unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     unsafe {
-        // 1. 获取上下文
+        // 获取上下文
         let context = &mut *(lparam.0 as *mut WindowEnumContext);
 
-        // 2. 基础可见性检查
+        // 基础可见性检查
         if !IsWindowVisible(hwnd).as_bool() {
             return BOOL(1);
         }
 
-        // 3. 检查 DWM Cloaked 属性
+        // 检查 DWM Cloaked 属性
         if is_cloaked(hwnd) {
             return BOOL(1);
         }
 
-        // 4. 过滤器：仅排除明确的透明穿透窗口（如 Overlay 自身）
+        // 过滤器：仅排除明确的透明穿透窗口（如 Overlay 自身）
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         if (ex_style as u32 & WS_EX_TRANSPARENT.0) != 0 {
             return BOOL(1);
         }
 
-        // 5. 获取窗口类名
+        // 获取窗口类名
         let mut class_buf: Vec<u16> = vec![0; 256];
         let class_len = GetClassNameW(hwnd, &mut class_buf);
         let class_name = OsString::from_wide(&class_buf[..class_len as usize])
             .to_string_lossy()
             .to_string();
 
-        // 6. 获取窗口实际矩形 (尝试排除阴影)
+        // 获取窗口实际矩形 (尝试排除阴影)
         let rect = match get_extended_frame_bounds(hwnd) {
             Some(r) => r,
             None => return BOOL(1),
@@ -123,7 +123,7 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
             return BOOL(1);
         }
 
-        // 7. 遮挡检测
+        // 遮挡检测
         let win_rgn = CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
         let visible_part = CreateRectRgn(0, 0, 0, 0);
 

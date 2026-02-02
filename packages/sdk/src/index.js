@@ -7,7 +7,7 @@
 import {
   isPreviewMode as checkPreviewMode,
   initPreviewMock,
-} from './preview-mock.js';
+} from './preview-mock';
 
 // ----------------------------------------------------------------------
 // Initialization (Side Effect)

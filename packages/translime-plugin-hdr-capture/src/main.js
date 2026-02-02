@@ -18,8 +18,7 @@ const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Main' }) : baseLogger;
 
 /**
- * 这是一个本地实现的配置代理，不依赖外部模块，
- * 确保在 CJS 混合环境下能稳定运行。
+ * 配置代理实例
  */
 const pluginConfig = usePluginConfig(PLUGIN_ID);
 
@@ -111,13 +110,7 @@ const unregisterShortcut = () => {
   }
 };
 
-/**
- * 创建透明叠加层窗口
- */
 
-/**
- * 创建透明叠加层窗口
- */
 const createOverlayWindow = (isDebug = false) => {
   const {
     minX, minY, width, height,
@@ -264,7 +257,7 @@ const startCapture = async (isDebug = false) => {
     return;
   }
 
-  // 适当减少宁静时间。阶梯轮询逻辑已移至 native 层，此处仅做最小化 DWM 稳定缓冲
+  // 等待 DWM 状态稳定
   await new Promise((resolve) => {
     setTimeout(resolve, 100);
   });
@@ -285,7 +278,7 @@ const startCapture = async (isDebug = false) => {
 
     currentCaptureSession = sessionData;
 
-    // [重要修改] Native 已经完成了预览所需的 SDR 转换，此处不再调用冗余的 toneMap
+    // 准备 UI 预览数据
     capturedScreens = await Promise.all(sessionData.map(async (s) => ({
       displayId: s.displayId,
       bounds: s.bounds,
@@ -359,7 +352,7 @@ const startCapture = async (isDebug = false) => {
     overlayWindow.setOpacity(0);
     overlayWindow.show();
   } else if (overlayWindow.getOpacity() === 0) {
-    // 已经是 show 状态但透明（例如之前 closeOverlay 只是设为透明）
+    // 窗口已显示但处于透明状态
     // 保持透明，直到数据通过
   }
 
@@ -560,7 +553,7 @@ export const ipcHandlers = [
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         try {
           const handleBuf = overlayWindow.getNativeWindowHandle();
-          // Windows HWND is 8 bytes on x64, 4 bytes on x86 but Electron usually returns 8 bytes buffer on x64
+          // 读取句柄缓冲区
           if (handleBuf.length === 8) {
             ignoreHandle = handleBuf.readBigInt64LE(0);
           } else if (handleBuf.length === 4) {
@@ -632,7 +625,7 @@ export const ipcHandlers = [
           return false;
         }
 
-        // 在主进程处理复制逻辑，绕过沙盒限制
+        // 执行复制
         logger.info('开始进行裁剪编码...');
         const pngBuffer = await capture.cropAndGetPngFromBuffer(currentCaptureSession, rect);
 

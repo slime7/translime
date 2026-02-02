@@ -277,8 +277,6 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
                             }
                         }
                         
-
-                        context.Unmap(&staging_resource, 0);
                         let _ = duplication.ReleaseFrame();
 
                         // 增强判定：全屏均匀采样 100 个点，防止因为局部黑边导致误判

@@ -70,13 +70,13 @@ const selectionBounds = computed(() => {
 
 // 控制放大镜显示
 const showMagnifier = computed(() => {
-  // 1. 如果正在移动整个选区，不显示
+  // 移动选区时不显示
   if (state.isMoving) return false;
 
-  // 2. 如果正在拖拽选取 (isSelecting) 或者正在调整大小 (isResizing) -> 显示
+  // 调整或创建选区时显示
   if (state.isSelecting || state.isResizing) return true;
 
-  // 3. 如果还没有选区，且不在移动状态 -> 显示 (用于辅助定位起始点)
+  // 无选区时显示辅助定位
   if (!state.hasSelection) return true;
 
   // 其他情况（也就是：有选区，且静止，且没在调整大小）-> 不显示
@@ -155,7 +155,7 @@ const onWheel = (e) => {
 const onResizeStart = (direction) => {
   state.isResizing = true;
   state.resizeDirection = direction;
-  // ... (rest of the function is handled by existing code, just use a known anchor)
+
   const isLeft = state.startX < state.endX;
   const isTop = state.startY < state.endY;
 
@@ -463,5 +463,5 @@ const rootCursor = computed(() => {
 </template>
 
 <style>
-/* App 级别的自定义样式可以放在这里 */
+
 </style>

@@ -8,7 +8,7 @@ const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Capture' }) : baseLogger;
 
 /**
- * 对应 RGBA Buffer 应用圆角遮罩 (原地修改)
+ * 对 RGBA Buffer 应用圆角遮罩
  * @param {Buffer} buffer - RGBA 图像数据
  * @param {number} width - 图像宽度
  * @param {number} height - 图像高度
@@ -161,8 +161,7 @@ export const getDisplays = () => nativeAddon.getDisplays();
  */
 export const captureDisplay = async (displayId = 0, hdrOptions = null) => {
   try {
-    // NAPI-RS 会自动在 JS camelCase 和 Rust snake_case 之间转换
-    // 因此这里使用 camelCase 直接传递
+    // 转换 HDR 选项
     const nativeHdrOptions = hdrOptions ? {
       enabled: hdrOptions.enabled,
       sdrWhiteNits: hdrOptions.sdrWhiteNits,
@@ -376,7 +375,7 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
 };
 
 /**
- * 优化 saveToBuffer 逻辑，支持缩放和 HDR 原始数据保存
+ * 保存裁剪后的图像，支持缩放和 HDR
  * @param {Array} sessionData - 捕获会话数据
  * @param {Object} rect - 裁剪区域
  * @param {Object} options - 保存选项

@@ -32,8 +32,7 @@ const radiusInput = ref(0);
 // 监听选区变化，同步到输入框
 watch(() => props.bounds, (newBounds) => {
   if (!newBounds) return;
-  // 只有在没有手动输入的情况下才自动更新，或者在刚打开时更新
-  // 为了简化体验，每次选区变化都更新输入框
+  // 每次选区变化都更新输入框
   widthInput.value = Math.round(newBounds.w || 0);
   heightInput.value = Math.round(newBounds.h || 0);
 }, { immediate: true });
@@ -98,7 +97,7 @@ const applySizeSettings = () => {
   if (newW <= 0 || newH <= 0) return;
 
   // 更新 state
-  // 这里的策略是：强制重置 start 为左上角，end 为右下角
+  // 重置 start 为左上角，end 为右下角
   state.startX = currentX;
   state.startY = currentY;
   state.endX = currentX + newW;
@@ -163,17 +162,10 @@ const toolbarPos = computed(() => {
   };
 
   // 基础工具栏尺寸
-  // 基础工具栏尺寸
+
   const tbWidth = 140;
   // 始终预留次级菜单的高度 (36 + 40)，防止展开时主菜单位置跳动
   const tbHeight = 76;
-
-  /*
-  // 如果显示尺寸设置栏，高度增加
-  if (showSizeSettings.value || showRadiusSettings.value) {
-    tbHeight += 40;
-  }
-  */
 
   const spacing = 8;
   const margin = 12;
@@ -190,18 +182,17 @@ const toolbarPos = computed(() => {
     bottom: db.y + db.height - state.offsetY,
   };
 
-  // 1. 尝试放在选区右下角外侧
+  // 优先放置在选区右下角外侧
   let left = x + w - tbWidth;
   let top = y + h + spacing;
 
-  // 2. 检查下方是否超出该显示器边界
+  // 检查底部是否超出屏幕
   if (top + tbHeight + margin > localDb.bottom) {
-    // 3. 尝试放在选区右上角外侧
+    // 尝试放置在右上角
     top = y - tbHeight - spacing;
 
-    // 4. 如果上方也放不下 (选区太高)
+    // 仍然超出，则放置在选区内部
     if (top < localDb.top + margin) {
-      // 5. 放在选区内部的右下角
       top = y + h - tbHeight - margin - 10;
       left = x + w - tbWidth - margin - 10;
     }
