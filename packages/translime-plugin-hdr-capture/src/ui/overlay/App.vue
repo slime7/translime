@@ -84,32 +84,6 @@ const showMagnifier = computed(() => {
 });
 
 // ==================== 交互逻辑 (Helpers) ====================
-function closeOverlay() {
-  window.hdrCapture?.close?.();
-}
-
-function handleCancel() {
-  if (state.hasSelection) {
-    state.hasSelection = false;
-    state.isSelecting = false;
-    state.isDragging = false;
-    state.isMoving = false;
-    state.highlightedWindow = null;
-  } else {
-    closeOverlay();
-  }
-}
-
-// ==================== 交互逻辑 (Helpers) ====================
-
-const findDisplayAtLocalPoint = (lx, ly) => {
-  const gx = lx + state.offsetX;
-  const gy = ly + state.offsetY;
-  return state.displays.find((d) => {
-    const b = d.bounds;
-    return gx >= b.x && gx < b.x + b.width && gy >= b.y && gy < b.y + b.height;
-  }) || state.displays[0];
-};
 
 const detectWindow = (lx, ly) => {
   if (state.isSelecting || state.isMoving || state.hasSelection) return;
@@ -133,7 +107,43 @@ const detectWindow = (lx, ly) => {
     state.candidates = newCandidates;
     state.candidateIndex = 0;
     state.highlightedWindow = newCandidates.length > 0 ? newCandidates[0] : null;
+  } else if (!state.highlightedWindow && newCandidates.length > 0) {
+    // 特殊情况：列表没变，但当前未选中任何窗口（例如刚取消选区），强制恢复选中
+    state.candidateIndex = 0;
+    [state.highlightedWindow] = newCandidates;
   }
+};
+
+function closeOverlay() {
+  window.hdrCapture?.close?.();
+}
+
+function handleCancel() {
+  if (state.hasSelection) {
+    state.hasSelection = false;
+    state.isSelecting = false;
+    state.isDragging = false;
+    state.isMoving = false;
+    state.highlightedWindow = null;
+
+    // 取消选区后，立即重新检测当前鼠标下的窗口
+    if (state.cursorPos) {
+      detectWindow(state.cursorPos.x, state.cursorPos.y);
+    }
+  } else {
+    closeOverlay();
+  }
+}
+
+// ==================== 交互逻辑 (Helpers) ====================
+
+const findDisplayAtLocalPoint = (lx, ly) => {
+  const gx = lx + state.offsetX;
+  const gy = ly + state.offsetY;
+  return state.displays.find((d) => {
+    const b = d.bounds;
+    return gx >= b.x && gx < b.x + b.width && gy >= b.y && gy < b.y + b.height;
+  }) || state.displays[0];
 };
 
 const onWheel = (e) => {
@@ -247,6 +257,8 @@ const onMouseDown = (e) => {
       return;
     }
     state.hasSelection = false;
+    // 点击空白处取消选区后，重新开始检测窗口
+    detectWindow(mx, my);
   }
 
   state.isSelecting = true;
@@ -348,16 +360,37 @@ function clearBlobUrls() {
   blobUrls.length = 0;
 }
 
+function resetState() {
+  state.hasSelection = false;
+  state.isSelecting = false;
+  state.isDragging = false;
+  state.isMoving = false;
+  state.isResizing = false;
+  state.highlightedWindow = null;
+  state.startX = 0;
+  state.startY = 0;
+  state.endX = 0;
+  state.endY = 0;
+  state.candidates = [];
+
+  clearBlobUrls();
+  state.capturedScreens = [];
+  state.allWindows = [];
+  state.displays = [];
+}
+
 onMounted(() => {
   if (window.hdrCapture?.onInit) {
     window.hdrCapture.onInit((data) => {
+      // 先重置所有状态
+      resetState();
+
       state.isDebug = !!data.isDebug;
       state.offsetX = data.minX;
       state.offsetY = data.minY;
       state.displays = data.displays || [];
 
-      // 重置交互状态
-      state.hasSelection = false;
+      // 设置新数据
       state.isSelecting = false;
       state.isDragging = false;
       state.isMoving = false;
@@ -385,6 +418,20 @@ onMounted(() => {
       }
 
       state.allWindows = data.windows || [];
+
+      // 立即触发一次窗口检测，确保静止状态下也能高亮当前窗口
+      if (state.cursorPos) {
+        // 注意：detectWindow 接收的是本地坐标 (相对于 Overlay 左上角)
+        // state.cursorPos 已经在上面转换为本地坐标了
+        detectWindow(state.cursorPos.x, state.cursorPos.y);
+      }
+    });
+  }
+
+  if (window.hdrCapture?.onReset) {
+    window.hdrCapture.onReset(() => {
+      logger.info('收到重置信号，清空状态');
+      resetState();
     });
   }
 

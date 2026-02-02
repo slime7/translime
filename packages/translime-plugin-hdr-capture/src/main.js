@@ -72,6 +72,8 @@ const getAllDisplaysBounds = () => {
     displays,
     minX,
     minY,
+    maxX,
+    maxY,
     width: maxX - minX,
     height: maxY - minY,
   };
@@ -87,16 +89,29 @@ const updateOverlayBounds = () => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
 
   const {
-    minX, minY, width, height,
+    minX, minY, maxY, width, height,
   } = getAllDisplaysBounds();
 
-  overlayWindow.setBounds({
-    x: minX,
-    y: minY,
-    width,
-    height,
-  });
-  logger.info(`屏幕变动，已更新 Overlay 边界: ${width}x${height} at (${minX}, ${minY})`);
+  // 简单策略：如果窗口当前是可见的，我们只需判断它是否应该处于离屏状态
+  // 但为了简化逻辑，我们只处理“如果它正在显示内容，则更新其大小以适应新屏幕”
+  // 至于离屏状态的窗口，我们干脆再次将其移动到新的安全离屏位置
+  // 或者，如果窗口处于离屏位置（y > maxY），我们更新它的离屏位置
+
+  const { y } = overlayWindow.getBounds();
+
+  if (y >= maxY) {
+    // 当前处于离屏状态，更新到新的离屏位置
+    overlayWindow.setBounds({
+      width, height, x: 0, y: maxY + 100,
+    });
+    logger.info(`屏幕变动，更新离屏位置: (0, ${maxY + 100})`);
+  } else {
+    // 当前处于显示状态，更新全屏边界
+    overlayWindow.setBounds({
+      x: minX, y: minY, width, height,
+    });
+    logger.info(`屏幕变动，更新捕获边界: ${width}x${height} at (${minX}, ${minY})`);
+  }
 };
 
 /**
@@ -109,7 +124,6 @@ const unregisterShortcut = () => {
     registeredShortcut = null;
   }
 };
-
 
 const createOverlayWindow = (isDebug = false) => {
   const {
@@ -127,7 +141,7 @@ const createOverlayWindow = (isDebug = false) => {
     skipTaskbar: !isDebug,
     resizable: isDebug,
     movable: isDebug,
-    maximizable: true,
+    maximizable: false,
     fullscreen: false,
     thickFrame: false,
     hasShadow: false,
@@ -251,10 +265,21 @@ const preCaptureAllScreens = async () => {
  * 启动截图流程
  */
 const startCapture = async (isDebug = false) => {
-  // 如果窗口已存在且可见，说明正在截图中，直接聚焦
+  // 缓存显示器边界信息，供后续逻辑复用
+  const {
+    displays: allDisplays, minX, minY, maxY, width: totalWidth, height: totalHeight,
+  } = getAllDisplaysBounds();
+
+  // 如果窗口已存在、由于离屏策略处于“可见”状态且坐标在有效范围内，说明正在截图中，直接聚焦
   if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
-    overlayWindow.focus();
-    return;
+    const { y } = overlayWindow.getBounds();
+
+    // 如果 y 坐标小于 maxY，说明窗口当前在某个显示器范围内，即正在截图中
+    // 只有当它真的在屏幕内时才直接 focus
+    if (y < maxY) {
+      overlayWindow.focus();
+      return;
+    }
   }
 
   // 等待 DWM 状态稳定
@@ -291,7 +316,7 @@ const startCapture = async (isDebug = false) => {
   // 获取鼠标当前位置，用于判断初始应高亮哪个屏幕
   const cursorPos = screen.getCursorScreenPoint();
 
-  // 获取所有顶层窗口信息用于点击识别
+  // 坐标转换后保留的窗口项
   const nativeWindows = capture.getTopLevelWindows();
   logger.info(`原生模块返回 ${nativeWindows.length} 个窗口`);
 
@@ -313,10 +338,6 @@ const startCapture = async (isDebug = false) => {
       return null;
     }
   }).filter(Boolean);
-
-  const {
-    displays: allDisplays, minX, minY, width: totalWidth, height: totalHeight,
-  } = getAllDisplaysBounds();
 
   // 为每个显示器添加独立的自动选区候选
   allDisplays.forEach((d, idx) => {
@@ -342,19 +363,11 @@ const startCapture = async (isDebug = false) => {
   // 确保窗口已创建
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     createOverlayWindow(isDebug);
-  } else {
-    // 如果窗口已存在（常驻模式），确保边界正确
-    updateOverlayBounds();
   }
 
-  // 立即显示窗口但设为全透明，让系统动画在数据加载期间完成，或者完全绕过动画感观
-  if (!overlayWindow.isVisible()) {
-    overlayWindow.setOpacity(0);
-    overlayWindow.show();
-  } else if (overlayWindow.getOpacity() === 0) {
-    // 窗口已显示但处于透明状态
-    // 保持透明，直到数据通过
-  }
+  // 立即显示或移动窗口
+  // 确保窗口位置正确（强制移动到 minX, minY）
+  // 注意：显示逻辑推迟到 sendDataAndShow 中
 
   // 准备初始化数据
   const initData = {
@@ -376,8 +389,19 @@ const startCapture = async (isDebug = false) => {
     logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
 
-    // 数据就绪，瞬间显示
-    overlayWindow.setOpacity(1);
+    // 关键修复：数据发送后，再将窗口移动回可见区域
+    // 这样用户看到的每一帧都是已加载好截图数据的画面，绝不会看到之前的 UI（放大镜等）
+
+    // 强制移动到 minX, minY (可见区域)
+    overlayWindow.setBounds({
+      x: minX, y: minY, width: totalWidth, height: totalHeight,
+    });
+
+    if (!overlayWindow.isVisible()) {
+      overlayWindow.showInactive();
+    }
+
+    // 数据就绪，确保交互状态正确
     overlayWindow.focus();
     overlayWindow.setIgnoreMouseEvents(false);
   };
@@ -440,13 +464,22 @@ const registerShortcut = (accelerator) => {
  */
 const closeOverlay = () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
+    // 无论普通模式还是快速模式，先通知 UI 重置状态（清空画面）
+    // 这能有效防止“Ghosting”重叠显示问题，并减少离屏时的内存占用
+    try {
+      overlayWindow.webContents.send(`overlay-reset@${PLUGIN_ID}`);
+    } catch (e) {
+      // ignore
+    }
+
     if (getFastResponse()) {
-      // 快速响应模式：隐藏窗口而不是销毁
-      overlayWindow.hide();
-      overlayWindow.setIgnoreMouseEvents(true); // 隐藏时忽略鼠标，以防万一
-      // 可选：通知 UI 重置状态，避免下次打开时看到旧画面一闪而过
-      // overlayWindow.webContents.send(`overlay-reset@${PLUGIN_ID}`);
-      logger.info('快速响应模式: Overlay 已隐藏');
+      // 快速响应模式：将窗口移出屏幕外部
+      // 动态计算所有显示器的最下方边界，将窗口放在其下方，确保绝对不可见
+      const { maxY } = getAllDisplaysBounds();
+
+      overlayWindow.setIgnoreMouseEvents(true);
+      overlayWindow.setPosition(0, maxY + 100);
+      logger.info(`快速响应模式: Overlay 已移至离屏常驻 (0, ${maxY + 100})`);
     } else {
       // 普通模式：销毁窗口
       overlayWindow.close();
@@ -454,8 +487,6 @@ const closeOverlay = () => {
       logger.info('Overlay 已关闭');
     }
     // 无论哪种模式，这里可以清理一下当前的 session 数据，释放内存
-    // 但如果在 fastResponse 模式下，保留它也没关系，毕竟下次 startCapture 会覆盖
-    // 为了节省内存，建议清理
     currentCaptureSession = null;
   }
 };

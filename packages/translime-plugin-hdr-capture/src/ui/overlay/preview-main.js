@@ -3,7 +3,7 @@
  * 在浏览器中预览 Overlay UI，不需要 Electron 环境
  */
 import { createApp } from 'vue';
-import { initOverlayPreviewMock } from './preview-mock.js';
+import { initOverlayPreviewMock } from './preview-mock';
 import App from './App.vue';
 import './index.css';
 

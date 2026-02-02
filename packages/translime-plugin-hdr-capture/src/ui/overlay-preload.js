@@ -68,6 +68,17 @@ contextBridge.exposeInMainWorld('hdrCapture', {
    * @param {function} callback
    */
   onInit: (callback) => {
+    // 移除旧的监听器以防止累积（虽然 App 只挂载一次，但热重载开发时很有用）
+    ipcRenderer.removeAllListeners(`overlay-init@${PLUGIN_ID}`);
     ipcRenderer.on(`overlay-init@${PLUGIN_ID}`, (event, data) => callback(data));
+  },
+
+  /**
+   * 监听重置消息
+   * @param {function} callback
+   */
+  onReset: (callback) => {
+    ipcRenderer.removeAllListeners(`overlay-reset@${PLUGIN_ID}`);
+    ipcRenderer.on(`overlay-reset@${PLUGIN_ID}`, () => callback());
   },
 });
