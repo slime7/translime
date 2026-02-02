@@ -206,6 +206,9 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
             .and_then(|o| o.preserve_raw)
             .unwrap_or(false) && is_hdr_format;
         
+        // 记录上一帧的有效像素比率，用于稳定性检查
+        let mut last_valid_ratio: Option<f32> = None;
+        
         while retry_count < 30 {
             let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
             let mut desktop_resource: Option<IDXGIResource> = None;
@@ -279,31 +282,72 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
                         
                         let _ = duplication.ReleaseFrame();
 
-                        // 增强判定：全屏均匀采样 100 个点，防止因为局部黑边导致误判
-                        let total_pixels = temp_buffer.len() / 4;
-                        let sample_step = (total_pixels / 100).max(1);
-                        let has_content = (0..100).any(|i| {
-                            let idx = i * sample_step * 4;
-                            if idx + 2 < temp_buffer.len() {
-                                temp_buffer[idx] > 0 || temp_buffer[idx+1] > 0 || temp_buffer[idx+2] > 0
-                            } else {
-                                false
-                            }
-                        });
+                        // 智能判定逻辑：
+                        // 1. 如果画面绝大部分有效 (>90%)，直接认为是好帧，零延迟返回
+                        // 2. 如果画面处于中间态 (50%~90%)，可能是暗色模式也可能是局部渲染中 (如上半部分黑)
+                        //    此时要求"连续两帧稳定"，即当前帧与上一帧的有效率变化不大 (<5%)，才认为是稳定画面
                         
-                        if has_content || retry_count >= 25 {
-                            if retry_count > 0 {
-                                println!("[HDR-Native] Display {} recovered at retry {}", display_id, retry_count);
+                        let total_pixels = temp_buffer.len() / 4;
+                        let step = 5;
+                        let mut valid_count = 0;
+                        
+                        let total_samples = total_pixels / step;
+                        // 只需要计算比率，不用预设阈值
+                        
+                        // 执行采样
+                        let _ = (0..total_pixels).step_by(step).try_for_each(|i| {
+                            let idx = i * 4;
+                            if idx + 2 < temp_buffer.len() {
+                                if temp_buffer[idx] > 0 || temp_buffer[idx+1] > 0 || temp_buffer[idx+2] > 0 {
+                                    valid_count += 1;
+                                }
                             }
+                            // 只要有一个 valid 就继续，这里只是为了统计 count
+                            // 使用 try_for_each 能够遍历但不支持 break true/false，这里主要用 for_each 的效果
+                            Some(())
+                        });
+
+                        let current_ratio = valid_count as f32 / total_samples as f32;
+                        
+                        let is_high_quality = current_ratio > 0.9;
+                        let is_valid_enough = current_ratio > 0.5;
+                        
+                        let is_stable = if let Some(last_ratio) = last_valid_ratio {
+                            (current_ratio - last_ratio).abs() < 0.05
+                        } else {
+                            false
+                        };
+
+                        if is_high_quality || (is_valid_enough && is_stable) || retry_count >= 25 {
+                            // 满足条件：高质量直接通过，或者中等质量且稳定，或者超时兜底
+                            
+                            // 保存结果
                             final_buffer = temp_buffer;
                             if !temp_raw_buffer.is_empty() {
                                 raw_hdr_data = Some(temp_raw_buffer);
                             }
+                            
+                            // 如果是因为超时强制退出的，打印日志
+                            if retry_count >= 25 {
+                                println!("[HDR-Native] Display {} timeout, forcing accept. Ratio: {:.2}", display_id, current_ratio);
+                            } else if retry_count > 0 {
+                                println!("[HDR-Native] Display {} captured at retry {}. Ratio: {:.2}", display_id, retry_count, current_ratio);
+                            }
+
+                            // 这里的 sleep 可以适当缩短或移除，因为有了稳定性检查
+                            // 但为了保险起见，对于非高质量（即暗色稳定帧），保留一个极短的缓冲
+                            if !is_high_quality {
+                                std::thread::sleep(std::time::Duration::from_millis(50));
+                            }
+                            
                             break;
+                        } 
+                        
+                        // 如果不满足退出条件，记录当前 ratio 供下一次比较
+                        if is_valid_enough {
+                            last_valid_ratio = Some(current_ratio);
                         } else {
-                            // 如果重试次数过多依然全黑，尝试重置下 duplication
-                            // 此时不进行复杂的重新 API 获取，仅执行 ReleaseFrame 并等待
-                            // 下一次循环会自动进行 AcquireNextFrame
+                            last_valid_ratio = None; // 画面太烂（<50%），重置稳定性检查
                         }
                     } else {
                         let _ = duplication.ReleaseFrame();
