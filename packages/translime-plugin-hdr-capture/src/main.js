@@ -186,11 +186,11 @@ const createOverlayWindow = (isDebug = false) => {
  * 预捕获所有屏幕画面
  * 返回原始数据用于后续处理，并关联 Electron 的显示器信息（缩放倍数）
  */
-const preCaptureAllScreens = async () => {
+const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => {
   const electronDisplays = screen.getAllDisplays();
   const nativeDisplays = capture.getDisplays();
 
-  logger.info('开始预捕获。检测到原生显示器数量:', nativeDisplays.length);
+  logger.info(`[Perf] 开始预捕获 (T+${Date.now() - startTime}ms). 检测到原生显示器数量:`, nativeDisplays.length);
 
   // 读取 HDR 映射配置
   const enableHdrMapping = getEnableHdrMapping();
@@ -203,7 +203,7 @@ const preCaptureAllScreens = async () => {
     enabled: true,
     sdrWhiteNits,
     hdrMaxNits,
-    // 当用户启用了 HDR 映射且勾选了保存 HDR 原始文件时，请求原始数据
+    preserveHdr, // 注意：传递给 native 的参数名和 config 可能略有不同，这里复用 preserveHdr
     preserveRaw: preserveHdr,
   } : null;
 
@@ -213,17 +213,33 @@ const preCaptureAllScreens = async () => {
 
   const capturePromises = nativeDisplays.map(async (nd) => {
     try {
-      logger.info(`正在捕获显示器 ID=${nd.id} (预期 ${nd.width}x${nd.height})`);
+      const t0 = Date.now();
+      logger.info(`[Perf] 正在捕获显示器 ID=${nd.id} (预期 ${nd.width}x${nd.height}) ...`);
       const {
         buffer, width, height, isHdr, rawHdrBuffer,
       } = await capture.captureDisplay(nd.id, hdrOptions);
+
+      const t1 = Date.now();
+      logger.info(`[Perf] 显示器 ID=${nd.id} 捕获完成, 耗时: ${t1 - t0}ms(T+${t1 - startTime}ms). 实际尺寸 ${width}x${height}, Buffer: ${buffer ? buffer.length : 0}, IS_HDR: ${isHdr}`);
+
+      // Debug 模式下，如果是非 HDR 屏幕，强制执行一次 Tone Mapping 以测试性能
+      if (isDebug && !isHdr && buffer && buffer.length > 0) {
+        try {
+          logger.info('[Perf] (Debug模式) 强制对 SDR 数据执行 Tone Mapping 测试...');
+          const tMap0 = Date.now();
+          // 注意：SDR 数据丢进去 toneMap 处理结果虽然色彩不对，但计算过程是一样的，足以反映耗时
+          await capture.toneMap(buffer, width, height, { exposure: 1.0 });
+          const tMap1 = Date.now();
+          logger.info(`[Perf] (Debug模式) 强制 Tone Mapping 耗时: ${tMap1 - tMap0}ms(T+${tMap1 - startTime}ms)`);
+        } catch (tmErr) {
+          logger.error('强制 Tone Mapping 测试失败:', tmErr);
+        }
+      }
 
       if (!buffer || buffer.length === 0) {
         logger.warn(`显示器 ID=${nd.id} 返回的 Buffer 为空`);
         return null;
       }
-
-      logger.info(`显示器 ID=${nd.id} 捕获成功: 实际尺寸 ${width}x${height}, Buffer 长度 ${buffer.length}, IS_HDR: ${isHdr}, 原始 HDR 数据: ${rawHdrBuffer ? rawHdrBuffer.length : 'N/A'}`);
 
       // 找到包含该 native 显示器中心点的 Electron 显示器，以获取 scaleFactor
       const centerX = nd.x + nd.width / 2;
@@ -233,8 +249,6 @@ const preCaptureAllScreens = async () => {
         return centerX >= b.x && centerX <= b.x + b.width
                && centerY >= b.y && centerY <= b.y + b.height;
       }) || electronDisplays[0];
-
-      logger.info(`显示器 ID=${nd.id} 匹配到 Electron 显示器: scale=${ed.scaleFactor}`);
 
       return {
         displayId: nd.id,
@@ -257,18 +271,26 @@ const preCaptureAllScreens = async () => {
     .filter((result) => result.status === 'fulfilled' && result.value !== null)
     .map((result) => result.value);
 
-  logger.info(`预捕获完成，成功获取到 ${finalResults.length} 张屏幕画面`);
+  logger.info(`[Perf] 预捕获全部完成 (T+${Date.now() - startTime}ms), 成功获取到 ${finalResults.length} 张屏幕画面`);
   return finalResults;
 };
 
 /**
  * 启动截图流程
  */
-const startCapture = async (isDebug = false) => {
+const startCapture = async (isDebug = false, startTime = Date.now()) => {
+  logger.info(`[Perf] startCapture 开始 (T+${Date.now() - startTime}ms)`);
+
   // 缓存显示器边界信息，供后续逻辑复用
   const {
     displays: allDisplays, minX, minY, maxY, width: totalWidth, height: totalHeight,
   } = getAllDisplaysBounds();
+
+  // [性能优化] 尽早确保窗口已创建，让 WebContents 加载与截图过程并行
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    logger.info(`[Perf] 预创建 Overlay 窗口 (T+${Date.now() - startTime}ms)`);
+    createOverlayWindow(isDebug);
+  }
 
   // 如果窗口已存在、由于离屏策略处于“可见”状态且坐标在有效范围内，说明正在截图中，直接聚焦
   if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
@@ -284,41 +306,52 @@ const startCapture = async (isDebug = false) => {
 
   // 等待 DWM 状态稳定
   await new Promise((resolve) => {
-    setTimeout(resolve, 100);
+    setTimeout(resolve, 10);
   });
+  logger.info(`[Perf] DWM 稳定等待结束 (T+${Date.now() - startTime}ms)`);
 
   // 预先捕获所有屏幕画面（冻结画面）
   let sessionData = [];
   // 并行地为 UI 准备编码后的画面 (WebP)
   let capturedScreens = [];
 
-  if (!isDebug) {
-    sessionData = await preCaptureAllScreens();
+  // 尝试真实截图 (无论是否 Debug，都尝试截图以支持性能测试)
+  sessionData = await preCaptureAllScreens(startTime, isDebug);
 
-    if (!sessionData || sessionData.length === 0) {
-      logger.error('启动失败: 未能捕获到任何屏幕画面。请检查原生模块加载状态及录屏权限。');
-      // 可以考虑这里弹出一个对话框通知用户
-      return;
-    }
-
+  if (sessionData && sessionData.length > 0) {
     currentCaptureSession = sessionData;
 
+    logger.info(`[Perf] 开始编码预览图 (T+${Date.now() - startTime}ms)...`);
     // 准备 UI 预览数据
-    capturedScreens = await Promise.all(sessionData.map(async (s) => ({
-      displayId: s.displayId,
-      bounds: s.bounds,
-      data: await capture.encodeImage(s.buffer, s.width, s.height, 'webp'),
-    })));
+    capturedScreens = await Promise.all(sessionData.map(async (s) => {
+      const tEncode0 = Date.now();
+      const data = await capture.encodeImage(s.buffer, s.width, s.height, 'webp');
+      const tEncode1 = Date.now();
+      logger.info(`[Perf] 编码显示器 ${s.displayId} 为 WebP 耗时: ${tEncode1 - tEncode0}ms`);
+      return {
+        displayId: s.displayId,
+        bounds: s.bounds,
+        data,
+      };
+    }));
+    logger.info(`[Perf] 所有预览图编码完成 (T+${Date.now() - startTime}ms)`);
+  } else if (!isDebug) {
+    // 非 Debug 模式下，截图失败则是致命错误
+    logger.error('启动失败: 未能捕获到任何屏幕画面。请检查原生模块加载状态及录屏权限。');
+    return;
   } else {
-    logger.info('Debug 模式：跳过实际截屏，提供空数据以启动 UI');
+    // Debug 模式下，截图失败（或空）则使用 Mock 数据启动 UI
+    logger.info('Debug 模式：真实截图未返回数据，提供空/Mock数据以启动 UI');
+    capturedScreens = []; // 或者这里可以 push 一些 mock 数据，但原代码是空的，维持原状
   }
 
   // 获取鼠标当前位置，用于判断初始应高亮哪个屏幕
   const cursorPos = screen.getCursorScreenPoint();
 
   // 坐标转换后保留的窗口项
+  const tWin0 = Date.now();
   const nativeWindows = capture.getTopLevelWindows();
-  logger.info(`原生模块返回 ${nativeWindows.length} 个窗口`);
+  logger.info(`[Perf] 获取顶层窗口耗时: ${Date.now() - tWin0}ms, 数量: ${nativeWindows.length}`);
 
   const windows = nativeWindows.map((win) => {
     try {
@@ -360,11 +393,6 @@ const startCapture = async (isDebug = false) => {
     logger.warn('未能成功转换任何窗口坐标或搜索结果为空');
   }
 
-  // 确保窗口已创建
-  if (!overlayWindow || overlayWindow.isDestroyed()) {
-    createOverlayWindow(isDebug);
-  }
-
   // 立即显示或移动窗口
   // 确保窗口位置正确（强制移动到 minX, minY）
   // 注意：显示逻辑推迟到 sendDataAndShow 中
@@ -383,10 +411,12 @@ const startCapture = async (isDebug = false) => {
       id: d.id,
       bounds: d.bounds,
     })),
+    // 传递触发时间戳，供 UI 计算总耗时
+    startTime,
   };
 
   const sendDataAndShow = () => {
-    logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
+    logger.info(`[Perf] 发送初始化数据 (T+${Date.now() - startTime}ms), 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
 
     // 关键修复：数据发送后，再将窗口移动回可见区域
@@ -404,6 +434,7 @@ const startCapture = async (isDebug = false) => {
     // 数据就绪，确保交互状态正确
     overlayWindow.focus();
     overlayWindow.setIgnoreMouseEvents(false);
+    logger.info(`[Perf] 窗口已显示并聚焦 (T+${Date.now() - startTime}ms)`);
   };
 
   // 如果页面正在加载，等待加载完成
@@ -434,13 +465,19 @@ const registerShortcut = (accelerator) => {
     return false;
   }
 
+  // 防止重复注册相同的快捷键
+  if (registeredShortcut === finalAccelerator) {
+    return true;
+  }
+
   // 先注销已有快捷键
   unregisterShortcut();
 
   try {
     const success = globalShortcut.register(finalAccelerator, () => {
-      logger.info(`触发快捷键: ${finalAccelerator}`);
-      startCapture().catch((err) => {
+      const now = Date.now();
+      logger.info(`[Perf] 快捷键触发: ${finalAccelerator} (T+0ms)`);
+      startCapture(false, now).catch((err) => {
         logger.error('快捷键触发 startCapture 失败:', err);
       });
     });
@@ -560,7 +597,7 @@ export const ipcHandlers = [
   {
     type: 'start-capture',
     handler: () => async ({ isDebug = false }) => {
-      await startCapture(isDebug);
+      await startCapture(isDebug, Date.now());
     },
   },
   {

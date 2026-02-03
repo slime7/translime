@@ -170,6 +170,9 @@ pub fn process_f16_row(src: &[u16], dest: &mut Vec<u8>, hdr_options: Option<&cra
         .and_then(|o| o.hdr_max_nits)
         .unwrap_or(1000.0) as f32;
     
+    // 预留空间 (如果未预留)
+    dest.reserve(src.len());
+
     for pixel in src.chunks(4) {
         // 将 F16 转换为线性 scRGB 浮点值
         let r_linear = f16_to_linear(pixel[0]);
@@ -184,6 +187,8 @@ pub fn process_f16_row(src: &[u16], dest: &mut Vec<u8>, hdr_options: Option<&cra
             hdr_to_sdr_simple_clamp(r_linear, g_linear, b_linear, sdr_white_nits)
         };
         
+        // 直接 extend 或 push (由于已经 reserve，push 开销很小，但 extend_from_slice 更快)
+        // 这里为了清晰和性能平衡，使用 unsafe set_len 的话需要小心初始化，这里保持 push 但确保 reserve
         dest.push(r_sdr);
         dest.push(g_sdr);
         dest.push(b_sdr);
@@ -204,6 +209,8 @@ pub fn process_10bit_row(src: &[u32], dest: &mut Vec<u8>, is_hdr: bool, hdr_opti
         .and_then(|o| o.hdr_max_nits)
         .unwrap_or(1000.0) as f32;
     
+    dest.reserve(src.len() * 4);
+
     for &pixel in src {
         // 10 bits R, G, B, 2 bits A
         let r_raw = (pixel & 0x3FF) as f32 / 1023.0;

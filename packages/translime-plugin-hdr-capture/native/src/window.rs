@@ -16,6 +16,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GW_HWNDNEXT, WS_EX_TRANSPARENT,
 };
 
+const NULLREGION: GDI_REGION_TYPE = GDI_REGION_TYPE(1);
+const ERROR: GDI_REGION_TYPE = GDI_REGION_TYPE(0);
+
 /// 窗口枚举上下文
 struct WindowEnumContext {
     windows: Vec<WindowInfo>,
@@ -129,7 +132,7 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
 
         let rgn_type = CombineRgn(visible_part, win_rgn, context.covered_region, RGN_DIFF);
 
-        if rgn_type != GDI_REGION_TYPE(1) && rgn_type != GDI_REGION_TYPE(0) {
+        if rgn_type != NULLREGION && rgn_type != ERROR {
             // 获取标题
             let title_len = GetWindowTextLengthW(hwnd);
             let mut title_buf: Vec<u16> = vec![0; (title_len + 1).max(1) as usize];
@@ -167,7 +170,6 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
 }
 
 /// 获取指定坐标处的窗口
-#[allow(clippy::collapsible_if)]
 pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option<WindowInfo> {
     unsafe {
         if let Some(ignore) = ignore_handle {
@@ -177,7 +179,8 @@ pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option
                 let hwnd_val = current_hwnd.0 as i64;
                 if IsWindowVisible(current_hwnd).as_bool() && hwnd_val != ignore && !is_cloaked(current_hwnd) {
                     if let Some(rect) = get_extended_frame_bounds(current_hwnd) {
-                        if x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom 
+                        if x >= rect.left && x < rect.right 
+                            && y >= rect.top && y < rect.bottom 
                             && (GetWindowLongW(current_hwnd, GWL_EXSTYLE) as u32 & WS_EX_TRANSPARENT.0) == 0 {
                             return get_window_info(current_hwnd);
                         }

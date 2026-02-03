@@ -174,17 +174,18 @@
                     color="primary"
                     variant="tonal"
                   >
-                    {{ settings.sdrWhiteNits }} nits
+                    {{ sliderState.sdrWhiteNits }} nits
                   </v-chip>
                 </div>
                 <v-slider
-                  v-model="settings.sdrWhiteNits"
+                  v-model="sliderState.sdrWhiteNits"
                   :min="80"
                   :max="400"
                   :step="1"
                   color="primary"
                   thumb-label
                   hide-details
+                  @end="settings.sdrWhiteNits = sliderState.sdrWhiteNits"
                 >
                   <template #prepend>
                     <span class="slider-range-label">80</span>
@@ -207,17 +208,18 @@
                     color="primary"
                     variant="tonal"
                   >
-                    {{ settings.hdrMaxNits }} nits
+                    {{ sliderState.hdrMaxNits }} nits
                   </v-chip>
                 </div>
                 <v-slider
-                  v-model="settings.hdrMaxNits"
+                  v-model="sliderState.hdrMaxNits"
                   :min="400"
                   :max="2000"
                   :step="10"
                   color="primary"
                   thumb-label
                   hide-details
+                  @end="settings.hdrMaxNits = sliderState.hdrMaxNits"
                 >
                   <template #prepend>
                     <span class="slider-range-label">400</span>
@@ -294,7 +296,7 @@ defineOptions({
 });
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
-const showDebugUi = false;
+const showDebugUi = true;
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'SettingsUI' }) : baseLogger;
 
@@ -310,6 +312,12 @@ const settings = reactive({
   sdrWhiteNits: 203, // SDR 白点亮度 (默认 Windows 标准)
   hdrMaxNits: 1000, // HDR 峰值亮度 (默认 1000 nits)
   preserveHdr: false, // 是否保存 HDR 原始文件
+});
+
+// 滑块临时状态（防抖）
+const sliderState = reactive({
+  sdrWhiteNits: 203,
+  hdrMaxNits: 1000,
 });
 
 // 用于 UI 显示的临时快捷键状态，避免输入过程中频繁触发保存
@@ -339,6 +347,10 @@ onMounted(async () => {
   if (savedSettings) {
     Object.assign(settings, savedSettings);
     tempShortcut.value = settings.shortcut; // Initialize tempShortcut
+
+    // 初始化滑块临时状态
+    sliderState.sdrWhiteNits = settings.sdrWhiteNits;
+    sliderState.hdrMaxNits = settings.hdrMaxNits;
   }
 
   // 如果保存路径为空，获取默认路径并填入（但不强制保存，除非用户修改了其他设置）

@@ -382,6 +382,10 @@ function resetState() {
 onMounted(() => {
   if (window.hdrCapture?.onInit) {
     window.hdrCapture.onInit((data) => {
+      const now = Date.now();
+      const startTime = data.startTime || now;
+      logger.info(`[Perf] UI 收到初始化数据, 开始处理 (T+${now - startTime}ms)`);
+
       // 先重置所有状态
       resetState();
 
@@ -425,6 +429,8 @@ onMounted(() => {
         // state.cursorPos 已经在上面转换为本地坐标了
         detectWindow(state.cursorPos.x, state.cursorPos.y);
       }
+
+      logger.info(`[Perf] UI 数据处理完成, 等待渲染更新 (T+${Date.now() - startTime}ms)`);
     });
   }
 
