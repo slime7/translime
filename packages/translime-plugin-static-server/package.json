@@ -1,6 +1,6 @@
 {
   "name": "translime-plugin-static-server",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "开启一个临时的静态文件服务器。",
   "license": "MIT",
   "keywords": [

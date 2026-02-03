@@ -306,73 +306,6 @@ const processPlugin = (plugin) => {
   }
 };
 
-/**
- * 递归安装依赖
- * 注意：由于缺乏 semver 解析，目前仅支持安装依赖的 latest 版本
- * 且采用扁平化安装到 plugins/node_modules
- * @param {object} dependencies - 依赖对象 { name: version }
- * @param {Set<string>} installed - 已安装的包集合，防止循环依赖
- */
-const installDependencies = async (dependencies, installed = new Set()) => {
-  if (!dependencies) return;
-  const deps = Object.keys(dependencies);
-
-  // 串行安装以避免并发冲突
-  /* eslint-disable no-restricted-syntax, no-await-in-loop, no-continue */
-  for (const name of deps) {
-    if (installed.has(name)) continue;
-
-    const destDir = path.join(PLUGIN_MODULES_PATH, name);
-    installed.add(name); // 标记为已处理，防止循环
-
-    try {
-      await fsp.access(destDir);
-      // 如果已存在，继续递归检查其依赖（可能是之前安装的）
-      const pkgPath = path.join(destDir, 'package.json');
-      try {
-        const pkgContent = await fsp.readFile(pkgPath, 'utf8');
-        const pkg = JSON.parse(pkgContent);
-        await installDependencies(pkg.dependencies, installed);
-      } catch (e) {
-        // ignore
-      }
-      continue;
-    } catch {
-      // 目录不存在，需要安装
-    }
-
-    try {
-      logger.debug(`[plugin] 正在安装依赖: ${name}`);
-      // 默认获取 latest
-      const metadata = await fetchPackageMetadata(name);
-      if (metadata.tarball) {
-        const tarballPath = path.join(PLUGIN_PACKAGE_DIR, `${name}-${metadata.version}.tgz`);
-
-        // 如果 tarball 不存在则下载
-        try {
-          await fsp.access(tarballPath);
-        } catch {
-          await downloadTarball(metadata.tarball, tarballPath);
-        }
-
-        await extractTarball(tarballPath, name);
-
-        // 递归安装子依赖
-        const depPkgPath = path.join(destDir, 'package.json');
-        try {
-          const depPkgContent = await fsp.readFile(depPkgPath, 'utf8');
-          const depPkg = JSON.parse(depPkgContent);
-          await installDependencies(depPkg.dependencies, installed);
-        } catch (e) {
-          // ignore
-        }
-      }
-    } catch (e) {
-      logger.warn(`[plugin] 依赖 ${name} 安装失败: ${e.message}`);
-    }
-  }
-};
-
 class PluginLoader extends EventEmitter {
   init() {
     this.cleanTempNodeFiles();
@@ -631,19 +564,6 @@ class PluginLoader extends EventEmitter {
       // 解压 tarball 到 node_modules
       await extractTarball(tarballPath, packageName);
 
-      // 读取插件 package.json 并安装依赖
-      const pluginDir = path.join(PLUGIN_MODULES_PATH, packageName);
-      const pkgPath = path.join(pluginDir, 'package.json');
-      try {
-        const pkgContent = await fsp.readFile(pkgPath, 'utf8');
-        const pkg = JSON.parse(pkgContent);
-        // 开始安装依赖，传入新的 Set
-        logger.info(`[plugin] 开始安装 ${packageName} 的依赖...`);
-        await installDependencies(pkg.dependencies, new Set([packageName]));
-      } catch (e) {
-        logger.warn(`[plugin] 读取插件 ${packageName} 信息或安装依赖失败: ${e.message}`);
-      }
-
       // 更新 package.json
       await updatePluginDependency(packageName, version, 'add');
 
@@ -695,7 +615,8 @@ class PluginLoader extends EventEmitter {
       }
 
       // 下载 tarball
-      const tarballFileName = `${packageName}-${metadata.version}.tgz`;
+      const safeName = packageName.replace(/\//g, '-');
+      const tarballFileName = `${safeName}-${metadata.version}.tgz`;
       const tarballPath = path.join(PLUGIN_PACKAGE_DIR, tarballFileName);
       await downloadTarball(metadata.tarball, tarballPath);
 
