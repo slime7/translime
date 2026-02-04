@@ -305,7 +305,7 @@ defineOptions({
 });
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
-const showDebugUi = true;
+const showDebugUi = false;
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'SettingsUI' }) : baseLogger;
 
