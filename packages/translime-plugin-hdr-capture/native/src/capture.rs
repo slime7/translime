@@ -1,12 +1,8 @@
-//! HDR 屏幕捕获模块
+//! HDR 屏幕捕获模块 (Windows Graphics Capture 版)
 //!
-//! 使用 Windows Desktop Duplication API 捕获屏幕
-//! 
-//! 性能优化备忘录:
-//! 1. 使用 CaptureSession 缓存 D3D 设备和 Duplication 接口，避免每次调用重复创建
-//! 2. 优化循环等待逻辑，对于静止画面直接返回上一帧
-//! 3. 智能质量判定代替固定 sleep
-//! 4. 优化像素处理循环，避免重复内存分配
+//! 该模块利用 Windows Graphics Capture API 实现了高性能的 HDR 屏幕捕获。
+//! 为了避免频繁创建 D3D 设备带来的性能开销及可能的会话失效错误，
+//! 模块对 D3D11 设备、上下文及 Staging Texture 进行了持久化缓存。
 
 use napi_derive::napi;
 use windows::Win32::Graphics::Direct3D11::{
@@ -14,442 +10,417 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_MAPPED_SUBRESOURCE,
     D3D11_MAP_READ, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
-use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_UNKNOWN;
-use windows::Win32::Graphics::Dxgi::Common::{
-    DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DXGI_FORMAT_R16G16B16A16_FLOAT,
-    DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_SAMPLE_DESC, DXGI_FORMAT,
-};
+use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_HARDWARE;
 use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory1, IDXGIAdapter, IDXGIFactory1, IDXGIOutput, IDXGIOutput1, IDXGIOutput6,
-    IDXGIOutputDuplication, IDXGIResource, DXGI_OUTDUPL_FRAME_INFO, DXGI_ERROR_WAIT_TIMEOUT,
-    DXGI_ERROR_ACCESS_LOST,
+    CreateDXGIFactory1, IDXGIFactory1, IDXGIDevice, DXGI_OUTPUT_DESC,
+    Common::{DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_SAMPLE_DESC},
 };
-use windows::core::Interface;
-use std::sync::{Mutex, OnceLock};
-use std::collections::HashMap;
-use std::time::Duration;
+use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop;
+use windows::Win32::System::WinRT::Direct3D11::{CreateDirect3D11DeviceFromDXGIDevice, IDirect3DDxgiInterfaceAccess};
+use windows::Graphics::Capture::{GraphicsCaptureItem, Direct3D11CaptureFramePool};
+use windows::Graphics::DirectX::DirectXPixelFormat;
+use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
+use windows::Win32::Graphics::Gdi::HMONITOR;
+use windows::Foundation::TypedEventHandler;
+use windows::core::{Interface, IInspectable};
 
-/// 显示器信息
+use std::sync::{Arc, Mutex, Condvar, OnceLock};
+use std::collections::HashMap;
+
+/// 显示器描述信息
 #[napi(object)]
 pub struct DisplayInfo {
-    /// 显示器索引
     pub id: u32,
-    /// 显示器名称
     pub name: String,
-    /// 左边界
     pub x: i32,
-    /// 上边界
     pub y: i32,
-    /// 宽度
     pub width: u32,
-    /// 高度
     pub height: u32,
-    /// 是否主显示器
     pub is_primary: bool,
 }
 
-/// 捕获会话结构体 - 保持 D3D 设备和 Duplication 状态
-struct CaptureSession {
-    context: ID3D11DeviceContext,
-    duplication: IDXGIOutputDuplication,
-    staging_resource: ID3D11Resource,
+/// 内部使用的缓存帧结构
+#[derive(Clone)]
+struct CachedFrame {
+    buffer: Vec<u8>,
+    raw_buffer: Option<Vec<u8>>,
     width: u32,
     height: u32,
-    pixel_format: DXGI_FORMAT,
-    // 缓存上一帧的数据，用于超时快速返回
-    last_buffer: Option<Vec<u8>>,
-    last_raw_buffer: Option<Vec<u8>>,
+    is_hdr: bool,
 }
 
-// 确保 Session 可以在线程间传递 (Mutex 保护)
-unsafe impl Send for CaptureSession {}
-unsafe impl Sync for CaptureSession {}
-
-// 全局会话缓存
-static SESSIONS: OnceLock<Mutex<HashMap<u32, CaptureSession>>> = OnceLock::new();
-
-fn get_sessions() -> &'static Mutex<HashMap<u32, CaptureSession>> {
-    SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
+/// 帧请求的同步状态
+struct RequestState {
+    pending: bool,
+    result: Option<Result<crate::CaptureResult, String>>,
 }
 
-/// 尝试创建一个新的捕获会话
-fn create_session(display_id: u32) -> Result<CaptureSession, Box<dyn std::error::Error>> {
+/// 帧请求同步辅助结构
+struct FrameRequest {
+    lock: Mutex<RequestState>,
+    cvar: Condvar,
+}
+
+/// 辅助结构，用于跨线程管理 Staging Texture
+struct StagingStore {
+    resource: Option<ID3D11Resource>,
+    desc: D3D11_TEXTURE2D_DESC,
+}
+
+/// D3D 持久化上下文容器
+struct D3DContext {
+    d3d_device: ID3D11Device,
+    d3d_context: Arc<Mutex<ID3D11DeviceContext>>,
+    winrt_device: IDirect3DDevice,
+    staging_store: Arc<Mutex<StagingStore>>,
+}
+
+// 确保上下文可在线程间安全传递
+unsafe impl Send for D3DContext {}
+unsafe impl Sync for D3DContext {}
+
+// 全局 D3D 上下文缓存，按显示器 ID 分组
+static CONTEXTS: OnceLock<Mutex<HashMap<u32, Arc<D3DContext>>>> = OnceLock::new();
+
+/// 获取或初始化全局上下文缓存
+fn get_contexts() -> &'static Mutex<HashMap<u32, Arc<D3DContext>>> {
+    CONTEXTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 根据显示器 ID 获取对应的显示器句柄 (HMONITOR)
+fn get_monitor_handle(display_id: u32) -> Result<HMONITOR, Box<dyn std::error::Error>> {
     unsafe {
-        // 创建 DXGI Factory
         let factory: IDXGIFactory1 = CreateDXGIFactory1()?;
-
-        // 查找目标显示器
         let mut current_id = 0u32;
-        let mut target_output: Option<IDXGIOutput> = None;
-        let mut target_adapter: Option<IDXGIAdapter> = None;
-
         let mut adapter_idx = 0u32;
-        'outer: while let Ok(adapter) = factory.EnumAdapters(adapter_idx) {
+        
+        while let Ok(adapter) = factory.EnumAdapters(adapter_idx) {
             let mut output_idx = 0u32;
             while let Ok(output) = adapter.EnumOutputs(output_idx) {
                 if current_id == display_id {
-                    target_output = Some(output);
-                    target_adapter = Some(adapter);
-                    break 'outer;
+                    let desc: DXGI_OUTPUT_DESC = output.GetDesc()?;
+                    return Ok(desc.Monitor);
                 }
                 current_id += 1;
                 output_idx += 1;
             }
             adapter_idx += 1;
         }
+        Err("指定的显示器 ID 未找到".into())
+    }
+}
 
-        let output = target_output.ok_or("Display not found")?;
-        let adapter = target_adapter.ok_or("Adapter not found")?;
+/// 获取或创建指定显示器的 D3D 持久化上下文
+fn get_or_create_d3d_context(display_id: u32) -> Result<Arc<D3DContext>, Box<dyn std::error::Error>> {
+    let mut contexts = get_contexts().lock().map_err(|_| "无法锁定设备上下文缓存")?;
 
-        // 创建 D3D11 设备
-        let mut device: Option<ID3D11Device> = None;
+    if let Some(ctx) = contexts.get(&display_id) {
+        return Ok(ctx.clone());
+    }
+
+    unsafe {
+        // 初始化 D3D11 设备与上下文
+        let mut d3d_device: Option<ID3D11Device> = None;
         let mut context: Option<ID3D11DeviceContext> = None;
-
+        
         D3D11CreateDevice(
-            &adapter,
-            D3D_DRIVER_TYPE_UNKNOWN,
+            None,
+            D3D_DRIVER_TYPE_HARDWARE,
             None,
             D3D11_CREATE_DEVICE_BGRA_SUPPORT,
             None,
             D3D11_SDK_VERSION,
-            Some(&mut device),
+            Some(&mut d3d_device),
             None,
             Some(&mut context),
         )?;
-
-        let device = device.ok_or("Failed to create D3D11 device")?;
-        let context = context.ok_or("Failed to get device context")?;
-
-        // 获取描述
-        let output_desc = output.GetDesc()?;
         
-        // 创建 Duplication 接口
-        let (duplication, is_output6) = {
-            if let Ok(output6) = output.clone().cast::<IDXGIOutput6>() {
-                let formats = [
-                    DXGI_FORMAT_R16G16B16A16_FLOAT,
-                    DXGI_FORMAT_B8G8R8A8_UNORM,
-                    DXGI_FORMAT_R10G10B10A2_UNORM,
-                ];
-                match output6.DuplicateOutput1(&device, 0, &formats) {
-                    Ok(dupl) => (dupl, true),
-                    Err(_) => {
-                        let output1: IDXGIOutput1 = output.clone().cast()?;
-                        (output1.DuplicateOutput(&device)?, false)
-                    }
-                }
-            } else {
-                let output1: IDXGIOutput1 = output.clone().cast()?;
-                (output1.DuplicateOutput(&device)?, false)
-            }
-        };
-
-        println!("[HDR-Native] Created Session for Display {} (scRGB: {})", display_id, is_output6);
-
-        let dupl_desc = duplication.GetDesc();
-        let pixel_format = dupl_desc.ModeDesc.Format;
+        let d3d_device = d3d_device.ok_or("无法创建 D3D11 设备")?;
+        let d3d_context = context.ok_or("无法创建 D3D11 上下文")?;
         
-        let mut width = dupl_desc.ModeDesc.Width;
-        let mut height = dupl_desc.ModeDesc.Height;
-        
-        if width == 0 || height == 0 {
-            width = (output_desc.DesktopCoordinates.right - output_desc.DesktopCoordinates.left).unsigned_abs();
-            height = (output_desc.DesktopCoordinates.bottom - output_desc.DesktopCoordinates.top).unsigned_abs();
-        }
+        // 将 D3D11 设备包装为 WinRT 可用的 Direct3D 设备
+        let dxgi_device: IDXGIDevice = d3d_device.cast()?;
+        let inspectable = CreateDirect3D11DeviceFromDXGIDevice(&dxgi_device)?;
+        let winrt_device: IDirect3DDevice = inspectable.cast()?;
 
-        // 创建 Staging Texture
-        let staging_desc = D3D11_TEXTURE2D_DESC {
-            Width: width,
-            Height: height,
-            MipLevels: 1,
-            ArraySize: 1,
-            Format: pixel_format,
-            SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
-            Usage: D3D11_USAGE_STAGING,
-            BindFlags: 0,
-            CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
-            MiscFlags: 0,
-        };
+        let ctx = Arc::new(D3DContext {
+            d3d_device,
+            d3d_context: Arc::new(Mutex::new(d3d_context)),
+            winrt_device,
+            staging_store: Arc::new(Mutex::new(StagingStore {
+                resource: None,
+                desc: D3D11_TEXTURE2D_DESC::default(),
+            })),
+        });
 
-        let mut staging_texture = None;
-        device.CreateTexture2D(&staging_desc, None, Some(&mut staging_texture))?;
-        let staging_texture = staging_texture.ok_or("Failed to create staging texture")?;
-        let staging_resource: ID3D11Resource = staging_texture.cast()?;
-
-        Ok(CaptureSession {
-            context,
-            duplication,
-            staging_resource,
-            width,
-            height,
-            pixel_format,
-            last_buffer: None,
-            last_raw_buffer: None,
-        })
+        contexts.insert(display_id, ctx.clone());
+        Ok(ctx)
     }
 }
 
-/// 获取所有显示器信息
+/// 获取系统中所有可用的显示器信息
 pub fn get_displays() -> Vec<DisplayInfo> {
     let mut displays = Vec::new();
-
     unsafe {
-        let factory: IDXGIFactory1 = match CreateDXGIFactory1() {
-            Ok(f) => f,
-            Err(_) => return displays,
-        };
-
-        let mut adapter_idx = 0u32;
-        while let Ok(adapter) = factory.EnumAdapters(adapter_idx) {
-            let mut output_idx = 0u32;
-            while let Ok(output) = adapter.EnumOutputs(output_idx) {
-                if let Ok(desc) = output.GetDesc() {
-                    let name_len = desc.DeviceName.iter().position(|&c| c == 0).unwrap_or(desc.DeviceName.len());
-                    let name = String::from_utf16_lossy(&desc.DeviceName[..name_len]);
-
-                    let x = desc.DesktopCoordinates.left;
-                    let y = desc.DesktopCoordinates.top;
-                    let width = (desc.DesktopCoordinates.right - desc.DesktopCoordinates.left) as u32;
-                    let height = (desc.DesktopCoordinates.bottom - desc.DesktopCoordinates.top) as u32;
-
-                    displays.push(DisplayInfo {
-                        id: displays.len() as u32,
-                        name,
-                        x,
-                        y,
-                        width,
-                        height,
-                        is_primary: adapter_idx == 0 && output_idx == 0,
-                    });
+        if let Ok(factory) = CreateDXGIFactory1::<IDXGIFactory1>() {
+            let mut adapter_idx = 0u32;
+            while let Ok(adapter) = factory.EnumAdapters(adapter_idx) {
+                let mut output_idx = 0u32;
+                while let Ok(output) = adapter.EnumOutputs(output_idx) {
+                    if let Ok(desc) = output.GetDesc() {
+                         let name_len = desc.DeviceName.iter().position(|&c| c == 0).unwrap_or(desc.DeviceName.len());
+                         let name = String::from_utf16_lossy(&desc.DeviceName[..name_len]);
+                         displays.push(DisplayInfo {
+                             id: displays.len() as u32,
+                             name,
+                             x: desc.DesktopCoordinates.left,
+                             y: desc.DesktopCoordinates.top,
+                             width: (desc.DesktopCoordinates.right - desc.DesktopCoordinates.left) as u32,
+                             height: (desc.DesktopCoordinates.bottom - desc.DesktopCoordinates.top) as u32,
+                             is_primary: adapter_idx == 0 && output_idx == 0,
+                         });
+                    }
+                    output_idx += 1;
                 }
-                output_idx += 1;
+                adapter_idx += 1;
             }
-            adapter_idx += 1;
         }
     }
-
     displays
 }
 
-/// 捕获指定显示器的屏幕
-pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOptions>) -> Result<crate::CaptureResult, Box<dyn std::error::Error>> {
-    let mut sessions = get_sessions().lock().map_err(|_| "Failed to lock sessions")?;
+/// 执行屏幕捕获的核心函数
+pub fn capture_display(
+    display_id: u32, 
+    hdr_options: Option<crate::HdrMappingOptions>, 
+    capture_cursor: Option<bool>
+) -> Result<crate::CaptureResult, Box<dyn std::error::Error>> {
+    let t_start = std::time::Instant::now();
 
-    // 尝试获取或创建会话
-    if !sessions.contains_key(&display_id) {
-        let new_session = create_session(display_id)?;
-        sessions.insert(display_id, new_session);
-    }
-
-    let session = sessions.get_mut(&display_id).ok_or("Session lost")?;
+    // 准备 D3D 上下文与显示器句柄
+    let d3d_ctx = get_or_create_d3d_context(display_id)?;
+    let monitor_handle = get_monitor_handle(display_id)?;
     
+    let t_setup = t_start.elapsed();
+
     unsafe {
-        let width = session.width;
-        let height = session.height;
-        let pixel_format = session.pixel_format;
+        // 设置捕获项与帧缓冲池
+        let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
+        let item: GraphicsCaptureItem = interop.CreateForMonitor(monitor_handle)?;
+
+        let item_size = item.Size()?;
+        let frame_pool = Direct3D11CaptureFramePool::CreateFreeThreaded(
+            &d3d_ctx.winrt_device,
+            DirectXPixelFormat::R16G16B16A16Float,
+            2,
+            item_size,
+        )?;
+
+        // 初始化异步等待状态
+        let request = Arc::new(FrameRequest {
+            lock: Mutex::new(RequestState {
+                pending: true,
+                result: None,
+            }),
+            cvar: Condvar::new(),
+        });
         
-        let is_hdr_format = pixel_format == DXGI_FORMAT_R16G16B16A16_FLOAT || pixel_format == DXGI_FORMAT_R10G10B10A2_UNORM;
-        let preserve_raw = hdr_options.as_ref()
-             .and_then(|o| o.preserve_raw)
-             .unwrap_or(false) && is_hdr_format;
+        let req_clone = Arc::clone(&request);
+        let staging_store = Arc::clone(&d3d_ctx.staging_store);
+        let d3d_device_raw = d3d_ctx.d3d_device.clone();
+        let d3d_ctx_raw = Arc::clone(&d3d_ctx.d3d_context);
 
-        let has_cache = session.last_buffer.is_some();
-        // 初次启动使用长轮询 (30次)，有缓存时使用快速轮询 (5次)
+        let t_capture_start = std::time::Instant::now();
 
-        let max_retries = if has_cache { 5 } else { 30 };
-        let mut retry_count = 0;
-        // 本次尝试中获取到的候补帧 (质量较差但有效的帧)
-        let mut candidate_buffer: Option<Vec<u8>> = None;
-        let mut candidate_raw_buffer: Option<Vec<u8>> = None;
-        // 上一次采样的有效像素比例，用于判断画面是否稳定
-        let mut last_valid_ratio: Option<f32> = None;
+        // 注册帧到达事件
+        frame_pool.FrameArrived(&TypedEventHandler::<Direct3D11CaptureFramePool, IInspectable>::new(move |pool: &Option<Direct3D11CaptureFramePool>, _| {
+            let t_arrived = t_capture_start.elapsed();
 
+            let pool = match pool {
+                Some(p) => p,
+                None => return Ok(()),
+            };
 
-
-        loop {
-            let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
-            let mut desktop_resource: Option<IDXGIResource> = None;
+            let mut state = req_clone.lock.lock().unwrap();
             
-            // 策略：前15次尝试使用短超时 (10ms)
-            // 后续尝试使用长超时 (100ms) 以等待渲染完成
-            let timeout_ms = if retry_count < 15 { 10 } else { 100 };
+            // 检查是否仍处于等待状态
+            if !state.pending {
+                let _ = pool.TryGetNextFrame();
+                return Ok(());
+            }
 
-            match session.duplication.AcquireNextFrame(timeout_ms, &mut frame_info, &mut desktop_resource) {
-                Ok(_) => {
-                    if let Some(resource) = desktop_resource {
-                        let desktop_texture: ID3D11Texture2D = resource.cast()?;
-                        session.context.CopyResource(&session.staging_resource, &desktop_texture.cast::<ID3D11Resource>()?);
-                        session.context.Flush();
-                        
-                        let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
-                        session.context.Map(&session.staging_resource, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
-                        
-                        let row_pitch = mapped.RowPitch as usize;
-                        let mut temp_buffer = Vec::with_capacity((width * height * 4) as usize);
-                        let mut temp_raw_buffer: Vec<u8> = if preserve_raw {
-                            Vec::with_capacity((width * height * 8) as usize)
-                        } else {
-                            Vec::new()
-                        };
-
-                        // 像素处理与格式转换
-                        for row in 0..height {
-                            let src = (mapped.pData as *const u8).add(row as usize * row_pitch);
-                            
-                            if pixel_format == DXGI_FORMAT_R16G16B16A16_FLOAT {
-                                let row_data = std::slice::from_raw_parts(src as *const u16, (width * 4) as usize);
-                                if preserve_raw {
-                                    let raw_bytes = std::slice::from_raw_parts(src, (width * 8) as usize);
-                                    temp_raw_buffer.extend_from_slice(raw_bytes);
-                                }
-                                crate::image_proc::process_f16_row(row_data, &mut temp_buffer, hdr_options.as_ref());
-                            } else if pixel_format == DXGI_FORMAT_R10G10B10A2_UNORM {
-                                let row_data = std::slice::from_raw_parts(src as *const u32, width as usize);
-                                if preserve_raw {
-                                    let raw_bytes = std::slice::from_raw_parts(src, (width * 4) as usize);
-                                    temp_raw_buffer.extend_from_slice(raw_bytes);
-                                }
-                                crate::image_proc::process_10bit_row(row_data, &mut temp_buffer, is_hdr_format, hdr_options.as_ref());
-                            } else {
-                                // RGBA/BGRA 8bit
-                                let row_data = std::slice::from_raw_parts(src, (width * 4) as usize);
-                                temp_buffer.reserve(row_data.len());
-                                if pixel_format == DXGI_FORMAT_B8G8R8A8_UNORM || pixel_format == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB {
-                                    for pixel in row_data.chunks(4) {
-                                        temp_buffer.push(pixel[2]); // R
-                                        temp_buffer.push(pixel[1]); // G
-                                        temp_buffer.push(pixel[0]); // B
-                                        temp_buffer.push(255);
-                                    }
-                                } else {
-                                    temp_buffer.extend_from_slice(row_data);
-                                }
-                            }
-                        }
-                        
-                        let _ = session.duplication.ReleaseFrame();
-
-                        // --- 质量判定 ---
-                        let total_pixels = temp_buffer.len() / 4;
-                        // 抽样检查：每20个像素取一个，判断是否有效
-                        // 只要像素不是纯黑 (0,0,0) 即视为有效
-                        let valid_count = temp_buffer.chunks(4).step_by(20).filter(|p| p[0] > 0 || p[1] > 0 || p[2] > 0).count();
-                        let current_ratio = valid_count as f32 / (total_pixels / 20 + 1) as f32;
-                        
-                        // 判定通过条件：
-                        // 1. 质量良好 (ratio > 0.5, 即 50% 的区域非黑) -> 认为是可靠帧，直接返回
-                        // 2. 画面稳定 (与上一次采样相比，比例变化 < 5%) -> 认为是稳定的暗色画面，直接返回
-                        // 3. 达到最大重试次数
-                        let is_stable = last_valid_ratio.map_or(false, |last| (current_ratio - last).abs() < 0.05);
-                        
-                        if current_ratio > 0.5 || is_stable || retry_count >= max_retries {
-                            session.last_buffer = Some(temp_buffer.clone());
-                            if preserve_raw { session.last_raw_buffer = Some(temp_raw_buffer.clone()); } else { session.last_raw_buffer = None; }
-
-                            return Ok(crate::CaptureResult {
-                                buffer: temp_buffer.into(),
-                                width,
-                                height,
-                                is_hdr: is_hdr_format,
-                                raw_hdr_buffer: if preserve_raw { Some(temp_raw_buffer.into()) } else { None },
-                            });
-                        } else {
-                            // 质量不佳 (可能是暗色游戏，也可能是瞬态坏帧)
-                            // 保存为候补帧 (只要不是全黑)
-                            if current_ratio > 0.001 {
-                                candidate_buffer = Some(temp_buffer);
-                                if preserve_raw { candidate_raw_buffer = Some(temp_raw_buffer); } else { candidate_raw_buffer = None; }
-                            }
-                            
-                            // 更新比率记录
-                            last_valid_ratio = Some(current_ratio);
-
-                            // 继续尝试，期望下一帧能拿到更好的画面
-                            if retry_count < 15 {
-                                std::thread::sleep(Duration::from_millis(10));
-                            }
-                            retry_count += 1;
-                            continue;
-                        }
-                    } else {
-                        // Resource 为空
-                        let _ = session.duplication.ReleaseFrame();
-                        if retry_count >= max_retries {
-                             // 次数用尽仍为空，尝试返回缓存，无缓存则报错
-                             if let Some(buf) = &session.last_buffer {
-                                 return Ok(crate::CaptureResult {
-                                    buffer: buf.clone().into(),
-                                    width,
-                                    height,
-                                    is_hdr: is_hdr_format,
-                                    raw_hdr_buffer: session.last_raw_buffer.as_ref().map(|v| v.clone().into()),
-                                });
-                             } else if let Some(buf) = &candidate_buffer {
-                                 // 返回候补帧
-                                 session.last_buffer = Some(buf.clone());
-                                 session.last_raw_buffer = candidate_raw_buffer.clone();
-                                 return Ok(crate::CaptureResult {
-                                     buffer: buf.clone().into(),
-                                     width,
-                                     height,
-                                     is_hdr: is_hdr_format,
-                                     raw_hdr_buffer: candidate_raw_buffer.as_ref().map(|v| v.clone().into()),
-                                 });
-                             } else {
-                                 return Err("Captured empty frame".into());
-                             }
-                        }
-                        retry_count += 1;
-                        continue;
-                    }
-                }
-                Err(e) if e.code() == DXGI_ERROR_WAIT_TIMEOUT => {
-                    // 超时且有历史缓存，直接返回
-                    if let Some(buf) = &session.last_buffer {
-                        return Ok(crate::CaptureResult {
-                            buffer: buf.clone().into(),
-                            width,
-                            height,
-                            is_hdr: is_hdr_format,
-                            raw_hdr_buffer: session.last_raw_buffer.as_ref().map(|v| v.clone().into()),
-                        });
-                    }
-                    
-                    // 超时但有候补帧，返回该帧
-                    if let Some(buf) = &candidate_buffer {
-                        session.last_buffer = Some(buf.clone());
-                        session.last_raw_buffer = candidate_raw_buffer.clone();
-
-                        return Ok(crate::CaptureResult {
-                             buffer: buf.clone().into(),
-                             width,
-                             height,
-                             is_hdr: is_hdr_format,
-                             raw_hdr_buffer: candidate_raw_buffer.as_ref().map(|v| v.clone().into()),
-                        });
-                    }
-
-                    // 重试次数超标且无数据，报错
-                    if retry_count >= max_retries {
-                         return Err("Timeout and no valid frame captured".into());
-                    }
-
-                    // 初次启动且超时，重试
-                    retry_count += 1;
-                    continue;
-                }
-                Err(e) if e.code() == DXGI_ERROR_ACCESS_LOST => {
-                    println!("[HDR-Native] Device access lost");
-                    sessions.remove(&display_id);
-                    return Err("Device access lost, please retry".into());
-                }
+            let frame = match pool.TryGetNextFrame() {
+                Ok(f) => f,
                 Err(e) => {
-                    return Err(format!("Capture failed: {:?}", e).into());
+                    state.result = Some(Err(format!("获取帧失败: {}", e)));
+                    state.pending = false;
+                    req_clone.cvar.notify_all();
+                    return Ok(());
+                }
+            };
+
+            let content_size = frame.ContentSize().unwrap_or_default();
+            let t_proc_start = std::time::Instant::now();
+            
+            // 具体的帧处理逻辑，包括 GPU 拷贝、解除绑定、CPU 色彩转换
+            let process_res = (|| -> Result<CachedFrame, String> {
+                let surface = frame.Surface().map_err(|e| e.to_string())?;
+                let access: IDirect3DDxgiInterfaceAccess = surface.cast().map_err(|e| e.to_string())?;
+                let texture: ID3D11Texture2D = access.GetInterface().map_err(|e| e.to_string())?;
+                
+                let mut params = D3D11_TEXTURE2D_DESC::default();
+                texture.GetDesc(&mut params);
+                
+                let mut staging_guard = staging_store.lock().unwrap();
+                let width = content_size.Width as u32;
+                let height = content_size.Height as u32;
+
+                // 动态检查并重建 Staging Texture，以适应分辨率或格式变化
+                if staging_guard.resource.is_none() || 
+                   staging_guard.desc.Width != width || 
+                   staging_guard.desc.Height != height ||
+                   staging_guard.desc.Format != params.Format {
+                    
+                     let desc = D3D11_TEXTURE2D_DESC {
+                        Width: width,
+                        Height: height,
+                        MipLevels: 1,
+                        ArraySize: 1,
+                        Format: params.Format,
+                        SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+                        Usage: D3D11_USAGE_STAGING,
+                        BindFlags: 0,
+                        CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+                        MiscFlags: 0,
+                    };
+                    
+                    let mut new_tex: Option<ID3D11Texture2D> = None;
+                    d3d_device_raw.CreateTexture2D(&desc, None, Some(&mut new_tex)).map_err(|e| e.to_string())?;
+                    let new_tex = new_tex.ok_or_else(|| "无法创建 Staging Texture".to_string())?;
+                    staging_guard.resource = Some(new_tex.cast().map_err(|e| e.to_string())?);
+                    staging_guard.desc = desc;
+                }
+                
+                let staging_resource = staging_guard.resource.as_ref().unwrap();
+                let src_resource: ID3D11Resource = texture.cast().map_err(|e| e.to_string())?;
+
+                // 将纹理从视频内存拷贝到系统内存（Staging）
+                {
+                    let context = d3d_ctx_raw.lock().unwrap();
+                    context.CopyResource(staging_resource, &src_resource);
+                }
+
+                // 映射 Staging Texture 到 CPU 地址空间
+                let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+                {
+                    let context = d3d_ctx_raw.lock().unwrap();
+                    context.Map(staging_resource, 0, D3D11_MAP_READ, 0, Some(&mut mapped)).map_err(|e| e.to_string())?;
+                }
+
+                let row_pitch = mapped.RowPitch as usize;
+                let width_usize = width as usize;
+                let height_usize = height as usize;
+                
+                let preserve_raw = hdr_options.as_ref().and_then(|o| o.preserve_raw).unwrap_or(false);
+                let is_f16 = params.Format == DXGI_FORMAT_R16G16B16A16_FLOAT;
+                
+                // 执行快速的 CPU 内存拷贝，并处理可能的内存步幅 (Stride) 差异
+                let bpp = if is_f16 { 8 } else { 4 };
+                let expected_pitch = width_usize * bpp;
+                let mut cpu_buffer: Vec<u8> = Vec::with_capacity(height_usize * expected_pitch);
+                
+                cpu_buffer.set_len(height_usize * expected_pitch);
+                let src_ptr = mapped.pData as *const u8;
+                let dest_ptr = cpu_buffer.as_mut_ptr();
+                
+                if row_pitch == expected_pitch {
+                    std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, height_usize * expected_pitch);
+                } else {
+                    for row in 0..height_usize {
+                        std::ptr::copy_nonoverlapping(
+                            src_ptr.add(row * row_pitch),
+                            dest_ptr.add(row * expected_pitch),
+                            expected_pitch
+                        );
+                    }
+                }
+
+                // 尽早解除纹理映射，释放 GPU 资源
+                {
+                    let context = d3d_ctx_raw.lock().unwrap();
+                    context.Unmap(staging_resource, 0);
+                }
+
+                // 进行图像处理与色彩映射（HDR -> SDR）
+                let (buffer, raw_buffer) = if is_f16 {
+                    let processed = crate::image_proc::process_f16_buffer_parallel(&cpu_buffer, width, height, hdr_options.as_ref());
+                    let raw = if preserve_raw { Some(cpu_buffer) } else { None };
+                    (processed, raw)
+                } else {
+                    (cpu_buffer, None)
+                };
+
+                Ok(CachedFrame {
+                    buffer,
+                    raw_buffer,
+                    width,
+                    height,
+                    is_hdr: is_f16,
+                })
+            })();
+            
+            let t_proc_end = t_proc_start.elapsed();
+            println!("[Rust-Perf] 屏幕 ID={} | 等待首帧: {:?} | 处理耗时: {:?}", display_id, t_arrived, t_proc_end);
+
+            match process_res {
+                Ok(cached) => {
+                    state.result = Some(Ok(crate::CaptureResult {
+                        buffer: cached.buffer.into(),
+                        width: cached.width,
+                        height: cached.height,
+                        is_hdr: cached.is_hdr,
+                        raw_hdr_buffer: cached.raw_buffer.map(|v| v.into()),
+                    }));
+                },
+                Err(e) => {
+                    state.result = Some(Err(e));
                 }
             }
-        }
+            
+            state.pending = false;
+            req_clone.cvar.notify_all();
+
+            Ok(())
+        }))?;
+
+        // 启动捕获会话
+        let session = frame_pool.CreateCaptureSession(&item)?;
+        let _ = session.SetIsBorderRequired(false);
+        let _ = session.SetIsCursorCaptureEnabled(capture_cursor.unwrap_or(false));
+        session.StartCapture()?;
+
+        // 等待捕获结果，设置 1000ms 超时以防止死锁
+        let mut state = request.lock.lock().unwrap();
+        let mut final_result = Err("捕获超时 (1000ms)".into());
+
+        let (state_guard, wait_res) = request.cvar.wait_timeout(state, std::time::Duration::from_millis(1000)).unwrap();
+        state = state_guard;
+
+        if !wait_res.timed_out() {
+             if let Some(res) = state.result.take() {
+                 final_result = res.map_err(|e| e.into());
+             }
+        } 
         
-        #[allow(unreachable_code)]
-        Err("Max retries exceeded".into())
+        let t_total = t_start.elapsed();
+        if final_result.is_ok() {
+             println!("[Rust-Perf] 屏幕 ID={} | 准备耗时: {:?} | 总体耗时: {:?}", display_id, t_setup, t_total);
+        }
+
+        // 显式清理 Session 和 Pool 资源
+        let _ = session.Close();
+        let _ = frame_pool.Close();
+
+        final_result
     }
 }

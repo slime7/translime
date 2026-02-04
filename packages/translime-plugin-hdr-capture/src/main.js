@@ -44,6 +44,7 @@ const getPreserveHdr = () => pluginConfig.get('preserveHdr', false);
 const getEnableHdrMapping = () => pluginConfig.get('enableHdrMapping', true);
 const getSdrWhiteNits = () => pluginConfig.get('sdrWhiteNits', 203);
 const getHdrMaxNits = () => pluginConfig.get('hdrMaxNits', 1000);
+const getCaptureCursor = () => pluginConfig.get('captureCursor', false);
 
 /**
  * 获取所有显示器的组合边界
@@ -197,6 +198,7 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
   const sdrWhiteNits = getSdrWhiteNits();
   const hdrMaxNits = getHdrMaxNits();
   const preserveHdr = getPreserveHdr();
+  const captureCursor = getCaptureCursor();
 
   // 构建 HDR 映射选项（仅在启用时传递）
   const hdrOptions = enableHdrMapping ? {
@@ -208,7 +210,7 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
   } : null;
 
   logger.info('HDR 映射配置:', {
-    enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr,
+    enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr, captureCursor,
   });
 
   const capturePromises = nativeDisplays.map(async (nd) => {
@@ -217,7 +219,7 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
       logger.info(`[Perf] 正在捕获显示器 ID=${nd.id} (预期 ${nd.width}x${nd.height}) ...`);
       const {
         buffer, width, height, isHdr, rawHdrBuffer,
-      } = await capture.captureDisplay(nd.id, hdrOptions);
+      } = await capture.captureDisplay(nd.id, hdrOptions, captureCursor);
 
       const t1 = Date.now();
       logger.info(`[Perf] 显示器 ID=${nd.id} 捕获完成, 耗时: ${t1 - t0}ms(T+${t1 - startTime}ms). 实际尺寸 ${width}x${height}, Buffer: ${buffer ? buffer.length : 0}, IS_HDR: ${isHdr}`);
@@ -419,7 +421,7 @@ const startCapture = async (isDebug = false, startTime = Date.now()) => {
     logger.info(`[Perf] 发送初始化数据 (T+${Date.now() - startTime}ms), 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
 
-    // 关键修复：数据发送后，再将窗口移动回可见区域
+    // 数据发送后，再将窗口移动回可见区域
     // 这样用户看到的每一帧都是已加载好截图数据的画面，绝不会看到之前的 UI（放大镜等）
 
     // 强制移动到 minX, minY (可见区域)

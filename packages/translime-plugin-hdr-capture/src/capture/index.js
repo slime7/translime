@@ -159,7 +159,7 @@ export const getDisplays = () => nativeAddon.getDisplays();
  * @param {boolean} [hdrOptions.preserveRaw] - 是否保留原始 HDR 数据
  * @returns {Promise<{buffer: Buffer, width: number, height: number, isHdr: boolean, rawHdrBuffer?: Buffer}>} 图像数据与实际尺寸
  */
-export const captureDisplay = async (displayId = 0, hdrOptions = null) => {
+export const captureDisplay = async (displayId = 0, hdrOptions = null, captureCursor = false) => {
   try {
     // 转换 HDR 选项
     const nativeHdrOptions = hdrOptions ? {
@@ -168,7 +168,7 @@ export const captureDisplay = async (displayId = 0, hdrOptions = null) => {
       hdrMaxNits: hdrOptions.hdrMaxNits,
       preserveRaw: hdrOptions.preserveRaw,
     } : null;
-    return await nativeAddon.captureDisplay(displayId, nativeHdrOptions);
+    return await nativeAddon.captureDisplay(displayId, nativeHdrOptions, captureCursor);
   } catch (e) {
     logger.error(`captureDisplay 失败 (ID=${displayId}):`, e);
     throw e;

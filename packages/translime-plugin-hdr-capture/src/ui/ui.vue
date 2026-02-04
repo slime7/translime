@@ -135,6 +135,15 @@
           </v-switch>
         </div>
 
+        <!-- 捕获鼠标 -->
+        <div class="setting-section">
+          <v-switch
+            v-model="settings.captureCursor"
+            label="捕获鼠标"
+            color="primary"
+          />
+        </div>
+
         <!-- HDR 映射设置组 -->
         <div class="setting-section">
           <v-switch
@@ -307,6 +316,7 @@ const settings = reactive({
   saveFilenameTemplate: '[HDR_Capture]_YYYY-MM-DD_HH-mm-ss', // 保存文件名模板
   saveFormat: 'png',
   fastResponse: true, // 快速响应模式 (Keep-Alive)
+  captureCursor: false, // 是否捕获鼠标
   // HDR 映射设置
   enableHdrMapping: true, // 是否启用自定义 HDR 映射
   sdrWhiteNits: 203, // SDR 白点亮度 (默认 Windows 标准)
