@@ -238,7 +238,7 @@
                   </template>
                 </v-slider>
                 <div class="slider-hint text-caption text-grey">
-                  HDR 内容的最大输入亮度，通常为 1000 nits
+                  HDR 内容的最大输入亮度，通常为你的显示器标称值
                 </div>
               </div>
 

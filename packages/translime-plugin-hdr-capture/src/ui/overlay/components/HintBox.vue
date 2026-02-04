@@ -50,10 +50,9 @@ const hintStyle = computed(() => {
     @mouseenter="onMouseEnter"
   >
     <div class="bg-black/75 text-white px-4 py-2 rounded-xl text-xs backdrop-blur-xs border border-white/10 shadow-lg">
-      <p>点击探测到的窗口</p>
+      <p>点击探测到的窗口快速选区</p>
       <p>滚轮切换窗口层次</p>
-      <p>拖放移动选区</p>
-      <p>右键、esc 取消</p>
+      <p>esc 取消</p>
     </div>
   </div>
 </template>
