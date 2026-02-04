@@ -254,17 +254,24 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
              .unwrap_or(false) && is_hdr_format;
 
         let has_cache = session.last_buffer.is_some();
-        // 初次启动使用原来的长轮询 (30次)，有缓存时使用快速轮询 (5次) 避免阻塞
+        // 初次启动使用长轮询 (30次)，有缓存时使用快速轮询 (5次)
+
         let max_retries = if has_cache { 5 } else { 30 };
         let mut retry_count = 0;
+        // 本次尝试中获取到的候补帧 (质量较差但有效的帧)
+        let mut candidate_buffer: Option<Vec<u8>> = None;
+        let mut candidate_raw_buffer: Option<Vec<u8>> = None;
+        // 上一次采样的有效像素比例，用于判断画面是否稳定
+        let mut last_valid_ratio: Option<f32> = None;
+
+
 
         loop {
             let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
             let mut desktop_resource: Option<IDXGIResource> = None;
             
-            // 恢复原本的"先快后慢"检测策略
-            // 前15次尝试使用短超时 (10ms)，快速捕捉可能的帧
-            // 后续尝试使用长超时 (100ms)，等待渲染完成
+            // 策略：前15次尝试使用短超时 (10ms)
+            // 后续尝试使用长超时 (100ms) 以等待渲染完成
             let timeout_ms = if retry_count < 15 { 10 } else { 100 };
 
             match session.duplication.AcquireNextFrame(timeout_ms, &mut frame_info, &mut desktop_resource) {
@@ -325,13 +332,17 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
                         // --- 质量判定 ---
                         let total_pixels = temp_buffer.len() / 4;
                         // 抽样检查：每20个像素取一个，判断是否有效
-                        let valid_count = temp_buffer.chunks(4).step_by(20).filter(|p| p[0] > 10 || p[1] > 10 || p[2] > 10).count();
+                        // 只要像素不是纯黑 (0,0,0) 即视为有效
+                        let valid_count = temp_buffer.chunks(4).step_by(20).filter(|p| p[0] > 0 || p[1] > 0 || p[2] > 0).count();
                         let current_ratio = valid_count as f32 / (total_pixels / 20 + 1) as f32;
                         
                         // 判定通过条件：
-                        // 1. 质量良好 (ratio > 0.8)
-                        // 2. 或者已经达到最大重试次数 (可能是真实的黑屏，接受它，不返回上一帧)
-                        if current_ratio > 0.8 || retry_count >= max_retries {
+                        // 1. 质量良好 (ratio > 0.5, 即 50% 的区域非黑) -> 认为是可靠帧，直接返回
+                        // 2. 画面稳定 (与上一次采样相比，比例变化 < 5%) -> 认为是稳定的暗色画面，直接返回
+                        // 3. 达到最大重试次数
+                        let is_stable = last_valid_ratio.map_or(false, |last| (current_ratio - last).abs() < 0.05);
+                        
+                        if current_ratio > 0.5 || is_stable || retry_count >= max_retries {
                             session.last_buffer = Some(temp_buffer.clone());
                             if preserve_raw { session.last_raw_buffer = Some(temp_raw_buffer.clone()); } else { session.last_raw_buffer = None; }
 
@@ -343,8 +354,17 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
                                 raw_hdr_buffer: if preserve_raw { Some(temp_raw_buffer.into()) } else { None },
                             });
                         } else {
-                            // 质量不佳，继续尝试
-                            // 如果是"快"阶段，稍微 sleep 一下防止 CPU 空转太快；"慢"阶段 AcquireNextFrame 已经等了 100ms
+                            // 质量不佳 (可能是暗色游戏，也可能是瞬态坏帧)
+                            // 保存为候补帧 (只要不是全黑)
+                            if current_ratio > 0.001 {
+                                candidate_buffer = Some(temp_buffer);
+                                if preserve_raw { candidate_raw_buffer = Some(temp_raw_buffer); } else { candidate_raw_buffer = None; }
+                            }
+                            
+                            // 更新比率记录
+                            last_valid_ratio = Some(current_ratio);
+
+                            // 继续尝试，期望下一帧能拿到更好的画面
                             if retry_count < 15 {
                                 std::thread::sleep(Duration::from_millis(10));
                             }
@@ -364,6 +384,17 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
                                     is_hdr: is_hdr_format,
                                     raw_hdr_buffer: session.last_raw_buffer.as_ref().map(|v| v.clone().into()),
                                 });
+                             } else if let Some(buf) = &candidate_buffer {
+                                 // 返回候补帧
+                                 session.last_buffer = Some(buf.clone());
+                                 session.last_raw_buffer = candidate_raw_buffer.clone();
+                                 return Ok(crate::CaptureResult {
+                                     buffer: buf.clone().into(),
+                                     width,
+                                     height,
+                                     is_hdr: is_hdr_format,
+                                     raw_hdr_buffer: candidate_raw_buffer.as_ref().map(|v| v.clone().into()),
+                                 });
                              } else {
                                  return Err("Captured empty frame".into());
                              }
@@ -373,7 +404,7 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
                     }
                 }
                 Err(e) if e.code() == DXGI_ERROR_WAIT_TIMEOUT => {
-                    // 超时 (无变化) -> 直接返回缓存 (性能优化)
+                    // 超时且有历史缓存，直接返回
                     if let Some(buf) = &session.last_buffer {
                         return Ok(crate::CaptureResult {
                             buffer: buf.clone().into(),
@@ -383,6 +414,26 @@ pub fn capture_display(display_id: u32, hdr_options: Option<crate::HdrMappingOpt
                             raw_hdr_buffer: session.last_raw_buffer.as_ref().map(|v| v.clone().into()),
                         });
                     }
+                    
+                    // 超时但有候补帧，返回该帧
+                    if let Some(buf) = &candidate_buffer {
+                        session.last_buffer = Some(buf.clone());
+                        session.last_raw_buffer = candidate_raw_buffer.clone();
+
+                        return Ok(crate::CaptureResult {
+                             buffer: buf.clone().into(),
+                             width,
+                             height,
+                             is_hdr: is_hdr_format,
+                             raw_hdr_buffer: candidate_raw_buffer.as_ref().map(|v| v.clone().into()),
+                        });
+                    }
+
+                    // 重试次数超标且无数据，报错
+                    if retry_count >= max_retries {
+                         return Err("Timeout and no valid frame captured".into());
+                    }
+
                     // 初次启动且超时，重试
                     retry_count += 1;
                     continue;
