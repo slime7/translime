@@ -479,6 +479,14 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
   if (savePath) {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
+
+    // Ensure save directory exists
+    try {
+      await fs.mkdir(savePath, { recursive: true });
+    } catch (err) {
+      logger.error(`无法创建保存目录: ${savePath}`, err);
+    }
+
     const timestamp = dayjs().format('HDR_Capture_YYYY-MM-DD_HH-mm-ss');
     let fileName;
 
