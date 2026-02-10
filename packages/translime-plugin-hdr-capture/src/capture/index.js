@@ -74,6 +74,50 @@ function applyBorderRadius(buffer, width, height, radius) {
   }
 }
 
+/**
+ * 将标注叠加层 (overlay) 以 alpha 混合方式合成到目标 buffer 上
+ * overlay 的逻辑尺寸与选区一致，需按 targetScale 缩放后逐像素混合
+ *
+ * @param {Buffer} dstBuffer - 目标 RGBA 图像 (物理尺寸)
+ * @param {number} dstWidth - 物理宽度
+ * @param {number} dstHeight - 物理高度
+ * @param {{ buffer: Buffer|Uint8Array, width: number, height: number }} overlayData - 标注层 RGBA 数据 (逻辑尺寸)
+ * @param {number} targetScale - 缩放倍率
+ */
+function applyOverlay(dstBuffer, dstWidth, dstHeight, overlayData, targetScale) {
+  const srcBuf = overlayData.buffer;
+  const srcW = overlayData.width;
+  const srcH = overlayData.height;
+
+  for (let dy = 0; dy < dstHeight; dy += 1) {
+    // 对应 overlay 逻辑坐标
+    const sy = Math.floor(dy / targetScale);
+    if (sy < srcH) {
+      for (let dx = 0; dx < dstWidth; dx += 1) {
+        const sx = Math.floor(dx / targetScale);
+        if (sx < srcW) {
+          const srcIdx = (sy * srcW + sx) * 4;
+          const srcA = srcBuf[srcIdx + 3];
+          if (srcA > 0) {
+            const dstIdx = (dy * dstWidth + dx) * 4;
+            const alpha = srcA / 255;
+            const invAlpha = 1 - alpha;
+
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx] = Math.round(srcBuf[srcIdx] * alpha + dstBuffer[dstIdx] * invAlpha);
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx + 1] = Math.round(srcBuf[srcIdx + 1] * alpha + dstBuffer[dstIdx + 1] * invAlpha);
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx + 2] = Math.round(srcBuf[srcIdx + 2] * alpha + dstBuffer[dstIdx + 2] * invAlpha);
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx + 3] = Math.min(255, Math.round(srcA + dstBuffer[dstIdx + 3] * invAlpha));
+          }
+        }
+      }
+    }
+  }
+}
+
 // 加载 native addon
 // NAPI-RS 生成的 index.js 已内置完整的跨平台加载逻辑
 let nativeAddon;
@@ -257,7 +301,14 @@ export const cropHdrF16 = async (rawBuffer, width, height, rect) => {
  * @param {Rect} rect - 裁剪区域
  */
 export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
-  logger.info('开始多屏幕混合裁剪, 选区:', { rect });
+  logger.info('开始多屏幕混合裁剪, 选区:', {
+    data: {
+      width: rect.width,
+      height: rect.height,
+      x: rect.x,
+      y: rect.y,
+    },
+  });
 
   if (!sessionData || sessionData.length === 0) {
     logger.error('裁剪失败: sessionData 为空！');
@@ -358,6 +409,19 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
       }
     }
   });
+
+  // 合成标注叠加层 (如果有)
+  if (rect.overlayData && rect.overlayData.buffer) {
+    logger.info('正在合成标注叠加层...');
+    const overlayBuf = Buffer.isBuffer(rect.overlayData.buffer)
+      ? rect.overlayData.buffer
+      : Buffer.from(rect.overlayData.buffer);
+    applyOverlay(finalBuffer, targetWidth, targetHeight, {
+      buffer: overlayBuf,
+      width: rect.overlayData.width,
+      height: rect.overlayData.height,
+    }, targetScale);
+  }
 
   // 应用圆角 (如果有)
   if (rect.borderRadius && rect.borderRadius > 0) {
@@ -467,6 +531,19 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
     }
   });
 
+  // 合成标注叠加层 (如果有)
+  if (rect.overlayData && rect.overlayData.buffer) {
+    logger.info('正在合成标注叠加层 (save)...');
+    const overlayBuf = Buffer.isBuffer(rect.overlayData.buffer)
+      ? rect.overlayData.buffer
+      : Buffer.from(rect.overlayData.buffer);
+    applyOverlay(finalBuffer, targetWidth, targetHeight, {
+      buffer: overlayBuf,
+      width: rect.overlayData.width,
+      height: rect.overlayData.height,
+    }, targetScale);
+  }
+
   // 应用圆角 (如果有)
   if (rect.borderRadius && rect.borderRadius > 0) {
     const radius = Math.round(rect.borderRadius * targetScale);
@@ -526,8 +603,10 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
           };
 
           logger.info('裁剪 HDR 原始数据:', {
-            displaySize: `${hdrDisplay.width}x${hdrDisplay.height}`,
-            cropRect: hdrCropRect,
+            data: {
+              displaySize: `${hdrDisplay.width}x${hdrDisplay.height}`,
+              cropRect: hdrCropRect,
+            },
           });
 
           // 裁剪 F16 格式的 HDR 原始数据

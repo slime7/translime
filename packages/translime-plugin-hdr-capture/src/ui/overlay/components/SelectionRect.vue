@@ -116,7 +116,8 @@ const onHandleMouseDown = (direction) => {
     <!-- 选区矩形 -->
     <div
       v-if="state.isSelecting || state.hasSelection"
-      class="absolute border border-dashed border-[#2196F3] box-border pointer-events-auto cursor-move"
+      class="absolute border border-dashed border-[#2196F3] box-border pointer-events-auto"
+      :class="state.drawingMode ? 'cursor-crosshair' : 'cursor-move'"
       :style="{
         left: bounds.x + 'px',
         top: bounds.y + 'px',
@@ -133,7 +134,7 @@ const onHandleMouseDown = (direction) => {
       </div>
 
       <!-- Resize Handles -->
-      <template v-if="!state.isMoving && state.hasSelection">
+      <template v-if="!state.isMoving && state.hasSelection && !state.drawingMode">
         <!-- Top Left -->
         <div
           class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-nw-resize z-20"

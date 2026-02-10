@@ -1,6 +1,6 @@
 <script setup>
 import {
-  computed, onMounted, onUnmounted, provide, reactive,
+  computed, onMounted, onUnmounted, provide, reactive, watch,
 } from 'vue';
 import { useLogger } from 'translime-sdk';
 import FrozenScreens from './components/FrozenScreens.vue';
@@ -51,6 +51,22 @@ const state = reactive({
 
   // 截图设置
   borderRadius: 0,
+
+  // 绘图工具状态
+  drawingMode: false,
+  rectConfig: {
+    type: 'stroke',
+    strokeWidth: 2,
+    color: 'rgba(255, 0, 0, 1)',
+  },
+  annotations: [],
+  activeAnnotation: null,
+  isDrawingRect: false,
+  drawingDragged: false,
+  isResizingAnnotation: false,
+  annotationResizeDir: null,
+  annResizeActiveX: null,
+  annResizeActiveY: null,
 });
 
 // 计算选区边界 (逻辑坐标)
@@ -65,6 +81,20 @@ const selectionBounds = computed(() => {
     y: Number.isNaN(y) ? 0 : y,
     w: Number.isNaN(w) ? 0 : w,
     h: Number.isNaN(h) ? 0 : h,
+  };
+});
+
+// 活动标注的边界计算
+const activeAnnotationBounds = computed(() => {
+  const ann = state.activeAnnotation;
+  if (!ann) {
+    return null;
+  }
+  return {
+    x: Math.min(ann.startX, ann.endX),
+    y: Math.min(ann.startY, ann.endY),
+    w: Math.abs(ann.endX - ann.startX),
+    h: Math.abs(ann.endY - ann.startY),
   };
 });
 
@@ -113,6 +143,117 @@ const detectWindow = (lx, ly) => {
     [state.highlightedWindow] = newCandidates;
   }
 };
+
+// ==================== 标注辅助函数 ====================
+let annotationIdCounter = 0;
+
+/** 将活动标注定型并推入标注列表 */
+const finalizeAnnotation = () => {
+  if (!state.activeAnnotation) {
+    return;
+  }
+  const bounds = activeAnnotationBounds.value;
+  if (bounds && bounds.w > 2 && bounds.h > 2) {
+    annotationIdCounter += 1;
+    state.annotations.push({
+      id: annotationIdCounter,
+      x: bounds.x,
+      y: bounds.y,
+      w: bounds.w,
+      h: bounds.h,
+      type: state.rectConfig.type,
+      strokeWidth: state.rectConfig.strokeWidth,
+      color: state.rectConfig.color,
+    });
+  }
+  state.activeAnnotation = null;
+};
+
+/** 开始标注矩形的尺寸调整 */
+const startAnnotationResize = (direction) => {
+  state.isResizingAnnotation = true;
+  state.annotationResizeDir = direction;
+
+  const ann = state.activeAnnotation;
+  const isLeft = ann.startX < ann.endX;
+  const isTop = ann.startY < ann.endY;
+
+  state.annResizeActiveX = null;
+  state.annResizeActiveY = null;
+
+  if (direction.includes('w')) {
+    state.annResizeActiveX = isLeft ? 'startX' : 'endX';
+  }
+  if (direction.includes('e')) {
+    state.annResizeActiveX = isLeft ? 'endX' : 'startX';
+  }
+  if (direction.includes('n')) {
+    state.annResizeActiveY = isTop ? 'startY' : 'endY';
+  }
+  if (direction.includes('s')) {
+    state.annResizeActiveY = isTop ? 'endY' : 'startY';
+  }
+};
+
+/**
+ * 获取定型标注的样式
+ * @param {object} ann - 标注对象
+ * @returns {object}
+ */
+const getAnnotationStyle = (ann) => {
+  const style = {
+    position: 'absolute',
+    left: `${ann.x}px`,
+    top: `${ann.y}px`,
+    width: `${ann.w}px`,
+    height: `${ann.h}px`,
+    pointerEvents: 'none',
+    boxSizing: 'border-box',
+  };
+
+  if (ann.type === 'stroke') {
+    style.border = `${ann.strokeWidth}px solid ${ann.color}`;
+    style.background = 'transparent';
+  } else {
+    style.background = ann.color;
+  }
+
+  return style;
+};
+
+/** 活动标注样式（响应式跟随 rectConfig） */
+const activeAnnotationStyle = computed(() => {
+  const ann = activeAnnotationBounds.value;
+  if (!ann) {
+    return {};
+  }
+  const cfg = state.rectConfig;
+  const style = {
+    position: 'absolute',
+    left: `${ann.x}px`,
+    top: `${ann.y}px`,
+    width: `${ann.w}px`,
+    height: `${ann.h}px`,
+    pointerEvents: 'none',
+    boxSizing: 'border-box',
+  };
+
+  if (cfg.type === 'stroke') {
+    style.border = `${cfg.strokeWidth}px solid ${cfg.color}`;
+    style.background = 'transparent';
+  } else {
+    style.background = cfg.color;
+  }
+
+  return style;
+});
+
+// drawingMode 关闭时自动定型活动标注
+watch(() => state.drawingMode, (newVal, oldVal) => {
+  if (oldVal && !newVal) {
+    finalizeAnnotation();
+  }
+});
 
 function closeOverlay() {
   window.hdrCapture?.close?.();
@@ -180,6 +321,55 @@ const onResizeStart = (direction) => {
   if (direction.includes('s')) state.resizeActiveY = isTop ? 'endY' : 'startY';
 };
 
+// ==================== 标注渲染 ====================
+
+/**
+ * 将所有标注绘制到离屏 Canvas，返回 RGBA 像素数据
+ * @param {number} w - 选区逻辑宽度
+ * @param {number} h - 选区逻辑高度
+ * @param {number} originX - 选区左上角 X（屏幕逻辑坐标）
+ * @param {number} originY - 选区左上角 Y（屏幕逻辑坐标）
+ * @returns {{ buffer: Uint8Array, width: number, height: number } | null}
+ */
+const renderAnnotationsToBuffer = (w, h, originX, originY) => {
+  // 定型活动标注（如果有）
+  finalizeAnnotation();
+
+  const allAnnotations = state.annotations;
+  if (allAnnotations.length === 0) {
+    return null;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  allAnnotations.forEach((ann) => {
+    // 转换为选区内部坐标
+    const ax = ann.x - originX;
+    const ay = ann.y - originY;
+
+    if (ann.type === 'stroke') {
+      ctx.strokeStyle = ann.color;
+      ctx.lineWidth = ann.strokeWidth;
+      // strokeRect 的坐标需要向内偏移半个线宽，以保证边框完全在矩形内
+      const halfLW = ann.strokeWidth / 2;
+      ctx.strokeRect(ax + halfLW, ay + halfLW, ann.w - ann.strokeWidth, ann.h - ann.strokeWidth);
+    } else {
+      ctx.fillStyle = ann.color;
+      ctx.fillRect(ax, ay, ann.w, ann.h);
+    }
+  });
+
+  const imageData = ctx.getImageData(0, 0, w, h);
+  return {
+    buffer: new Uint8Array(imageData.data.buffer),
+    width: w,
+    height: h,
+  };
+};
+
 // ==================== 操作处理 ====================
 const handleAction = async (type) => {
   if (type === 'cancel') {
@@ -187,10 +377,14 @@ const handleAction = async (type) => {
     return;
   }
 
+  const b = selectionBounds.value;
+
+  // 在关闭选区前渲染标注到像素数据
+  const overlayData = renderAnnotationsToBuffer(b.w, b.h, b.x, b.y);
+
   // 立即关闭选区显示，防止截图抓取到 Overlay 的黑色遮罩
   state.hasSelection = false;
 
-  const b = selectionBounds.value;
   const rect = {
     x: b.x + state.offsetX,
     y: b.y + state.offsetY,
@@ -199,7 +393,12 @@ const handleAction = async (type) => {
     borderRadius: state.borderRadius,
   };
 
-  logger.info(`执行操作: ${type}, 选区:`, { rect });
+  // 附加标注叠加层数据（如果有标注）
+  if (overlayData) {
+    rect.overlayData = overlayData;
+  }
+
+  logger.info(`执行操作: ${type}, 选区:`, { rect: { ...rect, overlayData: overlayData ? '[present]' : null } });
 
   try {
     if (type === 'save') {
@@ -237,10 +436,33 @@ const onDoubleClick = (e) => {
 };
 
 const onMouseDown = (e) => {
-  if (e.button !== 0) return;
+  if (e.button !== 0) {
+    return;
+  }
 
   const mx = e.clientX;
   const my = e.clientY;
+
+  // 绘图模式下的鼠标按下逻辑
+  if (state.drawingMode && state.hasSelection) {
+    const b = selectionBounds.value;
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      // 定型当前活动标注
+      if (state.activeAnnotation) {
+        finalizeAnnotation();
+      }
+      // 开始绘制新矩形
+      state.isDrawingRect = true;
+      state.drawingDragged = false;
+      state.activeAnnotation = {
+        startX: mx,
+        startY: my,
+        endX: mx,
+        endY: my,
+      };
+    }
+    return;
+  }
 
   if (state.hasSelection) {
     const b = selectionBounds.value;
@@ -257,7 +479,6 @@ const onMouseDown = (e) => {
       return;
     }
     state.hasSelection = false;
-    // 点击空白处取消选区后，重新开始检测窗口
     detectWindow(mx, my);
   }
 
@@ -275,9 +496,36 @@ const onMouseMove = (e) => {
     const my = e.clientY;
     state.cursorPos = { x: mx, y: my };
 
+    // 标注矩形尺寸调整
+    if (state.isResizingAnnotation && state.activeAnnotation) {
+      if (state.annResizeActiveX) {
+        state.activeAnnotation[state.annResizeActiveX] = mx;
+      }
+      if (state.annResizeActiveY) {
+        state.activeAnnotation[state.annResizeActiveY] = my;
+      }
+      return;
+    }
+
+    // 绘制标注矩形
+    if (state.isDrawingRect && state.activeAnnotation) {
+      const dx = mx - state.activeAnnotation.startX;
+      const dy = my - state.activeAnnotation.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        state.drawingDragged = true;
+      }
+      state.activeAnnotation.endX = mx;
+      state.activeAnnotation.endY = my;
+      return;
+    }
+
     if (state.isResizing) {
-      if (state.resizeActiveX) state[state.resizeActiveX] = mx;
-      if (state.resizeActiveY) state[state.resizeActiveY] = my;
+      if (state.resizeActiveX) {
+        state[state.resizeActiveX] = mx;
+      }
+      if (state.resizeActiveY) {
+        state[state.resizeActiveY] = my;
+      }
       return;
     }
 
@@ -311,7 +559,35 @@ const onMouseMove = (e) => {
 
 const onMouseUp = (e) => {
   try {
-    if (e.button !== 0) return;
+    if (e.button !== 0) {
+      return;
+    }
+
+    // 标注尺寸调整结束
+    if (state.isResizingAnnotation) {
+      state.isResizingAnnotation = false;
+      state.annotationResizeDir = null;
+      state.annResizeActiveX = null;
+      state.annResizeActiveY = null;
+      return;
+    }
+
+    // 绘制标注矩形结束
+    if (state.isDrawingRect) {
+      state.isDrawingRect = false;
+      if (!state.drawingDragged || !state.activeAnnotation) {
+        // 仅点击未拖拽，丢弃
+        state.activeAnnotation = null;
+      } else {
+        const w = Math.abs(state.activeAnnotation.endX - state.activeAnnotation.startX);
+        const h = Math.abs(state.activeAnnotation.endY - state.activeAnnotation.startY);
+        if (w < 3 || h < 3) {
+          state.activeAnnotation = null;
+        }
+      }
+      state.drawingDragged = false;
+      return;
+    }
 
     if (state.isResizing) {
       state.isResizing = false;
@@ -372,6 +648,15 @@ function resetState() {
   state.endX = 0;
   state.endY = 0;
   state.candidates = [];
+
+  // 重置绘图状态
+  state.drawingMode = false;
+  state.annotations = [];
+  state.activeAnnotation = null;
+  state.isDrawingRect = false;
+  state.drawingDragged = false;
+  state.isResizingAnnotation = false;
+  state.annotationResizeDir = null;
 
   clearBlobUrls();
   state.capturedScreens = [];
@@ -460,6 +745,9 @@ const rootCursor = computed(() => {
   if (state.isResizing && state.resizeDirection) {
     return `${state.resizeDirection}-resize`;
   }
+  if (state.isResizingAnnotation && state.annotationResizeDir) {
+    return `${state.annotationResizeDir}-resize`;
+  }
   if (state.isMoving) {
     return 'move';
   }
@@ -495,6 +783,68 @@ const rootCursor = computed(() => {
 
     <!-- 信息提示 -->
     <HintBox :cursor-pos="state.cursorPos" />
+
+    <!-- 标注图层 -->
+    <div
+      v-if="state.hasSelection && (state.annotations.length > 0 || state.activeAnnotation)"
+      class="absolute inset-0 z-20 pointer-events-none"
+    >
+      <!-- 已定型标注 -->
+      <div
+        v-for="ann in state.annotations"
+        :key="ann.id"
+        :style="getAnnotationStyle(ann)"
+      />
+
+      <!-- 活动标注（可调整大小） -->
+      <div
+        v-if="activeAnnotationBounds && activeAnnotationBounds.w > 0 && activeAnnotationBounds.h > 0"
+        :style="activeAnnotationStyle"
+      >
+        <!-- 调整手柄（仅绘制完成后、非正在拖拽时显示） -->
+        <template v-if="!state.isDrawingRect && state.activeAnnotation">
+          <div
+            class="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-nw-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('nw')"
+          />
+
+          <div
+            class="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-n-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('n')"
+          />
+
+          <div
+            class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-ne-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('ne')"
+          />
+
+          <div
+            class="absolute top-1/2 -right-1 -translate-y-1/2 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-e-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('e')"
+          />
+
+          <div
+            class="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-se-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('se')"
+          />
+
+          <div
+            class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-s-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('s')"
+          />
+
+          <div
+            class="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-sw-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('sw')"
+          />
+
+          <div
+            class="absolute top-1/2 -left-1 -translate-y-1/2 w-2.5 h-2.5 bg-white border border-blue-400 rounded-full cursor-w-resize z-30 pointer-events-auto"
+            @mousedown.stop="startAnnotationResize('w')"
+          />
+        </template>
+      </div>
+    </div>
 
     <!-- 操作工具栏 : (Debug 模式下依然显示，功能有 mock) -->
     <ActionToolbar

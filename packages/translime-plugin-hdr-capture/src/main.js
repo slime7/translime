@@ -683,7 +683,7 @@ export const ipcHandlers = [
   {
     type: 'copy-capture',
     handler: () => async (rect) => {
-      logger.info('收到 copy-capture 请求, rect:', rect);
+      logger.info('收到 copy-capture 请求');
       if (!currentCaptureSession) {
         logger.error('copy-capture 失败: 没有当前的截图会话');
         return null;
@@ -691,7 +691,7 @@ export const ipcHandlers = [
 
       try {
         if (!rect || rect.width <= 0 || rect.height <= 0) {
-          logger.error('copy-capture 失败: 无效的选区尺寸', rect);
+          logger.error('copy-capture 失败: 无效的选区尺寸');
           return false;
         }
 
