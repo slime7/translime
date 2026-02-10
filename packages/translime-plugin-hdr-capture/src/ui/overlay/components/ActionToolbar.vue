@@ -354,14 +354,7 @@ const debugLine = computed(() => {
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <rect
-                x="3"
-                y="3"
-                width="18"
-                height="18"
-                rx="5"
-                ry="5"
-              />
+              <path d="M3 21v-9a9 9 0 0 1 9-9h9" />
             </svg>
           </button>
 
