@@ -7,6 +7,7 @@ import logger from '../utils/logger';
 autoUpdater.logger = logger;
 // autoUpdater.logger.transports.file.level = 'info';
 autoUpdater.autoDownload = false; // 默认不自动下载，需要用户确认或我们手动控制
+autoUpdater.autoInstallOnAppQuit = true; // 下载完成后退出时自动安装更新
 
 export const checkForUpdates = () => {
   // 开发环境下通常不检查更新，或者需要特殊配置
@@ -68,9 +69,9 @@ export const init = () => {
     sendToWindow(ipcType.UPDATE_DOWNLOAD_PROGRESS, progressObj);
   });
 
-  // 下载完成
+  // 下载完成，退出时将自动安装
   autoUpdater.on('update-downloaded', (info) => {
-    logger.info('Update downloaded', info);
+    logger.info('Update downloaded, will auto install on next quit', info);
     sendToWindow(ipcType.UPDATE_DOWNLOADED, info);
   });
 };

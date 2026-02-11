@@ -64,18 +64,17 @@
               </div>
 
               <div v-else-if="updateStatus === 'downloaded'">
+                <div class="mb-2">
+                  更新已下载，将在下次启动时自动生效
+                </div>
                 <div>
                   <v-btn
                     size="small"
                     color="success"
-                    class="ml-2"
                     @click="quitAndInstall"
                   >
-                    重启并更新
+                    立即重启
                   </v-btn>
-                </div>
-                <div class="mt-2">
-                  更新已下载
                 </div>
               </div>
 
@@ -249,7 +248,7 @@ export default {
         updateStatus.value = 'downloaded';
         updateInfo.value = info;
         downloading.value = false;
-        toast.show('更新已下载，请重启安装');
+        toast.show('更新已下载，下次启动时自动生效');
       });
     };
 

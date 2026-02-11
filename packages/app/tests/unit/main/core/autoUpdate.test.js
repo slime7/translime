@@ -14,6 +14,7 @@ vi.mock('electron-updater', () => ({
     quitAndInstall: vi.fn(),
     on: vi.fn(),
     logger: null,
+    autoInstallOnAppQuit: false,
   },
 }));
 
