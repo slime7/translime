@@ -16,6 +16,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
+import readPackageManifest from '../utils/readPackageManifest';
 
 const requireFresh = createRequire(import.meta.url);
 
@@ -77,9 +78,7 @@ async function readPluginPackageInfo(filePath) {
 }
 
 const readPlugin = (pluginPath, devPlugins = null) => {
-  const pluginPkg = JSON.parse(
-    fs.readFileSync(path.join(pluginPath, 'package.json'), 'utf8'),
-  );
+  const pluginPkg = readPackageManifest(pluginPath);
   const plugin = pluginPkg.plugin || {};
   plugin.packageName = pluginPkg.name;
   if (
@@ -402,12 +401,12 @@ class PluginLoader extends EventEmitter {
   }
 
   enablePlugins(plugins) {
-    for (const plugin of plugins) {
+    plugins.forEach((plugin) => {
       this.plugins.push(plugin);
       if (plugin.enabled) {
         this.enablePlugin(plugin.packageName, true);
       }
-    }
+    });
     this.emit('init', this.plugins);
     this.plugins.forEach((plugin) => {
       if (plugin.enabled) {
