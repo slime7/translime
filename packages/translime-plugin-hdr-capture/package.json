@@ -1,6 +1,6 @@
 {
   "name": "translime-plugin-hdr-capture",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "轻松获取 HDR 截图",
   "license": "MIT",
   "keywords": [
@@ -26,6 +26,7 @@
     "dts": "index.d.ts"
   },
   "scripts": {
+    "lint": "eslint .",
     "dev": "vite build -c ui.vite.config.mjs --watch",
     "preview:ui": "vite -c ui.vite.config.mjs --mode preview",
     "preview:overlay": "vite -c overlay.vite.config.mjs --mode preview",

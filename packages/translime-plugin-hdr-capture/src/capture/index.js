@@ -119,47 +119,6 @@ function applyOverlay(dstBuffer, dstWidth, dstHeight, overlayData, targetScale) 
 }
 
 /**
- * 对 RGBA Buffer 中指定区域进行像素化或模糊处理
- *
- * @param {Buffer} buffer - 目标 RGBA 图像 (物理尺寸)
- * @param {number} bufWidth - 物理宽度
- * @param {number} bufHeight - 物理高度
- * @param {Array<{x: number, y: number, w: number, h: number, mode: string, blockSize: number}>} regions - 马赛克区域列表 (逻辑坐标)
- * @param {number} scale - 逻辑坐标到物理坐标的缩放倍率
- */
-function applyMosaic(buffer, bufWidth, bufHeight, regions, scale) {
-  if (!regions || regions.length === 0) {
-    return;
-  }
-
-  regions.forEach((region) => {
-    // 将逻辑坐标转换为物理坐标
-    const px = Math.round(region.x * scale);
-    const py = Math.round(region.y * scale);
-    const pw = Math.round(region.w * scale);
-    const ph = Math.round(region.h * scale);
-
-    // 边界裁剪
-    const x0 = Math.max(0, px);
-    const y0 = Math.max(0, py);
-    const x1 = Math.min(bufWidth, px + pw);
-    const y1 = Math.min(bufHeight, py + ph);
-
-    if (x1 <= x0 || y1 <= y0) {
-      return;
-    }
-
-    const blockSize = Math.max(1, Math.round((region.blockSize || 10) * scale));
-
-    if (region.mode === 'blur') {
-      applyBoxBlur(buffer, bufWidth, bufHeight, x0, y0, x1, y1, blockSize);
-    } else {
-      applyPixelate(buffer, bufWidth, x0, y0, x1, y1, blockSize);
-    }
-  });
-}
-
-/**
  * 像素化处理：将区域内的像素按方块平均颜色填充
  *
  * @param {Buffer} buffer - RGBA 图像
@@ -322,6 +281,47 @@ function applyBoxBlur(buffer, bufWidth, bufHeight, x0, y0, x1, y1, radius) {
     const dstOffset = ((y0 + y) * bufWidth + x0) * 4;
     out.copy(buffer, dstOffset, srcOffset, srcOffset + regionW * 4);
   }
+}
+
+/**
+ * 对 RGBA Buffer 中指定区域进行像素化或模糊处理
+ *
+ * @param {Buffer} buffer - 目标 RGBA 图像 (物理尺寸)
+ * @param {number} bufWidth - 物理宽度
+ * @param {number} bufHeight - 物理高度
+ * @param {Array<{x: number, y: number, w: number, h: number, mode: string, blockSize: number}>} regions - 马赛克区域列表 (逻辑坐标)
+ * @param {number} scale - 逻辑坐标到物理坐标的缩放倍率
+ */
+function applyMosaic(buffer, bufWidth, bufHeight, regions, scale) {
+  if (!regions || regions.length === 0) {
+    return;
+  }
+
+  regions.forEach((region) => {
+    // 将逻辑坐标转换为物理坐标
+    const px = Math.round(region.x * scale);
+    const py = Math.round(region.y * scale);
+    const pw = Math.round(region.w * scale);
+    const ph = Math.round(region.h * scale);
+
+    // 边界裁剪
+    const x0 = Math.max(0, px);
+    const y0 = Math.max(0, py);
+    const x1 = Math.min(bufWidth, px + pw);
+    const y1 = Math.min(bufHeight, py + ph);
+
+    if (x1 <= x0 || y1 <= y0) {
+      return;
+    }
+
+    const blockSize = Math.max(1, Math.round((region.blockSize || 10) * scale));
+
+    if (region.mode === 'blur') {
+      applyBoxBlur(buffer, bufWidth, bufHeight, x0, y0, x1, y1, blockSize);
+    } else {
+      applyPixelate(buffer, bufWidth, x0, y0, x1, y1, blockSize);
+    }
+  });
 }
 
 // 加载 native addon

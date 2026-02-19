@@ -14,4 +14,5 @@ await initOverlayPreviewMock();
 const app = createApp(App);
 app.mount('#app');
 
+// eslint-disable-next-line no-console
 console.log('[Overlay Preview] 应用已挂载');
