@@ -34,12 +34,16 @@ const togglePanel = (panel) => {
   activePanel.value = activePanel.value === panel ? null : panel;
 };
 
-// 监听面板切换，同步绘图模式
+// 监听面板切换，同步绘图模式与工具类型
+const DRAWING_PANELS = ['rect', 'mosaic', 'text'];
+
 watch(activePanel, (newVal, oldVal) => {
-  if (newVal === 'rect') {
+  if (DRAWING_PANELS.includes(newVal)) {
     state.drawingMode = true;
-  } else if (oldVal === 'rect') {
+    state.activeTool = newVal;
+  } else if (DRAWING_PANELS.includes(oldVal)) {
     state.drawingMode = false;
+    state.activeTool = null;
   }
 });
 
@@ -147,6 +151,78 @@ watch(rectColor, (val) => {
 /** 边框粗细滑块是否禁用（实心模式下禁用） */
 const isStrokeDisabled = computed(() => rectType.value === 'fill');
 
+// ======================== 马赛克工具设置 ========================
+/** 马赛克模式: 'pixelate' | 'blur' */
+const mosaicMode = ref('pixelate');
+/** 方块大小 / 模糊强度 */
+const mosaicBlockSize = ref(10);
+
+const MOSAIC_KEY_PREFIX = 'translime.hdr-capture.mosaic';
+
+/** 同步马赛克设置到 state */
+const syncMosaicConfig = () => {
+  state.mosaicConfig.mode = mosaicMode.value;
+  state.mosaicConfig.blockSize = mosaicBlockSize.value;
+};
+
+watch(mosaicMode, (val) => {
+  localStorage.setItem(`${MOSAIC_KEY_PREFIX}.mode`, val);
+  syncMosaicConfig();
+});
+
+watch(mosaicBlockSize, (val) => {
+  localStorage.setItem(`${MOSAIC_KEY_PREFIX}.blockSize`, val);
+  syncMosaicConfig();
+});
+
+/** 从 localStorage 恢复马赛克设置 */
+const loadMosaicSettings = () => {
+  const savedMode = localStorage.getItem(`${MOSAIC_KEY_PREFIX}.mode`);
+  if (savedMode === 'pixelate' || savedMode === 'blur') {
+    mosaicMode.value = savedMode;
+  }
+  const savedSize = localStorage.getItem(`${MOSAIC_KEY_PREFIX}.blockSize`);
+  if (savedSize !== null) {
+    mosaicBlockSize.value = parseInt(savedSize, 10) || 10;
+  }
+};
+
+// ======================== 文本工具设置 ========================
+/** 文本字号 */
+const textFontSize = ref(20);
+/** 文本颜色 */
+const textColor = ref('rgba(255, 0, 0, 1)');
+
+const TEXT_KEY_PREFIX = 'translime.hdr-capture.text';
+
+/** 同步文本设置到 state */
+const syncTextConfig = () => {
+  state.textConfig.fontSize = textFontSize.value;
+  state.textConfig.color = textColor.value;
+};
+
+watch(textFontSize, (val) => {
+  localStorage.setItem(`${TEXT_KEY_PREFIX}.fontSize`, val);
+  syncTextConfig();
+});
+
+watch(textColor, (val) => {
+  localStorage.setItem(`${TEXT_KEY_PREFIX}.color`, val);
+  syncTextConfig();
+});
+
+/** 从 localStorage 恢复文本设置 */
+const loadTextSettings = () => {
+  const savedSize = localStorage.getItem(`${TEXT_KEY_PREFIX}.fontSize`);
+  if (savedSize !== null) {
+    textFontSize.value = parseInt(savedSize, 10) || 20;
+  }
+  const savedColor = localStorage.getItem(`${TEXT_KEY_PREFIX}.color`);
+  if (savedColor) {
+    textColor.value = savedColor;
+  }
+};
+
 // ======================== 初始化 ========================
 onMounted(() => {
   const savedRadius = localStorage.getItem('translime.hdr-capture.borderRadius');
@@ -160,6 +236,10 @@ onMounted(() => {
 
   loadRectSettings();
   syncRectConfig();
+  loadMosaicSettings();
+  syncMosaicConfig();
+  loadTextSettings();
+  syncTextConfig();
 });
 
 // ======================== 键盘快捷键 ========================
@@ -387,7 +467,81 @@ const debugLine = computed(() => {
             </svg>
           </button>
 
+          <!-- 马赛克工具按钮 -->
+          <button
+            class="btn btn-settings"
+            :class="{ 'active': activePanel === 'mosaic' }"
+            title="马赛克/模糊"
+            @click.stop="togglePanel('mosaic')"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="none"
+            >
+              <rect x="2" y="2" width="5" height="5" />
+              <rect x="9" y="2" width="5" height="5" opacity="0.6" />
+              <rect x="16" y="2" width="5" height="5" />
+              <rect x="2" y="9" width="5" height="5" opacity="0.6" />
+              <rect x="9" y="9" width="5" height="5" />
+              <rect x="16" y="9" width="5" height="5" opacity="0.6" />
+              <rect x="2" y="16" width="5" height="5" />
+              <rect x="9" y="16" width="5" height="5" opacity="0.6" />
+              <rect x="16" y="16" width="5" height="5" />
+            </svg>
+          </button>
+
+          <!-- 文本工具按钮 -->
+          <button
+            class="btn btn-settings"
+            :class="{ 'active': activePanel === 'text' }"
+            title="文本标注"
+            @click.stop="togglePanel('text')"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="4 7 4 4 20 4 20 7" />
+              <line x1="9" y1="20" x2="15" y2="20" />
+              <line x1="12" y1="4" x2="12" y2="20" />
+            </svg>
+          </button>
+
           <div class="divider" />
+
+          <!-- 撤销按钮 -->
+          <button
+            class="btn btn-settings"
+            :disabled="state.history.length === 0"
+            title="撤销 (Ctrl+Z)"
+            @click.stop="actions.undo()"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+          </button>
 
           <!-- 功能按钮 -->
           <button class="btn btn-save" title="保存 (Ctrl+S)" @click.stop="actions.handleAction('save')">
@@ -569,9 +723,89 @@ const debugLine = computed(() => {
 
         <div class="sub-divider" />
 
-        <!-- 颜色选择（内联，无二级菜单） -->
+        <!-- 颜色选择 -->
         <ColorPicker
           v-model="rectColor"
+          :enable-alpha="true"
+        />
+      </div>
+
+      <!-- 马赛克工具设置栏 -->
+      <div v-if="activePanel === 'mosaic'" class="sub-panel">
+        <!-- 模式切换 -->
+        <div class="rect-type-toggle">
+          <button
+            class="rect-type-btn"
+            :class="{ 'rect-type-btn--active': mosaicMode === 'pixelate' }"
+            title="马赛克"
+            @click.stop="mosaicMode = 'pixelate'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="none"
+            >
+              <rect x="2" y="2" width="5" height="5" />
+              <rect x="9" y="9" width="5" height="5" />
+              <rect x="16" y="16" width="5" height="5" />
+            </svg>
+          </button>
+
+          <button
+            class="rect-type-btn"
+            :class="{ 'rect-type-btn--active': mosaicMode === 'blur' }"
+            title="模糊"
+            @click.stop="mosaicMode = 'blur'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" opacity="0.3" />
+              <circle cx="12" cy="12" r="6" opacity="0.6" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="sub-divider" />
+
+        <!-- 方块大小 / 模糊强度 -->
+        <span class="sub-panel__label">{{ mosaicMode === 'blur' ? '强度' : '方块' }}:</span>
+        <SliderControl
+          v-model="mosaicBlockSize"
+          :min="2"
+          :max="50"
+          :step="1"
+          unit=""
+          input-width="36px"
+        />
+      </div>
+
+      <!-- 文本工具设置栏 -->
+      <div v-if="activePanel === 'text'" class="sub-panel">
+        <span class="sub-panel__label">字号:</span>
+        <SliderControl
+          v-model="textFontSize"
+          :min="8"
+          :max="72"
+          :step="1"
+          unit=""
+          input-width="36px"
+        />
+
+        <div class="sub-divider" />
+
+        <ColorPicker
+          v-model="textColor"
           :enable-alpha="true"
         />
       </div>
