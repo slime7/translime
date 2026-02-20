@@ -26,6 +26,9 @@ const actions = inject('actions');
 /** 当前展开的子面板名称，null 表示全部关闭 */
 const activePanel = ref(null);
 
+/** 当前悬浮提示的文本 */
+const hoveredTooltip = ref('');
+
 /**
  * 切换子面板展开状态（互斥逻辑）
  * @param {'size' | 'radius' | 'rect'} panel - 面板标识
@@ -252,14 +255,8 @@ const handleKeydown = (e) => {
       return;
     }
 
-    if (activePanel.value !== null) {
-      activePanel.value = null;
-      e.preventDefault();
-      return;
-    }
-
     e.preventDefault();
-    actions.closeOverlay();
+    actions.handleAction('cancel');
     return;
   }
 
@@ -390,16 +387,22 @@ const debugLine = computed(() => {
           Monitor: {{ Math.round(toolbarPos.left) }},{{ Math.round(toolbarPos.top) }}
         </div>
 
+        <!-- 动态提示区域 -->
+        <div class="toolbar-tooltip-container" :class="{ 'is-active': hoveredTooltip }">
+          <div class="toolbar-tooltip-text">
+            {{ hoveredTooltip }}
+          </div>
+        </div>
+
         <div class="btn-group">
           <!-- 设置尺寸按钮 -->
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'size' }"
+            @mouseenter="hoveredTooltip = '设置尺寸'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('size')"
           >
-            <div class="btn-tooltip">
-              设置尺寸
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -422,11 +425,10 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'radius' }"
+            @mouseenter="hoveredTooltip = '设置圆角'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('radius')"
           >
-            <div class="btn-tooltip">
-              设置圆角
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -446,11 +448,10 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'rect' }"
+            @mouseenter="hoveredTooltip = '矩形工具'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('rect')"
           >
-            <div class="btn-tooltip">
-              矩形工具
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -477,11 +478,10 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'mosaic' }"
+            @mouseenter="hoveredTooltip = '马赛克/模糊'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('mosaic')"
           >
-            <div class="btn-tooltip">
-              马赛克/模糊
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -506,11 +506,10 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'text' }"
+            @mouseenter="hoveredTooltip = '文本标注'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('text')"
           >
-            <div class="btn-tooltip">
-              文本标注
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -534,11 +533,10 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :disabled="state.history.length === 0"
+            @mouseenter="hoveredTooltip = '撤销 (Ctrl+Z)'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="actions.undo()"
           >
-            <div class="btn-tooltip">
-              撤销 (Ctrl+Z)
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -558,11 +556,10 @@ const debugLine = computed(() => {
           <!-- 功能按钮 -->
           <button
             class="btn btn-save"
+            @mouseenter="hoveredTooltip = '保存 (Ctrl+S)'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="actions.handleAction('save')"
           >
-            <div class="btn-tooltip">
-              保存 (Ctrl+S)
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -582,11 +579,10 @@ const debugLine = computed(() => {
 
           <button
             class="btn btn-copy"
+            @mouseenter="hoveredTooltip = '复制 (Ctrl+C)'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="actions.handleAction('copy')"
           >
-            <div class="btn-tooltip">
-              复制 (Ctrl+C)
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -612,11 +608,10 @@ const debugLine = computed(() => {
 
           <button
             class="btn btn-cancel"
-            @click.stop="actions.closeOverlay()"
+            @mouseenter="hoveredTooltip = '取消 (Esc)'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="actions.handleAction('cancel')"
           >
-            <div class="btn-tooltip">
-              取消 (Esc)
-            </div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -865,52 +860,52 @@ const debugLine = computed(() => {
   transition: all .3s cubic-bezier(.4, 0, .2, 1);
 }
 
+.toolbar-tooltip-container {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-width .3s cubic-bezier(.4, 0, .2, 1), opacity .2s ease;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.toolbar-tooltip-container.is-active {
+  max-width: 150px;
+  opacity: 1;
+}
+
+.toolbar-tooltip-text {
+  font-size: 12px;
+  color: rgb(255 255 255 / 90%);
+  padding: 0 8px 0 6px;
+  font-weight: 500;
+}
+
 .btn-group {
   display: flex;
   align-items: center;
 }
 
 .btn {
+  width: 28px;
   height: 28px;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   color: white;
+  transition: all .15s ease;
   background: transparent;
   border-radius: 4px;
   margin: 0 1px;
-  padding: 0 5px; /* 添加内边距给图标留出基础空间 */
-  overflow: hidden; /* 隐藏折叠的文字 */
-  transition: all .2s cubic-bezier(.4, 0, .2, 1);
-}
-
-.btn svg {
-  flex-shrink: 0; /* 图标不挤压 */
-}
-
-.btn-tooltip {
-  max-width: 0;
-  opacity: 0;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 500;
-  padding-left: 0;
-  color: rgb(255 255 255 / 90%);
-  transition: all .2s cubic-bezier(.4, 0, .2, 1);
 }
 
 .btn:hover { background: rgb(255 255 255 / 15%); }
 
 .btn:active { transform: scale(.95); }
-
-.btn:hover .btn-tooltip,
-.btn.active .btn-tooltip {
-  max-width: 100px;
-  opacity: 1;
-  padding-left: 6px; /* 文字展开时与图标的间距 */
-  margin-right: 2px;
-}
 
 .btn.active {
   background: rgb(255 255 255 / 25%);

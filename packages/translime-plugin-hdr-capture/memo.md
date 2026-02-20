@@ -67,7 +67,7 @@ translime-plugin-hdr-capture/
     *   **入口**: 独立的多页应用入口 (`src/ui/overlay/window/overlay.html`)。
     *   **框架**: Vue 3 + TailwindCSS (无 Vuetify)。
     *   **通信桥梁**: `src/ui/overlay-preload.js` 向渲染进程注入 `window.hdrCapture` API (如 `onInit`, `saveCapture`)。
-    *   **组件**: `FrozenScreens` (背景冻结), `SelectionRect` (选区交互), `HintBox`.
+    *   **组件**: `FrozenScreens` (背景冻结), `SelectionRect` (选区交互), `HintBox` (智能防遮挡提示), `ActionToolbar` (操作工具栏与动态提示).
 
 *   **3. 通用样式**:
     *   推荐使用 **TailwindCSS** 进行布局。

@@ -177,14 +177,14 @@ const detectWindow = (lx, ly) => {
 let annotationIdCounter = 0;
 
 /** 将活动标注定型并推入标注列表 */
-const finalizeAnnotation = () => {
+const finalizeAnnotation = (overrideTool = null) => {
   if (!state.activeAnnotation) {
     return;
   }
   const bounds = activeAnnotationBounds.value;
   if (bounds && bounds.w > 2 && bounds.h > 2) {
     annotationIdCounter += 1;
-    const tool = state.activeTool || 'rect';
+    const tool = overrideTool || state.activeTool || 'rect';
 
     if (tool === 'mosaic') {
       state.annotations.push({
@@ -383,10 +383,15 @@ const finalizeTextAnnotation = () => {
   state.editingTextAnnotation = null;
 };
 
-/** 工具切换时自动定型文本 */
+/** 工具切换时自动定型文本和矩形/马赛克标注 */
 watch(() => state.activeTool, (newVal, oldVal) => {
-  if (oldVal === 'text' && newVal !== 'text') {
-    finalizeTextAnnotation();
+  if (newVal !== oldVal) {
+    if (state.activeAnnotation) {
+      finalizeAnnotation(oldVal);
+    }
+    if (oldVal === 'text' && newVal !== 'text') {
+      finalizeTextAnnotation();
+    }
   }
 });
 
