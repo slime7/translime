@@ -26,6 +26,9 @@ const actions = inject('actions');
 /** 当前展开的子面板名称，null 表示全部关闭 */
 const activePanel = ref(null);
 
+/** 当前悬浮提示的文本 */
+const hoveredTooltip = ref('');
+
 /**
  * 切换子面板展开状态（互斥逻辑）
  * @param {'size' | 'radius' | 'rect'} panel - 面板标识
@@ -390,12 +393,20 @@ const debugLine = computed(() => {
           Monitor: {{ Math.round(toolbarPos.left) }},{{ Math.round(toolbarPos.top) }}
         </div>
 
+        <!-- 动态提示区域 -->
+        <div class="toolbar-tooltip-container" :class="{ 'is-active': hoveredTooltip }">
+          <div class="toolbar-tooltip-text">
+            {{ hoveredTooltip }}
+          </div>
+        </div>
+
         <div class="btn-group">
           <!-- 设置尺寸按钮 -->
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'size' }"
-            title="设置尺寸"
+            @mouseenter="hoveredTooltip = '设置尺寸'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('size')"
           >
             <svg
@@ -420,7 +431,8 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'radius' }"
-            title="设置圆角"
+            @mouseenter="hoveredTooltip = '设置圆角'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('radius')"
           >
             <svg
@@ -442,7 +454,8 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'rect' }"
-            title="矩形工具"
+            @mouseenter="hoveredTooltip = '矩形工具'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('rect')"
           >
             <svg
@@ -471,7 +484,8 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'mosaic' }"
-            title="马赛克/模糊"
+            @mouseenter="hoveredTooltip = '马赛克/模糊'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('mosaic')"
           >
             <svg
@@ -498,7 +512,8 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :class="{ 'active': activePanel === 'text' }"
-            title="文本标注"
+            @mouseenter="hoveredTooltip = '文本标注'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="togglePanel('text')"
           >
             <svg
@@ -524,7 +539,8 @@ const debugLine = computed(() => {
           <button
             class="btn btn-settings"
             :disabled="state.history.length === 0"
-            title="撤销 (Ctrl+Z)"
+            @mouseenter="hoveredTooltip = '撤销 (Ctrl+Z)'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="actions.undo()"
           >
             <svg
@@ -544,7 +560,12 @@ const debugLine = computed(() => {
           </button>
 
           <!-- 功能按钮 -->
-          <button class="btn btn-save" title="保存 (Ctrl+S)" @click.stop="actions.handleAction('save')">
+          <button
+            class="btn btn-save"
+            @mouseenter="hoveredTooltip = '保存 (Ctrl+S)'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="actions.handleAction('save')"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -562,7 +583,12 @@ const debugLine = computed(() => {
             </svg>
           </button>
 
-          <button class="btn btn-copy" title="复制 (Ctrl+C)" @click.stop="actions.handleAction('copy')">
+          <button
+            class="btn btn-copy"
+            @mouseenter="hoveredTooltip = '复制 (Ctrl+C)'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="actions.handleAction('copy')"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -586,7 +612,12 @@ const debugLine = computed(() => {
             </svg>
           </button>
 
-          <button class="btn btn-cancel" title="取消 (Esc)" @click.stop="actions.closeOverlay()">
+          <button
+            class="btn btn-cancel"
+            @mouseenter="hoveredTooltip = '取消 (Esc)'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="actions.closeOverlay()"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -832,6 +863,29 @@ const debugLine = computed(() => {
   backdrop-filter: blur(12px);
   border: 1px solid rgb(255 255 255 / 10%);
   pointer-events: auto;
+  transition: all .3s cubic-bezier(.4, 0, .2, 1);
+}
+
+.toolbar-tooltip-container {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width .3s cubic-bezier(.4, 0, .2, 1), opacity .2s ease;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.toolbar-tooltip-container.is-active {
+  max-width: 150px;
+  opacity: 1;
+}
+
+.toolbar-tooltip-text {
+  font-size: 12px;
+  color: rgb(255 255 255 / 90%);
+  padding: 0 8px 0 6px;
+  font-weight: 500;
 }
 
 .btn-group {
