@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
         tailwindcss(),
       ],
       server: {
-        open: '/preview.html',
+        // open: '/preview.html',
       },
       resolve: {
         alias: {
