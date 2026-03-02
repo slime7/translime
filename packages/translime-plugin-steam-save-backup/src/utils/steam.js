@@ -148,13 +148,37 @@ export async function getSteamUserIds(steamPath) {
 }
 
 /**
- * Steam remotecache.vdf 中 root 值的含义（基于实际测试）：
- * 0 = <userdata>/<userId>/<appId>/remote/ (Steam Cloud 同步目录)
- * 1 = 游戏安装目录
- * 2 = %USERPROFILE%\Documents\ (我的文档) 或 Saved Games
- * 3 = %LOCALAPPDATA% (AppData\Local) - 例如 EarthDefenceForce6
- * 4 = %APPDATA% (AppData\Roaming) - 例如 Factorio saves
- * 12 = %LOCALAPPDATA%Low (AppData\LocalLow)
+ * Steam remotecache.vdf 中 root 值的映射
+ * 数据来源：Steam SDK 内部枚举 ERemoteStorageFileRoot
+ * https://github.com/emily33901/SteamStructs/blob/master/ERemoteStorageFileRoot.h
+ * https://partner.steamgames.com/doc/features/cloud
+ *
+ * | Root ID | SDK 枚举名                                        | Root 名称                 | 路径                                                      |
+ * |---------|---------------------------------------------------|---------------------------|------------------------------------------------------------|
+ * | 0       | k_ERemoteStorageFileRootDefault                   | Default                   | {Steam}/userdata/{UID}/{AppID}/remote/                     |
+ * | 1       | k_ERemoteStorageFileRootGameInstall               | GameInstall               | {SteamInstall}/steamapps/common/{Game}/                    |
+ * | 2       | k_ERemoteStorageFileRootWinMyDocuments             | WinMyDocuments            | Win: %USERPROFILE%\Documents\                              |
+ * | 3       | k_ERemoteStorageFileRootWinAppDataLocal            | WinAppDataLocal           | Win: %LOCALAPPDATA%\                                       |
+ * | 4       | k_ERemoteStorageFileRootWinAppDataRoaming          | WinAppDataRoaming         | Win: %APPDATA%\                                            |
+ * | 5       | k_ERemoteStorageFileRootSteamUserBaseStorage       | SteamUserBaseStorage      | (用途待验证)                                               |
+ * | 6       | k_ERemoteStorageFileRootMacHome                    | MacHome                   | Mac: ~/                                                    |
+ * | 7       | k_ERemoteStorageFileRootMacAppSupport              | MacAppSupport             | Mac: ~/Library/Application Support/                        |
+ * | 8       | k_ERemoteStorageFileRootMacDocuments               | MacDocuments              | Mac: ~/Documents/                                          |
+ * | 9       | k_ERemoteStorageFileRootWinSavedGames              | WinSavedGames             | Win: %USERPROFILE%\Saved Games\                            |
+ * | 10      | k_ERemoteStorageFileRootWinProgramData             | WinProgramData            | Win: %PROGRAMDATA%\                                        |
+ * | 11      | k_ERemoteStorageFileRootSteamCloudDocuments        | SteamCloudDocuments       | 见 SteamCloudDocuments 路径说明                            |
+ * | 12      | k_ERemoteStorageFileRootWinAppDataLocalLow         | WinAppDataLocalLow        | Win: %LOCALAPPDATA%Low\                                    |
+ * | 13      | k_ERemoteStorageFileRootMacCaches                  | MacCaches                 | Mac: ~/Library/Caches/                                     |
+ * | 14      | k_ERemoteStorageFileRootLinuxHome                  | LinuxHome                 | Linux: ~/                                                  |
+ * | 15      | k_ERemoteStorageFileRootLinuxXdgDataHome           | LinuxXdgDataHome          | Linux: $XDG_DATA_HOME/ (默认 ~/.local/share)               |
+ * | 16      | k_ERemoteStorageFileRootLinuxXdgConfigHome         | LinuxXdgConfigHome        | Linux: $XDG_CONFIG_HOME/ (默认 ~/.config)                  |
+ * | 17      | k_ERemoteStorageFileRootAndroidSteamPackageRoot    | AndroidSteamPackageRoot   | Android: (待验证)                                          |
+ * | 18      | (枚举中未定义，可能为后续新增)                      | WindowsHome               | Win: %USERPROFILE%\                                        |
+ *
+ * SteamCloudDocuments (Root 11) 路径说明：
+ *   Win:   %USERPROFILE%\Documents\Steam Cloud\[Steam用户名]\[游戏名]\
+ *   Mac:   ~/Documents/Steam Cloud/[Steam用户名]/[游戏名]/
+ *   Linux: ~/.SteamCloud/[Steam用户名]/[游戏名]/
  *
  * 注：同一游戏可能使用多个 root 类型，备份时需要记录所有来源
  */
@@ -169,34 +193,152 @@ export async function getSteamUserIds(steamPath) {
  */
 
 /**
+ * 根据 root 类型解析绝对路径
+ * @param {number} root - root 类型 ID
+ * @param {string} dirPath - 相对目录路径
+ * @param {Object} ctx - 解析上下文
+ * @param {string} ctx.appDir - userdata 下的应用目录
+ * @param {string|null} ctx.gameInstallDir - 游戏安装目录
+ * @param {string} ctx.steamPath - Steam 安装根路径
+ * @returns {string|null} 解析后的绝对路径
+ */
+function resolveRootPath(root, dirPath, ctx) {
+  const userProfile = process.env.USERPROFILE || process.env.HOME || '';
+
+  switch (root) {
+  case 0: // Default - Steam Cloud remote 目录
+    return path.join(ctx.appDir, 'remote', dirPath);
+
+  case 1: // GameInstall - 游戏安装目录
+    if (ctx.gameInstallDir) {
+      return path.join(ctx.gameInstallDir, dirPath);
+    }
+    return null;
+
+  case 2: // WinMyDocuments
+    return path.join(userProfile, 'Documents', dirPath);
+
+  case 3: // WinAppDataLocal
+    return path.join(
+      process.env.LOCALAPPDATA || path.join(userProfile, 'AppData', 'Local'),
+      dirPath,
+    );
+
+  case 4: // WinAppDataRoaming
+    return path.join(
+      process.env.APPDATA || path.join(userProfile, 'AppData', 'Roaming'),
+      dirPath,
+    );
+
+    // case 5: SteamUserBaseStorage - 用途待验证，暂不实现
+
+  case 6: // MacHome
+    if (process.platform === 'darwin') {
+      return path.join(process.env.HOME || '', dirPath);
+    }
+    return null;
+
+  case 7: // MacAppSupport
+    if (process.platform === 'darwin') {
+      return path.join(process.env.HOME || '', 'Library', 'Application Support', dirPath);
+    }
+    return null;
+
+  case 8: // MacDocuments
+    if (process.platform === 'darwin') {
+      return path.join(process.env.HOME || '', 'Documents', dirPath);
+    }
+    return null;
+
+  case 9: // WinSavedGames
+    return path.join(userProfile, 'Saved Games', dirPath);
+
+  case 10: // WinProgramData
+    return path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', dirPath);
+
+  case 11: { // SteamCloudDocuments
+    // 路径格式：[文档目录]/Steam Cloud/[Steam用户名]/[游戏名]/
+    // 由于无法直接获取 Steam 用户名和游戏名，通过扫描 Steam Cloud 目录匹配
+    const basePath = getSteamCloudDocumentsBase();
+    if (basePath) {
+      return path.join(basePath, dirPath);
+    }
+    return null;
+  }
+
+  case 12: // WinAppDataLocalLow
+    return path.join(userProfile, 'AppData', 'LocalLow', dirPath);
+
+  case 13: // MacCaches
+    if (process.platform === 'darwin') {
+      return path.join(process.env.HOME || '', 'Library', 'Caches', dirPath);
+    }
+    return null;
+
+  case 14: // LinuxHome
+    if (process.platform === 'linux') {
+      return path.join(process.env.HOME || '', dirPath);
+    }
+    return null;
+
+  case 15: // LinuxXdgDataHome
+    if (process.platform === 'linux') {
+      return path.join(
+        process.env.XDG_DATA_HOME || path.join(process.env.HOME || '', '.local', 'share'),
+        dirPath,
+      );
+    }
+    return null;
+
+  case 16: // LinuxXdgConfigHome
+    if (process.platform === 'linux') {
+      return path.join(
+        process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || '', '.config'),
+        dirPath,
+      );
+    }
+    return null;
+
+    // case 17: AndroidSteamPackageRoot - Android 专用，暂不实现
+
+  case 18: // WindowsHome
+    return path.join(userProfile, dirPath);
+
+  default:
+    console.warn(`未知的 root 类型: ${root}，回退到 Steam Cloud remote 目录`);
+    return path.join(ctx.appDir, 'remote', dirPath);
+  }
+}
+
+/**
+ * 获取 SteamCloudDocuments 的基础路径（不含用户名和游戏名部分）
+ * @returns {string|null} 基础路径
+ */
+function getSteamCloudDocumentsBase() {
+  const userProfile = process.env.USERPROFILE || process.env.HOME || '';
+
+  if (process.platform === 'win32') {
+    return path.join(userProfile, 'Documents', 'Steam Cloud');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(process.env.HOME || '', 'Documents', 'Steam Cloud');
+  }
+  if (process.platform === 'linux') {
+    return path.join(process.env.HOME || '', '.SteamCloud');
+  }
+  return null;
+}
+
+/**
  * 尝试查找游戏的存档路径
  * 通过解析 userdata 下的 remotecache.vdf 获取
- * @param {string} steamPath
- * @param {string} appId
+ * @param {string} steamPath - Steam 安装路径
+ * @param {string} appId - 游戏的 App ID
  * @param {string} [gameInstallDir] - 游戏安装目录（用于解析 root=1 的路径）
  * @returns {Promise<SavePathInfo[]>} 存档路径信息列表
  */
 export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
   const userIds = await getSteamUserIds(steamPath);
-
-  // 获取系统目录
-  const userProfile = process.env.USERPROFILE || process.env.HOME || '';
-  const appData = process.env.APPDATA || path.join(userProfile, 'AppData', 'Roaming');
-  const localAppData = process.env.LOCALAPPDATA || path.join(userProfile, 'AppData', 'Local');
-  const documentsPath = path.join(userProfile, 'Documents');
-  const savedGamesPath = path.join(userProfile, 'Saved Games');
-  const localAppDataLow = path.join(userProfile, 'AppData', 'LocalLow');
-
-  // 由于上述逻辑在替换中比较复杂，我先用原有的逻辑调整为并行，并解决并发访问 Map 的问题。
-  // 其实这里的 Map 访问逻辑：
-  // 1. check map.has(key)
-  // 2. if not, calculate absolutePath (ASYNC), then set map
-  // 3. else, push to files (SYNC)
-  // 问题在于 step 2 有 await，如果两个并发任务处理相同 key，第一个 await 时，第二个进来也会 check !has，于是计算两次并 set 两次。
-  // 这会导致第二次覆盖第一次（无害？），但如果第二次 set 了一个新对象，第一次后续的 push 就可能丢了或者 push 到旧对象（如果引用没变）。
-  // 为了安全，我们可以在 Map 里存 Promise？或者改回串行（在每个 user 内部串行，user 之间并行）。
-  // 考虑到同一个游戏同一个用户的 remotecache 文件条目可能很多，但目录不会太多。
-  // 让我们采用“先收集条目，再处理”的策略。
 
   // 收集所有需要处理的文件条目
   const entries = [];
@@ -208,9 +350,9 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
       try {
         const content = await readFile(remoteCachePath, 'utf8');
         const data = vdfParse(content);
-        const appData2 = data[appId];
-        if (appData2) {
-          Object.entries(appData2).forEach(([fileKey, fileInfo]) => {
+        const appData = data[appId];
+        if (appData) {
+          Object.entries(appData).forEach(([fileKey, fileInfo]) => {
             if (fileInfo && typeof fileInfo === 'object' && 'root' in fileInfo) {
               entries.push({ fileKey, fileInfo, appDir });
             }
@@ -223,7 +365,6 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
   }));
 
   // 同步聚合到 Map (key -> { root, dirPath, files: [] })
-  // 这里只保存元数据，不涉及 IO
   const rawMap = new Map();
   // eslint-disable-next-line no-restricted-syntax
   for (const { fileKey, fileInfo, appDir } of entries) {
@@ -237,46 +378,20 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
         root: rootType,
         relativePath: dirPath,
         files: [],
-        appDir, // 需要这个来解析 root=0
+        appDir,
       });
     }
     rawMap.get(key).files.push(path.basename(filePath));
   }
 
-  // 并行解析绝对路径
+  // 并行解析绝对路径并验证存在性
   const result = await Promise.all(Array.from(rawMap.values()).map(async (item) => {
-    let absolutePath = null;
     const { root, relativePath: dirPath, appDir } = item;
-
-    switch (root) {
-    case 1: // 游戏安装目录
-      if (gameInstallDir) {
-        absolutePath = path.join(gameInstallDir, dirPath);
-      }
-      break;
-    case 2: // Documents
-      absolutePath = path.join(documentsPath, dirPath);
-      if (!(await pathExists(absolutePath))) {
-        const altPath = path.join(savedGamesPath, dirPath);
-        if (await pathExists(altPath)) {
-          absolutePath = altPath;
-        }
-      }
-      break;
-    case 3: // AppData\Local
-      absolutePath = path.join(localAppData, dirPath);
-      break;
-    case 4: // AppData\Roaming
-      absolutePath = path.join(appData, dirPath);
-      break;
-    case 12: // AppData\LocalLow
-      absolutePath = path.join(localAppDataLow, dirPath);
-      break;
-    case 0: // Steam Cloud remote 目录
-    default:
-      absolutePath = path.join(appDir, 'remote', dirPath);
-      break;
-    }
+    const absolutePath = resolveRootPath(root, dirPath, {
+      appDir,
+      gameInstallDir,
+      steamPath,
+    });
 
     return {
       root,
@@ -288,3 +403,4 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
 
   return result;
 }
+

@@ -80,6 +80,6 @@ packages/translime-plugin-steam-save-backup/
 *   **文档同步**: 每次完成新功能或修改核心逻辑后，**必须同步更新本文件 (`memo.md`)**，以保持项目的一致性与可维护性。
 *   **当前状态**:
     *   状态: 稳定。核心备份/还原功能已实现。
-    *   近期更改: 添加了自定义备份根目录支持，排除列表管理以及更新备份备注功能。
+    *   近期更改: 重构 `steam.js` 中 remotecache.vdf 的 root 路径映射，基于 Steam SDK `ERemoteStorageFileRoot` 枚举补全 0-18 全部 Root ID，新增 macOS/Linux 跨平台支持，将路径解析逻辑提取为独立的 `resolveRootPath()` 函数。
 *   **Vite 配置**: 主进程和 UI 使用不同的配置文件，请确保修改对应配置。
 *   **构建**: `npm run build` 同时构建插件主逻辑和 UI。
