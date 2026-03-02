@@ -193,6 +193,25 @@ export async function getSteamUserIds(steamPath) {
  */
 
 /**
+ * 获取 SteamCloudDocuments 的基础路径（不含用户名和游戏名部分）
+ * @returns {string|null} 基础路径
+ */
+function getSteamCloudDocumentsBase() {
+  const userProfile = process.env.USERPROFILE || process.env.HOME || '';
+
+  if (process.platform === 'win32') {
+    return path.join(userProfile, 'Documents', 'Steam Cloud');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(process.env.HOME || '', 'Documents', 'Steam Cloud');
+  }
+  if (process.platform === 'linux') {
+    return path.join(process.env.HOME || '', '.SteamCloud');
+  }
+  return null;
+}
+
+/**
  * 根据 root 类型解析绝对路径
  * @param {number} root - root 类型 ID
  * @param {string} dirPath - 相对目录路径
@@ -308,25 +327,6 @@ function resolveRootPath(root, dirPath, ctx) {
     console.warn(`未知的 root 类型: ${root}，回退到 Steam Cloud remote 目录`);
     return path.join(ctx.appDir, 'remote', dirPath);
   }
-}
-
-/**
- * 获取 SteamCloudDocuments 的基础路径（不含用户名和游戏名部分）
- * @returns {string|null} 基础路径
- */
-function getSteamCloudDocumentsBase() {
-  const userProfile = process.env.USERPROFILE || process.env.HOME || '';
-
-  if (process.platform === 'win32') {
-    return path.join(userProfile, 'Documents', 'Steam Cloud');
-  }
-  if (process.platform === 'darwin') {
-    return path.join(process.env.HOME || '', 'Documents', 'Steam Cloud');
-  }
-  if (process.platform === 'linux') {
-    return path.join(process.env.HOME || '', '.SteamCloud');
-  }
-  return null;
 }
 
 /**
