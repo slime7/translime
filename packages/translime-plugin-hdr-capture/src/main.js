@@ -283,16 +283,16 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
 const startCapture = async (isDebug = false, startTime = Date.now()) => {
   logger.info(`[Perf] startCapture 开始 (T+${Date.now() - startTime}ms)`);
 
-  // 缓存显示器边界信息，供后续逻辑复用
-  const {
-    displays: allDisplays, minX, minY, maxY, width: totalWidth, height: totalHeight,
-  } = getAllDisplaysBounds();
-
   // [性能优化] 尽早确保窗口已创建，让 WebContents 加载与截图过程并行
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     logger.info(`[Perf] 预创建 Overlay 窗口 (T+${Date.now() - startTime}ms)`);
     createOverlayWindow(isDebug);
   }
+
+  // 获取最新显示器边界信息（每次都需要重新获取，以应对屏幕状态变更）
+  const {
+    displays: allDisplays, minX, minY, maxY, width: totalWidth, height: totalHeight,
+  } = getAllDisplaysBounds();
 
   // 如果窗口已存在、由于离屏策略处于“可见”状态且坐标在有效范围内，说明正在截图中，直接聚焦
   if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
@@ -419,15 +419,17 @@ const startCapture = async (isDebug = false, startTime = Date.now()) => {
 
   const sendDataAndShow = () => {
     logger.info(`[Perf] 发送初始化数据 (T+${Date.now() - startTime}ms), 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
-    overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
 
-    // 数据发送后，再将窗口移动回可见区域
-    // 这样用户看到的每一帧都是已加载好截图数据的画面，绝不会看到之前的 UI（放大镜等）
-
-    // 强制移动到 minX, minY (可见区域)
+    // 在发送数据前，强制更新窗口边界以匹配当前屏幕配置
+    // 这修复了屏幕状态变更（如全屏游戏切换分辨率）后覆盖层位置/尺寸异常的问题
     overlayWindow.setBounds({
       x: minX, y: minY, width: totalWidth, height: totalHeight,
     });
+
+    overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
+
+    // 数据发送后，再次确保窗口在可见区域
+    // 这样用户看到的每一帧都是已加载好截图数据的画面，绝不会看到之前的 UI（放大镜等）
 
     if (!overlayWindow.isVisible()) {
       overlayWindow.showInactive();
