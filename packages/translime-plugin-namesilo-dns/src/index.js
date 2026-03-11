@@ -50,7 +50,7 @@ const pushLog = (log) => {
   }
 };
 const getIp = async (type = 4) => {
-  const url = type === 6 ? 'https://ipv6.icanhazip.com' : 'https://icanhazip.com';
+  const url = type === 6 ? 'https://ipv6.icanhazip.com' : 'https://ipv4.icanhazip.com';
   logger.debug(`正在获取公网 IPv${type}, URL: ${url}`);
   try {
     const adapter = axiosHttpAdapter.default || axiosHttpAdapter;

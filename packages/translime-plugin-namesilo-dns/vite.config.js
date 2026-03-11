@@ -20,12 +20,18 @@ const config = ({ mode }) => ({
     },
     rollupOptions: {
       external: [
+        'electron',
         ...builtinModules,
-        'translime-sdk',
-        'semver-compare',
-        'fast-xml-parser',
-        /^axios(\/.*)?$/,
+        ...builtinModules.map((m) => `node:${m}`),
       ],
+      output: {
+        exports: 'named',
+        globals: builtinModules.reduce((acc, m) => {
+          acc[m] = m;
+          acc[`node:${m}`] = m;
+          return acc;
+        }, {}),
+      },
     },
   },
 });
