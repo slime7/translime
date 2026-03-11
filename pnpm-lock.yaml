@@ -441,23 +441,10 @@ importers:
         version: 3.4.0(vite@7.3.1(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))
 
   packages/translime-plugin-namesilo-dns:
-    dependencies:
-      fast-xml-parser:
-        specifier: ^4.0.7
-        version: 4.3.5
-      preact:
-        specifier: ^10.6.6
-        version: 10.19.6
     devDependencies:
       '@preact/preset-vite':
         specifier: ^2.1.11
         version: 2.8.1(@babel/core@7.24.0)(preact@10.19.6)(vite@7.3.1(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))
-      '@rollup/plugin-commonjs':
-        specifier: ^24.0.1
-        version: 24.1.0(rollup@3.29.4)
-      '@rollup/plugin-node-resolve':
-        specifier: ^15.0.1
-        version: 15.2.3(rollup@3.29.4)
       autoprefixer:
         specifier: ^10.4.4
         version: 10.4.18(postcss@8.4.35)
@@ -479,18 +466,24 @@ importers:
       eslint-plugin-import:
         specifier: ^2.31.0
         version: 2.31.0(eslint@9.24.0(jiti@2.6.1))
-      jest:
-        specifier: ^27.5.1
-        version: 27.5.1
+      fast-xml-parser:
+        specifier: ^4.0.7
+        version: 4.3.5
       postcss:
         specifier: ^8.4.12
         version: 8.4.35
+      preact:
+        specifier: ^10.19.0
+        version: 10.19.6
       semver-compare:
         specifier: ^1.0.0
         version: 1.0.0
       tailwindcss:
         specifier: ^3.0.23
         version: 3.4.1
+      translime-sdk:
+        specifier: workspace:*
+        version: link:../sdk
       vite:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@22.14.1)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0)
