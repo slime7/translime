@@ -37,10 +37,10 @@
 
         <v-form v-if="!loading.getSettings" class="mt-4" ref="settingForm">
           <v-container fluid>
-            <v-row
+            <div
               v-for="(menuItem, index) in settingMenu"
               :key="index"
-              align="center"
+              class="flex items-center -mx-4"
             >
               <v-text-field
                 v-if="menuItem.type === 'input' || menuItem.type === 'password'"
@@ -96,13 +96,13 @@
               >
                 <label
                   v-text="menuItem.name"
-                  class="flex-grow-1"
+                  class="grow"
                   :for="`switch-${menuItem.key}`"
                 />
 
                 <v-switch
                   v-model="settings[menuItem.key]"
-                  class="flex-grow-0 flex-shrink-0"
+                  class="grow-0 shrink-0"
                   :id="`switch-${menuItem.key}`"
                   color="primary"
                   hide-details
@@ -119,7 +119,7 @@
                   :key="cIndex"
                   :label="menuCheckboxItem.name"
                   :value="menuCheckboxItem.value"
-                  class="mr-2 flex-grow-0"
+                  class="mr-2 grow-0"
                   color="primary"
                   hide-details
                 />
@@ -144,7 +144,7 @@
                   />
                 </v-radio-group>
               </template>
-            </v-row>
+            </div>
           </v-container>
         </v-form>
 
@@ -205,7 +205,6 @@ export default {
     });
     const settings = reactive({});
     const initSettings = async () => {
-      console.log('init settings');
       const { packageName } = props.plugin;
       loading.getSettings = true;
       const settingsSaved = await ipc.invoke(ipcType.GET_PLUGIN_SETTING, packageName);
