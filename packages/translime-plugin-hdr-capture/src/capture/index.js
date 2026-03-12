@@ -8,7 +8,7 @@ const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Capture' }) : baseLogger;
 
 /**
- * 对应 RGBA Buffer 应用圆角遮罩 (原地修改)
+ * 对 RGBA Buffer 应用圆角遮罩
  * @param {Buffer} buffer - RGBA 图像数据
  * @param {number} width - 图像宽度
  * @param {number} height - 图像高度
@@ -72,6 +72,256 @@ function applyBorderRadius(buffer, width, height, radius) {
       processPixel(x, y, width - r, height - r);
     }
   }
+}
+
+/**
+ * 将标注叠加层 (overlay) 以 alpha 混合方式合成到目标 buffer 上
+ * overlay 的逻辑尺寸与选区一致，需按 targetScale 缩放后逐像素混合
+ *
+ * @param {Buffer} dstBuffer - 目标 RGBA 图像 (物理尺寸)
+ * @param {number} dstWidth - 物理宽度
+ * @param {number} dstHeight - 物理高度
+ * @param {{ buffer: Buffer|Uint8Array, width: number, height: number }} overlayData - 标注层 RGBA 数据 (逻辑尺寸)
+ * @param {number} targetScale - 缩放倍率
+ */
+function applyOverlay(dstBuffer, dstWidth, dstHeight, overlayData, targetScale) {
+  const srcBuf = overlayData.buffer;
+  const srcW = overlayData.width;
+  const srcH = overlayData.height;
+
+  for (let dy = 0; dy < dstHeight; dy += 1) {
+    // 对应 overlay 逻辑坐标
+    const sy = Math.floor(dy / targetScale);
+    if (sy < srcH) {
+      for (let dx = 0; dx < dstWidth; dx += 1) {
+        const sx = Math.floor(dx / targetScale);
+        if (sx < srcW) {
+          const srcIdx = (sy * srcW + sx) * 4;
+          const srcA = srcBuf[srcIdx + 3];
+          if (srcA > 0) {
+            const dstIdx = (dy * dstWidth + dx) * 4;
+            const alpha = srcA / 255;
+            const invAlpha = 1 - alpha;
+
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx] = Math.round(srcBuf[srcIdx] * alpha + dstBuffer[dstIdx] * invAlpha);
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx + 1] = Math.round(srcBuf[srcIdx + 1] * alpha + dstBuffer[dstIdx + 1] * invAlpha);
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx + 2] = Math.round(srcBuf[srcIdx + 2] * alpha + dstBuffer[dstIdx + 2] * invAlpha);
+            // eslint-disable-next-line no-param-reassign
+            dstBuffer[dstIdx + 3] = Math.min(255, Math.round(srcA + dstBuffer[dstIdx + 3] * invAlpha));
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 像素化处理：将区域内的像素按方块平均颜色填充
+ *
+ * @param {Buffer} buffer - RGBA 图像
+ * @param {number} bufWidth - 图像宽度
+ * @param {number} x0 - 区域左边界
+ * @param {number} y0 - 区域上边界
+ * @param {number} x1 - 区域右边界
+ * @param {number} y1 - 区域下边界
+ * @param {number} blockSize - 方块大小 (物理像素)
+ */
+function applyPixelate(buffer, bufWidth, x0, y0, x1, y1, blockSize) {
+  for (let by = y0; by < y1; by += blockSize) {
+    for (let bx = x0; bx < x1; bx += blockSize) {
+      const bw = Math.min(blockSize, x1 - bx);
+      const bh = Math.min(blockSize, y1 - by);
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      let count = 0;
+
+      // 累加方块内所有像素的颜色值
+      for (let dy = 0; dy < bh; dy += 1) {
+        for (let dx = 0; dx < bw; dx += 1) {
+          const idx = ((by + dy) * bufWidth + (bx + dx)) * 4;
+          r += buffer[idx];
+          g += buffer[idx + 1];
+          b += buffer[idx + 2];
+          a += buffer[idx + 3];
+          count += 1;
+        }
+      }
+
+      // 计算平均值并填充
+      if (count > 0) {
+        const avgR = Math.round(r / count);
+        const avgG = Math.round(g / count);
+        const avgB = Math.round(b / count);
+        const avgA = Math.round(a / count);
+
+        for (let dy = 0; dy < bh; dy += 1) {
+          for (let dx = 0; dx < bw; dx += 1) {
+            const idx = ((by + dy) * bufWidth + (bx + dx)) * 4;
+            // eslint-disable-next-line no-param-reassign
+            buffer[idx] = avgR;
+            // eslint-disable-next-line no-param-reassign
+            buffer[idx + 1] = avgG;
+            // eslint-disable-next-line no-param-reassign
+            buffer[idx + 2] = avgB;
+            // eslint-disable-next-line no-param-reassign
+            buffer[idx + 3] = avgA;
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 三次分离式 Box Blur (近似高斯模糊)
+ *
+ * @param {Buffer} buffer - RGBA 图像
+ * @param {number} bufWidth - 图像宽度
+ * @param {number} bufHeight - 图像高度
+ * @param {number} x0 - 区域左边界
+ * @param {number} y0 - 区域上边界
+ * @param {number} x1 - 区域右边界
+ * @param {number} y1 - 区域下边界
+ * @param {number} radius - 模糊半径 (物理像素)
+ */
+function applyBoxBlur(buffer, bufWidth, bufHeight, x0, y0, x1, y1, radius) {
+  const regionW = x1 - x0;
+  const regionH = y1 - y0;
+
+  // 将区域像素提取到临时缓冲区
+  const temp = Buffer.alloc(regionW * regionH * 4);
+
+  // 复制区域像素到 temp
+  for (let y = 0; y < regionH; y += 1) {
+    const srcOffset = ((y0 + y) * bufWidth + x0) * 4;
+    const dstOffset = y * regionW * 4;
+    buffer.copy(temp, dstOffset, srcOffset, srcOffset + regionW * 4);
+  }
+
+  const out = Buffer.alloc(regionW * regionH * 4);
+
+  // 三遍 box blur
+  const passes = 3;
+  for (let pass = 0; pass < passes; pass += 1) {
+    const src = pass === 0 ? temp : out;
+
+    // 水平方向
+    for (let y = 0; y < regionH; y += 1) {
+      for (let x = 0; x < regionW; x += 1) {
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let a = 0;
+        let count = 0;
+        const kStart = Math.max(0, x - radius);
+        const kEnd = Math.min(regionW - 1, x + radius);
+
+        for (let k = kStart; k <= kEnd; k += 1) {
+          const idx = (y * regionW + k) * 4;
+          r += src[idx];
+          g += src[idx + 1];
+          b += src[idx + 2];
+          a += src[idx + 3];
+          count += 1;
+        }
+
+        const idx = (y * regionW + x) * 4;
+        out[idx] = Math.round(r / count);
+        out[idx + 1] = Math.round(g / count);
+        out[idx + 2] = Math.round(b / count);
+        out[idx + 3] = Math.round(a / count);
+      }
+    }
+
+    // 将水平结果拷回 src 以进行垂直方向处理
+    out.copy(temp);
+
+    // 垂直方向
+    for (let y = 0; y < regionH; y += 1) {
+      for (let x = 0; x < regionW; x += 1) {
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let a = 0;
+        let count = 0;
+        const kStart = Math.max(0, y - radius);
+        const kEnd = Math.min(regionH - 1, y + radius);
+
+        for (let k = kStart; k <= kEnd; k += 1) {
+          const idx = (k * regionW + x) * 4;
+          r += temp[idx];
+          g += temp[idx + 1];
+          b += temp[idx + 2];
+          a += temp[idx + 3];
+          count += 1;
+        }
+
+        const idx = (y * regionW + x) * 4;
+        out[idx] = Math.round(r / count);
+        out[idx + 1] = Math.round(g / count);
+        out[idx + 2] = Math.round(b / count);
+        out[idx + 3] = Math.round(a / count);
+      }
+    }
+
+    // 为下一遍准备
+    if (pass < passes - 1) {
+      out.copy(temp);
+    }
+  }
+
+  // 将处理结果写回原 buffer
+  for (let y = 0; y < regionH; y += 1) {
+    const srcOffset = y * regionW * 4;
+    const dstOffset = ((y0 + y) * bufWidth + x0) * 4;
+    out.copy(buffer, dstOffset, srcOffset, srcOffset + regionW * 4);
+  }
+}
+
+/**
+ * 对 RGBA Buffer 中指定区域进行像素化或模糊处理
+ *
+ * @param {Buffer} buffer - 目标 RGBA 图像 (物理尺寸)
+ * @param {number} bufWidth - 物理宽度
+ * @param {number} bufHeight - 物理高度
+ * @param {Array<{x: number, y: number, w: number, h: number, mode: string, blockSize: number}>} regions - 马赛克区域列表 (逻辑坐标)
+ * @param {number} scale - 逻辑坐标到物理坐标的缩放倍率
+ */
+function applyMosaic(buffer, bufWidth, bufHeight, regions, scale) {
+  if (!regions || regions.length === 0) {
+    return;
+  }
+
+  regions.forEach((region) => {
+    // 将逻辑坐标转换为物理坐标
+    const px = Math.round(region.x * scale);
+    const py = Math.round(region.y * scale);
+    const pw = Math.round(region.w * scale);
+    const ph = Math.round(region.h * scale);
+
+    // 边界裁剪
+    const x0 = Math.max(0, px);
+    const y0 = Math.max(0, py);
+    const x1 = Math.min(bufWidth, px + pw);
+    const y1 = Math.min(bufHeight, py + ph);
+
+    if (x1 <= x0 || y1 <= y0) {
+      return;
+    }
+
+    const blockSize = Math.max(1, Math.round((region.blockSize || 10) * scale));
+
+    if (region.mode === 'blur') {
+      applyBoxBlur(buffer, bufWidth, bufHeight, x0, y0, x1, y1, blockSize);
+    } else {
+      applyPixelate(buffer, bufWidth, x0, y0, x1, y1, blockSize);
+    }
+  });
 }
 
 // 加载 native addon
@@ -159,17 +409,16 @@ export const getDisplays = () => nativeAddon.getDisplays();
  * @param {boolean} [hdrOptions.preserveRaw] - 是否保留原始 HDR 数据
  * @returns {Promise<{buffer: Buffer, width: number, height: number, isHdr: boolean, rawHdrBuffer?: Buffer}>} 图像数据与实际尺寸
  */
-export const captureDisplay = async (displayId = 0, hdrOptions = null) => {
+export const captureDisplay = async (displayId = 0, hdrOptions = null, captureCursor = false) => {
   try {
-    // NAPI-RS 会自动在 JS camelCase 和 Rust snake_case 之间转换
-    // 因此这里使用 camelCase 直接传递
+    // 转换 HDR 选项
     const nativeHdrOptions = hdrOptions ? {
       enabled: hdrOptions.enabled,
       sdrWhiteNits: hdrOptions.sdrWhiteNits,
       hdrMaxNits: hdrOptions.hdrMaxNits,
       preserveRaw: hdrOptions.preserveRaw,
     } : null;
-    return await nativeAddon.captureDisplay(displayId, nativeHdrOptions);
+    return await nativeAddon.captureDisplay(displayId, nativeHdrOptions, captureCursor);
   } catch (e) {
     logger.error(`captureDisplay 失败 (ID=${displayId}):`, e);
     throw e;
@@ -258,7 +507,14 @@ export const cropHdrF16 = async (rawBuffer, width, height, rect) => {
  * @param {Rect} rect - 裁剪区域
  */
 export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
-  logger.info('开始多屏幕混合裁剪, 选区:', { rect });
+  logger.info('开始多屏幕混合裁剪, 选区:', {
+    data: {
+      width: rect.width,
+      height: rect.height,
+      x: rect.x,
+      y: rect.y,
+    },
+  });
 
   if (!sessionData || sessionData.length === 0) {
     logger.error('裁剪失败: sessionData 为空！');
@@ -360,6 +616,25 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
     }
   });
 
+  // 应用马赛克/模糊 (如果有)
+  if (rect.mosaicRegions && rect.mosaicRegions.length > 0) {
+    logger.info(`正在应用马赛克/模糊, 区域数: ${rect.mosaicRegions.length}`);
+    applyMosaic(finalBuffer, targetWidth, targetHeight, rect.mosaicRegions, targetScale);
+  }
+
+  // 合成标注叠加层 (如果有)
+  if (rect.overlayData && rect.overlayData.buffer) {
+    logger.info('正在合成标注叠加层...');
+    const overlayBuf = Buffer.isBuffer(rect.overlayData.buffer)
+      ? rect.overlayData.buffer
+      : Buffer.from(rect.overlayData.buffer);
+    applyOverlay(finalBuffer, targetWidth, targetHeight, {
+      buffer: overlayBuf,
+      width: rect.overlayData.width,
+      height: rect.overlayData.height,
+    }, targetScale);
+  }
+
   // 应用圆角 (如果有)
   if (rect.borderRadius && rect.borderRadius > 0) {
     const radius = Math.round(rect.borderRadius * targetScale);
@@ -376,7 +651,7 @@ export const cropAndGetPngFromBuffer = async (sessionData, rect) => {
 };
 
 /**
- * 优化 saveToBuffer 逻辑，支持缩放和 HDR 原始数据保存
+ * 保存裁剪后的图像，支持缩放和 HDR
  * @param {Array} sessionData - 捕获会话数据
  * @param {Object} rect - 裁剪区域
  * @param {Object} options - 保存选项
@@ -468,6 +743,25 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
     }
   });
 
+  // 应用马赛克/模糊 (如果有)
+  if (rect.mosaicRegions && rect.mosaicRegions.length > 0) {
+    logger.info(`正在应用马赛克/模糊 (save), 区域数: ${rect.mosaicRegions.length}`);
+    applyMosaic(finalBuffer, targetWidth, targetHeight, rect.mosaicRegions, targetScale);
+  }
+
+  // 合成标注叠加层 (如果有)
+  if (rect.overlayData && rect.overlayData.buffer) {
+    logger.info('正在合成标注叠加层 (save)...');
+    const overlayBuf = Buffer.isBuffer(rect.overlayData.buffer)
+      ? rect.overlayData.buffer
+      : Buffer.from(rect.overlayData.buffer);
+    applyOverlay(finalBuffer, targetWidth, targetHeight, {
+      buffer: overlayBuf,
+      width: rect.overlayData.width,
+      height: rect.overlayData.height,
+    }, targetScale);
+  }
+
   // 应用圆角 (如果有)
   if (rect.borderRadius && rect.borderRadius > 0) {
     const radius = Math.round(rect.borderRadius * targetScale);
@@ -480,6 +774,14 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
   if (savePath) {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
+
+    // Ensure save directory exists
+    try {
+      await fs.mkdir(savePath, { recursive: true });
+    } catch (err) {
+      logger.error(`无法创建保存目录: ${savePath}`, err);
+    }
+
     const timestamp = dayjs().format('HDR_Capture_YYYY-MM-DD_HH-mm-ss');
     let fileName;
 
@@ -519,8 +821,10 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
           };
 
           logger.info('裁剪 HDR 原始数据:', {
-            displaySize: `${hdrDisplay.width}x${hdrDisplay.height}`,
-            cropRect: hdrCropRect,
+            data: {
+              displaySize: `${hdrDisplay.width}x${hdrDisplay.height}`,
+              cropRect: hdrCropRect,
+            },
           });
 
           // 裁剪 F16 格式的 HDR 原始数据

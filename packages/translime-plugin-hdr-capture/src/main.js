@@ -18,8 +18,7 @@ const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Main' }) : baseLogger;
 
 /**
- * 这是一个本地实现的配置代理，不依赖外部模块，
- * 确保在 CJS 混合环境下能稳定运行。
+ * 配置代理实例
  */
 const pluginConfig = usePluginConfig(PLUGIN_ID);
 
@@ -45,22 +44,8 @@ const getPreserveHdr = () => pluginConfig.get('preserveHdr', false);
 const getEnableHdrMapping = () => pluginConfig.get('enableHdrMapping', true);
 const getSdrWhiteNits = () => pluginConfig.get('sdrWhiteNits', 203);
 const getHdrMaxNits = () => pluginConfig.get('hdrMaxNits', 1000);
-const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
+const getCaptureCursor = () => pluginConfig.get('captureCursor', false);
 
-/**
- * 注销全局快捷键
- */
-const unregisterShortcut = () => {
-  if (registeredShortcut) {
-    globalShortcut.unregister(registeredShortcut);
-    logger.info(`快捷键已注销: ${registeredShortcut}`);
-    registeredShortcut = null;
-  }
-};
-
-/**
- * 创建透明叠加层窗口
- */
 /**
  * 获取所有显示器的组合边界
  */
@@ -88,14 +73,59 @@ const getAllDisplaysBounds = () => {
     displays,
     minX,
     minY,
+    maxX,
+    maxY,
     width: maxX - minX,
     height: maxY - minY,
   };
 };
 
+const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
+const getFastResponse = () => pluginConfig.get('fastResponse', true);
+
 /**
- * 创建透明叠加层窗口
+ * 更新 Overlay 窗口的边界（用于响应屏幕变化）
  */
+const updateOverlayBounds = () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+
+  const {
+    minX, minY, maxY, width, height,
+  } = getAllDisplaysBounds();
+
+  // 简单策略：如果窗口当前是可见的，我们只需判断它是否应该处于离屏状态
+  // 但为了简化逻辑，我们只处理“如果它正在显示内容，则更新其大小以适应新屏幕”
+  // 至于离屏状态的窗口，我们干脆再次将其移动到新的安全离屏位置
+  // 或者，如果窗口处于离屏位置（y > maxY），我们更新它的离屏位置
+
+  const { y } = overlayWindow.getBounds();
+
+  if (y >= maxY) {
+    // 当前处于离屏状态，更新到新的离屏位置
+    overlayWindow.setBounds({
+      width, height, x: 0, y: maxY + 100,
+    });
+    logger.info(`屏幕变动，更新离屏位置: (0, ${maxY + 100})`);
+  } else {
+    // 当前处于显示状态，更新全屏边界
+    overlayWindow.setBounds({
+      x: minX, y: minY, width, height,
+    });
+    logger.info(`屏幕变动，更新捕获边界: ${width}x${height} at (${minX}, ${minY})`);
+  }
+};
+
+/**
+ * 注销全局快捷键
+ */
+const unregisterShortcut = () => {
+  if (registeredShortcut) {
+    globalShortcut.unregister(registeredShortcut);
+    logger.info(`快捷键已注销: ${registeredShortcut}`);
+    registeredShortcut = null;
+  }
+};
+
 const createOverlayWindow = (isDebug = false) => {
   const {
     minX, minY, width, height,
@@ -112,10 +142,12 @@ const createOverlayWindow = (isDebug = false) => {
     skipTaskbar: !isDebug,
     resizable: isDebug,
     movable: isDebug,
-    maximizable: true,
+    maximizable: false,
     fullscreen: false,
     thickFrame: false,
     hasShadow: false,
+    // 初始不显示，等待数据准备就绪
+    show: false,
     type: 'toolbar',
     webPreferences: {
       nodeIntegration: false,
@@ -140,17 +172,8 @@ const createOverlayWindow = (isDebug = false) => {
     overlayWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
-  // 注意: 初始化数据发送由 startCapture 中的 did-finish-load 处理
-
   // 设置窗口忽略鼠标事件（初始状态）
-  // 后续通过 IPC 在需要时启用鼠标事件
   overlayWindow.setIgnoreMouseEvents(false);
-
-  // 确保窗口获得焦点以接收键盘事件
-  overlayWindow.on('ready-to-show', () => {
-    overlayWindow.show();
-    overlayWindow.focus();
-  });
 
   overlayWindow.on('closed', () => {
     overlayWindow = null;
@@ -164,44 +187,61 @@ const createOverlayWindow = (isDebug = false) => {
  * 预捕获所有屏幕画面
  * 返回原始数据用于后续处理，并关联 Electron 的显示器信息（缩放倍数）
  */
-const preCaptureAllScreens = async () => {
+const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => {
   const electronDisplays = screen.getAllDisplays();
   const nativeDisplays = capture.getDisplays();
 
-  logger.info('开始预捕获。检测到原生显示器数量:', nativeDisplays.length);
+  logger.info(`[Perf] 开始预捕获 (T+${Date.now() - startTime}ms). 检测到原生显示器数量:`, nativeDisplays.length);
 
   // 读取 HDR 映射配置
   const enableHdrMapping = getEnableHdrMapping();
   const sdrWhiteNits = getSdrWhiteNits();
   const hdrMaxNits = getHdrMaxNits();
   const preserveHdr = getPreserveHdr();
+  const captureCursor = getCaptureCursor();
 
   // 构建 HDR 映射选项（仅在启用时传递）
   const hdrOptions = enableHdrMapping ? {
     enabled: true,
     sdrWhiteNits,
     hdrMaxNits,
-    // 当用户启用了 HDR 映射且勾选了保存 HDR 原始文件时，请求原始数据
+    preserveHdr, // 注意：传递给 native 的参数名和 config 可能略有不同，这里复用 preserveHdr
     preserveRaw: preserveHdr,
   } : null;
 
   logger.info('HDR 映射配置:', {
-    enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr,
+    enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr, captureCursor,
   });
 
   const capturePromises = nativeDisplays.map(async (nd) => {
     try {
-      logger.info(`正在捕获显示器 ID=${nd.id} (预期 ${nd.width}x${nd.height})`);
+      const t0 = Date.now();
+      logger.info(`[Perf] 正在捕获显示器 ID=${nd.id} (预期 ${nd.width}x${nd.height}) ...`);
       const {
         buffer, width, height, isHdr, rawHdrBuffer,
-      } = await capture.captureDisplay(nd.id, hdrOptions);
+      } = await capture.captureDisplay(nd.id, hdrOptions, captureCursor);
+
+      const t1 = Date.now();
+      logger.info(`[Perf] 显示器 ID=${nd.id} 捕获完成, 耗时: ${t1 - t0}ms(T+${t1 - startTime}ms). 实际尺寸 ${width}x${height}, Buffer: ${buffer ? buffer.length : 0}, IS_HDR: ${isHdr}`);
+
+      // Debug 模式下，如果是非 HDR 屏幕，强制执行一次 Tone Mapping 以测试性能
+      if (isDebug && !isHdr && buffer && buffer.length > 0) {
+        try {
+          logger.info('[Perf] (Debug模式) 强制对 SDR 数据执行 Tone Mapping 测试...');
+          const tMap0 = Date.now();
+          // 注意：SDR 数据丢进去 toneMap 处理结果虽然色彩不对，但计算过程是一样的，足以反映耗时
+          await capture.toneMap(buffer, width, height, { exposure: 1.0 });
+          const tMap1 = Date.now();
+          logger.info(`[Perf] (Debug模式) 强制 Tone Mapping 耗时: ${tMap1 - tMap0}ms(T+${tMap1 - startTime}ms)`);
+        } catch (tmErr) {
+          logger.error('强制 Tone Mapping 测试失败:', tmErr);
+        }
+      }
 
       if (!buffer || buffer.length === 0) {
         logger.warn(`显示器 ID=${nd.id} 返回的 Buffer 为空`);
         return null;
       }
-
-      logger.info(`显示器 ID=${nd.id} 捕获成功: 实际尺寸 ${width}x${height}, Buffer 长度 ${buffer.length}, IS_HDR: ${isHdr}, 原始 HDR 数据: ${rawHdrBuffer ? rawHdrBuffer.length : 'N/A'}`);
 
       // 找到包含该 native 显示器中心点的 Electron 显示器，以获取 scaleFactor
       const centerX = nd.x + nd.width / 2;
@@ -211,8 +251,6 @@ const preCaptureAllScreens = async () => {
         return centerX >= b.x && centerX <= b.x + b.width
                && centerY >= b.y && centerY <= b.y + b.height;
       }) || electronDisplays[0];
-
-      logger.info(`显示器 ID=${nd.id} 匹配到 Electron 显示器: scale=${ed.scaleFactor}`);
 
       return {
         displayId: nd.id,
@@ -235,57 +273,87 @@ const preCaptureAllScreens = async () => {
     .filter((result) => result.status === 'fulfilled' && result.value !== null)
     .map((result) => result.value);
 
-  logger.info(`预捕获完成，成功获取到 ${finalResults.length} 张屏幕画面`);
+  logger.info(`[Perf] 预捕获全部完成 (T+${Date.now() - startTime}ms), 成功获取到 ${finalResults.length} 张屏幕画面`);
   return finalResults;
 };
 
 /**
  * 启动截图流程
  */
-const startCapture = async (isDebug = false) => {
-  if (overlayWindow) {
-    // 已有窗口，聚焦
-    overlayWindow.focus();
-    return;
+const startCapture = async (isDebug = false, startTime = Date.now()) => {
+  logger.info(`[Perf] startCapture 开始 (T+${Date.now() - startTime}ms)`);
+
+  // [性能优化] 尽早确保窗口已创建，让 WebContents 加载与截图过程并行
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    logger.info(`[Perf] 预创建 Overlay 窗口 (T+${Date.now() - startTime}ms)`);
+    createOverlayWindow(isDebug);
   }
 
-  // 适当减少宁静时间。阶梯轮询逻辑已移至 native 层，此处仅做最小化 DWM 稳定缓冲
+  // 获取最新显示器边界信息（每次都需要重新获取，以应对屏幕状态变更）
+  const {
+    displays: allDisplays, minX, minY, maxY, width: totalWidth, height: totalHeight,
+  } = getAllDisplaysBounds();
+
+  // 如果窗口已存在、由于离屏策略处于“可见”状态且坐标在有效范围内，说明正在截图中，直接聚焦
+  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+    const { y } = overlayWindow.getBounds();
+
+    // 如果 y 坐标小于 maxY，说明窗口当前在某个显示器范围内，即正在截图中
+    // 只有当它真的在屏幕内时才直接 focus
+    if (y < maxY) {
+      overlayWindow.focus();
+      return;
+    }
+  }
+
+  // 等待 DWM 状态稳定
   await new Promise((resolve) => {
-    setTimeout(resolve, 100);
+    setTimeout(resolve, 10);
   });
+  logger.info(`[Perf] DWM 稳定等待结束 (T+${Date.now() - startTime}ms)`);
 
   // 预先捕获所有屏幕画面（冻结画面）
   let sessionData = [];
   // 并行地为 UI 准备编码后的画面 (WebP)
   let capturedScreens = [];
 
-  if (!isDebug) {
-    sessionData = await preCaptureAllScreens();
+  // 尝试真实截图 (无论是否 Debug，都尝试截图以支持性能测试)
+  sessionData = await preCaptureAllScreens(startTime, isDebug);
 
-    if (!sessionData || sessionData.length === 0) {
-      logger.error('启动失败: 未能捕获到任何屏幕画面。请检查原生模块加载状态及录屏权限。');
-      // 可以考虑这里弹出一个对话框通知用户
-      return;
-    }
-
+  if (sessionData && sessionData.length > 0) {
     currentCaptureSession = sessionData;
 
-    // [重要修改] Native 已经完成了预览所需的 SDR 转换，此处不再调用冗余的 toneMap
-    capturedScreens = await Promise.all(sessionData.map(async (s) => ({
-      displayId: s.displayId,
-      bounds: s.bounds,
-      data: await capture.encodeImage(s.buffer, s.width, s.height, 'webp'),
-    })));
+    logger.info(`[Perf] 开始编码预览图 (T+${Date.now() - startTime}ms)...`);
+    // 准备 UI 预览数据
+    capturedScreens = await Promise.all(sessionData.map(async (s) => {
+      const tEncode0 = Date.now();
+      const data = await capture.encodeImage(s.buffer, s.width, s.height, 'webp');
+      const tEncode1 = Date.now();
+      logger.info(`[Perf] 编码显示器 ${s.displayId} 为 WebP 耗时: ${tEncode1 - tEncode0}ms`);
+      return {
+        displayId: s.displayId,
+        bounds: s.bounds,
+        data,
+      };
+    }));
+    logger.info(`[Perf] 所有预览图编码完成 (T+${Date.now() - startTime}ms)`);
+  } else if (!isDebug) {
+    // 非 Debug 模式下，截图失败则是致命错误
+    logger.error('启动失败: 未能捕获到任何屏幕画面。请检查原生模块加载状态及录屏权限。');
+    return;
   } else {
-    logger.info('Debug 模式：跳过实际截屏，提供空数据以启动 UI');
+    // Debug 模式下，截图失败（或空）则使用 Mock 数据启动 UI
+    logger.info('Debug 模式：真实截图未返回数据，提供空/Mock数据以启动 UI');
+    capturedScreens = []; // 或者这里可以 push 一些 mock 数据，但原代码是空的，维持原状
   }
 
   // 获取鼠标当前位置，用于判断初始应高亮哪个屏幕
   const cursorPos = screen.getCursorScreenPoint();
 
-  // 获取所有顶层窗口信息用于点击识别
+  // 坐标转换后保留的窗口项
+  const tWin0 = Date.now();
   const nativeWindows = capture.getTopLevelWindows();
-  logger.info(`原生模块返回 ${nativeWindows.length} 个窗口`);
+  logger.info(`[Perf] 获取顶层窗口耗时: ${Date.now() - tWin0}ms, 数量: ${nativeWindows.length}`);
 
   const windows = nativeWindows.map((win) => {
     try {
@@ -305,10 +373,6 @@ const startCapture = async (isDebug = false) => {
       return null;
     }
   }).filter(Boolean);
-
-  const {
-    displays: allDisplays, minX, minY, width: totalWidth, height: totalHeight,
-  } = getAllDisplaysBounds();
 
   // 为每个显示器添加独立的自动选区候选
   allDisplays.forEach((d, idx) => {
@@ -331,28 +395,59 @@ const startCapture = async (isDebug = false) => {
     logger.warn('未能成功转换任何窗口坐标或搜索结果为空');
   }
 
-  createOverlayWindow(isDebug);
+  // 立即显示或移动窗口
+  // 确保窗口位置正确（强制移动到 minX, minY）
+  // 注意：显示逻辑推迟到 sendDataAndShow 中
 
-  // 发送完整的初始化数据
-  overlayWindow.webContents.on('did-finish-load', () => {
-    const initData = {
-      isDebug,
-      minX,
-      minY,
-      width: totalWidth,
-      height: totalHeight,
-      capturedScreens,
-      cursorPos,
-      windows, // 发送窗口数据
-      displays: allDisplays.map((d) => ({
-        id: d.id,
-        bounds: d.bounds,
-      })),
-    };
+  // 准备初始化数据
+  const initData = {
+    isDebug,
+    minX,
+    minY,
+    width: totalWidth,
+    height: totalHeight,
+    capturedScreens,
+    cursorPos,
+    windows, // 发送窗口数据
+    displays: allDisplays.map((d) => ({
+      id: d.id,
+      bounds: d.bounds,
+    })),
+    // 传递触发时间戳，供 UI 计算总耗时
+    startTime,
+  };
 
-    logger.info(`发送初始化数据, 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
+  const sendDataAndShow = () => {
+    logger.info(`[Perf] 发送初始化数据 (T+${Date.now() - startTime}ms), 截图数量: ${capturedScreens.length}, 窗口数量: ${windows.length}, isDebug: ${isDebug}`);
+
+    // 在发送数据前，强制更新窗口边界以匹配当前屏幕配置
+    // 这修复了屏幕状态变更（如全屏游戏切换分辨率）后覆盖层位置/尺寸异常的问题
+    overlayWindow.setBounds({
+      x: minX, y: minY, width: totalWidth, height: totalHeight,
+    });
+
     overlayWindow.webContents.send(`overlay-init@${PLUGIN_ID}`, initData);
-  });
+
+    // 数据发送后，再次确保窗口在可见区域
+    // 这样用户看到的每一帧都是已加载好截图数据的画面，绝不会看到之前的 UI（放大镜等）
+
+    if (!overlayWindow.isVisible()) {
+      overlayWindow.showInactive();
+    }
+
+    // 数据就绪，确保交互状态正确
+    overlayWindow.focus();
+    overlayWindow.setIgnoreMouseEvents(false);
+    logger.info(`[Perf] 窗口已显示并聚焦 (T+${Date.now() - startTime}ms)`);
+  };
+
+  // 如果页面正在加载，等待加载完成
+  if (overlayWindow.webContents.isLoading()) {
+    overlayWindow.webContents.once('did-finish-load', sendDataAndShow);
+  } else {
+    // 页面已加载，直接发送数据并显示
+    sendDataAndShow();
+  }
 };
 
 /**
@@ -374,13 +469,19 @@ const registerShortcut = (accelerator) => {
     return false;
   }
 
+  // 防止重复注册相同的快捷键
+  if (registeredShortcut === finalAccelerator) {
+    return true;
+  }
+
   // 先注销已有快捷键
   unregisterShortcut();
 
   try {
     const success = globalShortcut.register(finalAccelerator, () => {
-      logger.info(`触发快捷键: ${finalAccelerator}`);
-      startCapture().catch((err) => {
+      const now = Date.now();
+      logger.info(`[Perf] 快捷键触发: ${finalAccelerator} (T+0ms)`);
+      startCapture(false, now).catch((err) => {
         logger.error('快捷键触发 startCapture 失败:', err);
       });
     });
@@ -403,9 +504,31 @@ const registerShortcut = (accelerator) => {
  * 关闭截图叠加层
  */
 const closeOverlay = () => {
-  if (overlayWindow) {
-    overlayWindow.close();
-    overlayWindow = null;
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    // 无论普通模式还是快速模式，先通知 UI 重置状态（清空画面）
+    // 这能有效防止“Ghosting”重叠显示问题，并减少离屏时的内存占用
+    try {
+      overlayWindow.webContents.send(`overlay-reset@${PLUGIN_ID}`);
+    } catch (e) {
+      // ignore
+    }
+
+    if (getFastResponse()) {
+      // 快速响应模式：将窗口移出屏幕外部
+      // 动态计算所有显示器的最下方边界，将窗口放在其下方，确保绝对不可见
+      const { maxY } = getAllDisplaysBounds();
+
+      overlayWindow.setIgnoreMouseEvents(true);
+      overlayWindow.setPosition(0, maxY + 100);
+      logger.info(`快速响应模式: Overlay 已移至离屏常驻 (0, ${maxY + 100})`);
+    } else {
+      // 普通模式：销毁窗口
+      overlayWindow.close();
+      overlayWindow = null;
+      logger.info('Overlay 已关闭');
+    }
+    // 无论哪种模式，这里可以清理一下当前的 session 数据，释放内存
+    currentCaptureSession = null;
   }
 };
 
@@ -422,6 +545,11 @@ export const pluginDidLoad = () => {
   if (shortcut) {
     registerShortcut(shortcut);
   }
+
+  // 监听屏幕变化
+  screen.on('display-metrics-changed', updateOverlayBounds);
+  screen.on('display-added', updateOverlayBounds);
+  screen.on('display-removed', updateOverlayBounds);
 };
 
 /**
@@ -433,8 +561,16 @@ export const pluginWillUnload = () => {
   // 注销快捷键
   unregisterShortcut();
 
-  // 关闭叠加层窗口
-  closeOverlay();
+  // 移除屏幕监听
+  screen.removeListener('display-metrics-changed', updateOverlayBounds);
+  screen.removeListener('display-added', updateOverlayBounds);
+  screen.removeListener('display-removed', updateOverlayBounds);
+
+  // 关闭叠加层窗口 (强制关闭，不考虑 fastResponse)
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.close();
+    overlayWindow = null;
+  }
 };
 
 /**
@@ -450,13 +586,22 @@ export const pluginSettingSaved = () => {
   } else {
     unregisterShortcut();
   }
+
+  // 检查快速响应模式设置
+  // 如果用户关闭了快速响应模式，且当前有隐藏的常驻窗口，则将其销毁以释放内存
+  const isFastResponse = getFastResponse();
+  if (!isFastResponse && overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) {
+    overlayWindow.close();
+    overlayWindow = null;
+    logger.info('快速响应模式已关闭，清理后台常驻窗口');
+  }
 };
 
 export const ipcHandlers = [
   {
     type: 'start-capture',
     handler: () => async ({ isDebug = false }) => {
-      await startCapture(isDebug);
+      await startCapture(isDebug, Date.now());
     },
   },
   {
@@ -480,7 +625,7 @@ export const ipcHandlers = [
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         try {
           const handleBuf = overlayWindow.getNativeWindowHandle();
-          // Windows HWND is 8 bytes on x64, 4 bytes on x86 but Electron usually returns 8 bytes buffer on x64
+          // 读取句柄缓冲区
           if (handleBuf.length === 8) {
             ignoreHandle = handleBuf.readBigInt64LE(0);
           } else if (handleBuf.length === 4) {
@@ -540,7 +685,7 @@ export const ipcHandlers = [
   {
     type: 'copy-capture',
     handler: () => async (rect) => {
-      logger.info('收到 copy-capture 请求, rect:', rect);
+      logger.info('收到 copy-capture 请求');
       if (!currentCaptureSession) {
         logger.error('copy-capture 失败: 没有当前的截图会话');
         return null;
@@ -548,11 +693,11 @@ export const ipcHandlers = [
 
       try {
         if (!rect || rect.width <= 0 || rect.height <= 0) {
-          logger.error('copy-capture 失败: 无效的选区尺寸', rect);
+          logger.error('copy-capture 失败: 无效的选区尺寸');
           return false;
         }
 
-        // 在主进程处理复制逻辑，绕过沙盒限制
+        // 执行复制
         logger.info('开始进行裁剪编码...');
         const pngBuffer = await capture.cropAndGetPngFromBuffer(currentCaptureSession, rect);
 

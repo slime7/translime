@@ -1,6 +1,6 @@
 <script setup>
 import {
-  computed, markRaw, onMounted, ref, watch,
+  computed, markRaw, onMounted, onUnmounted, ref, watch,
 } from 'vue';
 
 const props = defineProps({
@@ -177,6 +177,16 @@ function draw() {
 
 // 预加载图片对象
 watch(() => props.screens, (newScreens) => {
+  // 清理旧图片引用
+  const images = loadedImages.value;
+  for (let i = 0; i < images.length; i += 1) {
+    const item = images[i];
+    if (item.img) {
+      item.img.onload = null;
+    }
+  }
+
+  // 重新映射
   loadedImages.value = newScreens.map((s) => {
     const img = new Image();
     img.src = s.url;
@@ -184,7 +194,25 @@ watch(() => props.screens, (newScreens) => {
     img.onload = () => requestAnimationFrame(draw);
     return { ...s, img: markRaw(img) };
   });
+
+  // 强制立即重绘一次以清空画布（避免在图片加载间隙显示上一帧）
+  const canvas = canvasRef.value;
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const actualSize = props.size * dpr;
+    ctx?.clearRect(0, 0, actualSize, actualSize);
+  }
 }, { immediate: true, deep: true });
+
+onUnmounted(() => {
+  const images = loadedImages.value;
+  for (let i = 0; i < images.length; i += 1) {
+    const item = images[i];
+    if (item.img) item.img.onload = null;
+  }
+  loadedImages.value = [];
+});
 
 // 放大镜位置：跟随鼠标，但在旁边显示
 const magnifierPos = computed(() => {

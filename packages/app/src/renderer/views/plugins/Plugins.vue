@@ -68,7 +68,7 @@
               color="primary"
               :disabled="loading.search"
               @click="searchMore"
-              v-if="searchResult.total > searchResult.list.length"
+              v-if="searchResult.total > (searchPage + 1) * 8"
             >
               加载更多
             </v-btn>
@@ -266,7 +266,7 @@ export default {
         const data = await useHttp(`https://registry.npmjs.com/-/v1/search?${searchText}`, {
           params: {
             size: 8,
-            from: page,
+            from: page * 8,
             x: Math.random(),
           },
         }).get();
@@ -305,6 +305,7 @@ export default {
         return;
       }
       loading.install = true;
+      dialog.showLoader();
       try {
         const packageName = certainPackageName || (search.value.startsWith('translime-plugin-') ? search.value : `translime-plugin-${search.value}`);
         await ipc.invoke(ipcType.INSTALL_PLUGIN, packageName);
@@ -313,6 +314,7 @@ export default {
         alert.show(err.message, 'error');
       } finally {
         loading.install = false;
+        dialog.hideLoader();
         getPlugins();
       }
     };
@@ -344,8 +346,8 @@ export default {
       windowOpenDialogShow.value = false;
       if (result.err) {
         installLocalPluginDialog.value.errorMsg = '读取文件出错';
-      } else if (!result.data.canceled) {
-        [installLocalPluginDialog.value.filepath] = result.data.filePaths;
+      } else if (!result.canceled) {
+        [installLocalPluginDialog.value.filepath] = result.filePaths;
       }
     };
     const installLocalPlugins = async () => {
@@ -466,6 +468,7 @@ export default {
       search,
       searchAction,
       searchMore,
+      searchPage,
       searchResult,
       clearSearchResult,
       loading,

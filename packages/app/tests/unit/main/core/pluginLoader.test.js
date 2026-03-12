@@ -1,10 +1,11 @@
 import {
   beforeEach, describe, expect, it, vi,
 } from 'vitest';
+import EventEmitter from 'node:events';
 import pluginLoader from '@main/core/pluginLoader';
 
-// Mocks must be hoisted or defined before imports
-const { mockFs } = vi.hoisted(() => {
+// Mock 必须在导入之前提升或定义
+const { mockFs, mockFsp } = vi.hoisted(() => {
   const fs = {
     access: vi.fn(),
     accessSync: vi.fn(),
@@ -13,15 +14,50 @@ const { mockFs } = vi.hoisted(() => {
     readFileSync: vi.fn(),
     readdirSync: vi.fn(),
     createReadStream: vi.fn(),
+    createWriteStream: vi.fn(),
     constants: { F_OK: 0 },
   };
-  return { mockFs: fs };
+  const fsp = {
+    mkdir: vi.fn(),
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    rm: vi.fn(),
+    copyFile: vi.fn(),
+  };
+  return { mockFs: fs, mockFsp: fsp };
 });
 
 vi.mock('node:fs', () => ({
   default: mockFs,
   ...mockFs,
 }));
+
+vi.mock('node:fs/promises', () => ({
+  default: mockFsp,
+  ...mockFsp,
+}));
+
+vi.mock('node:stream/promises', () => ({
+  __esModule: true,
+  pipeline: vi.fn(),
+  default: { pipeline: vi.fn() },
+}));
+
+vi.mock('node:zlib', () => ({
+  default: {
+    createGunzip: vi.fn(),
+  },
+}));
+
+vi.mock('tar', () => ({
+  extract: vi.fn(),
+}));
+
+// Mock electron net
+const mockNetRequest = {
+  on: vi.fn(),
+  end: vi.fn(),
+};
 
 vi.mock('electron', () => ({
   app: {
@@ -32,6 +68,12 @@ vi.mock('electron', () => ({
   },
   Menu: {
     buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
+  },
+  net: {
+    request: vi.fn((options) => {
+      mockNetRequest.url = typeof options === 'string' ? options : options.url;
+      return mockNetRequest;
+    }),
   },
 }));
 
@@ -49,50 +91,82 @@ vi.mock('@main/utils/useMainStore', () => ({
 vi.mock('@main/utils/logger', () => ({
   default: {
     debug: vi.fn(),
+    info: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock appManager
+vi.mock('@main/utils/useAppManager', () => ({
+  default: {
+    getIpc: vi.fn(),
+    getWin: vi.fn(),
+    getChildWin: vi.fn(),
+    getPluginLoader: vi.fn(),
+  },
+}));
+
+// Mock 插件启用所需的 require
+const { mockRequire } = vi.hoisted(() => ({
+  mockRequire: vi.fn(),
+}));
+
+vi.mock('node:module', () => ({
+  default: {
+    createRequire: () => mockRequire,
+    _extensions: {
+      '.node': vi.fn(),
+      '.js': vi.fn(),
+    },
+  },
+  createRequire: () => mockRequire,
 }));
 
 describe('pluginLoader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 默认 Mock 行为
+    mockNetRequest.on.mockReset();
+    mockNetRequest.end.mockReset();
+    mockFs.createWriteStream.mockReturnValue({
+      write: vi.fn(),
+      end: vi.fn(),
+      on: vi.fn((event, cb) => {
+        if (event === 'finish') cb();
+      }),
+      destroy: vi.fn(),
+    });
   });
 
   describe('init', () => {
     it('应该检查并创建插件目录', () => {
-      // Simulate fs.access callback with error (file not found) to trigger creation
+      // 模拟 fs.access 回调报错（文件未找到）以触发创建
       mockFs.access.mockImplementation((path, mode, cb) => cb(new Error('not found')));
 
       pluginLoader.init();
 
       expect(mockFs.access).toHaveBeenCalled();
-      // Expect mkdirSync to be called for PLUGIN_DIR, PLUGIN_PACKAGE_DIR, PLUGIN_DIR_DEV
-      // Based on logic: fail access -> write package.json -> try access PLUGIN_DIR -> fail -> mkdir
-      // Since we mocked accessSync to fail? We need to control mock behavior carefully.
-
-      // Let's refine strict checks if logical complexity is high,
-      // or just verify essential calls.
-      expect(mockFs.writeFileSync).toHaveBeenCalled(); // Should write default package.json
+      expect(mockFs.writeFileSync).toHaveBeenCalled(); // 应该写入默认的 package.json
     });
   });
 
   describe('readPlugins', () => {
     it('应该读取插件列表', () => {
-      // Mock package.json content
+      // Mock package.json 内容
       mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
         dependencies: {
           'translime-plugin-test': '1.0.0',
         },
       }));
 
-      // Mock plugin package.json
+      // Mock 插件 package.json
       mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
         name: 'translime-plugin-test',
         plugin: {
           title: 'Test Plugin',
         },
       }));
-      // Mock accessSync success for validation
+      // Mock accessSync 成功以通过验证
       mockFs.accessSync.mockReturnValue(undefined);
 
       const plugins = pluginLoader.readPlugins();
@@ -110,6 +184,71 @@ describe('pluginLoader', () => {
       ];
       const p = pluginLoader.getPlugin('p1');
       expect(p).toEqual({ packageName: 'p1', title: 'P1' });
+    });
+  });
+
+  describe('installPlugin', () => {
+    const packageName = 'translime-plugin-demo';
+    const version = '1.0.1';
+    const tarballUrl = 'http://example.com/plugin.tgz';
+
+    beforeEach(() => {
+      // Mock 包元数据响应
+      mockNetRequest.on.mockImplementation((event, cb) => {
+        if (event === 'response') {
+          const response = new EventEmitter();
+          response.statusCode = 200;
+          response.headers = {};
+          cb(response);
+          // 模拟数据
+          if (mockNetRequest.url && mockNetRequest.url.includes('registry')) {
+            response.emit('data', Buffer.from(JSON.stringify({
+              version,
+              dist: { tarball: tarballUrl },
+            })));
+            response.emit('end');
+          } else {
+            // 模拟 tarball 下载
+            response.emit('data', Buffer.from('fake-tarball-content'));
+            response.emit('end');
+          }
+        }
+      });
+
+      // Mock package.json 读/写
+      mockFsp.readFile.mockResolvedValue(JSON.stringify({ dependencies: {} }));
+      mockFsp.writeFile.mockResolvedValue();
+
+      // Mock 安装后的插件读取
+      mockFs.readFileSync.mockReturnValue(JSON.stringify({
+        name: packageName,
+        version,
+        plugin: { title: 'Demo Plugin' },
+      }));
+    });
+
+    it('应该成功安装插件', async () => {
+      // 允许安装继续（假设没有现有插件或卸载成功）
+      pluginLoader.plugins = [];
+
+      const result = await pluginLoader.installPlugin(packageName);
+
+      expect(result).toEqual({ success: true, version });
+      // 验证元数据获取
+      expect(pluginLoader.getPlugin(packageName)).toBeDefined();
+    });
+
+    it('如果插件不存在应该报错', async () => {
+      mockNetRequest.on.mockImplementation((event, cb) => {
+        if (event === 'response') {
+          const response = new EventEmitter();
+          response.statusCode = 404;
+          cb(response);
+        }
+      });
+
+      await expect(pluginLoader.installPlugin(packageName))
+        .rejects.toThrow();
     });
   });
 });

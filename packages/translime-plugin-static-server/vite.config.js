@@ -7,7 +7,7 @@ import { builtinModules } from 'node:module';
 const config = ({ mode }) => ({
   envDir: process.cwd(),
   build: {
-    minify: false,
+    minify: true,
     sourcemap: mode === 'development' ? 'inline' : false,
     target: 'node20',
     outDir: './dist',
@@ -22,8 +22,6 @@ const config = ({ mode }) => ({
       external: [
         ...builtinModules,
         'http',
-        'serve-handler',
-        'detect-port',
       ],
     },
   },

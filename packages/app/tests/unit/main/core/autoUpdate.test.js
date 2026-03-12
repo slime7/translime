@@ -14,6 +14,7 @@ vi.mock('electron-updater', () => ({
     quitAndInstall: vi.fn(),
     on: vi.fn(),
     logger: null,
+    autoInstallOnAppQuit: false,
   },
 }));
 
@@ -67,7 +68,11 @@ describe('autoUpdate', () => {
 
     it('事件回调应该发送 IPC 消息', () => {
       const mockSend = vi.fn();
-      appManager.getIpc.mockReturnValue({ sendToClient: mockSend });
+      const mockSendToMain = vi.fn();
+      appManager.getIpc.mockReturnValue({
+        sendToClient: mockSend,
+        sendToMain: mockSendToMain,
+      });
 
       const onMap = {};
       autoUpdater.on.mockImplementation((event, cb) => {
@@ -79,7 +84,7 @@ describe('autoUpdate', () => {
       // Simulate 'checking-for-update'
       if (onMap['checking-for-update']) {
         onMap['checking-for-update']();
-        expect(mockSend).toHaveBeenCalledWith(ipcType.UPDATE_CHECKING, null);
+        expect(mockSendToMain).toHaveBeenCalledWith(ipcType.UPDATE_CHECKING, null);
       }
     });
   });

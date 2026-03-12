@@ -53,8 +53,8 @@ watchEffect(() => {
     const {
       x, y, w, h,
     } = hole;
-    // Use borderRadius from state only if it matches current selection
-    // Note: highlightedWindow doesn't support radius yet unless we want it to
+    // 仅在当前选区状态下使用 state 中的 borderRadius
+    // 注意：高亮窗口 (highlightedWindow) 暂不支持圆角，除非后续有需求
     const r = (props.state.isSelecting || props.state.hasSelection)
       ? (props.state.borderRadius || 0)
       : 0;
@@ -63,11 +63,11 @@ watchEffect(() => {
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
 
-    // Use standard roundRect if available (Chrome 99+)
+    // 如果浏览器支持标准 roundRect API (Chrome 99+) 则直接使用
     if (ctx.roundRect) {
       ctx.roundRect(x, y, w, h, r);
     } else {
-      // Fallback
+      // 兼容回退方案
       ctx.moveTo(x + r, y);
       ctx.lineTo(x + w - r, y);
       ctx.quadraticCurveTo(x + w, y, x + w, y + r);
@@ -116,7 +116,8 @@ const onHandleMouseDown = (direction) => {
     <!-- 选区矩形 -->
     <div
       v-if="state.isSelecting || state.hasSelection"
-      class="absolute border border-dashed border-[#2196F3] box-border pointer-events-auto cursor-move"
+      class="absolute border border-dashed border-[#2196F3] box-border pointer-events-auto"
+      :class="state.drawingMode ? 'cursor-crosshair' : 'cursor-move'"
       :style="{
         left: bounds.x + 'px',
         top: bounds.y + 'px',
@@ -133,7 +134,7 @@ const onHandleMouseDown = (direction) => {
       </div>
 
       <!-- Resize Handles -->
-      <template v-if="!state.isMoving && state.hasSelection">
+      <template v-if="!state.isMoving && state.hasSelection && !state.drawingMode">
         <!-- Top Left -->
         <div
           class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-nw-resize z-20"

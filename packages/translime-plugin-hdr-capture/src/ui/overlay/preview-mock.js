@@ -1,9 +1,10 @@
+/* eslint-disable no-console */
+/* eslint-disable import/prefer-default-export */
+
 /**
  * Overlay Preload Mock
  * 在浏览器 preview 模式下模拟 Electron preload 脚本的功能
  */
-
-const PLUGIN_ID = 'translime-plugin-hdr-capture';
 
 /**
  * 创建 mock 日志记录器

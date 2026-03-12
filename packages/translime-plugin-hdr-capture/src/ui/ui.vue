@@ -73,7 +73,7 @@
                 <template #activator="{ props }">
                   <v-icon
                     v-bind="props"
-                    icon="priority_high"
+                    icon="help_outline"
                     size="small"
                     class="mr-2 cursor-pointer"
                   />
@@ -110,15 +110,63 @@
           />
         </div>
 
+        <!-- 响应速度设置 -->
+        <div class="setting-section">
+          <v-switch
+            v-model="settings.fastResponse"
+            label="快速响应模式"
+            color="primary"
+          >
+            <template #append>
+              <v-tooltip
+                location="bottom"
+                text="开启后常驻后台，极大缩短截图响应时间 (推荐)"
+              >
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="help_outline"
+                    size="small"
+                    class="ml-2"
+                  />
+                </template>
+              </v-tooltip>
+            </template>
+          </v-switch>
+        </div>
+
+        <!-- 捕获鼠标 -->
+        <div class="setting-section">
+          <v-switch
+            v-model="settings.captureCursor"
+            label="捕获鼠标"
+            color="primary"
+          />
+        </div>
+
         <!-- HDR 映射设置组 -->
         <div class="setting-section">
           <v-switch
             v-model="settings.enableHdrMapping"
             label="启用 HDR 映射"
             color="primary"
-            hint="对 HDR 屏幕应用自定义的色调映射参数"
-            persistent-hint
-          />
+          >
+            <template #append>
+              <v-tooltip
+                location="bottom"
+                text="对 HDR 屏幕应用自定义的色调映射参数"
+              >
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="help_outline"
+                    size="small"
+                    class="ml-2"
+                  />
+                </template>
+              </v-tooltip>
+            </template>
+          </v-switch>
 
           <!-- HDR 映射子设置，仅在启用时显示 -->
           <v-expand-transition>
@@ -135,17 +183,18 @@
                     color="primary"
                     variant="tonal"
                   >
-                    {{ settings.sdrWhiteNits }} nits
+                    {{ sliderState.sdrWhiteNits }} nits
                   </v-chip>
                 </div>
                 <v-slider
-                  v-model="settings.sdrWhiteNits"
+                  v-model="sliderState.sdrWhiteNits"
                   :min="80"
                   :max="400"
                   :step="1"
                   color="primary"
                   thumb-label
                   hide-details
+                  @end="settings.sdrWhiteNits = sliderState.sdrWhiteNits"
                 >
                   <template #prepend>
                     <span class="slider-range-label">80</span>
@@ -168,17 +217,18 @@
                     color="primary"
                     variant="tonal"
                   >
-                    {{ settings.hdrMaxNits }} nits
+                    {{ sliderState.hdrMaxNits }} nits
                   </v-chip>
                 </div>
                 <v-slider
-                  v-model="settings.hdrMaxNits"
+                  v-model="sliderState.hdrMaxNits"
                   :min="400"
                   :max="2000"
                   :step="10"
                   color="primary"
                   thumb-label
                   hide-details
+                  @end="settings.hdrMaxNits = sliderState.hdrMaxNits"
                 >
                   <template #prepend>
                     <span class="slider-range-label">400</span>
@@ -188,7 +238,7 @@
                   </template>
                 </v-slider>
                 <div class="slider-hint text-caption text-grey">
-                  HDR 内容的最大输入亮度，通常为 1000 nits
+                  HDR 内容的最大输入亮度，通常为你的显示器标称值
                 </div>
               </div>
 
@@ -247,6 +297,7 @@ import {
   setPluginSetting,
   useDialog,
   useIpc,
+  useLogger,
 } from 'translime-sdk';
 
 defineOptions({
@@ -255,6 +306,8 @@ defineOptions({
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const showDebugUi = false;
+const baseLogger = useLogger();
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'SettingsUI' }) : baseLogger;
 
 // 设置状态
 const settings = reactive({
@@ -262,11 +315,19 @@ const settings = reactive({
   savePath: '',
   saveFilenameTemplate: '[HDR_Capture]_YYYY-MM-DD_HH-mm-ss', // 保存文件名模板
   saveFormat: 'png',
+  fastResponse: true, // 快速响应模式 (Keep-Alive)
+  captureCursor: false, // 是否捕获鼠标
   // HDR 映射设置
   enableHdrMapping: true, // 是否启用自定义 HDR 映射
   sdrWhiteNits: 203, // SDR 白点亮度 (默认 Windows 标准)
   hdrMaxNits: 1000, // HDR 峰值亮度 (默认 1000 nits)
   preserveHdr: false, // 是否保存 HDR 原始文件
+});
+
+// 滑块临时状态（防抖）
+const sliderState = reactive({
+  sdrWhiteNits: 203,
+  hdrMaxNits: 1000,
 });
 
 // 用于 UI 显示的临时快捷键状态，避免输入过程中频繁触发保存
@@ -296,6 +357,10 @@ onMounted(async () => {
   if (savedSettings) {
     Object.assign(settings, savedSettings);
     tempShortcut.value = settings.shortcut; // Initialize tempShortcut
+
+    // 初始化滑块临时状态
+    sliderState.sdrWhiteNits = settings.sdrWhiteNits;
+    sliderState.hdrMaxNits = settings.hdrMaxNits;
   }
 
   // 如果保存路径为空，获取默认路径并填入（但不强制保存，除非用户修改了其他设置）
@@ -307,8 +372,7 @@ onMounted(async () => {
         settings.savePath = defaultPath;
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('获取默认保存路径失败:', err);
+      logger.error('获取默认保存路径失败:', err);
     }
   }
 });
@@ -374,8 +438,7 @@ const startCapture = async (isDebug = false) => {
   try {
     await ipc.invoke(`start-capture@${PLUGIN_ID}`, { isDebug });
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error(err);
+    logger.error(err);
   }
 };
 </script>

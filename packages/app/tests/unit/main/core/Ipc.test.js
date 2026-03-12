@@ -162,7 +162,11 @@ describe('Ipc', () => {
       const result = ipc.appendHandler('newHandler', handlerFactory);
 
       expect(result).toBe(true);
-      expect(handlerFactory).toHaveBeenCalledWith({ sendToClient: expect.any(Function) });
+      expect(handlerFactory).toHaveBeenCalledWith({
+        sendToClient: expect.any(Function),
+        sendToMain: expect.any(Function),
+        sendToAllWindows: expect.any(Function),
+      });
       expect(ipc.handlerList.newHandler).toBeDefined();
     });
 

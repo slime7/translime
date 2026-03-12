@@ -1,10 +1,8 @@
-//! 窗口检测模块
+//! 窗口探测模块
 //!
-//! 使用 Windows API 获取窗口信息
+//! 利用 Windows API 获取顶层窗口的位置、大小及属性信息。
 
 use crate::WindowInfo;
-use std::ffi::OsString;
-use std::os::windows::ffi::OsStringExt;
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{
@@ -16,13 +14,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GW_HWNDNEXT, WS_EX_TRANSPARENT,
 };
 
-/// 窗口枚举上下文
+const NULLREGION: GDI_REGION_TYPE = GDI_REGION_TYPE(1);
+const ERROR: GDI_REGION_TYPE = GDI_REGION_TYPE(0);
+
+/// 窗口枚举上下文，用于存储枚举结果和累计的遮挡区域
 struct WindowEnumContext {
     windows: Vec<WindowInfo>,
     covered_region: HRGN,
 }
 
-/// 检查窗口是否被“Cloaked”
+/// 检查指定窗口是否被“隐藏”（Cloaked，如 UWP 应用的挂起状态）
 fn is_cloaked(hwnd: HWND) -> bool {
     let mut cloaked: u32 = 0;
     unsafe {
@@ -36,7 +37,7 @@ fn is_cloaked(hwnd: HWND) -> bool {
     cloaked != 0
 }
 
-/// 获取窗口的实际渲染边界 (排除阴影)
+/// 获取窗口的实际渲染边界（通过 DWM 排除阴影区域）
 fn get_extended_frame_bounds(hwnd: HWND) -> Option<RECT> {
     let mut rect = RECT::default();
     unsafe {
@@ -49,10 +50,10 @@ fn get_extended_frame_bounds(hwnd: HWND) -> Option<RECT> {
         if hr.is_ok() {
             Some(rect)
         } else {
-            // 如果 DWM 获取失败，退回到普通 Rect
-            let mut fallback_rect = RECT::default();
-            if GetWindowRect(hwnd, &mut fallback_rect).is_ok() {
-                Some(fallback_rect)
+            // DWM 获取失败时回退到普通矩形
+            let mut fallback = RECT::default();
+            if GetWindowRect(hwnd, &mut fallback).is_ok() {
+                Some(fallback)
             } else {
                 None
             }
@@ -60,13 +61,13 @@ fn get_extended_frame_bounds(hwnd: HWND) -> Option<RECT> {
     }
 }
 
-/// 获取所有顶层可见窗口 (过滤掉完全被遮挡的窗口)
+/// 获取当前桌面上所有顶层且可见的窗口列表
 pub fn get_top_level_windows() -> Vec<WindowInfo> {
     unsafe {
-        let covered_region = CreateRectRgn(0, 0, 0, 0);
+        let covered_rgn = CreateRectRgn(0, 0, 0, 0);
         let mut context = WindowEnumContext {
             windows: Vec::new(),
-            covered_region,
+            covered_region: covered_rgn,
         };
 
         let _ = EnumWindows(
@@ -74,43 +75,28 @@ pub fn get_top_level_windows() -> Vec<WindowInfo> {
             LPARAM(&mut context as *mut WindowEnumContext as isize),
         );
 
-        // 清理 GDI 资源
-        let _ = DeleteObject(covered_region);
-
+        // 释放 GDI 区域对象
+        let _ = DeleteObject(covered_rgn);
         context.windows
     }
 }
 
-/// EnumWindows 回调函数
+/// EnumWindows 的系统回调函数
 unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     unsafe {
-        // 1. 获取上下文
         let context = &mut *(lparam.0 as *mut WindowEnumContext);
 
-        // 2. 基础可见性检查
-        if !IsWindowVisible(hwnd).as_bool() {
+        // 基础过滤：排除不可见、被挂起或设为透明穿透的窗口
+        if !IsWindowVisible(hwnd).as_bool() || is_cloaked(hwnd) {
             return BOOL(1);
         }
 
-        // 3. 检查 DWM Cloaked 属性
-        if is_cloaked(hwnd) {
-            return BOOL(1);
-        }
-
-        // 4. 过滤器：仅排除明确的透明穿透窗口（如 Overlay 自身）
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         if (ex_style as u32 & WS_EX_TRANSPARENT.0) != 0 {
             return BOOL(1);
         }
 
-        // 5. 获取窗口类名
-        let mut class_buf: Vec<u16> = vec![0; 256];
-        let class_len = GetClassNameW(hwnd, &mut class_buf);
-        let class_name = OsString::from_wide(&class_buf[..class_len as usize])
-            .to_string_lossy()
-            .to_string();
-
-        // 6. 获取窗口实际矩形 (尝试排除阴影)
+        // 获取窗口实际边界
         let rect = match get_extended_frame_bounds(hwnd) {
             Some(r) => r,
             None => return BOOL(1),
@@ -118,25 +104,25 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
         
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
-
         if width <= 0 || height <= 0 {
             return BOOL(1);
         }
 
-        // 7. 遮挡检测
+        // 遮挡检测：利用 GDI RGN 排除完全被上方窗口覆盖的窗口
         let win_rgn = CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
         let visible_part = CreateRectRgn(0, 0, 0, 0);
-
         let rgn_type = CombineRgn(visible_part, win_rgn, context.covered_region, RGN_DIFF);
 
-        if rgn_type != GDI_REGION_TYPE(1) && rgn_type != GDI_REGION_TYPE(0) {
-            // 获取标题
+        if rgn_type != NULLREGION && rgn_type != ERROR {
+            // 获取窗口类名与标题
+            let mut class_buf = [0u16; 256];
+            let class_len = GetClassNameW(hwnd, &mut class_buf);
+            let class_name = String::from_utf16_lossy(&class_buf[..class_len as usize]);
+
             let title_len = GetWindowTextLengthW(hwnd);
-            let mut title_buf: Vec<u16> = vec![0; (title_len + 1).max(1) as usize];
+            let mut title_buf = vec![0u16; (title_len + 1).max(1) as usize];
             let _ = GetWindowTextW(hwnd, &mut title_buf);
-            let title = OsString::from_wide(&title_buf[..title_len.max(0) as usize])
-                .to_string_lossy()
-                .to_string();
+            let title = String::from_utf16_lossy(&title_buf[..title_len.max(0) as usize]);
 
             context.windows.push(WindowInfo {
                 handle: hwnd.0 as i64,
@@ -150,45 +136,41 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
                 height,
             });
 
-            // 更新已遮挡区域
-            let _ = CombineRgn(
-                context.covered_region,
-                context.covered_region,
-                win_rgn,
-                RGN_OR,
-            );
+            // 将当前窗口区域合并到已遮挡区域中
+            let _ = CombineRgn(context.covered_region, context.covered_region, win_rgn, RGN_OR);
         }
 
         let _ = DeleteObject(win_rgn);
         let _ = DeleteObject(visible_part);
 
-        BOOL(1) // 继续枚举
+        BOOL(1)
     }
 }
 
-/// 获取指定坐标处的窗口
-#[allow(clippy::collapsible_if)]
+/// 获取指定坐标位置下的最上层窗口信息
 pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option<WindowInfo> {
     unsafe {
         if let Some(ignore) = ignore_handle {
-            let mut current_hwnd = GetTopWindow(None).unwrap_or_default();
+            // 手动遍历窗口链，以支持忽略特定窗口（如 Overlay 窗口本身）
+            let mut current = GetTopWindow(None).unwrap_or_default();
 
-            while !current_hwnd.is_invalid() {
-                let hwnd_val = current_hwnd.0 as i64;
-                if IsWindowVisible(current_hwnd).as_bool() && hwnd_val != ignore && !is_cloaked(current_hwnd) {
-                    if let Some(rect) = get_extended_frame_bounds(current_hwnd) {
-                        if x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom 
-                            && (GetWindowLongW(current_hwnd, GWL_EXSTYLE) as u32 & WS_EX_TRANSPARENT.0) == 0 {
-                            return get_window_info(current_hwnd);
+            while !current.is_invalid() {
+                let val = current.0 as i64;
+                if IsWindowVisible(current).as_bool() && val != ignore && !is_cloaked(current) {
+                    if let Some(rect) = get_extended_frame_bounds(current) {
+                        if x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom {
+                            let ex_style = GetWindowLongW(current, GWL_EXSTYLE) as u32;
+                            if (ex_style & WS_EX_TRANSPARENT.0) == 0 {
+                                return get_window_info(current);
+                            }
                         }
                     }
                 }
-                current_hwnd = GetWindow(current_hwnd, GW_HWNDNEXT).unwrap_or_default();
+                current = GetWindow(current, GW_HWNDNEXT).unwrap_or_default();
             }
             None
         } else {
-            let point = POINT { x, y };
-            let hwnd = WindowFromPoint(point);
+            let hwnd = WindowFromPoint(POINT { x, y });
             if hwnd.0.is_null() || is_cloaked(hwnd) {
                 return None;
             }
@@ -197,21 +179,17 @@ pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option
     }
 }
 
-/// 辅助函数
+/// 内部辅助函数：构造 WindowInfo 结构
 unsafe fn get_window_info(hwnd: HWND) -> Option<WindowInfo> {
     unsafe {
         let title_len = GetWindowTextLengthW(hwnd);
-        let mut title_buf: Vec<u16> = vec![0; (title_len + 1).max(1) as usize];
+        let mut title_buf = vec![0u16; (title_len + 1).max(1) as usize];
         let _ = GetWindowTextW(hwnd, &mut title_buf);
-        let title = OsString::from_wide(&title_buf[..title_len.max(0) as usize])
-            .to_string_lossy()
-            .to_string();
+        let title = String::from_utf16_lossy(&title_buf[..title_len.max(0) as usize]);
 
-        let mut class_buf: Vec<u16> = vec![0; 256];
+        let mut class_buf = [0u16; 256];
         let class_len = GetClassNameW(hwnd, &mut class_buf);
-        let class_name = OsString::from_wide(&class_buf[..class_len as usize])
-            .to_string_lossy()
-            .to_string();
+        let class_name = String::from_utf16_lossy(&class_buf[..class_len as usize]);
 
         get_extended_frame_bounds(hwnd).map(|rect| WindowInfo {
             handle: hwnd.0 as i64,

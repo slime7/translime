@@ -2,6 +2,8 @@
 import {
   computed, inject, onMounted, onUnmounted, ref, watch,
 } from 'vue';
+import SliderControl from './SliderControl.vue';
+import ColorPicker from './ColorPicker.vue';
 
 const props = defineProps({
   bounds: {
@@ -20,72 +22,57 @@ const state = inject('state');
 const { findDisplayAtLocalPoint } = inject('utils');
 const actions = inject('actions');
 
-// 尺寸设置相关状态
-const showSizeSettings = ref(false);
+// ======================== 子菜单面板枚举 ========================
+/** 当前展开的子面板名称，null 表示全部关闭 */
+const activePanel = ref(null);
+
+/** 当前悬浮提示的文本 */
+const hoveredTooltip = ref('');
+
+/**
+ * 切换子面板展开状态（互斥逻辑）
+ * @param {'size' | 'radius' | 'rect'} panel - 面板标识
+ */
+const togglePanel = (panel) => {
+  activePanel.value = activePanel.value === panel ? null : panel;
+};
+
+// 监听面板切换，同步绘图模式与工具类型
+const DRAWING_PANELS = ['rect', 'mosaic', 'text'];
+
+watch(activePanel, (newVal, oldVal) => {
+  if (DRAWING_PANELS.includes(newVal)) {
+    state.drawingMode = true;
+    state.activeTool = newVal;
+  } else if (DRAWING_PANELS.includes(oldVal)) {
+    state.drawingMode = false;
+    state.activeTool = null;
+  }
+});
+
+// ======================== 尺寸设置 ========================
 const widthInput = ref(0);
 const heightInput = ref(0);
 
-// 圆角设置相关状态
-const showRadiusSettings = ref(false);
-const radiusInput = ref(0);
-
-// 监听选区变化，同步到输入框
 watch(() => props.bounds, (newBounds) => {
-  if (!newBounds) return;
-  // 只有在没有手动输入的情况下才自动更新，或者在刚打开时更新
-  // 为了简化体验，每次选区变化都更新输入框
+  if (!newBounds) {
+    return;
+  }
   widthInput.value = Math.round(newBounds.w || 0);
   heightInput.value = Math.round(newBounds.h || 0);
 }, { immediate: true });
 
-// 同步圆角设置
-watch(() => state.borderRadius, (val) => {
-  radiusInput.value = val || 0;
-}, { immediate: true });
-
-// 监听 radiusInput 变化并应用到 state (实时预览)
-watch(radiusInput, (val) => {
-  const r = Math.max(0, Math.min(120, parseInt(val, 10) || 0));
-  if (state.borderRadius !== r) {
-    state.borderRadius = r;
-  }
-});
-
-const toggleSizeSettings = () => {
-  showSizeSettings.value = !showSizeSettings.value;
-  if (showSizeSettings.value) {
-    showRadiusSettings.value = false; // 互斥
-  }
-  if (showSizeSettings.value && props.bounds) {
-    // 重新从 bounds 获取一次，确保是最新的
-    widthInput.value = Math.round(props.bounds.w || 0);
-    heightInput.value = Math.round(props.bounds.h || 0);
-  }
-};
-
-const toggleRadiusSettings = () => {
-  showRadiusSettings.value = !showRadiusSettings.value;
-  if (showRadiusSettings.value) {
-    showSizeSettings.value = false; // 互斥
-    radiusInput.value = state.borderRadius || 0;
-  }
-};
-
 const applySizeSettings = () => {
-  // 计算新的 endX 和 endY (假设 start 不动，改变 end)
-  // state.startX / startY 保持不变
-  // 新的宽高需要应用到 state.endX / endY
-
   const currentX = Math.min(state.startX, state.endX);
   const currentY = Math.min(state.startY, state.endY);
 
   const newW = parseInt(widthInput.value, 10) || 0;
   const newH = parseInt(heightInput.value, 10) || 0;
 
-  if (newW <= 0 || newH <= 0) return;
+  if (newW <= 0 || newH <= 0) {
+    return;
+  }
 
-  // 更新 state
-  // 这里的策略是：强制重置 start 为左上角，end 为右下角
   state.startX = currentX;
   state.startY = currentY;
   state.endX = currentX + newW;
@@ -95,18 +82,175 @@ const applySizeSettings = () => {
 const handleInputKeydown = (e) => {
   if (e.key === 'Enter') {
     applySizeSettings();
-    e.target.blur(); // 确认后失去焦点
+    e.target.blur();
   }
 };
 
-// 键盘快捷键处理
+// ======================== 圆角设置 ========================
+const radiusInput = ref(0);
+
+watch(() => state.borderRadius, (val) => {
+  radiusInput.value = val || 0;
+}, { immediate: true });
+
+watch(radiusInput, (val) => {
+  const r = Math.max(0, Math.min(120, parseInt(val, 10) || 0));
+  if (state.borderRadius !== r) {
+    state.borderRadius = r;
+    localStorage.setItem('translime.hdr-capture.borderRadius', r);
+  }
+});
+
+// ======================== 矩形工具设置 ========================
+/** 矩形类型：'stroke' 边框 | 'fill' 实心 */
+const rectType = ref('stroke');
+/** 边框粗细 */
+const rectStrokeWidth = ref(2);
+/** 矩形颜色（RGBA 字符串） */
+const rectColor = ref('rgba(255, 0, 0, 1)');
+
+const STORAGE_KEY_PREFIX = 'translime.hdr-capture.rect';
+
+/** 从 localStorage 恢复矩形设置 */
+const loadRectSettings = () => {
+  const savedType = localStorage.getItem(`${STORAGE_KEY_PREFIX}.type`);
+  if (savedType === 'stroke' || savedType === 'fill') {
+    rectType.value = savedType;
+  }
+
+  const savedWidth = localStorage.getItem(`${STORAGE_KEY_PREFIX}.strokeWidth`);
+  if (savedWidth !== null) {
+    rectStrokeWidth.value = parseInt(savedWidth, 10) || 2;
+  }
+
+  const savedColor = localStorage.getItem(`${STORAGE_KEY_PREFIX}.color`);
+  if (savedColor) {
+    rectColor.value = savedColor;
+  }
+};
+
+/** 同步矩形设置到 state.rectConfig 以供绘图系统读取 */
+const syncRectConfig = () => {
+  state.rectConfig.type = rectType.value;
+  state.rectConfig.strokeWidth = rectStrokeWidth.value;
+  state.rectConfig.color = rectColor.value;
+};
+
+watch(rectType, (val) => {
+  localStorage.setItem(`${STORAGE_KEY_PREFIX}.type`, val);
+  syncRectConfig();
+});
+
+watch(rectStrokeWidth, (val) => {
+  localStorage.setItem(`${STORAGE_KEY_PREFIX}.strokeWidth`, val);
+  syncRectConfig();
+});
+
+watch(rectColor, (val) => {
+  localStorage.setItem(`${STORAGE_KEY_PREFIX}.color`, val);
+  syncRectConfig();
+});
+
+/** 边框粗细滑块是否禁用（实心模式下禁用） */
+const isStrokeDisabled = computed(() => rectType.value === 'fill');
+
+// ======================== 马赛克工具设置 ========================
+/** 马赛克模式: 'pixelate' | 'blur' */
+const mosaicMode = ref('pixelate');
+/** 方块大小 / 模糊强度 */
+const mosaicBlockSize = ref(10);
+
+const MOSAIC_KEY_PREFIX = 'translime.hdr-capture.mosaic';
+
+/** 同步马赛克设置到 state */
+const syncMosaicConfig = () => {
+  state.mosaicConfig.mode = mosaicMode.value;
+  state.mosaicConfig.blockSize = mosaicBlockSize.value;
+};
+
+watch(mosaicMode, (val) => {
+  localStorage.setItem(`${MOSAIC_KEY_PREFIX}.mode`, val);
+  syncMosaicConfig();
+});
+
+watch(mosaicBlockSize, (val) => {
+  localStorage.setItem(`${MOSAIC_KEY_PREFIX}.blockSize`, val);
+  syncMosaicConfig();
+});
+
+/** 从 localStorage 恢复马赛克设置 */
+const loadMosaicSettings = () => {
+  const savedMode = localStorage.getItem(`${MOSAIC_KEY_PREFIX}.mode`);
+  if (savedMode === 'pixelate' || savedMode === 'blur') {
+    mosaicMode.value = savedMode;
+  }
+  const savedSize = localStorage.getItem(`${MOSAIC_KEY_PREFIX}.blockSize`);
+  if (savedSize !== null) {
+    mosaicBlockSize.value = parseInt(savedSize, 10) || 10;
+  }
+};
+
+// ======================== 文本工具设置 ========================
+/** 文本字号 */
+const textFontSize = ref(20);
+/** 文本颜色 */
+const textColor = ref('rgba(255, 0, 0, 1)');
+
+const TEXT_KEY_PREFIX = 'translime.hdr-capture.text';
+
+/** 同步文本设置到 state */
+const syncTextConfig = () => {
+  state.textConfig.fontSize = textFontSize.value;
+  state.textConfig.color = textColor.value;
+};
+
+watch(textFontSize, (val) => {
+  localStorage.setItem(`${TEXT_KEY_PREFIX}.fontSize`, val);
+  syncTextConfig();
+});
+
+watch(textColor, (val) => {
+  localStorage.setItem(`${TEXT_KEY_PREFIX}.color`, val);
+  syncTextConfig();
+});
+
+/** 从 localStorage 恢复文本设置 */
+const loadTextSettings = () => {
+  const savedSize = localStorage.getItem(`${TEXT_KEY_PREFIX}.fontSize`);
+  if (savedSize !== null) {
+    textFontSize.value = parseInt(savedSize, 10) || 20;
+  }
+  const savedColor = localStorage.getItem(`${TEXT_KEY_PREFIX}.color`);
+  if (savedColor) {
+    textColor.value = savedColor;
+  }
+};
+
+// ======================== 初始化 ========================
+onMounted(() => {
+  const savedRadius = localStorage.getItem('translime.hdr-capture.borderRadius');
+  if (savedRadius !== null) {
+    const r = parseInt(savedRadius, 10) || 0;
+    radiusInput.value = r;
+    if (state.borderRadius !== r) {
+      state.borderRadius = r;
+    }
+  }
+
+  loadRectSettings();
+  syncRectConfig();
+  loadMosaicSettings();
+  syncMosaicConfig();
+  loadTextSettings();
+  syncTextConfig();
+});
+
+// ======================== 键盘快捷键 ========================
 const handleKeydown = (e) => {
-  // Esc 取消 (全局有效，用于关闭截图或清除选区)
   if (e.key === 'Escape') {
-    // 如果正在输入尺寸，先关闭尺寸栏或失去焦点
-    if (showSizeSettings.value || showRadiusSettings.value) {
-      showSizeSettings.value = false;
-      showRadiusSettings.value = false;
+    // 优先取消活动标注
+    if (state.activeAnnotation) {
+      state.activeAnnotation = null;
       e.preventDefault();
       return;
     }
@@ -116,18 +260,19 @@ const handleKeydown = (e) => {
     return;
   }
 
-  // 其他快捷键仅在工具栏可见时生效
-  if (!props.visible) return;
+  if (!props.visible) {
+    return;
+  }
 
-  // 避免在输入框中打字时触发快捷键
-  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    return;
+  }
 
-  // Ctrl+S 保存
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault();
     actions.handleAction('save');
   }
-  // Ctrl+C 复制
+
   if (e.ctrlKey && e.key === 'c') {
     e.preventDefault();
     actions.handleAction('copy');
@@ -142,6 +287,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
 });
 
+// ======================== 工具栏定位 ========================
 const toolbarPos = computed(() => {
   const {
     x, y, w, h,
@@ -149,27 +295,14 @@ const toolbarPos = computed(() => {
     x: 0, y: 0, w: 0, h: 0,
   };
 
-  // 基础工具栏尺寸
-  // 基础工具栏尺寸
-  const tbWidth = 140;
-  // 始终预留次级菜单的高度 (36 + 40)，防止展开时主菜单位置跳动
+  const tbWidth = 170;
   const tbHeight = 76;
-
-  /*
-  // 如果显示尺寸设置栏，高度增加
-  if (showSizeSettings.value || showRadiusSettings.value) {
-    tbHeight += 40;
-  }
-  */
-
   const spacing = 8;
   const margin = 12;
 
-  // 找出选区中心所在的显示器
   const display = findDisplayAtLocalPoint(x + w / 2, y + h / 2);
   const db = display.bounds;
 
-  // 显示器在本地坐标系下的边界
   const localDb = {
     left: db.x - state.offsetX,
     top: db.y - state.offsetY,
@@ -177,24 +310,17 @@ const toolbarPos = computed(() => {
     bottom: db.y + db.height - state.offsetY,
   };
 
-  // 1. 尝试放在选区右下角外侧
   let left = x + w - tbWidth;
   let top = y + h + spacing;
 
-  // 2. 检查下方是否超出该显示器边界
   if (top + tbHeight + margin > localDb.bottom) {
-    // 3. 尝试放在选区右上角外侧
     top = y - tbHeight - spacing;
-
-    // 4. 如果上方也放不下 (选区太高)
     if (top < localDb.top + margin) {
-      // 5. 放在选区内部的右下角
       top = y + h - tbHeight - margin - 10;
       left = x + w - tbWidth - margin - 10;
     }
   }
 
-  // 安全钳制：确保不超出该显示器
   left = Math.max(localDb.left + margin, Math.min(left, localDb.right - tbWidth - margin));
   top = Math.max(localDb.top + margin, Math.min(top, localDb.bottom - tbHeight - margin));
 
@@ -205,10 +331,6 @@ const toolbarPos = computed(() => {
 
 const toolbarStyle = computed(() => {
   const pos = toolbarPos.value;
-  // 使用 transform: translateX(-100%) 技巧
-  // 将 left 设为工具栏的目标右边缘 (left + width)
-  // 这样无论容器实际宽度是多少，都会以这个右边缘为锚点向左延伸
-  // 从而保证主工具栏（右对齐）的位置视觉上固定不变
   return {
     left: `${pos.left + pos.tbWidth}px`,
     top: `${pos.top}px`,
@@ -216,9 +338,10 @@ const toolbarStyle = computed(() => {
   };
 });
 
-// Debug 直线
 const debugLine = computed(() => {
-  if (!state.isDebug || !props.visible) return null;
+  if (!state.isDebug || !props.visible) {
+    return null;
+  }
   const {
     x, y, w, h,
   } = props.bounds;
@@ -264,14 +387,21 @@ const debugLine = computed(() => {
           Monitor: {{ Math.round(toolbarPos.left) }},{{ Math.round(toolbarPos.top) }}
         </div>
 
-        <!-- 按钮组 -->
+        <!-- 动态提示区域 -->
+        <div class="toolbar-tooltip-container" :class="{ 'is-active': hoveredTooltip }">
+          <div class="toolbar-tooltip-text">
+            {{ hoveredTooltip }}
+          </div>
+        </div>
+
         <div class="btn-group">
-          <!-- 设置尺寸按钮 (左侧) -->
+          <!-- 设置尺寸按钮 -->
           <button
             class="btn btn-settings"
-            :class="{ 'active': showSizeSettings }"
-            title="设置尺寸"
-            @click.stop="toggleSizeSettings"
+            :class="{ 'active': activePanel === 'size' }"
+            @mouseenter="hoveredTooltip = '设置尺寸'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="togglePanel('size')"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -294,9 +424,33 @@ const debugLine = computed(() => {
           <!-- 设置圆角按钮 -->
           <button
             class="btn btn-settings"
-            :class="{ 'active': showRadiusSettings }"
-            title="设置圆角"
-            @click.stop="toggleRadiusSettings"
+            :class="{ 'active': activePanel === 'radius' }"
+            @mouseenter="hoveredTooltip = '设置圆角'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="togglePanel('radius')"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 21v-9a9 9 0 0 1 9-9h9" />
+            </svg>
+          </button>
+
+          <!-- 矩形工具按钮 -->
+          <button
+            class="btn btn-settings"
+            :class="{ 'active': activePanel === 'rect' }"
+            @mouseenter="hoveredTooltip = '矩形工具'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="togglePanel('rect')"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -314,19 +468,96 @@ const debugLine = computed(() => {
                 y="3"
                 width="18"
                 height="18"
-                rx="5"
-                ry="5"
+                rx="2"
+                ry="2"
               />
             </svg>
           </button>
 
-          <!-- 分割线 -->
+          <!-- 马赛克工具按钮 -->
+          <button
+            class="btn btn-settings"
+            :class="{ 'active': activePanel === 'mosaic' }"
+            @mouseenter="hoveredTooltip = '马赛克/模糊'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="togglePanel('mosaic')"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="none"
+            >
+              <rect x="2" y="2" width="5" height="5" />
+              <rect x="9" y="2" width="5" height="5" opacity="0.6" />
+              <rect x="16" y="2" width="5" height="5" />
+              <rect x="2" y="9" width="5" height="5" opacity="0.6" />
+              <rect x="9" y="9" width="5" height="5" />
+              <rect x="16" y="9" width="5" height="5" opacity="0.6" />
+              <rect x="2" y="16" width="5" height="5" />
+              <rect x="9" y="16" width="5" height="5" opacity="0.6" />
+              <rect x="16" y="16" width="5" height="5" />
+            </svg>
+          </button>
+
+          <!-- 文本工具按钮 -->
+          <button
+            class="btn btn-settings"
+            :class="{ 'active': activePanel === 'text' }"
+            @mouseenter="hoveredTooltip = '文本标注'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="togglePanel('text')"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="4 7 4 4 20 4 20 7" />
+              <line x1="9" y1="20" x2="15" y2="20" />
+              <line x1="12" y1="4" x2="12" y2="20" />
+            </svg>
+          </button>
+
           <div class="divider" />
 
-          <!-- 功能按钮 (右侧) -->
+          <!-- 撤销按钮 -->
+          <button
+            class="btn btn-settings"
+            :disabled="state.history.length === 0"
+            @mouseenter="hoveredTooltip = '撤销 (Ctrl+Z)'"
+            @mouseleave="hoveredTooltip = ''"
+            @click.stop="actions.undo()"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+          </button>
+
+          <!-- 功能按钮 -->
           <button
             class="btn btn-save"
-            title="保存 (Ctrl+S)"
+            @mouseenter="hoveredTooltip = '保存 (Ctrl+S)'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="actions.handleAction('save')"
           >
             <svg
@@ -345,9 +576,11 @@ const debugLine = computed(() => {
               <polyline points="7 3 7 8 15 8" />
             </svg>
           </button>
+
           <button
             class="btn btn-copy"
-            title="复制 (Ctrl+C)"
+            @mouseenter="hoveredTooltip = '复制 (Ctrl+C)'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="actions.handleAction('copy')"
           >
             <svg
@@ -372,9 +605,11 @@ const debugLine = computed(() => {
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
           </button>
+
           <button
             class="btn btn-cancel"
-            title="取消 (Esc)"
+            @mouseenter="hoveredTooltip = '取消 (Esc)'"
+            @mouseleave="hoveredTooltip = ''"
             @click.stop="actions.handleAction('cancel')"
           >
             <svg
@@ -396,7 +631,7 @@ const debugLine = computed(() => {
       </div>
 
       <!-- 尺寸设置栏 -->
-      <div v-if="showSizeSettings" class="size-settings-bar">
+      <div v-if="activePanel === 'size'" class="sub-panel">
         <div class="size-inputs">
           <input
             v-model="widthInput"
@@ -406,7 +641,9 @@ const debugLine = computed(() => {
             @keydown="handleInputKeydown"
             @mousedown.stop
           >
+
           <span class="size-separator">x</span>
+
           <input
             v-model="heightInput"
             type="number"
@@ -415,34 +652,187 @@ const debugLine = computed(() => {
             @keydown="handleInputKeydown"
             @mousedown.stop
           >
+
           <span class="size-unit">px</span>
         </div>
+
         <button class="btn-confirm" @click.stop="applySizeSettings">
           确定
         </button>
       </div>
 
       <!-- 圆角设置栏 -->
-      <div v-if="showRadiusSettings" class="size-settings-bar">
-        <div class="radius-settings">
-          <span class="radius-label">圆角半径:</span>
-          <input
+      <div v-if="activePanel === 'radius'" class="sub-panel">
+        <div class="sub-panel__row">
+          <span class="sub-panel__label">圆角:</span>
+
+          <SliderControl
             v-model="radiusInput"
-            type="range"
-            min="0"
-            max="120"
-            class="radius-slider"
-            @mousedown.stop
-          >
-          <input
-            v-model="radiusInput"
-            type="number"
-            class="size-input"
-            style="width: 50px;"
-            @mousedown.stop
-          >
-          <span class="size-unit">px</span>
+            :min="0"
+            :max="120"
+            :step="1"
+            unit="px"
+            input-width="50px"
+          />
         </div>
+      </div>
+
+      <!-- 矩形工具设置栏（横向排列） -->
+      <div v-if="activePanel === 'rect'" class="sub-panel">
+        <!-- 类型切换 -->
+        <div class="rect-type-toggle">
+          <button
+            class="rect-type-btn"
+            :class="{ 'rect-type-btn--active': rectType === 'stroke' }"
+            title="边框矩形"
+            @click.stop="rectType = 'stroke'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <rect
+                x="3"
+                y="3"
+                width="18"
+                height="18"
+                rx="1"
+                ry="1"
+              />
+            </svg>
+          </button>
+
+          <button
+            class="rect-type-btn"
+            :class="{ 'rect-type-btn--active': rectType === 'fill' }"
+            title="实心矩形"
+            @click.stop="rectType = 'fill'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="none"
+            >
+              <rect
+                x="3"
+                y="3"
+                width="18"
+                height="18"
+                rx="1"
+                ry="1"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="sub-divider" />
+
+        <!-- 边框粗细 -->
+        <SliderControl
+          v-model="rectStrokeWidth"
+          :min="1"
+          :max="20"
+          :step="1"
+          :disabled="isStrokeDisabled"
+          unit=""
+          input-width="32px"
+        />
+
+        <div class="sub-divider" />
+
+        <!-- 颜色选择 -->
+        <ColorPicker
+          v-model="rectColor"
+          :enable-alpha="true"
+        />
+      </div>
+
+      <!-- 马赛克工具设置栏 -->
+      <div v-if="activePanel === 'mosaic'" class="sub-panel">
+        <!-- 模式切换 -->
+        <div class="rect-type-toggle">
+          <button
+            class="rect-type-btn"
+            :class="{ 'rect-type-btn--active': mosaicMode === 'pixelate' }"
+            title="马赛克"
+            @click.stop="mosaicMode = 'pixelate'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="none"
+            >
+              <rect x="2" y="2" width="5" height="5" />
+              <rect x="9" y="9" width="5" height="5" />
+              <rect x="16" y="16" width="5" height="5" />
+            </svg>
+          </button>
+
+          <button
+            class="rect-type-btn"
+            :class="{ 'rect-type-btn--active': mosaicMode === 'blur' }"
+            title="模糊"
+            @click.stop="mosaicMode = 'blur'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" opacity="0.3" />
+              <circle cx="12" cy="12" r="6" opacity="0.6" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="sub-divider" />
+
+        <!-- 方块大小 / 模糊强度 -->
+        <span class="sub-panel__label">{{ mosaicMode === 'blur' ? '强度' : '方块' }}:</span>
+        <SliderControl
+          v-model="mosaicBlockSize"
+          :min="2"
+          :max="50"
+          :step="1"
+          unit=""
+          input-width="36px"
+        />
+      </div>
+
+      <!-- 文本工具设置栏 -->
+      <div v-if="activePanel === 'text'" class="sub-panel">
+        <span class="sub-panel__label">字号:</span>
+        <SliderControl
+          v-model="textFontSize"
+          :min="8"
+          :max="72"
+          :step="1"
+          unit=""
+          input-width="36px"
+        />
+
+        <div class="sub-divider" />
+
+        <ColorPicker
+          v-model="textColor"
+          :enable-alpha="true"
+        />
       </div>
     </div>
   </Teleport>
@@ -453,12 +843,11 @@ const debugLine = computed(() => {
   position: absolute;
   display: flex;
   flex-direction: column;
-  align-items: flex-end; /* 右对齐 */
+  align-items: flex-end;
   z-index: 100;
-  pointer-events: none; /* 容器透传点击，内部元素 auto */
+  pointer-events: none;
 }
 
-/* 主操作栏 */
 .action-toolbar-main {
   display: flex;
   padding: 4px;
@@ -468,6 +857,30 @@ const debugLine = computed(() => {
   backdrop-filter: blur(12px);
   border: 1px solid rgb(255 255 255 / 10%);
   pointer-events: auto;
+  transition: all .3s cubic-bezier(.4, 0, .2, 1);
+}
+
+.toolbar-tooltip-container {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-width .3s cubic-bezier(.4, 0, .2, 1), opacity .2s ease;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.toolbar-tooltip-container.is-active {
+  max-width: 150px;
+  opacity: 1;
+}
+
+.toolbar-tooltip-text {
+  font-size: 12px;
+  color: rgb(255 255 255 / 90%);
+  padding: 0 8px 0 6px;
+  font-weight: 500;
 }
 
 .btn-group {
@@ -490,20 +903,15 @@ const debugLine = computed(() => {
   margin: 0 1px;
 }
 
-.btn:hover {
-  background: rgb(255 255 255 / 15%);
-}
+.btn:hover { background: rgb(255 255 255 / 15%); }
 
-.btn:active {
-  transform: scale(.95);
-}
+.btn:active { transform: scale(.95); }
 
 .btn.active {
   background: rgb(255 255 255 / 25%);
   color: #adf;
 }
 
-/* 显式分割线 */
 .divider {
   width: 1px;
   height: 16px;
@@ -511,15 +919,21 @@ const debugLine = computed(() => {
   margin: 0 4px;
 }
 
-/* 特定颜色悬停 */
+.sub-divider {
+  width: 1px;
+  height: 18px;
+  background: rgb(255 255 255 / 15%);
+  flex-shrink: 0;
+}
+
 .btn-save:hover { background: rgb(76 175 80 / 60%); }
 
 .btn-copy:hover { background: rgb(33 150 243 / 60%); }
 
 .btn-cancel:hover { background: rgb(244 67 54 / 60%); }
 
-/* 尺寸设置栏 */
-.size-settings-bar {
+/* 通用子面板 */
+.sub-panel {
   margin-top: 4px;
   padding: 4px 8px;
   background: rgb(30 30 30 / 95%);
@@ -531,8 +945,21 @@ const debugLine = computed(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
+  min-height: 36px;
   box-sizing: border-box;
+}
+
+.sub-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sub-panel__label {
+  font-size: 12px;
+  color: rgb(255 255 255 / 70%);
+  white-space: nowrap;
 }
 
 .size-inputs {
@@ -564,7 +991,6 @@ const debugLine = computed(() => {
   background: rgb(0 0 0 / 50%);
 }
 
-/* 移除数字输入框的箭头 */
 .size-input::-webkit-outer-spin-button,
 .size-input::-webkit-inner-spin-button {
   appearance: none;
@@ -596,37 +1022,41 @@ const debugLine = computed(() => {
   white-space: nowrap;
 }
 
-.btn-confirm:hover {
-  background: #42a5f5;
+.btn-confirm:hover { background: #42a5f5; }
+
+.btn-confirm:active { background: #1976d2; }
+
+/* 矩形类型切换 */
+.rect-type-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgb(255 255 255 / 8%);
+  border-radius: 4px;
+  padding: 2px;
+  flex-shrink: 0;
 }
 
-.btn-confirm:active {
-  background: #1976d2;
-}
-
-.radius-settings {
+.rect-type-btn {
+  width: 24px;
+  height: 22px;
+  border: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  color: #eee;
-  font-size: 13px;
+  justify-content: center;
+  color: rgb(255 255 255 / 60%);
+  background: transparent;
+  border-radius: 3px;
+  transition: all .15s ease;
 }
 
-.radius-label {
-  font-size: 12px;
-  color: rgb(255 255 255 / 70%);
-  white-space: nowrap;
+.rect-type-btn:hover {
+  color: white;
+  background: rgb(255 255 255 / 12%);
 }
 
-.radius-slider {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: rgb(255 255 255 / 30%);
-  outline: none;
-  cursor: pointer;
-  accent-color: #2196f3;
-  width: 100px; /* Force width */
+.rect-type-btn--active {
+  color: #adf;
+  background: rgb(255 255 255 / 20%);
 }
 </style>

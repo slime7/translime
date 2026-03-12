@@ -1,29 +1,33 @@
 //! 图像处理模块
 //!
-//! 提供裁剪、Tone Mapping、编码等功能
+//! 提供图像裁剪、色彩空间转换 (Tone Mapping)、格式编码及缩放等核心功能。
 
 use crate::{Rect, ToneMappingOptions};
 use image::{ImageFormat, RgbImage, RgbaImage, DynamicImage};
 use std::io::Cursor;
+use rayon::prelude::*;
 
-/// 图像包装函数：将 Buffer 转换为 DynamicImage，支持 RGB 和 RGBA
+/// 将原始字节缓冲区转换为 DynamicImage 对象
+/// 支持自动识别和校验 RGB8 与 RGBA8 格式
 fn get_image(buffer: &[u8], width: u32, height: u32) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     let len = buffer.len();
     if len == (width * height * 4) as usize {
         let img = RgbaImage::from_raw(width, height, buffer.to_vec())
-            .ok_or("Failed to create RgbaImage")?;
+            .ok_or("创建 RgbaImage 失败：数据长度不匹配")?;
         Ok(DynamicImage::ImageRgba8(img))
     } else if len == (width * height * 3) as usize {
         let img = RgbImage::from_raw(width, height, buffer.to_vec())
-            .ok_or("Failed to create RgbImage")?;
+            .ok_or("创建 RgbImage 失败：数据长度不匹配")?;
         Ok(DynamicImage::ImageRgb8(img))
     } else {
-        Err(format!("Invalid buffer length: {}, expected {} (RGBA) or {} (RGB)", 
-            len, width * height * 4, width * height * 3).into())
+        Err(format!(
+            "无效的缓冲区长度：收到 {} 字节，期望 {} (RGBA) 或 {} (RGB)", 
+            len, width * height * 4, width * height * 3
+        ).into())
     }
 }
 
-/// 加密：裁剪并返回最终 RGBA 图像
+/// 裁剪 RGBA 或 RGB 图像并返回 NAPI 缓冲区
 pub fn crop_image(
     buffer: &[u8],
     width: u32,
@@ -32,61 +36,49 @@ pub fn crop_image(
 ) -> Result<napi::bindgen_prelude::Buffer, Box<dyn std::error::Error>> {
     let img = get_image(buffer, width, height)?;
     
-    // 确保裁剪区域在图像范围内
+    // 限制裁剪范围，防止超出图像边界
     let crop_x = rect.x.max(0) as u32;
     let crop_y = rect.y.max(0) as u32;
     let crop_width = (rect.width as u32).min(width.saturating_sub(crop_x));
     let crop_height = (rect.height as u32).min(height.saturating_sub(crop_y));
 
-    // 裁剪并保留原始色彩深度 (RGBA 或 RGB)
     let cropped = img.crop_imm(crop_x, crop_y, crop_width, crop_height);
-
     Ok(cropped.to_rgba8().into_raw().into())
 }
 
-/// 裁剪 HDR F16 格式的原始数据
-/// 
-/// 输入格式: RGBA F16 (每像素 8 字节)
-/// 输出格式: 裁剪后的 RGBA F16 数据
+/// 裁剪 HDR F16 (RGBA) 格式的原始数据
 pub fn crop_hdr_f16(
     buffer: &[u8],
     width: u32,
     height: u32,
     rect: &Rect,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let bytes_per_pixel = 8; // F16 RGBA = 4 channels * 2 bytes
-    let expected_size = (width * height * bytes_per_pixel) as usize;
+    const BYTES_PER_PIXEL: usize = 8; // F16 RGBA = 4 通道 * 2 字节
+    let expected_size = (width * height) as usize * BYTES_PER_PIXEL;
     
     if buffer.len() != expected_size {
-        return Err(format!(
-            "Invalid F16 buffer size: got {}, expected {} ({}x{} @ {} bytes/pixel)",
-            buffer.len(), expected_size, width, height, bytes_per_pixel
-        ).into());
+        return Err(format!("F16 缓冲区大小不正确：got {}, expected {}", buffer.len(), expected_size).into());
     }
     
-    // 确保裁剪区域在图像范围内
     let crop_x = rect.x.max(0) as u32;
     let crop_y = rect.y.max(0) as u32;
     let crop_width = (rect.width as u32).min(width.saturating_sub(crop_x));
     let crop_height = (rect.height as u32).min(height.saturating_sub(crop_y));
     
-    let mut result = Vec::with_capacity((crop_width * crop_height * bytes_per_pixel) as usize);
-    
-    let src_row_stride = (width * bytes_per_pixel) as usize;
-    let crop_row_bytes = (crop_width * bytes_per_pixel) as usize;
+    let mut result = Vec::with_capacity((crop_width * crop_height) as usize * BYTES_PER_PIXEL);
+    let src_stride = width as usize * BYTES_PER_PIXEL;
+    let row_bytes = crop_width as usize * BYTES_PER_PIXEL;
     
     for row in 0..crop_height {
         let src_y = crop_y + row;
-        let src_start = (src_y as usize * src_row_stride) + (crop_x as usize * bytes_per_pixel as usize);
-        let src_end = src_start + crop_row_bytes;
-        
-        result.extend_from_slice(&buffer[src_start..src_end]);
+        let start = (src_y as usize * src_stride) + (crop_x as usize * BYTES_PER_PIXEL);
+        result.extend_from_slice(&buffer[start..start + row_bytes]);
     }
     
     Ok(result)
 }
 
-/// HDR 到 SDR 的 Tone Mapping (RGBA 支持)
+/// 执行简单的 Reinhard 色调映射 (Tone Mapping)
 pub fn tone_map(
     hdr_buffer: &[u8],
     width: u32,
@@ -94,28 +86,25 @@ pub fn tone_map(
     options: Option<&ToneMappingOptions>,
 ) -> Result<napi::bindgen_prelude::Buffer, Box<dyn std::error::Error>> {
     let exposure = options.and_then(|o| o.exposure).unwrap_or(1.0);
-    
-    // 转换为 RGBA8 处理
     let mut img = get_image(hdr_buffer, width, height)?.to_rgba8();
 
     for pixel in img.pixels_mut() {
         pixel[0] = (apply_tone_curve(pixel[0] as f32 / 255.0, exposure) * 255.0).clamp(0.0, 255.0) as u8;
         pixel[1] = (apply_tone_curve(pixel[1] as f32 / 255.0, exposure) * 255.0).clamp(0.0, 255.0) as u8;
         pixel[2] = (apply_tone_curve(pixel[2] as f32 / 255.0, exposure) * 255.0).clamp(0.0, 255.0) as u8;
-        // Alpha 不变
     }
 
     Ok(img.into_raw().into())
 }
 
-/// 应用 Reinhard Tone Curve
+/// Reinhard 色调曲线应用函数
 fn apply_tone_curve(value: f32, exposure: f64) -> f32 {
     let x = value * exposure as f32;
-    // 使用更高白点的 Reinhard，使 1.0 映射到约 0.8 以上
+    // 带有高白点修正的 Reinhard 公式，使整体亮度更通透
     (x * (1.0 + x / 16.0)) / (1.0 + x)
 }
 
-/// 编码图像为指定格式
+/// 将图像编码为 PNG、JPG 或 WebP 格式
 pub fn encode_image(
     buffer: &[u8],
     width: u32,
@@ -126,25 +115,16 @@ pub fn encode_image(
     let mut output = Cursor::new(Vec::new());
 
     match format.to_lowercase().as_str() {
-        "png" => {
-            img.to_rgba8().write_to(&mut output, ImageFormat::Png)?;
-        }
-        "jpg" | "jpeg" => {
-            // JPEG 不支持 Alpha 通道，转换为 Rgb8
-            img.to_rgb8().write_to(&mut output, ImageFormat::Jpeg)?;
-        }
-        "webp" => {
-            img.to_rgba8().write_to(&mut output, ImageFormat::WebP)?;
-        }
-        _ => return Err(format!("Unsupported format: {}", format).into()),
+        "png" => img.to_rgba8().write_to(&mut output, ImageFormat::Png)?,
+        "jpg" | "jpeg" => img.to_rgb8().write_to(&mut output, ImageFormat::Jpeg)?,
+        "webp" => img.to_rgba8().write_to(&mut output, ImageFormat::WebP)?,
+        _ => return Err(format!("不支持的图像格式: {}", format).into()),
     };
 
     Ok(output.into_inner().into())
 }
 
-
-
-/// 调整图像大小
+/// 调整图像分辨率，使用 Lanczos3 滤波保证缩放质量
 pub fn resize_image(
     buffer: &[u8],
     width: u32,
@@ -157,145 +137,98 @@ pub fn resize_image(
     Ok(resized.to_rgba8().into_raw().into())
 }
 
-/// 处理 F16 格式的一行数据 (根据配置决定使用 Tone Mapping 或简单 Clip)
-pub fn process_f16_row(src: &[u16], dest: &mut Vec<u8>, hdr_options: Option<&crate::HdrMappingOptions>) {
-    // 从配置中提取 nits 参数，使用默认值作为回退
-    let mapping_enabled = hdr_options
-        .and_then(|o| o.enabled)
-        .unwrap_or(true);
-    let sdr_white_nits = hdr_options
-        .and_then(|o| o.sdr_white_nits)
-        .unwrap_or(203.0) as f32;
-    let hdr_max_nits = hdr_options
-        .and_then(|o| o.hdr_max_nits)
-        .unwrap_or(1000.0) as f32;
+/// 并行处理 F16 (scRGB) 缓冲区，转换为可显示的 SDR (sRGB) 数据
+pub fn process_f16_buffer_parallel(
+    src: &[u8], 
+    width: u32, 
+    height: u32, 
+    hdr_options: Option<&crate::HdrMappingOptions>
+) -> Vec<u8> {
+    let mapping_enabled = hdr_options.and_then(|o| o.enabled).unwrap_or(true);
+    let sdr_white_nits = hdr_options.and_then(|o| o.sdr_white_nits).unwrap_or(203.0) as f32;
+    let hdr_max_nits = hdr_options.and_then(|o| o.hdr_max_nits).unwrap_or(1000.0) as f32;
+
+    let width_usize = width as usize;
+    let height_usize = height as usize;
+    let mut dest = vec![0u8; width_usize * height_usize * 4];
     
-    for pixel in src.chunks(4) {
-        // 将 F16 转换为线性 scRGB 浮点值
-        let r_linear = f16_to_linear(pixel[0]);
-        let g_linear = f16_to_linear(pixel[1]);
-        let b_linear = f16_to_linear(pixel[2]);
-        
-        let (r_sdr, g_sdr, b_sdr) = if mapping_enabled {
-            // 使用 OBS 风格的 maxRGB Tone Mapping
-            hdr_to_sdr_maxrgb_with_params(r_linear, g_linear, b_linear, sdr_white_nits, hdr_max_nits)
-        } else {
-            // 不进行 Tone Mapping，仅根据 SDR 白点进行简单的裁剪
-            hdr_to_sdr_simple_clamp(r_linear, g_linear, b_linear, sdr_white_nits)
-        };
-        
-        dest.push(r_sdr);
-        dest.push(g_sdr);
-        dest.push(b_sdr);
-        dest.push(255);
-    }
+    let src_stride = width_usize * 8;
+    let dest_stride = width_usize * 4;
+
+    // 按行并行处理，减少调度开销并提高缓存亲和性
+    dest.par_chunks_mut(dest_stride)
+        .enumerate()
+        .for_each(|(y, row_dest)| {
+            let src_row_offset = y * src_stride;
+            if src_row_offset + src_stride <= src.len() {
+                let src_row = &src[src_row_offset..src_row_offset + src_stride];
+                
+                for x in 0..width_usize {
+                    let s_off = x * 8;
+                    // 从小端字节序还原 FP16 原始数据
+                    let r_f16 = u16::from_ne_bytes([src_row[s_off], src_row[s_off+1]]);
+                    let g_f16 = u16::from_ne_bytes([src_row[s_off+2], src_row[s_off+3]]);
+                    let b_f16 = u16::from_ne_bytes([src_row[s_off+4], src_row[s_off+5]]);
+                    
+                    let r_lin = f16_to_linear(r_f16);
+                    let g_lin = f16_to_linear(g_f16);
+                    let b_lin = f16_to_linear(b_f16);
+
+                    let (r, g, b) = if mapping_enabled {
+                        hdr_to_sdr_maxrgb(r_lin, g_lin, b_lin, sdr_white_nits, hdr_max_nits)
+                    } else {
+                        hdr_to_sdr_simple_clamp(r_lin, g_lin, b_lin, sdr_white_nits)
+                    };
+
+                    let d_off = x * 4;
+                    row_dest[d_off] = r;
+                    row_dest[d_off+1] = g;
+                    row_dest[d_off+2] = b;
+                    row_dest[d_off+3] = 255;
+                }
+            }
+        });
+
+    dest
 }
 
-/// 处理 10bit (R10G10B10A2) 格式的一行数据
-pub fn process_10bit_row(src: &[u32], dest: &mut Vec<u8>, is_hdr: bool, hdr_options: Option<&crate::HdrMappingOptions>) {
-    // 从配置中提取 nits 参数
-    let mapping_enabled = hdr_options
-        .and_then(|o| o.enabled)
-        .unwrap_or(true);
-    let sdr_white_nits = hdr_options
-        .and_then(|o| o.sdr_white_nits)
-        .unwrap_or(203.0) as f32;
-    let hdr_max_nits = hdr_options
-        .and_then(|o| o.hdr_max_nits)
-        .unwrap_or(1000.0) as f32;
-    
-    for &pixel in src {
-        // 10 bits R, G, B, 2 bits A
-        let r_raw = (pixel & 0x3FF) as f32 / 1023.0;
-        let g_raw = ((pixel >> 10) & 0x3FF) as f32 / 1023.0;
-        let b_raw = ((pixel >> 20) & 0x3FF) as f32 / 1023.0;
-        
-        if is_hdr {
-            // HDR 模式
-            let (r_sdr, g_sdr, b_sdr) = if mapping_enabled {
-                hdr_to_sdr_maxrgb_with_params(r_raw, g_raw, b_raw, sdr_white_nits, hdr_max_nits)
-            } else {
-                hdr_to_sdr_simple_clamp(r_raw, g_raw, b_raw, sdr_white_nits)
-            };
-            dest.push(r_sdr);
-            dest.push(g_sdr);
-            dest.push(b_sdr);
-        } else {
-            // SDR 模式：直接线性映射到 8bit
-            dest.push((r_raw * 255.0).clamp(0.0, 255.0) as u8);
-            dest.push((g_raw * 255.0).clamp(0.0, 255.0) as u8);
-            dest.push((b_raw * 255.0).clamp(0.0, 255.0) as u8);
-        }
-        dest.push(255);
-    }
-}
-
-/// 简单的 HDR 到 SDR 裁剪转换 (不使用 Tone Mapping)
-/// 仅根据 SDR 白点缩放并截断超过部分
+/// 基础的 HDR 到 SDR 裁剪（仅缩放并截断）
 fn hdr_to_sdr_simple_clamp(r: f32, g: f32, b: f32, sdr_white_nits: f32) -> (u8, u8, u8) {
     let sdr_white = sdr_white_nits / 80.0;
     
-    let r_mapped = (r / sdr_white).clamp(0.0, 1.0);
-    let g_mapped = (g / sdr_white).clamp(0.0, 1.0);
-    let b_mapped = (b / sdr_white).clamp(0.0, 1.0);
-    
-    let r_srgb = linear_to_srgb(r_mapped);
-    let g_srgb = linear_to_srgb(g_mapped);
-    let b_srgb = linear_to_srgb(b_mapped);
+    let r_srgb = linear_to_srgb((r / sdr_white).clamp(0.0, 1.0));
+    let g_srgb = linear_to_srgb((g / sdr_white).clamp(0.0, 1.0));
+    let b_srgb = linear_to_srgb((b / sdr_white).clamp(0.0, 1.0));
     
     ((r_srgb * 255.0) as u8, (g_srgb * 255.0) as u8, (b_srgb * 255.0) as u8)
 }
 
-/// OBS 风格的 maxRGB HDR 到 SDR 色调映射 (使用可配置的 nits 参数)
+/// 基于 maxRGB 算法的 HDR 到 SDR 色调映射 (OBS 风格)
 /// 
-/// 参数说明:
-/// - `sdr_white_nits`: SDR 白点亮度，Windows 默认约 203 nits
-/// - `hdr_max_nits`: HDR 内容的峰值亮度，通常 1000 nits
-/// 
-/// scRGB 换算: nits / 80 = scRGB 值
-fn hdr_to_sdr_maxrgb_with_params(r: f32, g: f32, b: f32, sdr_white_nits: f32, hdr_max_nits: f32) -> (u8, u8, u8) {
-    // 转换为 scRGB 单位
+/// scRGB 换算规则: nits / 80 = scRGB 亮度单位
+fn hdr_to_sdr_maxrgb(r: f32, g: f32, b: f32, sdr_white_nits: f32, hdr_max_nits: f32) -> (u8, u8, u8) {
     let sdr_white = sdr_white_nits / 80.0;
     let hdr_max = hdr_max_nits / 80.0;
     
-    // 找到最大通道值 (maxRGB 算法的核心)
-    let max_channel = r.max(g).max(b);
+    let max_ch = r.max(g).max(b);
+    if max_ch <= 0.0001 { return (0, 0, 0); }
     
-    if max_channel <= 0.0001 {
-        return (0, 0, 0);
-    }
+    // 计算输入亮度相对于 SDR 白点的比例
+    let luma_in = max_ch / sdr_white;
+    let white_pt = hdr_max / sdr_white;
     
-    // 使用 Reinhard 全局色调映射
-    // 公式: L_out = L_in / (1 + L_in / L_white)
-    // 
-    // 计算相对于 SDR 白点的亮度
-    let luma_in = max_channel / sdr_white;
+    // Reinhard 映射公式：保持色彩比例的同时压缩高亮区域
+    let luma_out = luma_in * (1.0 + luma_in / (white_pt * white_pt)) / (1.0 + luma_in);
+    let scale = luma_out / luma_in;
     
-    // Reinhard 压缩，使用 HDR_MAX/SDR_WHITE 作为白点参数
-    let white_point = hdr_max / sdr_white;
-    let luma_out = luma_in * (1.0 + luma_in / (white_point * white_point)) / (1.0 + luma_in);
+    let r_srgb = linear_to_srgb((r / sdr_white * scale).clamp(0.0, 1.0));
+    let g_srgb = linear_to_srgb((g / sdr_white * scale).clamp(0.0, 1.0));
+    let b_srgb = linear_to_srgb((b / sdr_white * scale).clamp(0.0, 1.0));
     
-    // 计算缩放比例 (保持色彩比例)
-    let scale = if luma_in > 0.0001 { luma_out / luma_in } else { 1.0 };
-    
-    // 应用缩放并归一化到 0-1
-    let r_mapped = (r / sdr_white * scale).clamp(0.0, 1.0);
-    let g_mapped = (g / sdr_white * scale).clamp(0.0, 1.0);
-    let b_mapped = (b / sdr_white * scale).clamp(0.0, 1.0);
-    
-    // 应用 sRGB gamma
-    let r_srgb = linear_to_srgb(r_mapped);
-    let g_srgb = linear_to_srgb(g_mapped);
-    let b_srgb = linear_to_srgb(b_mapped);
-    
-    (
-        (r_srgb * 255.0) as u8,
-        (g_srgb * 255.0) as u8,
-        (b_srgb * 255.0) as u8,
-    )
+    ((r_srgb * 255.0) as u8, (g_srgb * 255.0) as u8, (b_srgb * 255.0) as u8)
 }
 
-/// 线性到 sRGB gamma 转换
+/// 线性色彩值到 sRGB Gamma 空间的转换
 #[inline]
 fn linear_to_srgb(linear: f32) -> f32 {
     if linear <= 0.0031308 {
@@ -305,35 +238,25 @@ fn linear_to_srgb(linear: f32) -> f32 {
     }
 }
 
-/// 将 IEEE 754 binary16 (FP16) 转换为线性浮点值
-/// 
-/// 注意：此函数仅做格式转换，不进行任何 Tone Mapping
+/// 将 IEEE 754 binary16 (FP16) 编码的字节转换为 f32 线性值
 #[inline]
 fn f16_to_linear(val: u16) -> f32 {
-    // 提取符号、指数、尾数 (IEEE 754 binary16)
     let sign = (val >> 15) & 0x1;
     let exp = (val >> 10) & 0x1F;
     let frac = val & 0x3FF;
 
     let f = if exp == 0 {
-        // 次正规数 (Subnormal)
-        if frac == 0 { 0.0 } else { (frac as f32) * 2.0f32.powi(-14 - 10) }
+        if frac == 0 { 0.0 } else { (frac as f32) * 2.0f32.powi(-24) }
     } else if exp == 0x1F {
-        // 无穷大或 NaN，将其限制为 1.0
         if frac == 0 { if sign == 0 { 100.0 } else { 0.0 } } else { 1.0 }
     } else {
-        // 正规数
         (1.0 + (frac as f32) / 1024.0) * 2.0f32.powi(exp as i32 - 15)
     };
 
-    // 返回正数值 (scRGB 可以有负值，但我们这里只处理正值)
     if sign == 1 { 0.0 } else { f.max(0.0) }
 }
 
-/// 将原始 HDR F16 数据编码为 EXR 格式
-/// 
-/// 输入格式: RGBA F16 (每像素 8 字节)
-/// 输出格式: OpenEXR 文件字节流
+/// 将原始 HDR F16 数据编码为 OpenEXR 格式
 pub fn encode_hdr_to_exr(
     raw_buffer: &[u8],
     width: u32,
@@ -344,54 +267,34 @@ pub fn encode_hdr_to_exr(
     let width = width as usize;
     let height = height as usize;
     
-    // 验证缓冲区大小 (F16 格式: 每像素 8 字节 = 2 bytes * 4 channels)
     let expected_size = width * height * 8;
     if raw_buffer.len() != expected_size {
-        return Err(format!(
-            "Invalid buffer size: got {}, expected {} ({}x{} @ 8 bytes/pixel)",
-            raw_buffer.len(), expected_size, width, height
-        ).into());
+        return Err(format!("EXR 编码失败：缓冲区大小不匹配").into());
     }
     
-    // 将 F16 字节转换为 f32 RGB 像素数据 (EXR 使用 f32)
-    // scRGB 参考: 1.0 = 80 nits, 所以不需要额外的亮度调整
+    // 预分配像素数组，EXR crate 通常期望 f32 的 RGB 三元组
     let mut pixels: Vec<(f32, f32, f32)> = Vec::with_capacity(width * height);
     
     for y in 0..height {
         for x in 0..width {
-            let pixel_offset = (y * width + x) * 8; // 8 bytes per pixel
-            
-            // 读取 F16 值 (little-endian)
-            let r_f16 = u16::from_le_bytes([raw_buffer[pixel_offset], raw_buffer[pixel_offset + 1]]);
-            let g_f16 = u16::from_le_bytes([raw_buffer[pixel_offset + 2], raw_buffer[pixel_offset + 3]]);
-            let b_f16 = u16::from_le_bytes([raw_buffer[pixel_offset + 4], raw_buffer[pixel_offset + 5]]);
-            // Alpha 通道忽略，EXR 只保存 RGB
-            
-            // 转换为 f32
-            let r = f16_to_linear(r_f16);
-            let g = f16_to_linear(g_f16);
-            let b = f16_to_linear(b_f16);
-            
-            pixels.push((r, g, b));
+            let off = (y * width + x) * 8;
+            let r_f16 = u16::from_le_bytes([raw_buffer[off], raw_buffer[off + 1]]);
+            let g_f16 = u16::from_le_bytes([raw_buffer[off + 2], raw_buffer[off + 3]]);
+            let b_f16 = u16::from_le_bytes([raw_buffer[off + 4], raw_buffer[off + 5]]);
+            pixels.push((f16_to_linear(r_f16), f16_to_linear(g_f16), f16_to_linear(b_f16)));
         }
     }
     
-    // 创建 EXR 图像并编码到内存
-    let mut output_bytes: Vec<u8> = Vec::new();
-    
-    // 使用 exr crate 创建 EXR 文件
+    let mut out: Vec<u8> = Vec::new();
     let layer = Layer::new(
         (width, height),
         LayerAttributes::named("HDR Capture"),
         Encoding::SMALL_LOSSLESS,
         SpecificChannels::rgb(|pos: Vec2<usize>| {
-            let idx = pos.y() * width + pos.x();
-            pixels[idx]
+            pixels[pos.y() * width + pos.x()]
         }),
     );
     
-    let image = Image::from_layer(layer);
-    image.write().to_buffered(&mut std::io::Cursor::new(&mut output_bytes))?;
-    
-    Ok(output_bytes)
+    Image::from_layer(layer).write().to_buffered(&mut Cursor::new(&mut out))?;
+    Ok(out)
 }
