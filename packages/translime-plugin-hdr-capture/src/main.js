@@ -210,7 +210,7 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
   const electronDisplays = screen.getAllDisplays();
   const nativeDisplays = capture.getDisplays();
 
-  logger.info(`[Perf] 开始预捕获 (T+${Date.now() - startTime}ms). 检测到原生显示器数量:`, nativeDisplays.length);
+  logger.info(`[Perf] 开始预捕获 (T+${Date.now() - startTime}ms). 检测到原生显示器数量:`, { data: { count: nativeDisplays.length } });
 
   // 读取 HDR 映射配置
   const enableHdrMapping = getEnableHdrMapping();
@@ -229,7 +229,9 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
   } : null;
 
   logger.info('HDR 映射配置:', {
-    enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr, captureCursor,
+    data: {
+      enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr, captureCursor,
+    },
   });
 
   const capturePromises = nativeDisplays.map(async (nd) => {
@@ -735,11 +737,13 @@ export const ipcHandlers = [
       const preserveHdr = getPreserveHdr();
       const saveFilenameTemplate = getSaveFilenameTemplate();
       logger.info('保存截图', {
-        saveINfo: {
-          format,
-          savePath,
-          preserveHdr,
-          saveFilenameTemplate,
+        data: {
+          saveINfo: {
+            format,
+            savePath,
+            preserveHdr,
+            saveFilenameTemplate,
+          },
         },
       });
       return capture.cropAndSaveScaledFromBuffer(currentCaptureSession, rect, {

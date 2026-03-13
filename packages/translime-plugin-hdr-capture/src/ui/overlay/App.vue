@@ -715,7 +715,7 @@ const handleAction = async (type) => {
     }));
   }
 
-  logger.info(`执行操作: ${type}, 选区:`, { rect: { ...rect, overlayData: overlayData ? '[present]' : null } });
+  logger.info(`执行操作: ${type}, 选区:`, { data: { rect: { ...rect, overlayData: overlayData ? '[present]' : null } } });
 
   try {
     if (type === 'save') {
@@ -723,14 +723,14 @@ const handleAction = async (type) => {
         logger.info('Debug模式: 跳过 save 操作');
       } else {
         const res = await window.hdrCapture.saveCapture(rect);
-        logger.info('保存操作返回:', { res });
+        logger.info('保存操作返回:', { data: { res } });
       }
     } else if (type === 'copy') {
       if (state.isDebug) {
         logger.info('Debug模式: 跳过 copy 操作');
       } else {
         const res = await window.hdrCapture.copyCapture(rect);
-        logger.info('复制操作返回:', { res });
+        logger.info('复制操作返回:', { data: { res } });
       }
     }
   } catch (err) {
