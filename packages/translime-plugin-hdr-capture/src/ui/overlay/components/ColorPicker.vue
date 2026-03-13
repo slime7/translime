@@ -193,8 +193,7 @@ const previewStyle = computed(() => ({
   border-radius: 2px;
   background: rgb(255 255 255 / 30%);
   outline: none;
-  cursor: pointer;
-  accent-color: #2196f3;
+  accent-color: #38bdf8;
   width: 60px;
 }
 

@@ -850,12 +850,12 @@ const debugLine = computed(() => {
 
 .action-toolbar-main {
   display: flex;
-  padding: 4px;
-  background: rgb(30 30 30 / 95%);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgb(0 0 0 / 40%);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgb(255 255 255 / 10%);
+  padding: 6px;
+  background: rgb(18 18 20 / 75%);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 50%), inset 0 1px 0 rgb(255 255 255 / 10%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgb(255 255 255 / 8%);
   pointer-events: auto;
   transition: all .3s cubic-bezier(.4, 0, .2, 1);
 }
@@ -889,27 +889,31 @@ const debugLine = computed(() => {
 }
 
 .btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  transition: all .15s ease;
+  color: rgb(255 255 255 / 90%);
+  transition: all .2s cubic-bezier(.4, 0, .2, 1);
   background: transparent;
-  border-radius: 4px;
-  margin: 0 1px;
+  border-radius: 8px;
+  margin: 0 2px;
 }
 
-.btn:hover { background: rgb(255 255 255 / 15%); }
+.btn:hover {
+  background: rgb(255 255 255 / 12%);
+  color: white;
+}
 
-.btn:active { transform: scale(.95); }
+.btn:active { transform: scale(.92); }
 
 .btn.active {
-  background: rgb(255 255 255 / 25%);
-  color: #adf;
+  background: rgb(255 255 255 / 15%);
+  color: #38bdf8;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
 }
 
 .divider {
@@ -934,18 +938,18 @@ const debugLine = computed(() => {
 
 /* 通用子面板 */
 .sub-panel {
-  margin-top: 4px;
-  padding: 4px 8px;
-  background: rgb(30 30 30 / 95%);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgb(0 0 0 / 40%);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgb(255 255 255 / 10%);
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: rgb(18 18 20 / 75%);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 50%), inset 0 1px 0 rgb(255 255 255 / 10%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgb(255 255 255 / 8%);
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
+  gap: 12px;
+  min-height: 40px;
   box-sizing: border-box;
 }
 
@@ -1009,22 +1013,27 @@ const debugLine = computed(() => {
 }
 
 .btn-confirm {
-  border: none;
-  background: #2196f3;
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(14 165 233 / 90%);
   color: white;
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 12px;
+  border-radius: 6px;
+  padding: 2px 12px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  height: 22px;
-  line-height: 18px;
-  transition: background .15s;
+  height: 26px;
+  line-height: 20px;
+  transition: all .2s ease;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(14 165 233 / 30%);
 }
 
-.btn-confirm:hover { background: #42a5f5; }
+.btn-confirm:hover {
+  background: rgb(56 189 248 / 100%);
+  box-shadow: 0 4px 12px rgb(14 165 233 / 40%);
+}
 
-.btn-confirm:active { background: #1976d2; }
+.btn-confirm:active { background: rgb(2 132 199 / 100%); }
 
 /* 矩形类型切换 */
 .rect-type-toggle {
@@ -1037,8 +1046,8 @@ const debugLine = computed(() => {
 }
 
 .rect-type-btn {
-  width: 24px;
-  height: 22px;
+  width: 28px;
+  height: 26px;
   border: none;
   cursor: pointer;
   display: flex;
@@ -1046,8 +1055,8 @@ const debugLine = computed(() => {
   justify-content: center;
   color: rgb(255 255 255 / 60%);
   background: transparent;
-  border-radius: 3px;
-  transition: all .15s ease;
+  border-radius: 6px;
+  transition: all .2s ease;
 }
 
 .rect-type-btn:hover {
@@ -1056,7 +1065,8 @@ const debugLine = computed(() => {
 }
 
 .rect-type-btn--active {
-  color: #adf;
-  background: rgb(255 255 255 / 20%);
+  color: #38bdf8;
+  background: rgb(255 255 255 / 15%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
 }
 </style>
