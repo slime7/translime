@@ -87,7 +87,9 @@ const getFastResponse = () => pluginConfig.get('fastResponse', true);
  * 更新 Overlay 窗口的边界（用于响应屏幕变化）
  */
 const updateOverlayBounds = () => {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    return;
+  }
 
   const {
     minX, minY, maxY, width, height,
@@ -126,18 +128,22 @@ const unregisterShortcut = () => {
   }
 };
 
-const createOverlayWindow = (isDebug = false) => {
+const createOverlayWindow = (isDebug = false, offscreen = false) => {
   const {
-    minX, minY, width, height,
+    minX, minY, maxY, width, height,
   } = getAllDisplaysBounds();
+
+  // 离屏预创建：窗口放在所有屏幕下方
+  const initialY = offscreen ? maxY + 100 : minY;
 
   overlayWindow = new BrowserWindow({
     x: minX,
-    y: minY,
+    y: initialY,
     width,
     height,
     frame: false,
     transparent: true,
+    opacity: offscreen ? 1 : 0, // 常规触发时先透明，离屏预创建则不透明（反正看不见）
     alwaysOnTop: !isDebug, // Debug 模式下不置顶
     skipTaskbar: !isDebug,
     resizable: isDebug,
@@ -159,7 +165,7 @@ const createOverlayWindow = (isDebug = false) => {
   // 强制设置边界以防被系统截断
   overlayWindow.setBounds({
     x: minX,
-    y: minY,
+    y: initialY,
     width,
     height,
   });
@@ -179,6 +185,19 @@ const createOverlayWindow = (isDebug = false) => {
     overlayWindow = null;
     currentCaptureSession = null; // 清理会话缓存
   });
+
+  // 离屏预创建时，加载完成后 show 窗口但保持在离屏位置
+  // 这样 WebContents 进入活跃状态，IPC 通信不会被延迟
+  if (offscreen) {
+    overlayWindow.once('ready-to-show', () => {
+      // isDestroyed 保护
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.showInactive();
+        overlayWindow.setIgnoreMouseEvents(true);
+        logger.info(`Overlay 离屏预创建完成 (0, ${initialY})`);
+      }
+    });
+  }
 
   return overlayWindow;
 };
@@ -435,10 +454,20 @@ const startCapture = async (isDebug = false, startTime = Date.now()) => {
       overlayWindow.showInactive();
     }
 
-    // 数据就绪，确保交互状态正确
-    overlayWindow.focus();
+    // 在发送完数据之后，立刻允许交互，但如果是开启快速模式，则立即调焦
+    // 不管是什么模式，先让平台停止穿透
     overlayWindow.setIgnoreMouseEvents(false);
-    logger.info(`[Perf] 窗口已显示并聚焦 (T+${Date.now() - startTime}ms)`);
+
+    if (getFastResponse()) {
+      if (!isDebug) {
+        // 强制确保置顶后再 focus 避免在系统最底层
+        overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+      }
+      overlayWindow.focus();
+      logger.info(`[Perf] 窗口已显示并聚焦 (T+${Date.now() - startTime}ms)`);
+    } else {
+      logger.info(`[Perf] 窗口已发送数据，等待 overlay-ready 解除透明 (T+${Date.now() - startTime}ms)`);
+    }
   };
 
   // 如果页面正在加载，等待加载完成
@@ -455,7 +484,9 @@ const startCapture = async (isDebug = false, startTime = Date.now()) => {
  */
 const registerShortcut = (accelerator) => {
   let finalAccelerator = accelerator || getShortcut();
-  if (!finalAccelerator) return false;
+  if (!finalAccelerator) {
+    return false;
+  }
 
   // 基础归一化：将 Win 转换为 Super (Electron 规范)
   finalAccelerator = finalAccelerator.replace(/Win/g, 'Super');
@@ -546,6 +577,11 @@ export const pluginDidLoad = () => {
     registerShortcut(shortcut);
   }
 
+  // 快速响应模式下，预创建离屏 Overlay 窗口，消除首次截图冷启动延迟
+  if (getFastResponse()) {
+    createOverlayWindow(false, true);
+  }
+
   // 监听屏幕变化
   screen.on('display-metrics-changed', updateOverlayBounds);
   screen.on('display-added', updateOverlayBounds);
@@ -588,12 +624,19 @@ export const pluginSettingSaved = () => {
   }
 
   // 检查快速响应模式设置
-  // 如果用户关闭了快速响应模式，且当前有隐藏的常驻窗口，则将其销毁以释放内存
   const isFastResponse = getFastResponse();
-  if (!isFastResponse && overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) {
-    overlayWindow.close();
-    overlayWindow = null;
-    logger.info('快速响应模式已关闭，清理后台常驻窗口');
+
+  if (!isFastResponse) {
+    // 如果用户关闭了快速响应模式，且当前有隐藏的窗口，将其销毁
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.close();
+      overlayWindow = null;
+      logger.info('快速响应模式已关闭，清理现存窗口');
+    }
+  } else if (isFastResponse && (!overlayWindow || overlayWindow.isDestroyed())) {
+    // 如果用户开启了快速响应模式，但当前没有窗口，重新预创建
+    logger.info('快速响应模式已开启，预创建离屏窗口');
+    createOverlayWindow(false, true);
   }
 };
 
@@ -608,6 +651,28 @@ export const ipcHandlers = [
     type: 'close-overlay',
     handler: () => () => {
       closeOverlay();
+    },
+  },
+  {
+    type: 'overlay-ready',
+    handler: () => () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        const opacity = overlayWindow.getOpacity();
+        if (opacity < 1) {
+          overlayWindow.setOpacity(1);
+        }
+        // 确保能进行交互，并强制置顶
+        // 这里不检测 isDebug，是因为我们在 getWindowAtPoint 也不会受到这行影响
+        // 但如果是在开发模式下一直顶层有点烦，所以还是保留判断比较好
+        // 由于 ipcRenderer 传不来 isDebug，我们可以去判断一下 window options
+        if (overlayWindow.isAlwaysOnTop() || overlayWindow.webContents.isDevToolsOpened() === false) {
+          overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+        }
+
+        overlayWindow.focus();
+        overlayWindow.setIgnoreMouseEvents(false);
+        logger.info('[Perf] 收到 overlay-ready，已重置透明度并确保聚焦');
+      }
     },
   },
   {

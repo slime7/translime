@@ -1094,6 +1094,12 @@ onMounted(() => {
       }
 
       logger.info(`[Perf] UI 数据处理完成, 等待渲染更新 (T+${Date.now() - startTime}ms)`);
+
+      nextTick(() => {
+        if (window.hdrCapture?.notifyReady) {
+          window.hdrCapture.notifyReady();
+        }
+      });
     });
   }
 
