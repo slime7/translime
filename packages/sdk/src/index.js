@@ -69,6 +69,18 @@ export function usePluginConfig(pluginId) {
   };
 }
 
+/**
+ * 获取插件间通信工具
+ * @description 仅在 **主进程 (Main Process)** 环境可用
+ * @returns {import('./index.d').PluginInterop|null}
+ */
+export function usePluginInterop() {
+  if (typeof global !== 'undefined' && global.pluginInterop) {
+    return global.pluginInterop;
+  }
+  return null;
+}
+
 // ----------------------------------------------------------------------
 // UI & Renderer APIs (Renderer Process Only)
 // ----------------------------------------------------------------------

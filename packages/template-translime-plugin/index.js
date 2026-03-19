@@ -1,4 +1,5 @@
 import { usePluginConfig } from 'translime-sdk';
+import EventEmitter from 'node:events';
 
 const id = 'translime-plugin-example';
 
@@ -115,6 +116,21 @@ const ipcHandlers = [
   },
 ];
 
+// 跨插件通信（可选）
+// 通过导出 libs 对象，可以将数据、方法或事件暴露给其他插件使用
+const bus = new EventEmitter();
+let counter = 0;
+
+const libs = {
+  getCounter: () => counter,
+  increment: () => {
+    counter += 1;
+    bus.emit('counter-changed', counter);
+  },
+  onCounterChanged: (fn) => bus.on('counter-changed', fn),
+  offCounterChanged: (fn) => bus.off('counter-changed', fn),
+};
+
 export default {
   pluginDidLoad,
   pluginWillUnload,
@@ -122,4 +138,5 @@ export default {
   settingMenu,
   pluginMenu,
   ipcHandlers,
+  libs,
 };
