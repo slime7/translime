@@ -109,14 +109,14 @@ const onHandleMouseDown = (direction) => {
 
     <!-- 窗口探测高亮 -->
     <div
-      class="absolute border border-dashed border-[#2196F3] bg-[#2196F3]/10 transition-all duration-100 ease-out box-border"
+      class="absolute border-2 border-dashed border-[#38bdf8] bg-[#38bdf8]/15 transition-all duration-150 ease-out box-border rounded-sm shadow-[0_0_15px_rgba(56,189,248,0.3)]"
       :style="windowHighlightStyle"
     />
 
     <!-- 选区矩形 -->
     <div
       v-if="state.isSelecting || state.hasSelection"
-      class="absolute border border-dashed border-[#2196F3] box-border pointer-events-auto"
+      class="absolute border-[1.5px] border-solid border-[#38bdf8] box-border pointer-events-auto shadow-[0_0_0_1px_rgba(0,0,0,0.2),0_4px_24px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.1)]"
       :class="state.drawingMode ? 'cursor-crosshair' : 'cursor-move'"
       :style="{
         left: bounds.x + 'px',
@@ -128,7 +128,7 @@ const onHandleMouseDown = (direction) => {
     >
       <div
         v-if="bounds.w > 80 && bounds.h > 24"
-        class="absolute top-1 left-1 bg-[#2196F3] text-white px-2 py-0.5 rounded text-xs whitespace-nowrap shadow-md pointer-events-none"
+        class="absolute -top-7 left-0 bg-black/75 backdrop-blur-md text-white px-2 py-1 rounded-md text-xs whitespace-nowrap shadow-lg pointer-events-none border border-white/10 font-mono tracking-wide"
       >
         {{ Math.round(bounds.w) }} × {{ Math.round(bounds.h) }}
       </div>
@@ -137,42 +137,42 @@ const onHandleMouseDown = (direction) => {
       <template v-if="!state.isMoving && state.hasSelection && !state.drawingMode">
         <!-- Top Left -->
         <div
-          class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-nw-resize z-20"
+          class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-nw-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('nw')"
         />
         <!-- Top -->
         <div
-          class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-n-resize z-20"
+          class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-n-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('n')"
         />
         <!-- Top Right -->
         <div
-          class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-ne-resize z-20"
+          class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-ne-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('ne')"
         />
         <!-- Right -->
         <div
-          class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-e-resize z-20"
+          class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-e-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('e')"
         />
         <!-- Bottom Right -->
         <div
-          class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-se-resize z-20"
+          class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-se-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('se')"
         />
         <!-- Bottom -->
         <div
-          class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-s-resize z-20"
+          class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-s-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('s')"
         />
         <!-- Bottom Left -->
         <div
-          class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-sw-resize z-20"
+          class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-sw-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('sw')"
         />
         <!-- Left -->
         <div
-          class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-[#2196F3] rounded-full cursor-w-resize z-20"
+          class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-[#38bdf8] rounded-full cursor-w-resize z-20 shadow-sm"
           @mousedown.stop="onHandleMouseDown('w')"
         />
       </template>

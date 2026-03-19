@@ -132,10 +132,15 @@ watchEffect(() => {
     :style="hintStyle"
     @mouseenter="onMouseEnter"
   >
-    <div class="bg-black/75 text-white px-4 py-2 rounded-xl text-xs backdrop-blur-xs border border-white/10 shadow-lg">
-      <p>点击探测到的窗口快速选区</p>
-      <p>滚轮切换窗口层次</p>
-      <p>esc 取消</p>
+    <div class="bg-[#121214]/75 text-white/90 px-4 py-3 rounded-xl text-[13px] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] font-medium tracking-wide">
+      <p class="mb-1 flex border-b border-white/10 pb-1">
+        ✨ 智能操作提示
+      </p>
+      <ul class="space-y-1.5 mt-2 opacity-80 text-xs">
+        <li>• 点击探测到的窗口快速选区</li>
+        <li>• 滚轮切换窗口层次</li>
+        <li>• <kbd class="px-1 py-0.5 bg-white/10 rounded">ESC</kbd> 取消</li>
+      </ul>
     </div>
   </div>
 </template>

@@ -128,8 +128,7 @@ const onWheel = (e) => {
   border-radius: 2px;
   background: rgb(255 255 255 / 30%);
   outline: none;
-  cursor: pointer;
-  accent-color: #2196f3;
+  accent-color: #38bdf8;
   width: 100px;
 }
 
@@ -149,7 +148,7 @@ const onWheel = (e) => {
 }
 
 .slider-control__input:focus {
-  border-color: #2196f3;
+  border-color: #38bdf8;
   background: rgb(0 0 0 / 50%);
 }
 

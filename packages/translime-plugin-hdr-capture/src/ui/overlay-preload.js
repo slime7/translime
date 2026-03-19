@@ -64,6 +64,11 @@ contextBridge.exposeInMainWorld('hdrCapture', {
   close: () => ipcRenderer.send('ipc-msg', { type: `close-overlay@${PLUGIN_ID}` }),
 
   /**
+   * 通知主进程界面已就绪 (可解除透明)
+   */
+  notifyReady: () => ipcRenderer.send('ipc-msg', { type: `overlay-ready@${PLUGIN_ID}` }),
+
+  /**
    * 监听初始化消息
    * @param {function} callback
    */
