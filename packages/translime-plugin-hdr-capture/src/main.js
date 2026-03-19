@@ -6,6 +6,7 @@ import {
 } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import EventEmitter from 'node:events';
 import { useLogger, usePluginConfig } from 'translime-sdk';
 // eslint-disable-next-line import/extensions
 import * as capture from './capture/index.js';
@@ -16,6 +17,11 @@ const dirname = path.dirname(filename);
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Main' }) : baseLogger;
+
+/**
+ * 内部事件总线，用于跨插件通信
+ */
+const bus = new EventEmitter();
 
 /**
  * 配置代理实例
@@ -746,9 +752,13 @@ export const ipcHandlers = [
           },
         },
       });
-      return capture.cropAndSaveScaledFromBuffer(currentCaptureSession, rect, {
+      const result = await capture.cropAndSaveScaledFromBuffer(currentCaptureSession, rect, {
         format, savePath, preserveHdr, saveFilenameTemplate,
       });
+      if (result) {
+        bus.emit('capture-complete', { path: result.path, hdrPath: result.hdrPath, type: 'save' });
+      }
+      return result?.path ?? null;
     },
   },
   {
@@ -776,6 +786,7 @@ export const ipcHandlers = [
           const image = nativeImage.createFromBuffer(pngBuffer);
           clipboard.writeImage(image);
           logger.info('写入剪贴板完成');
+          bus.emit('capture-complete', { path: null, hdrPath: null, type: 'copy' });
           return true;
         }
         logger.error('copy-capture 失败: 编码返回的 Buffer 为空');
@@ -791,3 +802,30 @@ export const ipcHandlers = [
     handler: () => async () => app.getPath('pictures'),
   },
 ];
+
+/**
+ * 跨插件通信 API
+ * 其他插件通过 pluginInterop 获取此对象后，可监听截图完成事件
+ *
+ * @example
+ * const interop = usePluginInterop();
+ * const hdrApi = interop.getExports('translime-plugin-hdr-capture');
+ * hdrApi.onCaptureComplete(({ path, hdrPath, type }) => {
+ *   // path: 保存时为文件路径，复制时为 null
+ *   // hdrPath: HDR 原始文件路径（未开启或保存失败时为 null）
+ *   // type: 'save' | 'copy'
+ * });
+ */
+export const libs = {
+  /**
+   * 监听截图完成事件
+   * @param {(detail: { path: string|null, hdrPath: string|null, type: 'save'|'copy' }) => void} fn 回调函数
+   */
+  onCaptureComplete: (fn) => bus.on('capture-complete', fn),
+
+  /**
+   * 移除截图完成事件监听
+   * @param {Function} fn 之前注册的回调函数
+   */
+  offCaptureComplete: (fn) => bus.off('capture-complete', fn),
+};

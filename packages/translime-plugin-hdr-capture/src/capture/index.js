@@ -800,6 +800,9 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
     await fs.writeFile(fullPath, encodedData);
     logger.info(`SDR 图像已保存: ${fullPath}`);
 
+    // HDR 原始文件保存路径，未保存成功时为 null
+    let hdrPath = null;
+
     // 如果启用了保存 HDR 原始文件，保存裁剪后的 HDR 数据为 EXR 格式
     if (preserveHdr) {
       // 检查是否有 HDR 屏幕且包含原始数据
@@ -845,6 +848,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
           const exrFileName = fileName.replace(`.${format}`, '.exr');
           const exrFullPath = path.join(savePath, exrFileName);
           await fs.writeFile(exrFullPath, exrData);
+          hdrPath = exrFullPath;
           logger.info(`HDR EXR 文件已保存: ${exrFullPath} (${hdrCropRect.width}x${hdrCropRect.height}, ${exrData.length} bytes)`);
         } catch (exrError) {
           logger.error('HDR 裁剪/编码失败:', exrError);
@@ -873,6 +877,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
           ]);
 
           await fs.writeFile(fallbackPath, combinedBuffer);
+          hdrPath = fallbackPath;
           logger.info(`HDR 原始数据已保存 (fallback): ${fallbackPath}`);
         }
       } else {
@@ -880,7 +885,7 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
       }
     }
 
-    return fullPath;
+    return { path: fullPath, hdrPath };
   }
   return null;
 };
