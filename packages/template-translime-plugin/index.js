@@ -1,19 +1,74 @@
-import { usePluginConfig } from 'translime-sdk';
+import { useLogger, usePluginConfig, usePluginInterop } from 'translime-sdk';
 import EventEmitter from 'node:events';
 
 const id = 'translime-plugin-example';
+const baseLogger = useLogger();
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: id, context: 'Main' }) : baseLogger;
 
 const pluginConfig = usePluginConfig(id);
+let captureCompleteListener = null;
+let activeHdrApi = null;
+
+const registerHdrCaptureListener = (hdrApi) => {
+  if (!hdrApi) return;
+  // 如果之前已经注册过，先移除
+  if (activeHdrApi && captureCompleteListener) {
+    activeHdrApi.offCaptureComplete(captureCompleteListener);
+  }
+
+  captureCompleteListener = ({ path, hdrPath, type }) => {
+    logger.info(`[${id}] 截图完成: type=${type}, path=${path}, hdrPath=${hdrPath}`);
+  };
+
+  hdrApi.onCaptureComplete(captureCompleteListener);
+  activeHdrApi = hdrApi;
+};
+
+const unregisterHdrCaptureListener = () => {
+  if (activeHdrApi && captureCompleteListener) {
+    activeHdrApi.offCaptureComplete(captureCompleteListener);
+  }
+  captureCompleteListener = null;
+  activeHdrApi = null;
+};
+
+let activateListener = null;
+
 // 加载时执行
 const pluginDidLoad = () => {
   console.log('plugin loaded');
   const setting = pluginConfig.get('setting', {});
   console.log('settings: ', setting);
+
+  const interop = usePluginInterop();
+  if (interop) {
+    // 启动时如果 HDR 截图插件已启用，则直接注册监听
+    const hdrApi = interop.getExports('translime-plugin-hdr-capture');
+    registerHdrCaptureListener(hdrApi);
+
+    // 监听后续插件状态变化（例如禁用后重新启用）
+    activateListener = (pluginId, exports) => {
+      if (pluginId === 'translime-plugin-hdr-capture') {
+        console.log(`[${id}] 监听到 HDR 截图插件激活，重新注册监听器`);
+        registerHdrCaptureListener(exports);
+      }
+    };
+    interop.on('activated', activateListener);
+  }
 };
 
 // 禁用时执行
 const pluginWillUnload = () => {
   console.log('plugin unloaded');
+
+  // 移除捕获回调监听
+  unregisterHdrCaptureListener();
+
+  const interop = usePluginInterop();
+  if (interop && activateListener) {
+    interop.off('activated', activateListener);
+    activateListener = null;
+  }
 };
 
 // 设置保存时执行

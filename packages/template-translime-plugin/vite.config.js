@@ -21,6 +21,7 @@ const config = ({ mode }) => ({
     rollupOptions: {
       external: [
         ...builtinModules,
+        ...builtinModules.map((m) => `node:${m}`),
       ],
     },
   },
