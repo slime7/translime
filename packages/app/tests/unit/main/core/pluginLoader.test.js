@@ -4,6 +4,8 @@ import {
 import EventEmitter from 'node:events';
 import pluginLoader from '@main/core/pluginLoader';
 
+import pluginInterop from '@main/core/pluginInterop';
+
 // Mock 必须在导入之前提升或定义
 const { mockFs, mockFsp } = vi.hoisted(() => {
   const fs = {
@@ -106,10 +108,25 @@ vi.mock('@main/utils/useAppManager', () => ({
   },
 }));
 
-// Mock 插件启用所需的 require
-const { mockRequire } = vi.hoisted(() => ({
-  mockRequire: vi.fn(),
+// Mock pluginInterop
+vi.mock('@main/core/pluginInterop', () => ({
+  default: {
+    register: vi.fn(),
+    unregister: vi.fn(),
+    getExports: vi.fn(),
+    getRegisteredPlugins: vi.fn(),
+    waitForPlugin: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+  },
 }));
+
+// Mock 插件启用所需的 require
+const { mockRequire } = vi.hoisted(() => {
+  const req = vi.fn();
+  req.cache = {};
+  return { mockRequire: req };
+});
 
 vi.mock('node:module', () => ({
   default: {
@@ -125,6 +142,7 @@ vi.mock('node:module', () => ({
 describe('pluginLoader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequire.cache = {};
     // 默认 Mock 行为
     mockNetRequest.on.mockReset();
     mockNetRequest.end.mockReset();
@@ -136,6 +154,7 @@ describe('pluginLoader', () => {
       }),
       destroy: vi.fn(),
     });
+    pluginLoader.plugins = [];
   });
 
   describe('init', () => {
@@ -249,6 +268,29 @@ describe('pluginLoader', () => {
 
       await expect(pluginLoader.installPlugin(packageName))
         .rejects.toThrow();
+    });
+  });
+
+  describe('enablePlugin/disablePlugin', () => {
+    it('启用带有 libs 的插件时应注册 interop，禁用时应注销', () => {
+      const mockLibs = { sayHello: () => 'hello' };
+      mockRequire.mockReturnValue({ libs: mockLibs });
+
+      const packageName = 'translime-plugin-interop-test';
+
+      // 预先构造一个未启用的插件在 pluginLoader.plugins 中
+      pluginLoader.plugins = [{
+        packageName,
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: false,
+      }];
+
+      pluginLoader.enablePlugin(packageName);
+      expect(pluginInterop.register).toHaveBeenCalledWith(packageName, mockLibs);
+
+      pluginLoader.disablePlugin(packageName);
+      expect(pluginInterop.unregister).toHaveBeenCalledWith(packageName);
     });
   });
 });

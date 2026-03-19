@@ -50,6 +50,46 @@ const { VBtn, VCard } = useVuetifyComponents();
 
 - `getMainStore()`: 获取主程序的全局 Store。
 - `usePluginConfig(pluginId)`: 获取针对特定插件的配置工具。
+- `usePluginInterop()`: 获取插件间通信工具 (`PluginInterop` 实例)，用于在主进程中访问其他插件暴露的 API 和事件。
+
+#### 插件间通信 (usePluginInterop)
+
+使用 `usePluginInterop()` 可以在一个插件的主进程代码中调用另一个插件导出的 `libs` 对象。跨插件通信只在主进程有效。
+
+> [!IMPORTANT]  
+> 由于插件加载顺序和启用状态不确定，**强烈不建议**缓存 `interop.getExports()` 的返回值。推荐在需要调用时**实时获取**，或使用事件监听机制。如果必须等待另一个插件加载，请使用 `waitForPlugin()`。
+
+**获取 API 示例**
+
+```javascript
+import { usePluginInterop } from 'translime-sdk';
+
+const doSomething = async () => {
+  const interop = usePluginInterop();
+  if (!interop) return;
+
+  // 方式一：懒获取（推荐，始终拿最新引用）
+  const targetApi = interop.getExports('target-plugin-id');
+  if (targetApi) {
+    targetApi.someMethod();
+  }
+
+  // 方式二：等待目标插件激活
+  try {
+    const api = await interop.waitForPlugin('target-plugin-id', 5000 /* 5秒超时 */);
+    api.someMethod();
+  } catch (err) {
+    console.error('目标插件未就绪');
+  }
+
+  // 方式三：监听目标插件生命周期
+  interop.on('activated', (pluginId, exports) => {
+    if (pluginId === 'target-plugin-id') {
+      exports.onEvent((data) => console.log('收到事件:', data));
+    }
+  });
+};
+```
 
 ### 渲染进程 (Renderer Process)
 
