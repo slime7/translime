@@ -756,6 +756,7 @@ export const ipcHandlers = [
         format, savePath, preserveHdr, saveFilenameTemplate,
       });
       if (result) {
+        logger.info('触发保存完成事件');
         bus.emit('capture-complete', { path: result.path, hdrPath: result.hdrPath, type: 'save' });
       }
       return result?.path ?? null;
