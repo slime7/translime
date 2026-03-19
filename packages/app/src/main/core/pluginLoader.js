@@ -17,6 +17,7 @@ import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
 import readPackageManifest from '../utils/readPackageManifest';
+import pluginInterop from './pluginInterop';
 
 const requireFresh = createRequire(import.meta.url);
 
@@ -479,6 +480,11 @@ class PluginLoader extends EventEmitter {
       processPlugin(mergedPlugin);
     }
 
+    // 插件核心逻辑加载后，注册 libs
+    if (mergedPlugin.libs) {
+      pluginInterop.register(mergedPlugin.packageName, mergedPlugin.libs);
+    }
+
     this.emit('plugin:enabled', {
       plugin: mergedPlugin,
       pluginId: mergedPlugin.packageName,
@@ -499,6 +505,8 @@ class PluginLoader extends EventEmitter {
         appManager.getIpc()?.removeHandler(`${handler.type}@${plugin.packageName}`);
       });
     }
+    // 注销插件跨组件通信注册表
+    pluginInterop.unregister(plugin.packageName);
     // 调用插件卸载方法
     if (typeof plugin.pluginWillUnload === 'function') {
       plugin.pluginWillUnload();
@@ -812,7 +820,7 @@ class PluginLoader extends EventEmitter {
 
   access(pluginId) {
     const plugin = this.getPlugin(pluginId);
-    return plugin.lib;
+    return plugin ? plugin.libs : undefined;
   }
 
   onPluginSettingSave(pluginId) {
