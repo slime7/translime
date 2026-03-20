@@ -16,6 +16,10 @@ const config = {
     buildResources: 'buildResources',
     app: 'dist',
   },
+  npmArgs: [
+    '--ignore-scripts',
+  ],
+  npmRebuild: false,
   files: [
     '**',
   ],
