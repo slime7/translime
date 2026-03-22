@@ -148,16 +148,16 @@
             </p>
           </div>
 
-          <div class="relative z-10 flex flex-wrap gap-4 p-5 rounded-3xl bg-surface-container-lowest border border-outline-variant/50">
-            <div class="flex flex-col px-4 border-r border-outline-variant/50">
+          <div class="relative z-10 flex flex-wrap gap-3 p-5 rounded-3xl bg-surface-container-lowest border border-outline-variant/50">
+            <div class="flex flex-col px-4 py-1 rounded-xl bg-surface-container/50">
               <span class="text-xs text-on-surface-variant font-bold tracking-wider uppercase mb-1">默认筛选</span>
               <span class="text-xl font-black text-on-surface">{{ activeFilterLabel }}</span>
             </div>
-            <div class="flex flex-col px-4 border-r border-outline-variant/50">
+            <div class="flex flex-col px-4 py-1 rounded-xl bg-surface-container/50">
               <span class="text-xs text-on-surface-variant font-bold tracking-wider uppercase mb-1">条目数量</span>
               <span class="text-xl font-black text-on-surface">{{ state.collections.length }}</span>
             </div>
-            <div class="flex flex-col px-4 min-w-[120px]">
+            <div class="flex flex-col px-4 py-1 rounded-xl bg-surface-container/50 min-w-[120px]">
               <span class="text-xs text-on-surface-variant font-bold tracking-wider uppercase mb-1">账号状态</span>
               <span class="text-lg font-bold text-primary truncate max-w-[120px]">
                 {{ state.viewer?.nickname || '就绪' }}
@@ -360,7 +360,15 @@
                         <div class="flex justify-between items-end">
                           <div>
                             <span class="text-[0.65rem] font-bold text-medium-emphasis uppercase tracking-widest block mb-1 leading-none">当前进度</span>
-                            <span class="text-sm font-black text-primary leading-none block">{{ item.progressText }}</span>
+                            <div class="flex flex-wrap gap-[3px] mt-1.5 max-w-[140px]">
+                              <span
+                                v-for="n in (item.eps || 0)"
+                                :key="n"
+                                class="progress-dot"
+                                :class="n <= item.watchedEpisodes ? 'progress-dot--filled' : 'progress-dot--empty'"
+                              />
+                              <span v-if="!item.eps" class="text-xs font-black text-primary leading-none">{{ item.progressText }}</span>
+                            </div>
                           </div>
                           <v-icon icon="arrow_forward" size="small" class="text-medium-emphasis opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
                         </div>
@@ -482,23 +490,43 @@
                   class="flex flex-col p-4 rounded-2xl border transition-all duration-300 group"
                   :class="episode.watched ? 'bg-primary/5 border-primary/30' : 'bg-surface border-outline-variant/40 hover:border-outline-variant'"
                 >
-                  <div class="flex justify-between items-start mb-3 gap-2">
+                  <div class="flex justify-between items-start mb-2 gap-2">
                     <span class="bg-surface-container-high border border-outline-variant/20 text-on-surface font-black text-xs px-2.5 py-1 rounded-lg shrink-0">
-                      {{ episode.sort || '?' }} 话
+                      {{ episode.sort || '?' }} 话<template v-if="episode.ep != null"> ({{ episode.ep }})</template>
                     </span>
                     <v-chip
                       size="small"
-                      :color="episode.watched ? 'primary' : 'surface-variant'"
+                      :color="episodeCollectionTone(episode.collectionType)"
                       :variant="episode.watched ? 'flat' : 'tonal'"
                       class="font-bold shrink-0"
                     >
-                      {{ episode.watched ? '已看' : '未看' }}
+                      {{ episodeCollectionLabel(episode.collectionType) }}
                     </v-chip>
                   </div>
 
-                  <h4 class="font-bold text-on-surface text-sm mb-4 line-clamp-2 leading-snug flex-1">
-                    {{ episode.title }}
-                  </h4>
+                  <div class="mb-3 flex-1">
+                    <h4 class="font-bold text-on-surface text-sm leading-snug line-clamp-1" :title="episode.nameCn || episode.name">
+                      {{ episode.nameCn || episode.name || `第 ${episode.sort || '?'} 话` }}
+                    </h4>
+                    <p
+                      v-if="episode.nameCn && episode.name && episode.nameCn !== episode.name"
+                      class="text-xs text-on-surface-variant mt-0.5 truncate"
+                      :title="episode.name"
+                    >
+                      {{ episode.name }}
+                    </p>
+                  </div>
+
+                  <div v-if="episode.airdate || episode.duration" class="flex flex-wrap gap-x-3 gap-y-1 text-[0.65rem] text-on-surface-variant mb-3">
+                    <span v-if="episode.airdate" class="flex items-center gap-1">
+                      <v-icon icon="calendar_today" size="12" />
+                      {{ episode.airdate }}
+                    </span>
+                    <span v-if="episode.duration" class="flex items-center gap-1">
+                      <v-icon icon="schedule" size="12" />
+                      {{ episode.duration }}
+                    </span>
+                  </div>
 
                   <div class="flex gap-2 mt-auto w-full">
                     <v-btn
@@ -510,7 +538,7 @@
                       :disabled="episode.watched || actionLoading"
                       @click="markEpisodeWatched(episode.id)"
                     >
-                      标记
+                      看过
                     </v-btn>
                     <v-btn
                       size="small"
@@ -518,11 +546,49 @@
                       variant="tonal"
                       color="secondary"
                       class="flex-1 font-bold tracking-wide"
-                      :disabled="actionLoading"
+                      :disabled="episode.watched || actionLoading"
                       @click="markProgressToEpisode(selectedCollection.subjectId, episode.id)"
                     >
                       看到这
                     </v-btn>
+                    <v-menu>
+                      <template #activator="{ props: menuProps }">
+                        <v-btn
+                          size="small"
+                          rounded="lg"
+                          variant="tonal"
+                          color="on-surface-variant"
+                          icon="more_horiz"
+                          class="h-[28px]"
+                          :disabled="actionLoading"
+                          v-bind="menuProps"
+                        />
+                      </template>
+                      <v-list density="compact" class="rounded-xl" bg-color="surface-container">
+                        <v-list-item
+                          :disabled="episode.collectionType === episodeCollectionTypes.WISH || actionLoading"
+                          @click="markEpisodeState(episode.id, episodeCollectionTypes.WISH)"
+                        >
+                          <template #prepend>
+                            <v-icon icon="bookmark_border" size="small" />
+                          </template>
+                          <v-list-item-title class="text-sm font-medium">
+                            想看
+                          </v-list-item-title>
+                        </v-list-item>
+                        <v-list-item
+                          :disabled="episode.collectionType === episodeCollectionTypes.DROPPED || actionLoading"
+                          @click="markEpisodeState(episode.id, episodeCollectionTypes.DROPPED)"
+                        >
+                          <template #prepend>
+                            <v-icon icon="block" size="small" />
+                          </template>
+                          <v-list-item-title class="text-sm font-medium">
+                            抛弃
+                          </v-list-item-title>
+                        </v-list-item>
+                      </v-list>
+                    </v-menu>
                   </div>
                 </div>
               </div>
@@ -536,7 +602,11 @@
 
 <script setup>
 import { computed, onMounted } from 'vue';
-import { SUBJECT_FILTER_OPTIONS } from '../shared/constants';
+import {
+  EPISODE_COLLECTION_LABELS,
+  EPISODE_COLLECTION_TONES,
+  SUBJECT_FILTER_OPTIONS,
+} from '../shared/constants';
 import { useBangumiLogs } from './useBangumiLogs';
 
 defineOptions({
@@ -550,6 +620,7 @@ const {
   selectedCollection,
   selectedEpisodes,
   filterOptions,
+  episodeCollectionTypes,
   syncStatus,
   verifyToken,
   logout,
@@ -560,6 +631,7 @@ const {
   collectSubject,
   updateCollectionType,
   markEpisodeWatched,
+  markEpisodeState,
   markProgressToEpisode,
   openTokenPage,
 } = useBangumiLogs();
@@ -567,6 +639,9 @@ const {
 const activeFilterLabel = computed(() => SUBJECT_FILTER_OPTIONS.find(
   (item) => Number(item.value) === Number(state.filterType),
 )?.title || '在看');
+
+const episodeCollectionLabel = (type) => EPISODE_COLLECTION_LABELS[type] || '未看';
+const episodeCollectionTone = (type) => EPISODE_COLLECTION_TONES[type] || 'surface-variant';
 
 const handleDetailDialogChange = (value) => {
   if (!value) {
@@ -608,7 +683,8 @@ onMounted(async () => {
 
 .collection-card {
   transition: transform .3s cubic-bezier(.2, 0, 0, 1), box-shadow .3s cubic-bezier(.2, 0, 0, 1), border-color .3s ease;
-  height: 154px;
+  height: auto;
+  min-height: 154px;
 }
 
 .collection-card:hover {
@@ -627,5 +703,21 @@ onMounted(async () => {
 
 .custom-textfield :deep(.v-field) {
   border-radius: 1rem;
+}
+
+.progress-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.progress-dot--filled {
+  background: rgb(var(--v-theme-primary));
+}
+
+.progress-dot--empty {
+  background: rgb(var(--v-theme-outline-variant), .3);
+  box-shadow: inset 0 0 0 1px rgb(var(--v-theme-outline-variant), .5);
 }
 </style>

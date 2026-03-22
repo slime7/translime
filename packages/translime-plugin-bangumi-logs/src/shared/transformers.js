@@ -76,14 +76,20 @@ export const mapCollectionToListItem = (collection = {}) => {
 export const mapEpisodeCollection = (item = {}) => {
   const episode = item.episode || {};
   const sort = Number(episode.sort || 0);
+  const ep = episode.ep != null ? Number(episode.ep) : null;
 
   return {
     id: episode.id,
+    nameCn: episode.name_cn || '',
+    name: episode.name || '',
     title: episode.name_cn || episode.name || `第 ${sort || '?'} 话`,
     originalTitle: episode.name || '',
     sort,
+    ep,
     type: Number(episode.type || 0),
     airdate: episode.airdate || '',
+    duration: episode.duration || '',
+    durationSeconds: Number(episode.duration_seconds || 0),
     watched: Number(item.type) === EPISODE_WATCHED_TYPE,
     collectionType: Number(item.type || 0),
     isMainStory: Number(episode.type || 0) === MAIN_STORY_EPISODE_TYPE,

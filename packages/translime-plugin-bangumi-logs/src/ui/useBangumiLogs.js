@@ -10,6 +10,7 @@ import {
 } from 'translime-sdk';
 import {
   BANGUMI_ACCESS_TOKEN_URL,
+  EPISODE_COLLECTION_TYPES,
   EPISODE_WATCHED_TYPE,
   SUBJECT_COLLECTION_TYPES,
   SUBJECT_FILTER_OPTIONS,
@@ -233,6 +234,22 @@ export const useBangumiLogs = () => {
     }
   };
 
+  const markEpisodeState = async (episodeId, type) => {
+    actionLoading.value = true;
+
+    try {
+      await invoke('update-episode-state@translime-plugin-bangumi-logs', {
+        episodeId,
+        type,
+      });
+      await refreshSelectedSubject();
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      actionLoading.value = false;
+    }
+  };
+
   const markProgressToEpisode = async (subjectId, episodeId) => {
     actionLoading.value = true;
 
@@ -258,6 +275,7 @@ export const useBangumiLogs = () => {
     selectedCollection,
     selectedEpisodes,
     filterOptions: SUBJECT_FILTER_OPTIONS,
+    episodeCollectionTypes: EPISODE_COLLECTION_TYPES,
     syncStatus,
     verifyToken,
     logout,
@@ -269,6 +287,7 @@ export const useBangumiLogs = () => {
     collectSubject,
     updateCollectionType,
     markEpisodeWatched,
+    markEpisodeState,
     markProgressToEpisode,
     openTokenPage,
   };

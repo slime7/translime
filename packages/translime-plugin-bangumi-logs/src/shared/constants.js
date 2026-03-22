@@ -5,6 +5,26 @@ export const BANGUMI_USER_AGENT = 'Translime Bangumi Logs/3.0.0 (https://github.
 export const ANIME_SUBJECT_TYPE = 2;
 export const MAIN_STORY_EPISODE_TYPE = 0;
 export const EPISODE_WATCHED_TYPE = 2;
+
+export const EPISODE_COLLECTION_TYPES = {
+  WISH: 1,
+  WATCHED: 2,
+  DROPPED: 3,
+};
+
+export const EPISODE_COLLECTION_LABELS = {
+  0: '未看',
+  1: '想看',
+  2: '已看',
+  3: '抛弃',
+};
+
+export const EPISODE_COLLECTION_TONES = {
+  0: 'surface-variant',
+  1: 'secondary',
+  2: 'primary',
+  3: 'error',
+};
 export const SUBJECT_COLLECTION_TYPES = {
   WISH: 1,
   DONE: 2,
