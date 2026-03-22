@@ -21,7 +21,7 @@ const { mainStore, appManager } = global;
 const APP_VERSION = mainStore?.APP_VERSION || '0.0.0';
 const isVerDot3 = verCmp(APP_VERSION, '0.3.0') >= 0;
 const APPDATA_PATH = isVerDot3 ? mainStore.APPDATA_PATH : global.APPDATA_PATH;
-const pluginDir = path.resolve(APPDATA_PATH, 'google-domains-ddns');
+const pluginDir = path.resolve(APPDATA_PATH, 'namesilo-ddns');
 const logFile = path.resolve(pluginDir, 'logs.txt');
 const pluginWin = isVerDot3 ? () => appManager.getChildWin(`plugin-window-${id}`) : () => global.childWins[`plugin-window-${id}`];
 const ipc = isVerDot3 ? appManager.getIpc() : global.ipc;

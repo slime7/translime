@@ -4,16 +4,16 @@ import {
   getUiPreferences,
   setAccessToken,
   setUiPreferences,
-} from './config.js';
-import { createBangumiApi } from './bangumiApi.js';
-import { mapBangumiErrorMessage } from '../shared/errors.js';
+} from './config';
+import createBangumiApi from './bangumiApi';
+import { mapBangumiErrorMessage } from '../shared/errors';
 import {
   buildMarkProgressPayload,
   filterAnimeSearchResults,
   mapCollectionToListItem,
   mapEpisodeCollections,
   mapViewer,
-} from '../shared/transformers.js';
+} from '../shared/transformers';
 
 const requireToken = () => {
   const token = getAccessToken();
@@ -27,7 +27,7 @@ const requireToken = () => {
 
 const getApi = () => createBangumiApi(requireToken());
 
-export const createHandlers = () => ([
+const createHandlers = () => ([
   {
     type: 'auth-status',
     handler: () => async () => {
@@ -185,3 +185,5 @@ export const createHandlers = () => ([
     },
   },
 ]);
+
+export default createHandlers;

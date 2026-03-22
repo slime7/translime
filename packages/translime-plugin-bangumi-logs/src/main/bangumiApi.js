@@ -1,7 +1,7 @@
-import { ANIME_SUBJECT_TYPE, EPISODE_WATCHED_TYPE } from '../shared/constants.js';
-import { requestBangumi } from './request.js';
+import { ANIME_SUBJECT_TYPE, EPISODE_WATCHED_TYPE } from '../shared/constants';
+import requestBangumi from './request';
 
-export const createBangumiApi = (token) => {
+const createBangumiApi = (token) => {
   const request = (path, options = {}) => requestBangumi(path, {
     ...options,
     token,
@@ -72,3 +72,5 @@ export const createBangumiApi = (token) => {
     },
   };
 };
+
+export default createBangumiApi;

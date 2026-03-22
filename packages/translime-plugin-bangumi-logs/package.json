@@ -12,7 +12,7 @@
   },
   "files": [
     "dist",
-    "icon.png"
+    "icon.svg"
   ],
   "scripts": {
     "dev": "vite build -c ui.vite.config.mjs --watch",
@@ -44,12 +44,13 @@
   "plugin": {
     "title": "Bangumi Logs",
     "description": "Bangumi Logs plugin",
-    "icon": "./icon.png",
+    "icon": "./icon.svg",
     "//windowUrl": "dist/ui/index.html",
     "ui": "dist/ui.esm.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "axios": "^1.8.4",
     "tailwindcss": "^4.2.2"
   }
 }

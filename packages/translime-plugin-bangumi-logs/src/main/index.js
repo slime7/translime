@@ -1,20 +1,16 @@
 import { useLogger } from 'translime-sdk';
-import { PLUGIN_ID } from '../shared/constants.js';
-import { createHandlers } from './handlers.js';
+import { PLUGIN_ID } from '../shared/constants';
+import createHandlers from './handlers';
 
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Main' }) : baseLogger;
 
-const pluginDidLoad = () => {
+export const pluginDidLoad = () => {
   logger.info('Bangumi Logs loaded');
 };
 
-const pluginWillUnload = () => {
+export const pluginWillUnload = () => {
   logger.info('Bangumi Logs unloaded');
 };
 
-export default {
-  pluginDidLoad,
-  pluginWillUnload,
-  ipcHandlers: createHandlers(),
-};
+export const ipcHandlers = createHandlers();

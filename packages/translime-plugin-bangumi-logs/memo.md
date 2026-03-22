@@ -48,6 +48,14 @@ packages/translime-plugin-bangumi-logs/
                                 # 数据转换与进度逻辑测试
 ```
 
+## API 规范说明
+
+本插件对 Bangumi API 的调用与数据模型解析，均以项目根目录下的本地文档为准：
+
+- **文档位置**: `docs/api/`
+- **核心定义**: `docs/api/open-api/v0.yaml` (OpenAPI 3.0 规范)
+- **数据结构**: 分集 (Episode/EpisodeDetail) 的 `airdate` 字段用于判断放送状态。
+
 ## 运行逻辑
 
 主进程和 UI 分离。

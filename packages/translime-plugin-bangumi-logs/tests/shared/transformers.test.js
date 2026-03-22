@@ -1,10 +1,13 @@
 import {
+  describe, expect, it,
+} from 'vitest';
+import {
   buildMarkProgressPayload,
   filterAnimeSearchResults,
   mapCollectionToListItem,
   mapEpisodeCollections,
   normalizeSummary,
-} from '../../src/shared/transformers.js';
+} from '../../src/shared/transformers';
 
 describe('transformers', () => {
   it('搜索结果应只保留动画条目', () => {

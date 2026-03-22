@@ -361,12 +361,22 @@
                           <div>
                             <span class="text-[0.65rem] font-bold text-medium-emphasis uppercase tracking-widest block mb-1 leading-none">当前进度</span>
                             <div class="flex flex-wrap gap-[3px] mt-1.5 max-w-[140px]">
-                              <span
-                                v-for="n in (item.eps || 0)"
-                                :key="n"
-                                class="progress-dot"
-                                :class="n <= item.watchedEpisodes ? 'progress-dot--filled' : 'progress-dot--empty'"
-                              />
+                              <template v-for="n in (item.eps || 0)" :key="n">
+                                <span
+                                  v-if="n <= item.watchedEpisodes"
+                                  class="progress-dot progress-dot--filled"
+                                  title="已看"
+                                />
+                                <span
+                                  v-else-if="item.airedEpisodes != null && n <= item.airedEpisodes"
+                                  class="progress-dot progress-dot--available"
+                                  title="未看"
+                                />
+                                <span
+                                  v-else
+                                  class="progress-dot progress-dot--unaired"
+                                />
+                              </template>
                               <span v-if="!item.eps" class="text-xs font-black text-primary leading-none">{{ item.progressText }}</span>
                             </div>
                           </div>
@@ -488,12 +498,26 @@
                   v-for="episode in selectedEpisodes"
                   :key="episode.id"
                   class="flex flex-col p-4 rounded-2xl border transition-all duration-300 group"
-                  :class="episode.watched ? 'bg-primary/5 border-primary/30' : 'bg-surface border-outline-variant/40 hover:border-outline-variant'"
+                  :class="[
+                    episode.watched ? 'bg-primary/5 border-primary/30' : 'bg-surface border-outline-variant/40 hover:border-outline-variant',
+                    episode.isAired === false ? 'opacity-70 bg-surface-container-low/50' : ''
+                  ]"
                 >
                   <div class="flex justify-between items-start mb-2 gap-2">
-                    <span class="bg-surface-container-high border border-outline-variant/20 text-on-surface font-black text-xs px-2.5 py-1 rounded-lg shrink-0">
-                      {{ episode.sort || '?' }} 话<template v-if="episode.ep != null"> ({{ episode.ep }})</template>
-                    </span>
+                    <div class="flex gap-2 items-center">
+                      <span class="bg-surface-container-high border border-outline-variant/20 text-on-surface font-black text-xs px-2.5 py-1 rounded-lg shrink-0">
+                        {{ episode.sort || '?' }} 话<template v-if="episode.ep != null"> ({{ episode.ep }})</template>
+                      </span>
+                      <v-chip
+                        v-if="episode.isAired === false"
+                        size="x-small"
+                        color="outline"
+                        variant="tonal"
+                        class="font-black px-2 py-0 h-5"
+                      >
+                        未开播
+                      </v-chip>
+                    </div>
                     <v-chip
                       size="small"
                       :color="episodeCollectionTone(episode.collectionType)"
@@ -607,7 +631,7 @@ import {
   EPISODE_COLLECTION_TONES,
   SUBJECT_FILTER_OPTIONS,
 } from '../shared/constants';
-import { useBangumiLogs } from './useBangumiLogs';
+import useBangumiLogs from './useBangumiLogs';
 
 defineOptions({
   name: 'BangumiLogsApp',
@@ -716,8 +740,12 @@ onMounted(async () => {
   background: rgb(var(--v-theme-primary));
 }
 
-.progress-dot--empty {
-  background: rgb(var(--v-theme-outline-variant), .3);
-  box-shadow: inset 0 0 0 1px rgb(var(--v-theme-outline-variant), .5);
+.progress-dot--available {
+  background: rgb(var(--v-theme-tertiary));
+}
+
+.progress-dot--unaired {
+  background: rgb(var(--v-theme-surface-variant), .2);
+  box-shadow: inset 0 0 0 1px rgb(var(--v-theme-outline-variant), .4);
 }
 </style>

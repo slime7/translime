@@ -1,5 +1,5 @@
 import { usePluginConfig } from 'translime-sdk';
-import { PLUGIN_ID, SUBJECT_COLLECTION_TYPES } from '../shared/constants.js';
+import { PLUGIN_ID, SUBJECT_COLLECTION_TYPES } from '../shared/constants';
 
 const pluginConfig = usePluginConfig(PLUGIN_ID);
 

@@ -20,6 +20,7 @@ const config = ({ mode }) => ({
     },
     rollupOptions: {
       external: [
+        'electron',
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
       ],

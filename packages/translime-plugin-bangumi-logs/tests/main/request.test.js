@@ -1,42 +1,46 @@
-import { requestBangumi } from '../../src/main/request.js';
-import { BangumiApiError, mapBangumiErrorMessage } from '../../src/shared/errors.js';
+import {
+  afterEach, describe, expect, it, vi,
+} from 'vitest';
+import axios from 'axios';
+import requestBangumi from '../../src/main/request';
+import { BangumiApiError, mapBangumiErrorMessage } from '../../src/shared/errors';
+
+vi.mock('axios');
 
 describe('requestBangumi', () => {
-  const originalFetch = global.fetch;
-
   afterEach(() => {
-    global.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
-  it('应携带 Authorization 与 User-Agent 请求头', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      text: () => Promise.resolve(JSON.stringify({ username: 'slime' })),
+  it('应携带 Authorization 与 User-Agent 请求头并使用正确参数调用 axios', async () => {
+    axios.mockResolvedValue({
+      status: 200,
+      data: { username: 'slime' },
     });
 
     await requestBangumi('/v0/me', {
       token: 'token-1',
     });
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const [, config] = global.fetch.mock.calls[0];
+    expect(axios).toHaveBeenCalledTimes(1);
+    const [config] = axios.mock.calls[0];
     expect(config.headers.Authorization).toBe('Bearer token-1');
     expect(config.headers['User-Agent']).toContain('Translime Bangumi Logs');
+    expect(config.url).toBe('/v0/me');
+    expect(config.baseURL).toContain('api.bgm.tv');
   });
 
   it('请求失败时应抛出 BangumiApiError', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      text: () => Promise.resolve(JSON.stringify({ title: 'unauthorized' })),
+    axios.mockRejectedValue({
+      response: {
+        status: 401,
+        data: { title: 'unauthorized' },
+      },
     });
 
     await expect(requestBangumi('/v0/me', {
       token: 'bad-token',
-    })).rejects.toBeInstanceOf(BangumiApiError);
+    })).rejects.toThrow(BangumiApiError);
   });
 
   it('应将 401 错误映射为中文提示', () => {

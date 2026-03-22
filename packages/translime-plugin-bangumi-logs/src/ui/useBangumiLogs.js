@@ -14,8 +14,8 @@ import {
   EPISODE_WATCHED_TYPE,
   SUBJECT_COLLECTION_TYPES,
   SUBJECT_FILTER_OPTIONS,
-} from '../shared/constants.js';
-import { previewApi } from './previewData.js';
+} from '../shared/constants';
+import previewApi from './previewData';
 
 const createDefaultState = () => ({
   ready: false,
@@ -35,7 +35,7 @@ const createDefaultState = () => ({
   searchResults: [],
 });
 
-export const useBangumiLogs = () => {
+const useBangumiLogs = () => {
   const ipc = useIpc();
   const previewMode = isPreviewMode();
   const invoke = (channel, payload) => {
@@ -152,7 +152,15 @@ export const useBangumiLogs = () => {
       const result = await invoke('get-subject-episodes@translime-plugin-bangumi-logs', {
         subjectId,
       });
-      state.episodeMap[subjectId] = result.items || [];
+      const episodes = result.items || [];
+      state.episodeMap[subjectId] = episodes;
+
+      // Update airedEpisodes count for the collection card
+      const airedCount = episodes.filter((ep) => ep.isMainStory && ep.isAired !== false).length;
+      const collection = state.collections.find((c) => Number(c.subjectId) === Number(subjectId));
+      if (collection) {
+        collection.airedEpisodes = airedCount;
+      }
     } finally {
       detailLoading.value = false;
     }
@@ -292,3 +300,5 @@ export const useBangumiLogs = () => {
     openTokenPage,
   };
 };
+
+export default useBangumiLogs;

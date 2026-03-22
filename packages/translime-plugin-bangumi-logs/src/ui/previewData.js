@@ -1,4 +1,4 @@
-import { SUBJECT_COLLECTION_TYPES } from '../shared/constants.js';
+import { SUBJECT_COLLECTION_TYPES } from '../shared/constants';
 
 const collectionState = {
   viewer: {
@@ -20,6 +20,7 @@ const collectionState = {
       summary: '和寿命漫长的精灵一起慢慢向前的旅程。',
       eps: 28,
       watchedEpisodes: 14,
+      airedEpisodes: 14,
       progressText: '14/28',
       score: 8.8,
       rank: 12,
@@ -37,6 +38,7 @@ const collectionState = {
       summary: '边冒险边做饭的地下城日常。',
       eps: 24,
       watchedEpisodes: 9,
+      airedEpisodes: 6,
       progressText: '9/24',
       score: 8.4,
       rank: 45,
@@ -54,6 +56,7 @@ const collectionState = {
       summary: '放学后的音乐部时光。',
       eps: 14,
       watchedEpisodes: 14,
+      airedEpisodes: 14,
       progressText: '14/14',
       score: 8.2,
       rank: 60,
@@ -73,12 +76,13 @@ const collectionState = {
       sort: index + 1,
       ep: index + 1,
       type: 0,
-      airdate: `2023-09-${String(29 + index).padStart(2, '0')}`,
+      airdate: index < 14 ? `2023-09-${String(29 + index).padStart(2, '0')}` : `2026-04-${String(index - 13).padStart(2, '0')}`,
       duration: '24:00',
       durationSeconds: 1440,
       watched: index + 1 <= 14,
       collectionType: index + 1 <= 14 ? 2 : 0,
       isMainStory: true,
+      isAired: index < 14,
     })),
     102: Array.from({ length: 12 }, (_, index) => ({
       id: 10200 + index + 1,
@@ -89,12 +93,15 @@ const collectionState = {
       sort: index + 25,
       ep: index + 1,
       type: 0,
-      airdate: index < 6 ? `2024-04-${String(4 + index * 7).padStart(2, '0')}` : '',
+      airdate: index < 6
+        ? `2024-04-${String(4 + index * 7).padStart(2, '0')}`
+        : `2026-05-${String(2 + (index - 6) * 7).padStart(2, '0')}`,
       duration: index % 3 === 0 ? '23:40' : '',
       durationSeconds: index % 3 === 0 ? 1420 : 0,
       watched: index + 1 <= 9,
       collectionType: index + 1 <= 9 ? 2 : 0,
       isMainStory: true,
+      isAired: index < 6,
     })),
     103: Array.from({ length: 14 }, (_, index) => ({
       id: 10300 + index + 1,
@@ -111,6 +118,7 @@ const collectionState = {
       watched: true,
       collectionType: 2,
       isMainStory: true,
+      isAired: true,
     })),
   },
   searchResults: [
@@ -160,7 +168,7 @@ const syncCollectionProgress = (subjectId) => {
   collection.progressText = collection.eps > 0 ? `${watchedEpisodes}/${collection.eps}` : String(watchedEpisodes);
 };
 
-export const previewApi = {
+const previewApi = {
   async authStatus() {
     return {
       authenticated: Boolean(collectionState.token),
@@ -248,6 +256,7 @@ export const previewApi = {
         watched: false,
         collectionType: 0,
         isMainStory: true,
+        isAired: null,
       }));
     }
 
@@ -268,7 +277,7 @@ export const previewApi = {
   },
   async updateEpisodeState({ episodeId }) {
     Object.values(collectionState.episodes).forEach((items) => {
-      const target = items.find((item) => item.id === Number(episodeId));
+      const target = items.find((itm) => itm.id === Number(episodeId));
       if (target) {
         target.watched = true;
         target.collectionType = 2;
@@ -289,15 +298,18 @@ export const previewApi = {
       throw new Error('没有可更新的分集进度。');
     }
 
-    items.forEach((item) => {
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
       if (item.sort <= target.sort) {
         item.watched = true;
         item.collectionType = 2;
       }
-    });
+    }
 
     syncCollectionProgress(Number(subjectId));
 
     return { success: true };
   },
 };
+
+export default previewApi;

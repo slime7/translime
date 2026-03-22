@@ -1,1 +1,5 @@
-export { default } from './src/main/index.js';
+export {
+  pluginDidLoad,
+  pluginWillUnload,
+  ipcHandlers,
+} from './src/main/index';

@@ -4,7 +4,7 @@ import {
   MAIN_STORY_EPISODE_TYPE,
   SUBJECT_COLLECTION_LABELS,
   SUBJECT_COLLECTION_TONES,
-} from './constants.js';
+} from './constants';
 
 export const isAnimeSubject = (subject) => Number(subject?.type) === ANIME_SUBJECT_TYPE;
 
@@ -73,10 +73,21 @@ export const mapCollectionToListItem = (collection = {}) => {
   };
 };
 
+export const isEpisodeAired = (airdate) => {
+  if (!airdate) return null;
+  const date = new Date(airdate);
+  if (Number.isNaN(date.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date <= today;
+};
+
 export const mapEpisodeCollection = (item = {}) => {
   const episode = item.episode || {};
   const sort = Number(episode.sort || 0);
   const ep = episode.ep != null ? Number(episode.ep) : null;
+  const airdate = episode.airdate || '';
+  const aired = isEpisodeAired(airdate);
 
   return {
     id: episode.id,
@@ -87,12 +98,13 @@ export const mapEpisodeCollection = (item = {}) => {
     sort,
     ep,
     type: Number(episode.type || 0),
-    airdate: episode.airdate || '',
+    airdate,
     duration: episode.duration || '',
     durationSeconds: Number(episode.duration_seconds || 0),
     watched: Number(item.type) === EPISODE_WATCHED_TYPE,
     collectionType: Number(item.type || 0),
     isMainStory: Number(episode.type || 0) === MAIN_STORY_EPISODE_TYPE,
+    isAired: aired,
   };
 };
 
@@ -109,14 +121,15 @@ export const buildEpisodeStatePayload = (episodeId, type = EPISODE_WATCHED_TYPE)
   type: Number(type),
 });
 
-export const buildMarkProgressPayload = (episodeCollections = [], targetEpisodeId) => {
-  const targetEpisode = episodeCollections.find((item) => Number(item.id) === Number(targetEpisodeId));
+export const buildMarkProgressPayload = (episodeCollections, targetEpisodeId) => {
+  const collections = episodeCollections || [];
+  const targetEpisode = collections.find((item) => Number(item.id) === Number(targetEpisodeId));
 
   if (!targetEpisode) {
     return [];
   }
 
-  return episodeCollections
+  return collections
     .filter((item) => item.isMainStory && item.sort <= targetEpisode.sort)
     .map((item) => item.id);
 };
