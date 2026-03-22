@@ -1,7 +1,5 @@
 import { defineConfig } from 'vite';
 import { builtinModules } from 'node:module';
-import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
 
 /**
  * @type {import('vite').UserConfig}
@@ -24,14 +22,7 @@ export default defineConfig(({ mode }) => ({
       formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
-    commonjsOptions: {
-      include: [],
-    },
     rollupOptions: {
-      plugins: [
-        resolve(),
-        commonjs(),
-      ],
       external: [
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
