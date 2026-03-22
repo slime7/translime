@@ -17,6 +17,10 @@ const TEXT_FILE_EXTENSIONS = new Set([
   '.yaml',
   '.txt',
 ]);
+const SKIPPED_ENTRIES = new Set([
+  'node_modules',
+  'dist',
+]);
 
 function parseArgs(argv) {
   const options = {
@@ -89,6 +93,7 @@ function copyDirectory(sourceDir, targetDir, force) {
   fs.cpSync(sourceDir, targetDir, {
     recursive: true,
     force: false,
+    filter: (source) => !SKIPPED_ENTRIES.has(path.basename(source)),
   });
 }
 

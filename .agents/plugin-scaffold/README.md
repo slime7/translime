@@ -5,7 +5,7 @@ Shared plugin scaffolding resource for repository-local agents.
 Use the bundled script from the repository root:
 
 ```powershell
-node .agent/plugin-scaffold/create-plugin.mjs --name translime-plugin-your-name
+node .agents/plugin-scaffold/create-plugin.mjs --name translime-plugin-your-name
 ```
 
 Optional flags:
