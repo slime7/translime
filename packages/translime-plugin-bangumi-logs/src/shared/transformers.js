@@ -10,6 +10,10 @@ export const isAnimeSubject = (subject) => Number(subject?.type) === ANIME_SUBJE
 
 export const normalizeSubjectTitle = (subject) => subject?.name_cn || subject?.name || '未命名条目';
 
+export const normalizeSummary = (value = '') => String(value || '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 export const getSubjectCover = (subject) => (
   subject?.images?.large
   || subject?.images?.common
@@ -34,7 +38,7 @@ export const filterAnimeSearchResults = (items = []) => items
     rank: subject.rank || 0,
     eps: Number(subject.eps || 0),
     airDate: subject.date || '',
-    summary: subject.short_summary || subject.summary || '',
+    summary: normalizeSummary(subject.short_summary || subject.summary || ''),
   }));
 
 export const mapViewer = (viewer = {}) => ({
@@ -56,7 +60,7 @@ export const mapCollectionToListItem = (collection = {}) => {
     title: normalizeSubjectTitle(subject),
     originalTitle: subject.name || '',
     cover: getSubjectCover(subject),
-    summary: subject.short_summary || '',
+    summary: normalizeSummary(subject.short_summary || subject.summary || ''),
     eps: totalEpisodes,
     watchedEpisodes,
     progressText: totalEpisodes > 0 ? `${watchedEpisodes}/${totalEpisodes}` : `${watchedEpisodes}`,

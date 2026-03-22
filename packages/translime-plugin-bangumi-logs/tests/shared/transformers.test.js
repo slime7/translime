@@ -3,13 +3,18 @@ import {
   filterAnimeSearchResults,
   mapCollectionToListItem,
   mapEpisodeCollections,
+  normalizeSummary,
 } from '../../src/shared/transformers.js';
 
 describe('transformers', () => {
   it('搜索结果应只保留动画条目', () => {
     const result = filterAnimeSearchResults([
-      { id: 1, type: 2, name: '动画 A', name_cn: '动画 A', images: {} },
-      { id: 2, type: 4, name: '游戏 B', name_cn: '游戏 B', images: {} },
+      {
+        id: 1, type: 2, name: '动画 A', name_cn: '动画 A', images: {},
+      },
+      {
+        id: 2, type: 4, name: '游戏 B', name_cn: '游戏 B', images: {},
+      },
     ]);
 
     expect(result).toHaveLength(1);
@@ -26,7 +31,7 @@ describe('transformers', () => {
         name: 'Original',
         name_cn: '中文标题',
         eps: 12,
-        short_summary: '简介',
+        short_summary: ' 简介 \n\n 第二行 ',
         score: 7.8,
         rank: 123,
         images: {
@@ -36,6 +41,7 @@ describe('transformers', () => {
     });
 
     expect(item.title).toBe('中文标题');
+    expect(item.summary).toBe('简介 第二行');
     expect(item.progressText).toBe('5/12');
     expect(item.collectionTypeLabel).toBe('在看');
   });
@@ -44,11 +50,15 @@ describe('transformers', () => {
     const items = mapEpisodeCollections([
       {
         type: 1,
-        episode: { id: 2, sort: 2, type: 0, name: 'ep2', name_cn: '第2话' },
+        episode: {
+          id: 2, sort: 2, type: 0, name: 'ep2', name_cn: '第 2 话',
+        },
       },
       {
         type: 2,
-        episode: { id: 1, sort: 1, type: 0, name: 'ep1', name_cn: '第1话' },
+        episode: {
+          id: 1, sort: 1, type: 0, name: 'ep1', name_cn: '第 1 话',
+        },
       },
     ]);
 
@@ -66,5 +76,9 @@ describe('transformers', () => {
     ], 2);
 
     expect(ids).toEqual([1, 2]);
+  });
+
+  it('应清理简介中的多余空白', () => {
+    expect(normalizeSummary(' \n 简介第一句 \r\n   简介第二句\t')).toBe('简介第一句 简介第二句');
   });
 });

@@ -28,6 +28,7 @@ const createDefaultState = () => ({
   filterType: SUBJECT_COLLECTION_TYPES.DOING,
   collections: [],
   selectedSubjectId: 0,
+  detailDialogOpen: false,
   episodeMap: {},
   searchKeyword: '',
   searchResults: [],
@@ -102,10 +103,10 @@ export const useBangumiLogs = () => {
       state.viewer = result.viewer;
       state.collections = result.collections || [];
       state.filterType = Number(result.filterType || filterType);
-      state.selectedSubjectId = state.collections[0]?.subjectId || 0;
 
-      if (state.selectedSubjectId) {
-        await loadEpisodes(state.selectedSubjectId);
+      if (!state.collections.some((item) => Number(item.subjectId) === Number(state.selectedSubjectId))) {
+        state.selectedSubjectId = 0;
+        state.detailDialogOpen = false;
       }
     } catch (error) {
       setError(error.message);
@@ -156,15 +157,23 @@ export const useBangumiLogs = () => {
     }
   };
 
+  const openCollectionDetail = async (subjectId) => {
+    state.selectedSubjectId = subjectId;
+    state.detailDialogOpen = true;
+    await loadEpisodes(subjectId);
+  };
+
+  const closeCollectionDetail = () => {
+    state.detailDialogOpen = false;
+  };
+
   const refreshSelectedSubject = async () => {
     if (!state.selectedSubjectId) {
       return;
     }
 
-    await Promise.all([
-      loadDashboard(state.filterType),
-      loadEpisodes(state.selectedSubjectId),
-    ]);
+    await loadDashboard(state.filterType);
+    await loadEpisodes(state.selectedSubjectId);
   };
 
   const searchSubjects = async () => {
@@ -254,6 +263,8 @@ export const useBangumiLogs = () => {
     logout,
     loadDashboard,
     loadEpisodes,
+    openCollectionDetail,
+    closeCollectionDetail,
     searchSubjects,
     collectSubject,
     updateCollectionType,
