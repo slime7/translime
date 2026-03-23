@@ -8,6 +8,7 @@ import {
   isPreviewMode as checkPreviewMode,
   initPreviewMock,
 } from './preview-mock';
+import electronNetAdapter from './electronNetAdapter';
 
 // ----------------------------------------------------------------------
 // Initialization (Side Effect)
@@ -229,3 +230,4 @@ export function useLogger() {
   return console;
 }
 
+export { electronNetAdapter };
