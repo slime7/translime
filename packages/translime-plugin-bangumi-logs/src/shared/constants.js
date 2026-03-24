@@ -1,7 +1,7 @@
 export const PLUGIN_ID = 'translime-plugin-bangumi-logs';
 export const BANGUMI_API_BASE_URL = 'https://api.bgm.tv';
 export const BANGUMI_ACCESS_TOKEN_URL = 'https://next.bgm.tv/demo/access-token/create';
-export const BANGUMI_USER_AGENT = 'Translime Bangumi Logs/3.0.0 (https://github.com/slime7/translime)';
+export const BANGUMI_USER_AGENT = 'Translime Bangumi Logs/1.0.0 (https://github.com/slime7/translime)';
 export const ANIME_SUBJECT_TYPE = 2;
 export const MAIN_STORY_EPISODE_TYPE = 0;
 export const EPISODE_WATCHED_TYPE = 2;
