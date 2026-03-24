@@ -1,7 +1,10 @@
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default {
-  root: __dirname,
+  root: dirname,
   test: {
     globals: true,
     environment: 'node',
@@ -9,7 +12,7 @@ export default {
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': resolve(dirname, 'src'),
     },
   },
 };

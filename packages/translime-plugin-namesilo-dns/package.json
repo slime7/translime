@@ -18,9 +18,9 @@
     "src"
   ],
   "scripts": {
-    "dev": "vite -c ui.vite.config.js",
+    "dev": "vite -c ui.vite.config.mjs",
     "build:plugin": "vite build",
-    "build:ui": "vite build -c ui.vite.config.js",
+    "build:ui": "vite build -c ui.vite.config.mjs",
     "build": "pnpm run build:plugin && pnpm run build:ui"
   },
   "devDependencies": {
@@ -38,7 +38,7 @@
     "semver-compare": "^1.0.0",
     "tailwindcss": "^3.0.23",
     "translime-sdk": "workspace:*",
-    "vite": "^7.3.1"
+    "vite": "^8.0.0"
   },
   "plugin": {
     "title": "namesilo dns",

@@ -4,7 +4,7 @@ import * as tunnel from 'tunnel';
 import verCmp from 'semver-compare';
 import axios from 'axios';
 import axiosHttpAdapter from 'axios/unsafe/adapters/http';
-import pkg from '../package.json';
+import pkg from '../package.json' with { type: 'json' };
 
 const id = pkg.name;
 const { mainStore, appManager } = global;

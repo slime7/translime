@@ -95,7 +95,7 @@ export function translimeSdk(options = {}) {
           __TRANSLIME_PREVIEW__: isPreviewMode, // 注入全局变量供代码判断环境
         },
         build: {
-          rollupOptions: {
+          rolldownOptions: {
             external: ['electron'], // 永远排除 electron
             output: {
               globals: {
@@ -115,7 +115,7 @@ export function translimeSdk(options = {}) {
           // 切换为 SPA 模式 (非库模式)
           build: {
             lib: undefined,
-            rollupOptions: {
+            rolldownOptions: {
               external: [], // Preview 模式下需要打包所有依赖
             },
           },
@@ -262,4 +262,3 @@ startPreview(PluginComponent);
 }
 
 export default translimeSdk;
-

@@ -220,7 +220,7 @@ pnpm add translime-sdk
 
 ### 使用 Vite 插件
 
-在插件的 `vite.config.js` 中使用内置插件，可以自动处理 `electron` 等依赖的外部化：
+在插件的 `vite.config.mjs` 中使用内置插件，可以自动处理 `electron` 等依赖的外部化：
 
 ```javascript
 import { defineConfig } from 'vite';

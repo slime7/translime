@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   mode: 'production',
@@ -16,10 +19,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@pkg': resolve(__dirname, 'src'),
-      '@': resolve(__dirname, 'src/renderer'),
-      '@main': resolve(__dirname, 'src/main'),
-      '@share': resolve(__dirname, 'src/share'),
+      '@pkg': resolve(dirname, 'src'),
+      '@': resolve(dirname, 'src/renderer'),
+      '@main': resolve(dirname, 'src/main'),
+      '@share': resolve(dirname, 'src/share'),
     },
   },
   define: {

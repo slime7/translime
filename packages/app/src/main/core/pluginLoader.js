@@ -19,7 +19,9 @@ import logger from '../utils/logger';
 import readPackageManifest from '../utils/readPackageManifest';
 import pluginInterop from './pluginInterop';
 
-const requireFresh = createRequire(import.meta.url);
+const requireFresh = typeof __filename === 'string'
+  ? createRequire(__filename)
+  : createRequire(import.meta.url);
 
 const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');

@@ -20,7 +20,7 @@
     "build:plugin": "vite build",
     "build:ui": "vite build -c ui.vite.config.mjs",
     "build": "pnpm run build:plugin && pnpm run build:ui",
-    "test": "pnpm exec vitest run -c vitest.config.js"
+    "test": "pnpm exec vitest run -c vitest.config.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
@@ -30,7 +30,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-vue": "^10.0.0",
     "translime-sdk": "workspace:*",
-    "vite": "^7.3.1",
+    "vite": "^8.0.0",
     "vite-plugin-css-injected-by-js": "^3.4.0",
     "vite-plugin-vuetify": "^2.1.1",
     "vitest": "^4.0.17",

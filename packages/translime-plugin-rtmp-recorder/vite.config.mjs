@@ -1,14 +1,18 @@
+import { defineConfig } from 'vite';
 import { builtinModules } from 'node:module';
 
 /**
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-const config = ({ mode }) => ({
+export default defineConfig(({ mode }) => ({
   envDir: process.cwd(),
+  define: {
+    'process.env.FLUENTFFMPEG_COV': false,
+  },
   build: {
     minify: false,
-    sourcemap: mode === 'development' ? 'inline' : false,
+    sourcemap: mode === 'preview' ? 'inline' : false,
     target: 'node20',
     outDir: './dist',
     emptyOutDir: true,
@@ -18,22 +22,12 @@ const config = ({ mode }) => ({
       formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
-        'electron',
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
+        'fluent-ffmpeg',
       ],
-      output: {
-        exports: 'named',
-        globals: builtinModules.reduce((acc, m) => {
-          acc[m] = m;
-          acc[`node:${m}`] = m;
-          return acc;
-        }, {}),
-      },
     },
   },
-});
-
-export default config;
+}));

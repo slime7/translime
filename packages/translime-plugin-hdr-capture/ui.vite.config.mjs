@@ -74,7 +74,7 @@ export default defineConfig(({ mode }) => {
         fileName: (format) => `ui.${format}.js`,
         cssFileName: 'ui',
       },
-      rollupOptions: {
+      rolldownOptions: {
         external: ['vue'],
       },
       emptyOutDir: false,

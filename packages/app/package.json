@@ -12,7 +12,7 @@
     "node": ">=v18.20",
     "npm": ">=7.7"
   },
-  "main": "dist/main/index.js",
+  "main": "dist/main/index.cjs",
   "type": "module",
   "scripts": {
     "dev": "node scripts/watch.js",
@@ -69,7 +69,7 @@
     "stylelint-config-html": "^1.1.0",
     "stylelint-scss": "^6.14.0",
     "terser": "^5.16.3",
-    "vite": "^7.3.1",
+    "vite": "^8.0.0",
     "vite-plugin-static-copy": "^3.1.5",
     "vite-plugin-vuetify": "^2.1.1",
     "vitest": "^4.0.17",

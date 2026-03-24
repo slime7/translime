@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => {
         fileName: (format) => `ui.${format}.js`,
         cssFileName: 'ui',
       },
-      rollupOptions: {
+      rolldownOptions: {
         external: ['vue'], // 打包排除 vue 依赖并且主项目有 `importmap`，不需要设置全局变量
       },
       emptyOutDir: false,

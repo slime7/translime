@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
           formats: ['cjs'],
           fileName: () => 'overlay-preload.cjs.js',
         },
-        rollupOptions: {
+        rolldownOptions: {
           external: ['electron'],
         },
         minify: false,
@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: path.resolve(dirname, 'dist'),
       emptyOutDir: false,
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           overlay: path.resolve(dirname, 'src/ui/overlay/overlay.html'),
         },
@@ -78,7 +78,7 @@ export default defineConfig(({ mode }) => {
           assetFileNames: '[name].[ext]',
         },
       },
-      minify: 'esbuild',
+      minify: true,
       target: 'esnext',
     },
     resolve: {

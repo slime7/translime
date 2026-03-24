@@ -18,7 +18,7 @@ const config = ({ mode }) => ({
       formats: ['cjs'],
       fileName: (format) => `main.${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         'electron',
         ...builtinModules,

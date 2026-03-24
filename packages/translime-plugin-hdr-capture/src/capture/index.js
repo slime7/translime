@@ -2,7 +2,11 @@ import { createRequire } from 'node:module';
 import { useLogger } from 'translime-sdk';
 import dayjs from 'dayjs';
 
-const localRequire = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
+const localRequire = typeof require !== 'undefined'
+  ? require
+  : typeof __filename === 'string'
+    ? createRequire(__filename)
+    : createRequire(import.meta.url);
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Capture' }) : baseLogger;
@@ -889,4 +893,3 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
   }
   return null;
 };
-

@@ -10,7 +10,7 @@ pnpm add translime-sdk
 
 ## Vite 集成
 
-在插件的 `vite.config.js` 中使用 `translimeSdk()`，可以自动处理 `electron` 等依赖的外部化，并支持 preview 模式。
+在插件的 `vite.config.mjs` 中使用 `translimeSdk()`，可以自动处理 `electron` 等依赖的外部化，并支持 preview 模式。
 
 ```javascript
 import { defineConfig } from 'vite';

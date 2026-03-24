@@ -7,21 +7,21 @@ import { builtinModules } from 'node:module';
 const config = ({ mode }) => ({
   envDir: process.cwd(),
   build: {
-    minify: true,
+    minify: false,
     sourcemap: mode === 'development' ? 'inline' : false,
     target: 'node20',
     outDir: './dist',
     emptyOutDir: true,
     lib: {
-      entry: 'src/index.js',
+      entry: 'index.js',
       name: 'plugin',
       formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         ...builtinModules,
-        'http',
+        ...builtinModules.map((m) => `node:${m}`),
       ],
     },
   },

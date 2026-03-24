@@ -451,7 +451,7 @@ onMounted(async () => {
 .log-viewer__toolbar {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: .75rem;
 }
 
 .log-viewer__toolbar-field {
@@ -461,25 +461,25 @@ onMounted(async () => {
 .log-viewer__toolbar-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: .5rem;
 }
 
 .log-viewer__status {
-  margin-top: 0.75rem;
-  font-size: 0.875rem;
+  margin-top: .75rem;
+  font-size: .875rem;
 }
 
 .log-viewer__records {
   margin-top: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: .75rem;
 }
 
 .log-viewer__record {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: .75rem;
 }
 
 .log-viewer__record-main {
@@ -491,27 +491,27 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: .5rem;
 }
 
 .log-viewer__record-event {
-  margin-top: 0.75rem;
+  margin-top: .75rem;
 }
 
 .log-viewer__record-message {
-  margin-top: 0.25rem;
-  word-break: break-word;
+  margin-top: .25rem;
+  word-break: break-all;
   font-size: 1rem;
 }
 
 .log-viewer__stack {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
+  margin-top: .75rem;
+  padding: .75rem;
+  border-radius: .75rem;
   background: rgb(0 0 0 / 5%);
   white-space: pre-wrap;
   word-break: break-all;
-  font-size: 0.875rem;
+  font-size: .875rem;
 }
 
 .log-viewer__record-actions {
@@ -522,7 +522,7 @@ onMounted(async () => {
   margin-top: 1rem;
 }
 
-@media (min-width: 64rem) {
+@media (width >= 64rem) {
   .log-viewer__toolbar {
     flex-direction: row;
     align-items: center;

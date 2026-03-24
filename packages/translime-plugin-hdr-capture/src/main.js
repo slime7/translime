@@ -11,8 +11,9 @@ import { useLogger, usePluginConfig } from 'translime-sdk';
 // eslint-disable-next-line import/extensions
 import * as capture from './capture/index.js';
 
-const filename = fileURLToPath(import.meta.url);
-const dirname = path.dirname(filename);
+const dirname = typeof __dirname === 'string'
+  ? __dirname
+  : path.dirname(fileURLToPath(import.meta.url));
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();

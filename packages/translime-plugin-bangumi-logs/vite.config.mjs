@@ -18,8 +18,9 @@ const config = ({ mode }) => ({
       formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
+        'electron',
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
       ],

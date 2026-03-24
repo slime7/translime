@@ -1,6 +1,4 @@
 import { builtinModules } from 'node:module';
-import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
 
 /**
  * @type {import('vite').UserConfig}
@@ -11,26 +9,29 @@ const config = ({ mode }) => ({
   build: {
     minify: false,
     sourcemap: mode === 'development' ? 'inline' : false,
-    target: 'node16',
+    target: 'node20',
     outDir: './dist',
     emptyOutDir: true,
     lib: {
       entry: 'src/index.js',
       name: 'plugin',
-      formats: ['es', 'umd'],
+      formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
-    rollupOptions: {
-      plugins: [
-        resolve(),
-        commonjs(),
-      ],
+    rolldownOptions: {
       external: [
+        'electron',
         ...builtinModules,
-        'axios',
-        'semver-compare',
-        'tunnel',
+        ...builtinModules.map((m) => `node:${m}`),
       ],
+      output: {
+        exports: 'named',
+        globals: builtinModules.reduce((acc, m) => {
+          acc[m] = m;
+          acc[`node:${m}`] = m;
+          return acc;
+        }, {}),
+      },
     },
   },
 });

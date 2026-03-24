@@ -6,7 +6,7 @@ import axios from 'axios';
 // eslint-disable-next-line import/no-unresolved, import/extensions
 import axiosHttpAdapter from 'axios/unsafe/adapters/http.js';
 import { useLogger } from 'translime-sdk';
-import pkg from '../package.json';
+import pkg from '../package.json' with { type: 'json' };
 
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: pkg.name, context: 'Main' }) : baseLogger;

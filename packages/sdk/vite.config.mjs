@@ -26,7 +26,7 @@ export default defineConfig({
         return `${entryName}.${ext}`;
       },
     },
-    rollupOptions: {
+    rolldownOptions: {
       // Externalize deps to reduce bundle size and avoid conflicts
       external: [
         'electron',

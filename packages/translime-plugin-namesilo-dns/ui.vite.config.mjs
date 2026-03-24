@@ -1,5 +1,8 @@
 import { resolve } from 'node:path';
 import preact from '@preact/preset-vite';
+import { fileURLToPath } from 'node:url';
+
+const dirname = fileURLToPath(new URL('.', import.meta.url));
 
 /**
  * @type {import('vite').UserConfig}
@@ -15,9 +18,9 @@ const config = {
     target: 'node16',
     outDir: './dist',
     cssCodeSplit: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
-        ui: resolve(__dirname, 'ui.html'),
+        ui: resolve(dirname, 'ui.html'),
       },
     },
     emptyOutDir: false,

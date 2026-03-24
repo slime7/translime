@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
-import pkg from './package.json' with { type: 'json' };
 
 /**
  * @type {import('vite').UserConfig}
@@ -13,7 +12,7 @@ export default defineConfig(({ mode }) => ({
     vue(),
     tailwindcss(),
     cssInjectedByJsPlugin({
-      styleId: pkg.name,
+      styleId: 'translime-plugin-static-server',
       injectCodeFunction: function injectCodeCustomRunTimeFunction(cssCode, options) {
         try {
           if (typeof document !== 'undefined') {
@@ -41,11 +40,11 @@ export default defineConfig(({ mode }) => ({
     outDir: './dist',
     lib: {
       entry: 'src/ui.vue',
-      name: pkg.name, // 需要指定一个唯一 id
+      name: 'translime-plugin-static-server', // 需要指定一个唯一 id
       formats: ['esm'],
       fileName: (format) => `ui.${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         'vue',
       ],

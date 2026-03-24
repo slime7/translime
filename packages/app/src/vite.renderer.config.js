@@ -81,10 +81,9 @@ export default defineConfig(({ mode }) => {
       outDir: join(RENDERER_ROOT, '../../dist/renderer'),
       emptyOutDir: true,
       minify: false,
-      commonjsOptions: {},
       sourcemap: isDev ? 'inline' : false,
       target: 'chrome134',
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           main: join(RENDERER_ROOT, 'index.html'),
         },

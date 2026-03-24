@@ -20,8 +20,9 @@ import { listLogDates, readLogRecords } from '../utils/logViewer';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
 
-const filename = fileURLToPath(import.meta.url);
-const dir = dirname(filename);
+const dir = typeof __dirname === 'string'
+  ? __dirname
+  : dirname(fileURLToPath(import.meta.url));
 
 const ipcHandler = {
   ...netHandler,

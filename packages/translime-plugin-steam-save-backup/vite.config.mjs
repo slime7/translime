@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => ({
       formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         'electron',
         ...builtinModules,

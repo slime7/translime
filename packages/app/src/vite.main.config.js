@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { builtinModules } from 'node:module';
 import { defineConfig } from 'vite';
-import pkg from '../package.json';
+import pkg from '../package.json' with { type: 'json' };
 
 const { external = [] } = pkg;
 
@@ -44,9 +44,10 @@ export default defineConfig(({ mode }) => {
       },
       lib: {
         entry: 'index.js',
-        formats: ['es'],
+        formats: ['cjs'],
+        fileName: () => '[name].cjs',
       },
-      rollupOptions: {
+      rolldownOptions: {
         external: [
           'electron',
           'electron-devtools-installer',
@@ -55,7 +56,7 @@ export default defineConfig(({ mode }) => {
           ...external,
         ],
         output: {
-          entryFileNames: '[name].js',
+          entryFileNames: '[name].cjs',
         },
       },
       emptyOutDir: true,

@@ -7,22 +7,21 @@ import { builtinModules } from 'node:module';
 const config = ({ mode }) => ({
   envDir: process.cwd(),
   build: {
-    minify: false,
+    minify: true,
     sourcemap: mode === 'development' ? 'inline' : false,
     target: 'node20',
     outDir: './dist',
     emptyOutDir: true,
     lib: {
-      entry: 'index.js',
+      entry: 'src/index.js',
       name: 'plugin',
       formats: ['cjs'],
       fileName: (format) => `index.${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
-        'electron',
         ...builtinModules,
-        ...builtinModules.map((m) => `node:${m}`),
+        'http',
       ],
     },
   },
