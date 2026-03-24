@@ -38,6 +38,10 @@ export const THEME_UPDATED = 'theme-updated';
 export const GET_NATIVE_THEME = 'get-native-theme';
 export const SET_NATIVE_THEME = 'set-native-theme';
 export const GET_LAUNCH_ARGV = 'get-launch-argv';
+export const GET_LOG_DATES = 'get-log-dates';
+export const GET_LOG_RECORDS = 'get-log-records';
+export const COPY_TEXT = 'copy-text';
+export const READ_CLIPBOARD_TEXT = 'read-clipboard-text';
 export const DEEP_LINK_OPEN = 'deep-link-open';
 export const LOGGER = 'logger';
 export const IPC_TOAST = 'ipc-toast';
@@ -97,6 +101,10 @@ export default {
   SET_NATIVE_THEME,
   SHOW_DEV_PLUGIN,
   GET_LAUNCH_ARGV,
+  GET_LOG_DATES,
+  GET_LOG_RECORDS,
+  COPY_TEXT,
+  READ_CLIPBOARD_TEXT,
   DEEP_LINK_OPEN,
   LOGGER,
   IPC_TOAST,
@@ -116,4 +124,3 @@ export default {
   SYSTEM_COLOR_CHANGED: 'system-color-changed',
   THEME_COLOR_UPDATED: 'theme-color-updated',
 };
-

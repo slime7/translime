@@ -16,6 +16,7 @@ import createWindow from '../utils/createWindow';
 import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
+import { listLogDates, readLogRecords } from '../utils/logViewer';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
 
@@ -381,6 +382,19 @@ const ipcHandler = {
   },
   [ipcType.GET_LAUNCH_ARGV]() {
     return process.argv;
+  },
+  async [ipcType.GET_LOG_DATES]() {
+    return listLogDates(mainStore.APPDATA_PATH);
+  },
+  async [ipcType.GET_LOG_RECORDS](date) {
+    return readLogRecords(mainStore.APPDATA_PATH, date);
+  },
+  [ipcType.COPY_TEXT](text = '') {
+    clipboard.writeText(String(text));
+    return true;
+  },
+  [ipcType.READ_CLIPBOARD_TEXT]() {
+    return clipboard.readText();
   },
   [ipcType.LOGGER](level, payload) {
     if (payload && typeof payload === 'object' && !Array.isArray(payload) && payload.args) {

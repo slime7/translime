@@ -1,5 +1,4 @@
 import {
-  clipboard,
   contextBridge,
   ipcRenderer,
 } from 'electron';
@@ -100,7 +99,6 @@ const api = {
       detach,
     };
   },
-  clipboard,
   dialog: {
     showOpenDialog: (...args) => api.useIpc().invoke(ipcType.DIALOG_SHOW_OPEN_DIALOG, ...args),
     showSaveDialog: (...args) => api.useIpc().invoke(ipcType.DIALOG_SHOW_SAVE_DIALOG, ...args),
@@ -129,9 +127,9 @@ api.ipcRenderer.receive('ipc-reply', (msg) => {
  *
  * @see https://www.electronjs.org/docs/api/context-bridge
  */
+contextBridge.exposeInMainWorld(apiKey, api);
 api.useIpc().invoke(ipcType.GET_PATH, 'userData').then((result) => {
   api.APPDATA_PATH = result;
-  contextBridge.exposeInMainWorld(apiKey, api);
 });
 
 function createLoggerBase(defaultMeta = {}) {
