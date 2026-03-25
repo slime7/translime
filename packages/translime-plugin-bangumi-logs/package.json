@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Bangumi Logs plugin",
   "license": "MIT",
-  "private": true,
+  "keywords": [
+    "translime",
+    "translime-plugin"
+  ],
   "main": "./dist/index.cjs.js",
   "exports": {
     ".": {
@@ -42,7 +45,7 @@
   },
   "plugin": {
     "title": "Bangumi Logs",
-    "description": "Bangumi Logs plugin",
+    "description": "Bangumi Logs",
     "icon": "./icon.svg",
     "//windowUrl": "dist/ui/index.html",
     "ui": "dist/ui.esm.js"
