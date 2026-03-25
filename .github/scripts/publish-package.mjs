@@ -85,7 +85,7 @@ if (!manifest.version) {
 }
 
 if (manifest.scripts?.build) {
-  runPnpm(repoRoot, ['--filter', name, 'run', 'build']);
+  runPnpm(repoRoot, ['-r', '--filter', `${name}...`, 'run', 'build']);
 }
 
 const distDir = path.join(packageDir, 'dist');
