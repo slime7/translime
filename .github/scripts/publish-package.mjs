@@ -8,6 +8,23 @@ function fail(message) {
   process.exit(1);
 }
 
+function runPnpm(repoRoot, args) {
+  const result = spawnSync(
+    'pnpm',
+    args,
+    {
+      cwd: repoRoot,
+      stdio: 'inherit',
+      shell: true,
+      env: process.env,
+    },
+  );
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
 function parseArgs(argv) {
   const args = {};
 
@@ -67,17 +84,14 @@ if (!manifest.version) {
   fail(`Package "${name}" is missing version`);
 }
 
-const publishResult = spawnSync(
-  'pnpm',
-  ['--filter', name, 'publish', '--no-git-checks'],
-  {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    shell: true,
-    env: process.env,
-  },
-);
-
-if (publishResult.status !== 0) {
-  process.exit(publishResult.status ?? 1);
+if (manifest.scripts?.build) {
+  runPnpm(repoRoot, ['--filter', name, 'run', 'build']);
 }
+
+const distDir = path.join(packageDir, 'dist');
+
+if (!existsSync(distDir)) {
+  fail(`Build output not found: ${distDir}`);
+}
+
+runPnpm(repoRoot, ['--filter', name, 'publish', '--no-git-checks']);

@@ -16,8 +16,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "dev": "vite -c ui.vite.config.mjs",
