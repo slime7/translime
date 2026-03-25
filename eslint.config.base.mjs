@@ -7,7 +7,6 @@ export default [
     ignores: ['node_modules/**/*', '**/dist/**/*', 'packages/rendererx/**/*'],
   },
   ...vue.configs['flat/strongly-recommended'],
-  airbnbExtended.plugins.importX,
   airbnbExtended.plugins.stylistic,
   ...airbnbExtended.configs.base.recommended,
   {
@@ -21,6 +20,7 @@ export default [
       parserOptions: {},
     },
     plugins: {
+      ...airbnbExtended.plugins.importX.plugins,
       vue,
     },
     rules: {

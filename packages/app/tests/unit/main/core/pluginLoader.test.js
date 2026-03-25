@@ -2,7 +2,9 @@ import {
   beforeEach, describe, expect, it, vi,
 } from 'vitest';
 import EventEmitter from 'node:events';
+import nodePath from 'node:path';
 import pluginLoader from '@main/core/pluginLoader';
+import mainStore from '@main/utils/useMainStore';
 
 import pluginInterop from '@main/core/pluginInterop';
 
@@ -196,6 +198,42 @@ describe('pluginLoader', () => {
     });
   });
 
+  describe('readPlugins: dev state', () => {
+    it('开发插件未构建时应标记为 build-missing', () => {
+      mockFs.readFileSync.mockReturnValue(JSON.stringify({
+        name: 'translime-plugin-dev-test',
+        main: './dist/index.cjs.js',
+        plugin: {
+          title: 'Dev Test Plugin',
+          ui: 'dist/ui.esm.js',
+        },
+      }));
+
+      const existingPaths = new Set([
+        nodePath.join(
+          '/mock/user/data/plugins_dev/node_modules/translime-plugin-dev-test',
+          'package.json',
+        ),
+      ]);
+      mockFs.accessSync.mockImplementation((targetPath) => {
+        if (!existingPaths.has(targetPath)) {
+          throw new Error('not found');
+        }
+      });
+
+      const plugin = pluginLoader.readPluginSafe(
+        '/mock/user/data/plugins_dev/node_modules/translime-plugin-dev-test',
+        {
+          source: 'dev',
+        },
+      );
+
+      expect(plugin.packageName).toBe('translime-plugin-dev-test');
+      expect(plugin.status).toBe('build-missing');
+      expect(plugin.available).toBe(false);
+    });
+  });
+
   describe('getPlugin', () => {
     it('应该按名称返回插件', () => {
       pluginLoader.plugins = [
@@ -291,6 +329,36 @@ describe('pluginLoader', () => {
 
       pluginLoader.disablePlugin(packageName);
       expect(pluginInterop.unregister).toHaveBeenCalledWith(packageName);
+    });
+  });
+
+  describe('reloadPlugin/refreshDevPlugins', () => {
+    it('应能从已链接目录重新扫描开发插件', async () => {
+      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
+        dependencies: {},
+      }));
+      mockFs.readdirSync.mockReturnValue(['translime-plugin-dev-refresh']);
+      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
+        name: 'translime-plugin-dev-refresh',
+        plugin: {
+          title: 'Refresh Test',
+        },
+      }));
+      mockFs.accessSync.mockImplementation(() => undefined);
+
+      mainStore.config.get.mockImplementation((key, defaultValue) => {
+        if (key === 'setting.showDevPlugin') {
+          return true;
+        }
+        return defaultValue;
+      });
+
+      const plugins = pluginLoader.refreshDevPlugins();
+
+      expect(Array.isArray(plugins)).toBe(true);
+      expect(
+        plugins.some((plugin) => plugin.packageName === 'translime-plugin-dev-refresh'),
+      ).toBe(true);
     });
   });
 });

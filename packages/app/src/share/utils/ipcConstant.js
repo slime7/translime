@@ -19,6 +19,7 @@ export const INSTALL_LOCAL_PLUGIN = 'install-local-plugin';
 export const UNINSTALL_PLUGIN = 'uninstall-plugin';
 export const DISABLE_PLUGIN = 'disable-plugin';
 export const ENABLE_PLUGIN = 'enable-plugin';
+export const REFRESH_DEV_PLUGINS = 'refresh-dev-plugins';
 export const GET_PLUGIN_SETTING = 'get-plugin-setting';
 export const SET_PLUGIN_SETTING = 'set-plugin-setting';
 export const OPEN_PLUGIN_CONTEXT_MENU = 'open-plugin-context-menu';
@@ -82,6 +83,7 @@ export default {
   UNINSTALL_PLUGIN,
   DISABLE_PLUGIN,
   ENABLE_PLUGIN,
+  REFRESH_DEV_PLUGINS,
   GET_PLUGIN_SETTING,
   SET_PLUGIN_SETTING,
   OPEN_PLUGIN_CONTEXT_MENU,

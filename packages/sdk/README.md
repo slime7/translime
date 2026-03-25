@@ -141,6 +141,16 @@ const request = axios.create({
 - Preview 模式下会自动回退到 SDK 提供的 mock `window.ts.net` 实现，适合基础联调。
 - 如果请求逻辑包含敏感凭据、签名或更复杂的业务编排，仍建议放在插件主进程，再通过插件自己的 IPC 暴露给 UI。
 
+## 宿主优先的开发流程
+
+开发插件时，应把真实的 Translime 宿主作为主要运行环境。推荐顺序如下：
+
+1. 在你自己的插件仓库中开发并重新构建插件。
+2. 通过 `pnpm link` 将插件包链接到 Translime 的 `plugins_dev/node_modules` 目录。
+3. 直接在 Translime 中打开插件，验证真实的宿主布局、设置、IPC 和窗口行为。
+
+`preview:ui` 仍然可用，但只建议作为独立 UI 调试的辅助工具。对于依赖 Translime 上下文的页面，不应以 preview 结果替代宿主内验证。
+
 ## Preview 模式
 
 Preview 模式允许你在普通浏览器中预览和调试插件 UI，无需依赖 Electron 环境。
