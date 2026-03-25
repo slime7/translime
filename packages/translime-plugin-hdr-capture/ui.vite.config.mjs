@@ -1,11 +1,9 @@
-/* eslint-disable import/no-unresolved */
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import vuetify from 'vite-plugin-vuetify';
 import { getPreviewSettingsPath, translimeSdk } from 'translime-sdk/vite';
-/* eslint-enable import/no-unresolved */
 
 /**
  * @type {import('vite').UserConfig}

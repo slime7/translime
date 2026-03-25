@@ -36,8 +36,10 @@ let activateListener = null;
 
 // 加载时执行
 const pluginDidLoad = () => {
+  // eslint-disable-next-line no-console
   console.log('plugin loaded');
   const setting = pluginConfig.get('setting', {});
+  // eslint-disable-next-line no-console
   console.log('settings: ', setting);
 
   const interop = usePluginInterop();
@@ -49,6 +51,7 @@ const pluginDidLoad = () => {
     // 监听后续插件状态变化（例如禁用后重新启用）
     activateListener = (pluginId, exports) => {
       if (pluginId === 'translime-plugin-hdr-capture') {
+        // eslint-disable-next-line no-console
         console.log(`[${id}] 监听到 HDR 截图插件激活，重新注册监听器`);
         registerHdrCaptureListener(exports);
       }
@@ -59,6 +62,7 @@ const pluginDidLoad = () => {
 
 // 禁用时执行
 const pluginWillUnload = () => {
+  // eslint-disable-next-line no-console
   console.log('plugin unloaded');
 
   // 移除捕获回调监听
@@ -73,6 +77,7 @@ const pluginWillUnload = () => {
 
 // 设置保存时执行
 const pluginSettingSaved = () => {
+  // eslint-disable-next-line no-console
   console.log('plugin setting saved');
 };
 
@@ -155,6 +160,7 @@ const pluginMenu = [
     id: `${id}-custom-menu`,
     label: 'custom menu',
     click() {
+      // eslint-disable-next-line no-console
       console.log('custom menu clicked');
     },
   },
@@ -165,6 +171,7 @@ const ipcHandlers = [
   {
     type: 'test-ipc', // 调用时需加上`@${id}`，此处为 'test-ipc@translime-plugin-example'
     handler: ({ sendToClient }) => (arg1, arg2) => {
+      // eslint-disable-next-line no-console
       console.log('test-ipc', 'test ipc from plugin: ', arg1, arg2);
       sendToClient(`test-ipc-reply@${id}`, 'test ipc reply from plugin');
     },

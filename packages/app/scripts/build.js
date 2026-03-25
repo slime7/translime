@@ -4,7 +4,7 @@ import builder from 'electron-builder';
 import { build as viteBuild } from 'vite';
 import { resolve } from 'node:path';
 import fs from 'node:fs';
-// eslint-disable-next-line import/extensions
+// eslint-disable-next-line import-x/extensions
 import builderConfig from '../electron-builder.config.js';
 import pkg from '../package.json' with { type: 'json' };
 

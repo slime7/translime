@@ -1,10 +1,12 @@
 import globals from 'globals';
+import babelParser from '@babel/eslint-parser';
 import * as airbnbExtended from 'eslint-config-airbnb-extended';
 import vue from 'eslint-plugin-vue';
+import vueParser from 'vue-eslint-parser';
 
 export default [
   {
-    ignores: ['node_modules/**/*', '**/dist/**/*', 'packages/rendererx/**/*'],
+    ignores: ['node_modules/**/*', '**/dist/**/*', 'packages/rendererx/**/*', '**/*.d.ts'],
   },
   ...vue.configs['flat/strongly-recommended'],
   airbnbExtended.plugins.stylistic,
@@ -15,11 +17,23 @@ export default [
         ...globals.node,
         ...globals.browser,
       },
+      parser: babelParser,
       ecmaVersion: 'latest',
       sourceType: 'module',
-      parserOptions: {},
+      parserOptions: {
+        requireConfigFile: false,
+        babelOptions: {
+          babelrc: false,
+          configFile: false,
+          plugins: [
+            '@babel/plugin-syntax-jsx',
+            '@babel/plugin-syntax-import-attributes',
+          ],
+        },
+      },
     },
     plugins: {
+      ...airbnbExtended.plugins.stylistic.plugins,
       ...airbnbExtended.plugins.importX.plugins,
       vue,
     },
@@ -27,7 +41,8 @@ export default [
       semi: ['error', 'always'],
       'semi-spacing': ['error', { before: false, after: true }],
       quotes: ['error', 'single', { avoidEscape: true }],
-      indent: ['error', 2],
+      indent: ['error', 2, { SwitchCase: 0 }],
+      '@stylistic/indent': ['error', 2, { SwitchCase: 0 }],
       'keyword-spacing': ['error', {
         before: true,
         after: true,
@@ -58,6 +73,7 @@ export default [
         unnecessary: true,
         numbers: false,
       }],
+      '@stylistic/max-len': 'off',
       'import-x/no-commonjs': [0],
       'import-x/no-extraneous-dependencies': ['off'],
       'no-multi-spaces': ['error', { ignoreEOLComments: false }],
@@ -86,6 +102,30 @@ export default [
     files: ['**/*.mjs'],
     rules: {
       'import-x/extensions': 'off',
+    },
+  },
+  {
+    files: ['**/*.vue'],
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        parser: babelParser,
+        requireConfigFile: false,
+        babelOptions: {
+          babelrc: false,
+          configFile: false,
+          plugins: [
+            '@babel/plugin-syntax-jsx',
+            '@babel/plugin-syntax-import-attributes',
+          ],
+        },
+      },
+    },
+  },
+  {
+    files: ['**/src/preview/entry-template.js'],
+    rules: {
+      'import-x/no-unresolved': 'off',
     },
   },
 ];

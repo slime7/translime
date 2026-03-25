@@ -72,7 +72,9 @@ const startElectronProcess = (logger) => {
 
   // 处理进程退出
   electronProcess.on('exit', (code, signal) => {
-    if (!manualRestart && !signal) { process.exit(code || 0); } else {
+    if (!manualRestart && !signal) {
+      process.exit(code || 0);
+    } else {
       manualRestart = false;
     }
   });

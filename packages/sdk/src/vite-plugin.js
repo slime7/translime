@@ -3,8 +3,8 @@ import { dirname, resolve } from 'path';
 import { readFileSync } from 'fs';
 
 // 获取当前模块所在目录
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const filename = fileURLToPath(import.meta.url);
+const currentDir = dirname(filename);
 
 // ----------------------------------------------------------------------
 // Constants
@@ -23,7 +23,7 @@ const RESOLVED_VIRTUAL_PREVIEW_ENTRY = `\0${VIRTUAL_PREVIEW_ENTRY}`;
  * @returns {string} 绝对路径
  */
 export function getPreviewSettingsPath() {
-  return resolve(__dirname, 'preview/settings.scss');
+  return resolve(currentDir, 'preview/settings.scss');
 }
 
 /**
@@ -149,7 +149,7 @@ export function translimeSdk(options = {}) {
       // 拦截 index.html 请求，提供 Preview 模板
       server.middlewares.use((req, res, next) => {
         if (req.url === '/' || req.url === '/index.html') {
-          const templatePath = resolve(__dirname, '../preview-template.html');
+          const templatePath = resolve(currentDir, '../preview-template.html');
           let html;
           try {
             html = readFileSync(templatePath, 'utf-8');
@@ -206,17 +206,21 @@ startPreview(PluginComponent);
       // 扫描 JS/TS 中的组件名 (e.g. VBtn, VCard)
       const componentRegex = /\b(V[A-Z][\w$]+)\b/g;
       let match;
-      while ((match = componentRegex.exec(code)) !== null) {
+      match = componentRegex.exec(code);
+      while (match !== null) {
         matches.add(match[1]);
+        match = componentRegex.exec(code);
       }
 
       // 扫描 Vue 模板中的 kebab-case 标签 (e.g. <v-btn>)
       if (id.endsWith('.vue')) {
         const templateTagRegex = /<v-([a-z0-9-]+)\b/g;
-        while ((match = templateTagRegex.exec(code)) !== null) {
+        match = templateTagRegex.exec(code);
+        while (match !== null) {
           // camelCase 转换: v-btn -> VBtn
           const name = `V${match[1].split('-').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join('')}`;
           matches.add(name);
+          match = templateTagRegex.exec(code);
         }
       }
 

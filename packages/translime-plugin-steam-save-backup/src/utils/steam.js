@@ -403,4 +403,3 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
 
   return result;
 }
-

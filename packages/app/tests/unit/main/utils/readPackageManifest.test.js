@@ -1,5 +1,5 @@
 import {
-  afterEach, beforeEach, describe, expect, it, vi,
+  afterEach, beforeEach, describe, expect, it,
 } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';

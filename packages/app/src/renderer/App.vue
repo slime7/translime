@@ -33,7 +33,7 @@ export default {
     };
     const remoteConsoleListener = () => {
       ipc.on('console', ({ type, args }) => {
-        // eslint-disable-next-line no-console
+
         console[type](...args);
       });
     };

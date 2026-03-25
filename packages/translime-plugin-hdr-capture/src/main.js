@@ -8,8 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import EventEmitter from 'node:events';
 import { useLogger, usePluginConfig } from 'translime-sdk';
-// eslint-disable-next-line import/extensions
-import * as capture from './capture/index.js';
+import * as capture from './capture';
 
 const dirname = typeof __dirname === 'string'
   ? __dirname

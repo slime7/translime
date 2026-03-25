@@ -1,5 +1,4 @@
 /* eslint-disable no-console */
-/* eslint-disable import/prefer-default-export */
 
 /**
  * Overlay Preload Mock
@@ -177,3 +176,5 @@ export async function initOverlayPreviewMock() {
 
   console.log('[Overlay Preview] mock 环境初始化完成');
 }
+
+export default initOverlayPreviewMock;

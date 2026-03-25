@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
 
 const copyFile = (src, dest) => {
   const destDir = path.dirname(dest);
@@ -11,10 +11,11 @@ const copyFile = (src, dest) => {
     fs.mkdirSync(destDir, { recursive: true });
   }
   fs.copyFileSync(src, dest);
+  // eslint-disable-next-line no-console
   console.log(`Copied ${src} to ${dest}`);
 };
 
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(dirname, '..');
 const distDir = path.resolve(rootDir, 'dist');
 const srcDir = path.resolve(rootDir, 'src');
 

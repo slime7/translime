@@ -44,6 +44,7 @@ export default defineConfig(({ mode }) => {
               document.head.appendChild(elementStyle);
             }
           } catch (e) {
+            // eslint-disable-next-line no-console
             console.error('vite-plugin-css-injected-by-js', e);
           }
         },

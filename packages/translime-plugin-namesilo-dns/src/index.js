@@ -3,7 +3,7 @@ import fs from 'fs';
 import { XMLParser } from 'fast-xml-parser';
 import verCmp from 'semver-compare';
 import axios from 'axios';
-// eslint-disable-next-line import/no-unresolved, import/extensions
+// eslint-disable-next-line import-x/extensions
 import axiosHttpAdapter from 'axios/unsafe/adapters/http.js';
 import { useLogger } from 'translime-sdk';
 import pkg from '../package.json' with { type: 'json' };
