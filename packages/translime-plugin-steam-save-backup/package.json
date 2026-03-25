@@ -18,12 +18,12 @@
     "src/icon.svg"
   ],
   "scripts": {
-    "dev": "vite build -c ui.vite.config.js --watch --mode preview",
+    "dev": "vite build -c ui.vite.config.mjs --watch --mode preview",
     "build:plugin": "vite build",
-    "build:ui": "vite build -c ui.vite.config.js",
+    "build:ui": "vite build -c ui.vite.config.mjs",
     "build": "npm run build:plugin && npm run build:ui",
     "preview:plugin": "vite build --mode preview",
-    "preview:ui": "vite build -c ui.vite.config.js --mode preview",
+    "preview:ui": "vite build -c ui.vite.config.mjs --mode preview",
     "preview": "npm run preview:plugin && npm run preview:ui"
   },
   "devDependencies": {

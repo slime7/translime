@@ -31,6 +31,15 @@
               icon="folder_zip"
               @click="installLocalPluginDialog.open()"
             />
+
+            <v-btn
+              class="ml-2"
+              density="comfortable"
+              icon="refresh"
+              :loading="loading.refresh"
+              :disabled="loading.refresh"
+              @click="refreshDevPlugins"
+            />
           </template>
         </v-text-field>
       </div>
@@ -184,6 +193,7 @@ export default {
       install: false,
       uninstall: false,
       search: false,
+      refresh: false,
     });
     const search = ref('');
 
@@ -240,7 +250,6 @@ export default {
           }
         } catch (err) {
           // 单个检查失败不影响整体
-          // eslint-disable-next-line no-console
           console.error(`Check update failed for ${p.packageName}`, err);
         }
       });
@@ -408,6 +417,20 @@ export default {
         getPlugins();
       }
     };
+    const refreshDevPlugins = async () => {
+      if (loading.refresh) {
+        return;
+      }
+      loading.refresh = true;
+      try {
+        await ipc.invoke(ipcType.REFRESH_DEV_PLUGINS);
+      } catch (err) {
+        alert.show(err.message, 'error');
+      } finally {
+        loading.refresh = false;
+        getPlugins();
+      }
+    };
 
     const pluginCardRefs = ref(null);
 
@@ -465,6 +488,7 @@ export default {
       uninstallPlugins,
       enablePlugin,
       disablePlugin,
+      refreshDevPlugins,
       search,
       searchAction,
       searchMore,

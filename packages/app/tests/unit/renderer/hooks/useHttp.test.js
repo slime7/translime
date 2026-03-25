@@ -145,20 +145,19 @@ describe('useHttp', () => {
     });
 
     it('调用 abort 应该触发 signal', async () => {
-      let signal;
+      let requestSignal;
       axiosMock.mockImplementation((config) => {
-        signal = config.signal;
+        requestSignal = config.signal;
         return new Promise(() => {}); // 挂起请求
       });
 
       const http = useHttp('http://localhost/api');
       http.execute();
 
-      const abortSpy = vi.spyOn(AbortSignal.prototype, 'dispatchEvent'); // 间接验证，实际环境难以直接监测 abort 事件
-      // 但我们可以验证 http.abort() 是否被调用不报错，并在真实场景中验证 controller.abort
-
       http.abort();
-      // 在 jsdom 环境下模拟完全的 AbortController 行为可能有限，主要验证逻辑覆盖
+
+      expect(requestSignal).toBeInstanceOf(AbortSignal);
+      expect(requestSignal.aborted).toBe(true);
     });
   });
 

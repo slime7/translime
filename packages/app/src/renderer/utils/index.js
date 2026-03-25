@@ -49,7 +49,7 @@ export const selectFileDialog = (win, options = {}) => {
   });
 };
 
-export const openPluginWindow = (plugin, dark = false, appSetting = {}) => {
+export const openPluginWindow = (plugin, appSetting = {}) => {
   const url = plugin.windowUrl
     ? plugin.windowUrl
     : `index.html#/plugin/${plugin.packageName}`;

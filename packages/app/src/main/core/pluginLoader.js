@@ -19,7 +19,7 @@ import logger from '../utils/logger';
 import readPackageManifest from '../utils/readPackageManifest';
 import pluginInterop from './pluginInterop';
 
-const requireFresh = createRequire(import.meta.url);
+const requireFresh = createRequire(path.join(process.cwd(), 'package.json'));
 
 const APPDATA_PATH = app.getPath('userData');
 const PLUGIN_DIR = path.join(APPDATA_PATH, 'plugins');
@@ -29,11 +29,84 @@ const PLUGIN_MODULES_PATH = path.join(PLUGIN_DIR, 'node_modules');
 const PLUGIN_MODULES_PATH_DEV = path.join(PLUGIN_DIR_DEV, 'node_modules');
 const PLUGIN_PACKAGE_DIR = path.join(PLUGIN_DIR, 'package');
 const TEMP_NODE_DIR = path.join(app.getPath('temp'), 'translime-node-cache');
+const PLUGIN_SOURCE_RELEASE = 'release';
+const PLUGIN_SOURCE_DEV = 'dev';
+const PLUGIN_STATUS_READY = 'ready';
+const PLUGIN_STATUS_BUILD_MISSING = 'build-missing';
+const PLUGIN_STATUS_LOAD_ERROR = 'load-error';
 
 const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(
   isDevPlugin ? PLUGIN_MODULES_PATH_DEV : PLUGIN_MODULES_PATH,
   pluginName,
 );
+
+const isPluginPackageName = (name) => /^translime-plugin-/.test(name);
+
+const pathExists = (targetPath) => {
+  try {
+    fs.accessSync(targetPath);
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+
+const getEntryIssues = (plugin) => {
+  const issues = [];
+  if (plugin.exports) {
+    const mainEntry = path.resolve(plugin.pluginPath, plugin.exports);
+    if (!pathExists(mainEntry)) {
+      issues.push('main entry');
+    }
+  }
+  if (plugin.ui && !pathExists(plugin.ui)) {
+    issues.push('ui bundle');
+  }
+  if (plugin.windowUrl && plugin.windowUrl.startsWith('file://')) {
+    const filePath = plugin.windowUrl.replace(/^file:\/\//, '');
+    if (!pathExists(filePath)) {
+      issues.push('window page');
+    }
+  }
+  return issues;
+};
+
+const applyPluginStatus = (plugin, status = PLUGIN_STATUS_READY, statusText = '') => ({
+  ...plugin,
+  status,
+  statusText,
+  lastError: status === PLUGIN_STATUS_READY ? '' : statusText,
+  available: status === PLUGIN_STATUS_READY,
+});
+
+const createBrokenPlugin = ({
+  packageName,
+  pluginPath,
+  source,
+  error,
+}) => {
+  const plugin = {
+    packageName,
+    title: packageName,
+    description: '',
+    author: '',
+    link: '',
+    icon: null,
+    exports: null,
+    pluginPath,
+    version: '',
+    enabled: false,
+    dev: source === PLUGIN_SOURCE_DEV,
+    source,
+    loadTime: 0,
+  };
+
+  return applyPluginStatus(
+    plugin,
+    PLUGIN_STATUS_LOAD_ERROR,
+    error instanceof Error ? error.message : String(error),
+  );
+};
 
 async function readPluginPackageInfo(filePath) {
   return new Promise((resolve, reject) => {
@@ -78,9 +151,12 @@ async function readPluginPackageInfo(filePath) {
   });
 }
 
-const readPlugin = (pluginPath, devPlugins = null) => {
+const readPlugin = (pluginPath, {
+  source = PLUGIN_SOURCE_RELEASE,
+  devPlugins = null,
+} = {}) => {
   const pluginPkg = readPackageManifest(pluginPath);
-  const plugin = pluginPkg.plugin || {};
+  let plugin = pluginPkg.plugin || {};
   plugin.packageName = pluginPkg.name;
   if (
     devPlugins
@@ -114,14 +190,15 @@ const readPlugin = (pluginPath, devPlugins = null) => {
         svg: 'image/svg+xml',
       };
       const ext = path.extname(imgPath).toLowerCase().replace('.', '');
-      plugin.icon = `data:${mimeTypes[ext]};base64, ${fs.readFileSync(imgPath, { encoding: 'base64' })}`;
+      const iconData = fs.readFileSync(imgPath, { encoding: 'base64' });
+      plugin.icon = `data:${mimeTypes[ext]};base64, ${iconData}`;
     } catch (err) {
       plugin.icon = null;
     }
   } else {
     plugin.icon = null;
   }
-  if (!devPlugins && plugin['windowUrl.dev']) {
+  if (source === PLUGIN_SOURCE_DEV && plugin['windowUrl.dev']) {
     plugin.windowUrl = plugin['windowUrl.dev'];
   }
   if (plugin.windowUrl) {
@@ -140,16 +217,42 @@ const readPlugin = (pluginPath, devPlugins = null) => {
   }
   plugin.pluginPath = pluginPath;
   plugin.version = pluginPkg.version;
-  plugin.enabled = mainStore.config.get(
+  plugin.dev = source === PLUGIN_SOURCE_DEV;
+  plugin.source = source;
+  plugin.loadTime = 0;
+  const shouldEnable = mainStore.config.get(
     `plugin.${plugin.packageName}.enabled`,
     true,
   );
-  if (!devPlugins) {
-    plugin.dev = true;
+  const entryIssues = getEntryIssues(plugin);
+  if (entryIssues.length) {
+    plugin = applyPluginStatus(
+      plugin,
+      PLUGIN_STATUS_BUILD_MISSING,
+      `缺少${entryIssues.join('、')}，请先构建插件后再在 Translime 中加载。`,
+    );
+    plugin.enabled = false;
+  } else {
+    plugin = applyPluginStatus(plugin);
+    plugin.enabled = shouldEnable;
   }
 
   return plugin;
 };
+
+function readPluginSafe(pluginPath, options = {}) {
+  const fallbackName = path.basename(pluginPath);
+  try {
+    return readPlugin(pluginPath, options);
+  } catch (error) {
+    return createBrokenPlugin({
+      packageName: fallbackName,
+      pluginPath,
+      source: options.source || PLUGIN_SOURCE_RELEASE,
+      error,
+    });
+  }
+}
 
 /**
  * 获取当前配置的 npm registry 地址
@@ -193,7 +296,7 @@ const fetchPackageMetadata = (packageName, version) => new Promise((resolve, rej
         const data = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
         resolve({
           version: data.version,
-          tarball: data.dist?.tarball,
+          tarball: data.dist ? data.dist.tarball : undefined,
         });
       } catch (err) {
         reject(new Error('解析包元数据失败'));
@@ -360,6 +463,13 @@ class PluginLoader extends EventEmitter {
     return this.plugins.findIndex((plugin) => plugin.packageName === name);
   }
 
+  readPluginSafe(pluginPath, options = {}) {
+    if (!Array.isArray(this.plugins)) {
+      throw new TypeError('plugins 列表未初始化');
+    }
+    return readPluginSafe(pluginPath, options);
+  }
+
   readPlugins() {
     try {
       fs.accessSync(PLUGIN_MODULES_PATH_DEV);
@@ -369,31 +479,32 @@ class PluginLoader extends EventEmitter {
     const showDevPlugin = mainStore.config.get('setting.showDevPlugin', false);
     const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
     const deps = Object.keys(json.dependencies || {});
+    this.plugins = [];
 
     const filterFn = (isDev = false) => (name) => {
-      if (!/^translime-plugin-/.test(name)) {
+      if (!isPluginPackageName(name)) {
         return false;
       }
       const pluginPath = resolvePluginPath(name, isDev);
-      try {
-        fs.accessSync(pluginPath);
-        return true;
-      } catch (err) {
-        return false;
-      }
+      return pathExists(pluginPath);
     };
 
     // 如果开启了开发插件选项，优先读取开发插件目录
     const devModules = showDevPlugin
       ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV)
         .filter(filterFn(true))
-        .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath, true)))
+        .map((pluginName) => readPluginSafe(resolvePluginPath(pluginName, true), {
+          source: PLUGIN_SOURCE_DEV,
+        }))
       : [];
 
     // 读取普通插件，如果同名的开发插件已存在（无论是否启用），则跳过普通插件
     const modules = deps
       .filter(filterFn())
-      .map((pluginPath) => readPlugin(resolvePluginPath(pluginPath), devModules))
+      .map((pluginName) => readPluginSafe(resolvePluginPath(pluginName), {
+        source: PLUGIN_SOURCE_RELEASE,
+        devPlugins: devModules,
+      }))
       .filter((plugin) => plugin);
 
     // 将插件列表保存到 this.plugins 中，并启用在设置在设置为 enabled 的插件
@@ -404,7 +515,7 @@ class PluginLoader extends EventEmitter {
   enablePlugins(plugins) {
     plugins.forEach((plugin) => {
       this.plugins.push(plugin);
-      if (plugin.enabled) {
+      if (plugin.enabled && plugin.available !== false) {
         this.enablePlugin(plugin.packageName, true);
       }
     });
@@ -418,13 +529,22 @@ class PluginLoader extends EventEmitter {
 
   enablePlugin(packageName, init = false) {
     let plugin = this.getPlugin(packageName);
-    const pluginPath = resolvePluginPath(packageName);
     if (!plugin) {
-      plugin = readPlugin(
-        pluginPath,
-        this.getPlugins().filter((p) => p.dev),
-      );
+      const pluginPath = resolvePluginPath(packageName);
+      plugin = readPluginSafe(pluginPath, {
+        source: PLUGIN_SOURCE_RELEASE,
+        devPlugins: this.getPlugins().filter((p) => p.dev),
+      });
       logger.debug('[plugin] reload plugin: ', { plugin });
+    }
+    if (plugin.available === false) {
+      this.emit('plugin:error', {
+        plugin,
+        pluginId: packageName,
+        error: new Error(plugin.statusText),
+        operation: 'enable',
+      });
+      return plugin;
     }
     let pluginMain = {};
     if (plugin.exports) {
@@ -442,28 +562,32 @@ class PluginLoader extends EventEmitter {
           windowOptions: pluginImport.windowOptions,
         };
       } catch (err) {
-        // todo: handle error
         logger.error('[plugin] enable error: ', err);
+        plugin = applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, err.message);
+        plugin.enabled = false;
         this.emit('plugin:error', {
           plugin: plugin || null,
           pluginId: packageName,
           error: err,
           operation: 'enable',
         });
+        return plugin;
       }
     }
+    plugin = applyPluginStatus(plugin);
     pluginMain.enabled = true;
     pluginMain.loadTime = Date.now();
     mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
     const mergedPlugin = Object.assign(plugin, pluginMain || {});
     if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
       mergedPlugin.ipcHandlers.forEach((handler) => {
-        appManager
-          .getIpc()
-          ?.appendHandler(
+        const ipc = appManager.getIpc();
+        if (ipc) {
+          ipc.appendHandler(
             `${handler.type}@${mergedPlugin.packageName}`,
             handler.handler,
           );
+        }
       });
     }
     mergedPlugin.windowOptions = {};
@@ -494,7 +618,15 @@ class PluginLoader extends EventEmitter {
     return mergedPlugin;
   }
 
-  disablePlugin(packageName, isUninstall = false) {
+  disablePlugin(packageName, options = {}) {
+    const normalizedOptions = typeof options === 'boolean'
+      ? { isUninstall: options }
+      : options;
+    const {
+      isUninstall = false,
+      keepDisabledRecord = !isUninstall,
+      persistState = !isUninstall,
+    } = normalizedOptions;
     const plugin = this.getPlugin(packageName) || {};
     Object.assign(plugin, {
       enabled: false,
@@ -502,7 +634,10 @@ class PluginLoader extends EventEmitter {
     // 移除 ipc
     if (plugin.ipcHandlers && plugin.ipcHandlers.length) {
       plugin.ipcHandlers.forEach((handler) => {
-        appManager.getIpc()?.removeHandler(`${handler.type}@${plugin.packageName}`);
+        const ipc = appManager.getIpc();
+        if (ipc) {
+          ipc.removeHandler(`${handler.type}@${plugin.packageName}`);
+        }
       });
     }
     // 注销插件跨组件通信注册表
@@ -544,12 +679,17 @@ class PluginLoader extends EventEmitter {
     }
     const isDev = plugin.dev;
     this.plugins.splice(this.plugins.indexOf(plugin), 1);
-    if (!isUninstall) {
-      const p = readPlugin(plugin.pluginPath, [packageName]);
+    if (keepDisabledRecord && !isUninstall) {
+      const p = readPluginSafe(plugin.pluginPath, {
+        source: isDev ? PLUGIN_SOURCE_DEV : PLUGIN_SOURCE_RELEASE,
+        devPlugins: isDev ? null : this.getPlugins().filter((item) => item.dev),
+      });
       p.enabled = false;
       p.dev = isDev; // 保留原始的 dev 标志
       this.plugins.push(p);
-      mainStore.config.set(`plugin.${plugin.packageName}.enabled`, false);
+      if (persistState) {
+        mainStore.config.set(`plugin.${plugin.packageName}.enabled`, false);
+      }
     }
 
     this.emit('plugin:disabled', {
@@ -557,6 +697,20 @@ class PluginLoader extends EventEmitter {
       pluginId: packageName,
       isUninstall,
     });
+  }
+
+  refreshDevPlugins() {
+    const previousPlugins = [...this.plugins];
+    previousPlugins.forEach((plugin) => {
+      if (plugin.enabled) {
+        this.disablePlugin(plugin.packageName, {
+          keepDisabledRecord: false,
+          persistState: false,
+        });
+      }
+    });
+    this.plugins = [];
+    return this.readPlugins();
   }
 
   /**
@@ -843,7 +997,8 @@ class PluginLoader extends EventEmitter {
       ) {
         try {
           // 生成唯一临时文件名，防止冲突
-          const tempFileName = `${path.basename(filename, '.node')}.${Date.now()}.${Math.random().toString(36).slice(2)}.node`;
+          const tempFileName = `${path.basename(filename, '.node')}.${Date.now()}.`
+            + `${Math.random().toString(36).slice(2)}.node`;
           const tempPath = path.join(TEMP_NODE_DIR, tempFileName);
 
           if (!fs.existsSync(TEMP_NODE_DIR)) {

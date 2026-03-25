@@ -19,6 +19,7 @@ export const INSTALL_LOCAL_PLUGIN = 'install-local-plugin';
 export const UNINSTALL_PLUGIN = 'uninstall-plugin';
 export const DISABLE_PLUGIN = 'disable-plugin';
 export const ENABLE_PLUGIN = 'enable-plugin';
+export const REFRESH_DEV_PLUGINS = 'refresh-dev-plugins';
 export const GET_PLUGIN_SETTING = 'get-plugin-setting';
 export const SET_PLUGIN_SETTING = 'set-plugin-setting';
 export const OPEN_PLUGIN_CONTEXT_MENU = 'open-plugin-context-menu';
@@ -38,6 +39,10 @@ export const THEME_UPDATED = 'theme-updated';
 export const GET_NATIVE_THEME = 'get-native-theme';
 export const SET_NATIVE_THEME = 'set-native-theme';
 export const GET_LAUNCH_ARGV = 'get-launch-argv';
+export const GET_LOG_DATES = 'get-log-dates';
+export const GET_LOG_RECORDS = 'get-log-records';
+export const COPY_TEXT = 'copy-text';
+export const READ_CLIPBOARD_TEXT = 'read-clipboard-text';
 export const DEEP_LINK_OPEN = 'deep-link-open';
 export const LOGGER = 'logger';
 export const IPC_TOAST = 'ipc-toast';
@@ -78,6 +83,7 @@ export default {
   UNINSTALL_PLUGIN,
   DISABLE_PLUGIN,
   ENABLE_PLUGIN,
+  REFRESH_DEV_PLUGINS,
   GET_PLUGIN_SETTING,
   SET_PLUGIN_SETTING,
   OPEN_PLUGIN_CONTEXT_MENU,
@@ -97,6 +103,10 @@ export default {
   SET_NATIVE_THEME,
   SHOW_DEV_PLUGIN,
   GET_LAUNCH_ARGV,
+  GET_LOG_DATES,
+  GET_LOG_RECORDS,
+  COPY_TEXT,
+  READ_CLIPBOARD_TEXT,
   DEEP_LINK_OPEN,
   LOGGER,
   IPC_TOAST,
@@ -116,4 +126,3 @@ export default {
   SYSTEM_COLOR_CHANGED: 'system-color-changed',
   THEME_COLOR_UPDATED: 'theme-color-updated',
 };
-

@@ -42,8 +42,14 @@
   ],
   "eslint.workingDirectories": [
     {
-      "mode": "auto"
+      "directory": ".",
+      "changeProcessCWD": true
+    },
+    {
+      "pattern": "packages/*",
+      "changeProcessCWD": true
     }
   ],
+  "eslint.packageManager": "pnpm",
   "eslint.useFlatConfig": true
 }

@@ -29,19 +29,19 @@ export interface PluginInterop {
    * @param pluginId 插件 ID
    */
   getExports<T = any>(pluginId: string): T | undefined;
-  
+
   /**
    * 获取所有已注册公共 API 的插件列表
    */
   getRegisteredPlugins(): string[];
-  
+
   /**
    * 等待目标插件被激活并获取其 API
    * @param pluginId 目标插件 ID
    * @param timeout 超时时间 (毫秒)，默认 10000。0 表示永不超时
    */
   waitForPlugin<T = any>(pluginId: string, timeout?: number): Promise<T>;
-  
+
   on(event: 'activated', listener: (pluginId: string, exports: any) => void): this;
   on(event: 'deactivated', listener: (pluginId: string) => void): this;
   off(event: 'activated', listener: (pluginId: string, exports: any) => void): this;
@@ -121,3 +121,7 @@ export function useLogger(): {
   debug(...args: any[]): void;
 };
 
+/**
+ * Axios adapter backed by `window.ts.net`.
+ */
+export function electronNetAdapter(config: any): Promise<any>;

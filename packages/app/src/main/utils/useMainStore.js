@@ -4,8 +4,9 @@ import * as path from 'node:path';
 import pkg from '@pkg/../package.json' with { type: 'json' };
 import appConfigStore from './appConfigStore';
 
-const filename = fileURLToPath(import.meta.url);
-const dir = path.dirname(filename);
+const dir = typeof __dirname === 'string'
+  ? __dirname
+  : path.dirname(fileURLToPath(import.meta.url));
 
 const useMainStore = () => {
   const APP_VERSION = pkg.version;

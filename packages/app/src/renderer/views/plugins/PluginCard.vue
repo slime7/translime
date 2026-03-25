@@ -24,7 +24,16 @@
                   label
                   class="mr-2"
                 >
-                  DEV
+                  本地开发
+                </v-chip>
+                <v-chip
+                  v-if="statusMeta"
+                  size="small"
+                  label
+                  class="mr-2"
+                  :color="statusMeta.color"
+                >
+                  {{ statusMeta.label }}
                 </v-chip>
                 <span>{{ cardTitle }}</span>
               </v-card-title>
@@ -37,7 +46,13 @@
           </v-card-subtitle>
 
           <v-card-text class="grow">
-            {{ plugin.description }}
+            <div>{{ plugin.description }}</div>
+            <div
+              v-if="plugin.statusText"
+              class="mt-2 text-sm plugin-status"
+            >
+              {{ plugin.statusText }}
+            </div>
           </v-card-text>
 
           <v-card-actions>
@@ -243,6 +258,21 @@ export default {
       ...(plugin.value.versions ?? []),
     ]);
     const hasNewVersion = computed(() => versionList.value.length > 1 && verCompare(versionList.value[1].value, plugin.value.version) > 0);
+    const statusMeta = computed(() => {
+      if (plugin.value.status === 'build-missing') {
+        return {
+          label: '需要构建',
+          color: 'warning',
+        };
+      }
+      if (plugin.value.status === 'load-error') {
+        return {
+          label: '加载失败',
+          color: 'error',
+        };
+      }
+      return null;
+    });
     watch([isInstalled, canUpdated], () => {
       selectedVersion.value = '';
     });
@@ -267,6 +297,7 @@ export default {
       selectedVersion,
       versionList,
       hasNewVersion,
+      statusMeta,
     };
   },
 };
@@ -280,6 +311,12 @@ export default {
 .plugin-item-card {
   position: relative;
   transition: all .3s cubic-bezier(.4, 0, .2, 1);
+
+  .plugin-status {
+    opacity: .78;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
 
   .plugin-bg-icon {
     position: absolute;

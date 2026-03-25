@@ -12,7 +12,9 @@
     </div>
 
     <div class="mt-4">
-      <v-btn color="primary" @click="copy">{{ copied ? '已' : '' }}复制</v-btn>
+      <v-btn color="primary" @click="copy">
+        {{ copied ? '已' : '' }}复制
+      </v-btn>
     </div>
 
     <div class="emoji mt-4">

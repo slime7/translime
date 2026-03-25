@@ -1,0 +1,55 @@
+{
+  "name": "translime-plugin-bangumi-logs",
+  "version": "1.0.0",
+  "description": "Bangumi Logs plugin",
+  "license": "MIT",
+  "private": true,
+  "main": "./dist/index.cjs.js",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs.js"
+    }
+  },
+  "files": [
+    "dist",
+    "icon.svg"
+  ],
+  "scripts": {
+    "dev": "vite build -c ui.vite.config.mjs --watch",
+    "preview:ui": "vite -c ui.vite.config.mjs --mode preview",
+    "build:plugin": "vite build",
+    "build:ui": "vite build -c ui.vite.config.mjs",
+    "build": "pnpm run build:plugin && pnpm run build:ui",
+    "test": "pnpm exec vitest run -c vitest.config.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.0",
+    "eslint": "~9.24.0",
+    "eslint-config-airbnb-extended": "^3.0.1",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-vue": "^10.0.0",
+    "translime-sdk": "workspace:*",
+    "vite": "^8.0.0",
+    "vite-plugin-css-injected-by-js": "^3.4.0",
+    "vite-plugin-vuetify": "^2.1.1",
+    "vitest": "^4.0.17",
+    "vue": "^3.5.13",
+    "vuetify": "^3.11.6"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.13",
+    "vuetify": "^3.11.6"
+  },
+  "plugin": {
+    "title": "Bangumi Logs",
+    "description": "Bangumi Logs plugin",
+    "icon": "./icon.svg",
+    "//windowUrl": "dist/ui/index.html",
+    "ui": "dist/ui.esm.js"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "axios": "^1.8.4",
+    "tailwindcss": "^4.2.2"
+  }
+}

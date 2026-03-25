@@ -2,7 +2,15 @@ import { createRequire } from 'node:module';
 import { useLogger } from 'translime-sdk';
 import dayjs from 'dayjs';
 
-const require = createRequire(import.meta.url);
+const localRequire = (() => {
+  if (typeof require !== 'undefined') {
+    return require;
+  }
+  if (typeof __filename === 'string') {
+    return createRequire(__filename);
+  }
+  return createRequire(import.meta.url);
+})();
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'Capture' }) : baseLogger;
@@ -330,8 +338,8 @@ let nativeAddon;
 
 try {
   // 使用 NAPI-RS 生成的加载器，自动处理平台/架构检测
-  // eslint-disable-next-line import/no-unresolved, import/extensions
-  nativeAddon = require('./bin/index.js');
+
+  nativeAddon = localRequire('./bin/index.js');
 } catch (e) {
   logger.error('无法加载 native addon:', e.message);
   logger.error('请先运行 pnpm run build:native 构建 Rust 模块');
@@ -340,12 +348,22 @@ try {
   nativeAddon = {
     getTopLevelWindows: () => [],
     getWindowAtPoint: () => null,
-    captureDisplay: () => { throw new Error('Native addon not loaded'); },
+    captureDisplay: () => {
+      throw new Error('Native addon not loaded');
+    },
     getDisplays: () => [],
-    cropImage: () => { throw new Error('Native addon not loaded'); },
-    toneMap: () => { throw new Error('Native addon not loaded'); },
-    encodeImage: () => { throw new Error('Native addon not loaded'); },
-    resizeImage: () => { throw new Error('Native addon not loaded'); },
+    cropImage: () => {
+      throw new Error('Native addon not loaded');
+    },
+    toneMap: () => {
+      throw new Error('Native addon not loaded');
+    },
+    encodeImage: () => {
+      throw new Error('Native addon not loaded');
+    },
+    resizeImage: () => {
+      throw new Error('Native addon not loaded');
+    },
   };
 }
 
@@ -889,4 +907,3 @@ export const cropAndSaveScaledFromBuffer = async (sessionData, rect, options = {
   }
   return null;
 };
-

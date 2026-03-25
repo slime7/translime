@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import vue from '@vitejs/plugin-vue';
 import vuetify from 'vite-plugin-vuetify';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   plugins: [
@@ -15,10 +15,10 @@ export default defineConfig({
   build: {
     lib: {
       entry: {
-        index: resolve(__dirname, 'src/index.js'),
-        'vite-plugin': resolve(__dirname, 'src/vite-plugin.js'),
-        preview: resolve(__dirname, 'src/preview/main.js'),
-        'preview-mock': resolve(__dirname, 'src/preview-mock.js'),
+        index: resolve(dirname, 'src/index.js'),
+        'vite-plugin': resolve(dirname, 'src/vite-plugin.js'),
+        preview: resolve(dirname, 'src/preview/main.js'),
+        'preview-mock': resolve(dirname, 'src/preview-mock.js'),
       },
       formats: ['es', 'cjs'],
       fileName: (format, entryName) => {
@@ -26,7 +26,7 @@ export default defineConfig({
         return `${entryName}.${ext}`;
       },
     },
-    rollupOptions: {
+    rolldownOptions: {
       // Externalize deps to reduce bundle size and avoid conflicts
       external: [
         'electron',

@@ -15,6 +15,7 @@ import electronNetAdapter from '@/utils/electronNetAdapter';
  * @property {Object} headers - 响应头
  * @property {Object} requestConfig - 请求配置
  * @property {Function} execute - 执行请求的方法
+ * @property {Function} abort - 中止请求
  * @property {Function} get - GET 方法
  * @property {Function} post - POST 方法
  * @property {Function} put - PUT 方法

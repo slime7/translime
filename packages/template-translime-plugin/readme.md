@@ -2,6 +2,19 @@
 
 本指南将介绍如何开发和调试 Translime 插件。
 
+## 推荐开发流程
+
+优先以已安装的 Translime 宿主作为真实开发环境。推荐流程如下：
+
+1. 在你自己的插件仓库中构建或 watch 插件。
+2. 在插件根目录执行 `pnpm link --global`。
+3. 打开 Translime 的用户数据目录，进入 `plugins_dev/node_modules`。
+4. 在该目录执行 `pnpm link --global <package-name>`。
+5. 在 Translime 设置中开启“显示开发中插件”，然后直接在宿主内打开插件页面。
+6. 每次重新构建后，使用插件卡片上的重载按钮或右键菜单中的重载入口快速验证。
+
+`preview:ui` 仍然保留，但只作为局部 UI 试验的辅助工具。涉及布局、主题、窗口模式、设置面板和宿主集成行为时，应以宿主内效果为准。
+
 ## 本地开发测试
 
 利用 `link` 命令将本地插件包添加到 Translime 的开发目录中进行测试。
@@ -220,7 +233,7 @@ pnpm add translime-sdk
 
 ### 使用 Vite 插件
 
-在插件的 `vite.config.js` 中使用内置插件，可以自动处理 `electron` 等依赖的外部化：
+在插件的 `vite.config.mjs` 中使用内置插件，可以自动处理 `electron` 等依赖的外部化：
 
 ```javascript
 import { defineConfig } from 'vite';

@@ -3,10 +3,10 @@ import fs from 'fs';
 import { XMLParser } from 'fast-xml-parser';
 import verCmp from 'semver-compare';
 import axios from 'axios';
-// eslint-disable-next-line import/no-unresolved, import/extensions
+// eslint-disable-next-line import-x/extensions
 import axiosHttpAdapter from 'axios/unsafe/adapters/http.js';
 import { useLogger } from 'translime-sdk';
-import pkg from '../package.json';
+import pkg from '../package.json' with { type: 'json' };
 
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: pkg.name, context: 'Main' }) : baseLogger;
@@ -21,7 +21,7 @@ const { mainStore, appManager } = global;
 const APP_VERSION = mainStore?.APP_VERSION || '0.0.0';
 const isVerDot3 = verCmp(APP_VERSION, '0.3.0') >= 0;
 const APPDATA_PATH = isVerDot3 ? mainStore.APPDATA_PATH : global.APPDATA_PATH;
-const pluginDir = path.resolve(APPDATA_PATH, 'google-domains-ddns');
+const pluginDir = path.resolve(APPDATA_PATH, 'namesilo-ddns');
 const logFile = path.resolve(pluginDir, 'logs.txt');
 const pluginWin = isVerDot3 ? () => appManager.getChildWin(`plugin-window-${id}`) : () => global.childWins[`plugin-window-${id}`];
 const ipc = isVerDot3 ? appManager.getIpc() : global.ipc;

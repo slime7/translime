@@ -1,0 +1,3 @@
+[submodule "packages/translime-plugin-bangumi-logs/docs/api"]
+	path = packages/translime-plugin-bangumi-logs/docs/api
+	url = https://github.com/bangumi/api

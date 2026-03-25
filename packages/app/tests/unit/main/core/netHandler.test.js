@@ -2,76 +2,72 @@ import {
   beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
-// Mock ipcConstant
 vi.mock('@pkg/share/utils/ipcConstant', () => ({
   NET_REQUEST: 'net-request',
   NET_ABORT: 'net-abort',
 }));
 
-// Mock electron net module
-const { mockRequest, mockResponse } = vi.hoisted(() => {
-  const response = {
-    statusCode: 200,
-    statusMessage: 'OK',
-    headers: { 'content-type': 'application/json' },
-    on: vi.fn(),
-  };
-
-  const request = {
-    on: vi.fn(),
-    write: vi.fn(),
-    end: vi.fn(),
-    abort: vi.fn(),
-  };
-
-  return { mockRequest: request, mockResponse: response };
-});
+const { mockFetch } = vi.hoisted(() => ({
+  mockFetch: vi.fn(),
+}));
 
 vi.mock('electron', () => ({
   net: {
-    request: vi.fn(() => mockRequest),
+    fetch: mockFetch,
   },
 }));
+
+const createHeaders = (headers = {}) => ({
+  forEach(callback) {
+    Object.entries(headers).forEach(([key, value]) => callback(value, key));
+  },
+});
+
+const createResponse = ({
+  status = 200,
+  statusText = 'OK',
+  headers = { 'content-type': 'application/json' },
+  text = '',
+  arrayBuffer = Buffer.from(text),
+  textError = null,
+  arrayBufferError = null,
+} = {}) => ({
+  status,
+  statusText,
+  headers: createHeaders(headers),
+  async text() {
+    if (textError) {
+      throw textError;
+    }
+    return text;
+  },
+  async arrayBuffer() {
+    if (arrayBufferError) {
+      throw arrayBufferError;
+    }
+    return arrayBuffer;
+  },
+});
 
 describe('netHandler', () => {
   let netHandler;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-
-    // Reset mock implementations
-    mockRequest.on.mockReset();
-    mockRequest.write.mockReset();
-    mockRequest.end.mockReset();
-    mockRequest.abort.mockReset();
-    mockResponse.on.mockReset();
-
-    // Import fresh netHandler for each test
     vi.resetModules();
+    mockFetch.mockReset();
+
     const module = await import('@main/core/netHandler');
     netHandler = module.default;
   });
 
   describe('NET_REQUEST', () => {
     it('应该创建并发送请求', async () => {
-      // 模拟成功响应
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'response') {
-          // 模拟响应事件
-          setTimeout(() => {
-            mockResponse.on.mockImplementation((respEvent, respCallback) => {
-              if (respEvent === 'data') {
-                respCallback(Buffer.from('{"success":true}'));
-              } else if (respEvent === 'end') {
-                respCallback();
-              }
-            });
-            callback(mockResponse);
-          }, 0);
-        }
-      });
+      mockFetch.mockResolvedValue(createResponse({
+        text: '{"success":true}',
+      }));
 
-      const promise = netHandler['net-request']({
+      const result = await netHandler['net-request']({
         requestId: 'req-1',
         config: {
           method: 'GET',
@@ -79,26 +75,19 @@ describe('netHandler', () => {
         },
       });
 
-      const result = await promise;
-
-      expect(result.status).toBe(200);
-      expect(result.statusText).toBe('OK');
-      expect(result.data).toBe('{"success":true}');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost/api', expect.objectContaining({
+        method: 'GET',
+      }));
+      expect(result).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        data: '{"success":true}',
+      });
     });
 
     it('应该正确设置请求头', async () => {
-      const { net } = await import('electron');
-
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'response') {
-          setTimeout(() => {
-            mockResponse.on.mockImplementation((respEvent, respCallback) => {
-              if (respEvent === 'end') respCallback();
-            });
-            callback(mockResponse);
-          }, 0);
-        }
-      });
+      mockFetch.mockResolvedValue(createResponse());
 
       await netHandler['net-request']({
         requestId: 'req-2',
@@ -109,24 +98,14 @@ describe('netHandler', () => {
         },
       });
 
-      expect(net.request).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost/api', expect.objectContaining({
         method: 'POST',
-        url: 'http://localhost/api',
         headers: { 'Content-Type': 'application/json' },
       }));
     });
 
     it('应该写入请求体', async () => {
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'response') {
-          setTimeout(() => {
-            mockResponse.on.mockImplementation((respEvent, respCallback) => {
-              if (respEvent === 'end') respCallback();
-            });
-            callback(mockResponse);
-          }, 0);
-        }
-      });
+      mockFetch.mockResolvedValue(createResponse());
 
       await netHandler['net-request']({
         requestId: 'req-3',
@@ -137,21 +116,13 @@ describe('netHandler', () => {
         },
       });
 
-      expect(mockRequest.write).toHaveBeenCalledWith('{"foo":"bar"}');
-      expect(mockRequest.end).toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost/api', expect.objectContaining({
+        body: '{"foo":"bar"}',
+      }));
     });
 
     it('字符串请求体应直接写入', async () => {
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'response') {
-          setTimeout(() => {
-            mockResponse.on.mockImplementation((respEvent, respCallback) => {
-              if (respEvent === 'end') respCallback();
-            });
-            callback(mockResponse);
-          }, 0);
-        }
-      });
+      mockFetch.mockResolvedValue(createResponse());
 
       await netHandler['net-request']({
         requestId: 'req-4',
@@ -162,24 +133,15 @@ describe('netHandler', () => {
         },
       });
 
-      expect(mockRequest.write).toHaveBeenCalledWith('raw string data');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost/api', expect.objectContaining({
+        body: 'raw string data',
+      }));
     });
 
     it('arrayBuffer 响应类型应返回 base64 编码', async () => {
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'response') {
-          setTimeout(() => {
-            mockResponse.on.mockImplementation((respEvent, respCallback) => {
-              if (respEvent === 'data') {
-                respCallback(Buffer.from([0x48, 0x65, 0x6c, 0x6c, 0x6f])); // "Hello"
-              } else if (respEvent === 'end') {
-                respCallback();
-              }
-            });
-            callback(mockResponse);
-          }, 0);
-        }
-      });
+      mockFetch.mockResolvedValue(createResponse({
+        arrayBuffer: Uint8Array.from([0x48, 0x65, 0x6c, 0x6c, 0x6f]).buffer,
+      }));
 
       const result = await netHandler['net-request']({
         requestId: 'req-5',
@@ -194,13 +156,7 @@ describe('netHandler', () => {
     });
 
     it('请求错误应 reject', async () => {
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'error') {
-          setTimeout(() => {
-            callback(new Error('Network error'));
-          }, 0);
-        }
-      });
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(netHandler['net-request']({
         requestId: 'req-6',
@@ -212,37 +168,31 @@ describe('netHandler', () => {
     });
 
     it('请求被取消应返回 aborted 错误', async () => {
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'error') {
-          setTimeout(() => {
-            const error = new Error('aborted');
-            callback(error);
-          }, 0);
-        }
-      });
+      mockFetch.mockImplementation((_url, options) => new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      }));
 
-      await expect(netHandler['net-request']({
+      const promise = netHandler['net-request']({
         requestId: 'req-7',
         config: {
           method: 'GET',
           url: 'http://localhost/api',
         },
-      })).rejects.toThrow('Request was aborted');
+      });
+
+      netHandler['net-abort']({ requestId: 'req-7' });
+
+      await expect(promise).rejects.toThrow('Request was aborted');
     });
 
     it('响应错误应 reject', async () => {
-      mockRequest.on.mockImplementation((event, callback) => {
-        if (event === 'response') {
-          setTimeout(() => {
-            mockResponse.on.mockImplementation((respEvent, respCallback) => {
-              if (respEvent === 'error') {
-                respCallback(new Error('Response error'));
-              }
-            });
-            callback(mockResponse);
-          }, 0);
-        }
-      });
+      mockFetch.mockResolvedValue(createResponse({
+        textError: new Error('Response error'),
+      }));
 
       await expect(netHandler['net-request']({
         requestId: 'req-8',
@@ -256,11 +206,17 @@ describe('netHandler', () => {
 
   describe('NET_ABORT', () => {
     it('应该取消正在进行的请求', async () => {
-      // 创建一个挂起的请求
-      mockRequest.on.mockImplementation(() => {});
+      let aborted = false;
+      mockFetch.mockImplementation((_url, options) => new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => {
+          aborted = true;
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      }));
 
-      // 发起请求但不等待
-      netHandler['net-request']({
+      const requestPromise = netHandler['net-request']({
         requestId: 'abort-req-1',
         config: {
           method: 'GET',
@@ -268,10 +224,10 @@ describe('netHandler', () => {
         },
       });
 
-      // 取消请求
       netHandler['net-abort']({ requestId: 'abort-req-1' });
 
-      expect(mockRequest.abort).toHaveBeenCalled();
+      await expect(requestPromise).rejects.toThrow('Request was aborted');
+      expect(aborted).toBe(true);
     });
 
     it('取消不存在的请求不应抛出错误', () => {

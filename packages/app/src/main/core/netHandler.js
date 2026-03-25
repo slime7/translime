@@ -10,76 +10,72 @@ export default {
    * @param {object} param0.config - 请求配置
    * @returns {Promise<object>} 响应对象
    */
-  [ipcType.NET_REQUEST]({ requestId, config }) {
-    return new Promise((resolve, reject) => {
-      try {
-        const request = net.request({
-          method: config.method,
-          url: config.url,
-          ...config.headers && { headers: config.headers },
-        });
+  async [ipcType.NET_REQUEST]({ requestId, config }) {
+    try {
+      const controller = new AbortController();
 
-        // 将请求存入 Map，以便后续取消
-        activeRequests.set(requestId, request);
+      // 将请求存入 Map，以便后续取消
+      activeRequests.set(requestId, controller);
 
-        request.on('response', (response) => {
-          // 收集响应数据
-          const chunks = [];
+      const fetchOptions = {
+        method: config.method || 'GET',
+        signal: controller.signal,
+      };
 
-          response.on('data', (chunk) => {
-            chunks.push(chunk);
-          });
-
-          response.on('end', () => {
-            // 请求完成，移除 Map 记录
-            activeRequests.delete(requestId);
-
-            const data = Buffer.concat(chunks);
-            // 返回响应数据
-            const result = {
-              status: response.statusCode,
-              statusText: response.statusMessage,
-              headers: response.headers,
-              data: data.toString('utf-8'), // 简单处理，如果是二进制需转 base64
-            };
-            if (config?.responseType === 'arrayBuffer') {
-              result.data = data.toString('base64');
-            }
-            resolve(result);
-          });
-
-          response.on('error', (error) => {
-            activeRequests.delete(requestId);
-            reject(error);
-          });
-        });
-
-        request.on('error', (error) => {
-          activeRequests.delete(requestId);
-          // 区分取消和真正的错误
-          if (error.message === 'aborted') {
-            reject(new Error('Request was aborted'));
-          } else {
-            reject(error);
-          }
-        });
-
-        // 写入请求体
-        if (config.data) {
-          request.write(typeof config.data === 'string' ? config.data : JSON.stringify(config.data));
-        }
-
-        request.end();
-      } catch (error) {
-        activeRequests.delete(requestId);
-        reject(error);
+      if (config.headers) {
+        fetchOptions.headers = config.headers;
       }
-    });
+
+      const methodUpper = fetchOptions.method.toUpperCase();
+      // 写入请求体，GET/HEAD 请求不能包含 body
+      if (config.data && methodUpper !== 'GET' && methodUpper !== 'HEAD') {
+        fetchOptions.body = typeof config.data === 'string' ? config.data : JSON.stringify(config.data);
+      }
+
+      const response = await net.fetch(config.url, fetchOptions);
+
+      let data;
+      if (config?.responseType === 'arrayBuffer') {
+        const arrayBuffer = await response.arrayBuffer();
+        // 如果是二进制需转 base64
+        data = Buffer.from(arrayBuffer).toString('base64');
+      } else {
+        // 简单处理
+        data = await response.text();
+      }
+
+      // 请求完成，移除 Map 记录
+      activeRequests.delete(requestId);
+
+      const responseHeaders = {};
+      if (response.headers && typeof response.headers.forEach === 'function') {
+        response.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
+        });
+      } else if (response.headers) {
+        Object.assign(responseHeaders, response.headers);
+      }
+
+      // 返回响应数据
+      return {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+        data,
+      };
+    } catch (error) {
+      activeRequests.delete(requestId);
+      // 区分取消和真正的错误
+      if (error && error.name === 'AbortError') {
+        throw new Error('Request was aborted');
+      }
+      throw error;
+    }
   },
   [ipcType.NET_ABORT]({ requestId }) {
-    const request = activeRequests.get(requestId);
-    if (request) {
-      request.abort();
+    const controller = activeRequests.get(requestId);
+    if (controller) {
+      controller.abort();
       activeRequests.delete(requestId);
     }
   },

@@ -9,18 +9,15 @@ import {
   systemPreferences,
 } from 'electron';
 import fs from 'node:fs';
-import { dirname, join, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, sep } from 'node:path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '../utils/createWindow';
 import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
+import { listLogDates, readLogRecords } from '../utils/logViewer';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
-
-const filename = fileURLToPath(import.meta.url);
-const dir = dirname(filename);
 
 const ipcHandler = {
   ...netHandler,
@@ -130,19 +127,23 @@ const ipcHandler = {
         width: winBound.width,
         height: winBound.height,
         minWidth,
-        useContentSize: typeof options.useContentSize !== 'undefined' ? options.useContentSize : false,
+        useContentSize:
+          typeof options.useContentSize !== 'undefined' ? options.useContentSize : false,
         frame: typeof options.frame !== 'undefined' ? options.frame : true,
         titleBarStyle: options.titleBarStyle || 'default',
-        titleBarOverlay: typeof options.titleBarOverlay !== 'undefined' ? options.titleBarOverlay : false,
+        titleBarOverlay:
+          typeof options.titleBarOverlay !== 'undefined' ? options.titleBarOverlay : false,
         title: options.title || 'translime',
         resizable: typeof options.resizable !== 'undefined' ? options.resizable : true,
-        transparent: typeof options.transparent !== 'undefined' ? options.transparent : false,
-        autoHideMenuBar: typeof options.autoHideMenuBar !== 'undefined' ? options.autoHideMenuBar : false,
+        transparent:
+          typeof options.transparent !== 'undefined' ? options.transparent : false,
+        autoHideMenuBar:
+          typeof options.autoHideMenuBar !== 'undefined' ? options.autoHideMenuBar : false,
         opacity: typeof options.opacity !== 'undefined' ? options.opacity : 1,
         skipTaskbar: typeof options.skipTaskbar !== 'undefined' ? options.skipTaskbar : false,
         focusable: typeof options.focusable !== 'undefined' ? options.focusable : true,
         webPreferences: {
-          preload: join(dir, '../preload/index.cjs'),
+          preload: join(mainStore.ROOT, '../preload/index.cjs'),
           nodeIntegration: false,
           contextIsolation: true,
           sandbox: false,
@@ -151,11 +152,19 @@ const ipcHandler = {
       appManager.setChildWin(name, win);
 
       appManager.getChildWin(name).on('maximize', () => {
-        appManager.getIpc().sendToClient(`set-maximize-status:${name}`, true, appManager.getChildWin(name).webContents);
+        appManager.getIpc().sendToClient(
+          `set-maximize-status:${name}`,
+          true,
+          appManager.getChildWin(name).webContents,
+        );
       });
 
       appManager.getChildWin(name).on('unmaximize', () => {
-        appManager.getIpc().sendToClient(`set-maximize-status:${name}`, false, appManager.getChildWin(name).webContents);
+        appManager.getIpc().sendToClient(
+          `set-maximize-status:${name}`,
+          false,
+          appManager.getChildWin(name).webContents,
+        );
       });
 
       appManager.getChildWin(name).on('close', () => {
@@ -251,6 +260,18 @@ const ipcHandler = {
     }
     throw new Error('插件未初始化');
   },
+  async [ipcType.REFRESH_DEV_PLUGINS]() {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      try {
+        loader.refreshDevPlugins();
+        return true;
+      } catch (err) {
+        throw new Error(`开发插件刷新失败: ${err.message}`);
+      }
+    }
+    throw new Error('插件未初始化');
+  },
   async [ipcType.GET_PLUGIN_SETTING](packageName) {
     const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
     return settings;
@@ -261,7 +282,10 @@ const ipcHandler = {
     } else {
       mainStore.config.set(`plugin.${packageName}.settings.${key}`, settings);
     }
-    appManager.getPluginLoader()?.onPluginSettingSave(packageName);
+    const pluginLoader = appManager.getPluginLoader();
+    if (pluginLoader) {
+      pluginLoader.onPluginSettingSave(packageName);
+    }
     return true;
   },
   [ipcType.OPEN_PLUGIN_CONTEXT_MENU](packageName) {
@@ -272,19 +296,28 @@ const ipcHandler = {
   },
   [ipcType.DIALOG_SHOW_OPEN_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showOpenDialog(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
+      return dialog.showOpenDialog(
+        appManager.getChildWin(winOrOptions) || appManager.getWin(),
+        options,
+      );
     }
     return dialog.showOpenDialog(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_SAVE_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showSaveDialog(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
+      return dialog.showSaveDialog(
+        appManager.getChildWin(winOrOptions) || appManager.getWin(),
+        options,
+      );
     }
     return dialog.showSaveDialog(winOrOptions);
   },
   [ipcType.DIALOG_SHOW_MESSAGE_BOX](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showMessageBox(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
+      return dialog.showMessageBox(
+        appManager.getChildWin(winOrOptions) || appManager.getWin(),
+        options,
+      );
     }
     return dialog.showMessageBox(winOrOptions);
   },
@@ -293,7 +326,10 @@ const ipcHandler = {
   },
   [ipcType.DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
-      return dialog.showCertificateTrustDialog(appManager.getChildWin(winOrOptions) || appManager.getWin(), options);
+      return dialog.showCertificateTrustDialog(
+        appManager.getChildWin(winOrOptions) || appManager.getWin(),
+        options,
+      );
     }
     return dialog.showCertificateTrustDialog(winOrOptions);
   },
@@ -382,6 +418,19 @@ const ipcHandler = {
   [ipcType.GET_LAUNCH_ARGV]() {
     return process.argv;
   },
+  async [ipcType.GET_LOG_DATES]() {
+    return listLogDates(mainStore.APPDATA_PATH);
+  },
+  async [ipcType.GET_LOG_RECORDS](date) {
+    return readLogRecords(mainStore.APPDATA_PATH, date);
+  },
+  [ipcType.COPY_TEXT](text = '') {
+    clipboard.writeText(String(text));
+    return true;
+  },
+  [ipcType.READ_CLIPBOARD_TEXT]() {
+    return clipboard.readText();
+  },
   [ipcType.LOGGER](level, payload) {
     if (payload && typeof payload === 'object' && !Array.isArray(payload) && payload.args) {
       const { args, meta } = payload;
@@ -422,7 +471,7 @@ const ipcHandler = {
     }
   },
   ping() {
-    console.log('pong', new Date());
+    logger.debug('pong', new Date());
   },
   ping2(foo, bar) {
     return new Promise((resolve) => {

@@ -4,7 +4,7 @@ import * as tunnel from 'tunnel';
 import verCmp from 'semver-compare';
 import axios from 'axios';
 import axiosHttpAdapter from 'axios/unsafe/adapters/http';
-import pkg from '../package.json';
+import pkg from '../package.json' with { type: 'json' };
 
 const id = pkg.name;
 const { mainStore, appManager } = global;
@@ -37,19 +37,19 @@ const pushLog = (log) => {
     ipc.sendToClient('logs', logs, pluginWin());
   }
 };
-const getIp = (type = 4) => new Promise(async (resolve, reject) => {
+const getIp = async (type = 4) => {
   const url = type === 6 ? 'https://ipv6.icanhazip.com' : 'https://icanhazip.com';
   try {
     const { data } = await axios.get(url, {
       adapter: axiosHttpAdapter,
       responseType: 'text',
     });
-    resolve(data.trim());
+    return data.trim();
   } catch (err) {
-    reject(new Error(`获取 ipv${type} 失败`));
+    throw new Error(`获取 ipv${type} 失败`);
   }
-});
-const setRecord = (hostname, username, password, ip, proxy) => new Promise(async (resolve, reject) => {
+};
+const setRecord = async (hostname, username, password, ip, proxy) => {
   try {
     const basicAuth = btoa(`${username}:${password}`);
     const { data } = await axios.post('https://domains.google.com/nic/update', null, {
@@ -67,15 +67,14 @@ const setRecord = (hostname, username, password, ip, proxy) => new Promise(async
       proxy: false,
     });
     pushLog(`接口返回值：${data}`);
-    if (/^good|nochg/.test(data)) {
-      resolve(data);
-    } else {
-      reject(new Error(`设置 dns 失败: ${data}`));
+    if (!/^good|nochg/.test(data)) {
+      throw new Error(`设置 dns 失败: ${data}`);
     }
+    return data;
   } catch (err) {
-    reject(new Error('设置 dns 失败'));
+    throw new Error(err.message || '设置 dns 失败');
   }
-});
+};
 const main = async (hostname, username, password, proxy, type = 4) => {
   try {
     const ip = await getIp(type);

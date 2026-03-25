@@ -12,7 +12,7 @@
     "node": ">=v18.20",
     "npm": ">=7.7"
   },
-  "main": "dist/main/index.js",
+  "main": "dist/main/index.cjs",
   "type": "module",
   "scripts": {
     "dev": "node scripts/watch.js",
@@ -53,9 +53,8 @@
     "electron-builder": "^26.0.12",
     "electron-devtools-installer": "4.0.0",
     "eslint": "~9.24.0",
-    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-extended": "^3.0.1",
     "eslint-import-resolver-alias": "^1.1.2",
-    "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-vue": "^10.0.0",
     "jsdom": "^27.4.0",
     "playwright": "1.15.2",

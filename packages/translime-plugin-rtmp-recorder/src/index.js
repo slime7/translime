@@ -1,5 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg';
-import pkg from '../package.json';
+import pkg from '../package.json' with { type: 'json' };
 import record from './record';
 
 const id = pkg.name;

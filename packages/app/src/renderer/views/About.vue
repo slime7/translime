@@ -148,6 +148,11 @@
                   打开 app 目录
                 </v-btn>
               </div>
+              <div>
+                <v-btn color="primary" @click="openLogViewer">
+                  查看日志
+                </v-btn>
+              </div>
               <div
                 v-if="isDev"
               >
@@ -165,6 +170,7 @@
 
 <script>
 import { onMounted, ref, version as vueVersion } from 'vue';
+import { useRouter } from 'vue-router';
 import { version as vuetifyVersion } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
@@ -178,6 +184,7 @@ export default {
 
   setup() {
     const ipc = useIpc();
+    const router = useRouter();
     const store = globalStore();
     const dialog = useDialog();
     const alert = useAlert();
@@ -208,6 +215,11 @@ export default {
     };
     const appDir = () => {
       ipc.send(ipcType.OPEN_APP_PATH);
+    };
+    const openLogViewer = () => {
+      router.push({
+        name: 'LogViewer',
+      });
     };
     const openLink = (url) => {
       ipc.send(ipcType.OPEN_LINK, { url });
@@ -278,6 +290,7 @@ export default {
       testConfirm,
       reloadApp,
       appDir,
+      openLogViewer,
       githubLink,
       appArgv: store.appArgv,
       // update

@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 import LayoutBase from '../views/Layout/Base.vue';
 import AppHome from '../views/Home.vue';
 import AppAbout from '../views/About.vue';
+import AppLogViewer from '../views/LogViewer.vue';
 import AppPlugins from '../views/plugins/Plugins.vue';
 import AppSetting from '../views/Setting.vue';
 import AppPluginPage from '../views/plugins/PluginPage.vue';
@@ -24,6 +25,11 @@ const routes = [
         path: '/about',
         name: 'About',
         component: AppAbout,
+      },
+      {
+        path: '/logs',
+        name: 'LogViewer',
+        component: AppLogViewer,
       },
       {
         path: '/plugins',

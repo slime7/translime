@@ -59,13 +59,13 @@ describe('renderer/utils/index', () => {
       });
 
       it('setValue 函数式更新应该接收当前状态', () => {
-        const [state, setValue] = useState({ count: 0 });
+        const [countState, setValue] = useState({ count: 0 });
 
-        setValue((s) => {
-          s.count += 10;
+        setValue((state) => {
+          state.count += 10;
         });
 
-        expect(state.count).toBe(10);
+        expect(countState.count).toBe(10);
       });
 
       it('应该支持嵌套对象', () => {

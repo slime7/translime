@@ -6,7 +6,7 @@ import ipcHandler from '@main/core/ipcHandler';
 import appManager from '@main/utils/useAppManager';
 
 const {
-  mockShell, mockApp, mockDialog, mockNativeTheme,
+  mockShell, mockApp, mockDialog, mockNativeTheme, NotificationMock,
 } = vi.hoisted(() => ({
   mockShell: {
     openExternal: vi.fn(),
@@ -29,6 +29,17 @@ const {
     shouldUseDarkColors: false,
     themeSource: 'system',
   },
+  NotificationMock: class {
+    constructor() {
+      this.show = vi.fn();
+      this.on = vi.fn();
+      this.close = vi.fn();
+    }
+
+    static isSupported() {
+      return true;
+    }
+  },
 }));
 
 vi.mock('electron', () => ({
@@ -36,15 +47,7 @@ vi.mock('electron', () => ({
   shell: mockShell,
   dialog: mockDialog,
   nativeTheme: mockNativeTheme,
-  Notification: class {
-    static isSupported() { return true; }
-
-    show() {}
-
-    on() {}
-
-    close() {}
-  },
+  Notification: NotificationMock,
   Menu: {
     buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
   },
@@ -175,6 +178,20 @@ describe('ipcHandler', () => {
     it('DIALOG_SHOW_OPEN_DIALOG 应该调用 dialog.showOpenDialog', () => {
       ipcHandler[ipcType.DIALOG_SHOW_OPEN_DIALOG]();
       expect(mockDialog.showOpenDialog).toHaveBeenCalled();
+    });
+  });
+
+  describe('Plugin Development Actions', () => {
+    it('REFRESH_DEV_PLUGINS 应转发到 pluginLoader.refreshDevPlugins', async () => {
+      const loader = {
+        refreshDevPlugins: vi.fn(() => [{ packageName: 'translime-plugin-dev' }]),
+      };
+      appManager.getPluginLoader.mockReturnValue(loader);
+
+      const result = await ipcHandler[ipcType.REFRESH_DEV_PLUGINS]();
+
+      expect(loader.refreshDevPlugins).toHaveBeenCalled();
+      expect(result).toBe(true);
     });
   });
 });

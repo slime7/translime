@@ -1,42 +1,48 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import globals from 'globals';
+import babelParser from '@babel/eslint-parser';
+import * as airbnbExtended from 'eslint-config-airbnb-extended';
 import vue from 'eslint-plugin-vue';
-import js from '@eslint/js';
-import { FlatCompat } from '@eslint/eslintrc';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all,
-});
+import vueParser from 'vue-eslint-parser';
 
 export default [
   {
-    ignores: ['node_modules/**/*', '**/dist/**/*', 'packages/rendererx/**/*'],
+    ignores: ['node_modules/**/*', '**/dist/**/*', 'packages/rendererx/**/*', '**/*.d.ts'],
   },
-  ...compat.extends('plugin:vue/strongly-recommended', 'airbnb-base'),
+  ...vue.configs['flat/strongly-recommended'],
+  airbnbExtended.plugins.stylistic,
+  ...airbnbExtended.configs.base.recommended,
   {
     languageOptions: {
       globals: {
         ...globals.node,
         ...globals.browser,
       },
+      parser: babelParser,
       ecmaVersion: 'latest',
       sourceType: 'module',
-      parserOptions: {},
+      parserOptions: {
+        requireConfigFile: false,
+        babelOptions: {
+          babelrc: false,
+          configFile: false,
+          plugins: [
+            '@babel/plugin-syntax-jsx',
+            '@babel/plugin-syntax-import-attributes',
+          ],
+        },
+      },
     },
     plugins: {
+      ...airbnbExtended.plugins.stylistic.plugins,
+      ...airbnbExtended.plugins.importX.plugins,
       vue,
     },
     rules: {
       semi: ['error', 'always'],
       'semi-spacing': ['error', { before: false, after: true }],
       quotes: ['error', 'single', { avoidEscape: true }],
-      indent: ['error', 2],
+      indent: ['error', 2, { SwitchCase: 0 }],
+      '@stylistic/indent': ['error', 2, { SwitchCase: 0 }],
       'keyword-spacing': ['error', {
         before: true,
         after: true,
@@ -67,8 +73,9 @@ export default [
         unnecessary: true,
         numbers: false,
       }],
-      'import/no-commonjs': [0],
-      'import/no-extraneous-dependencies': ['off'],
+      '@stylistic/max-len': 'off',
+      'import-x/no-commonjs': [0],
+      'import-x/no-extraneous-dependencies': ['off'],
       'no-multi-spaces': ['error', { ignoreEOLComments: false }],
       'no-trailing-spaces': ['error'],
       'no-multiple-empty-lines': ['error', { max: 1, maxEOF: 1 }],
@@ -88,16 +95,37 @@ export default [
         props: true,
         ignorePropertyModificationsFor: ['state', 'acc', 'e'],
       }],
-      'import/no-cycle': 'warn',
+      'import-x/no-cycle': 'warn',
     },
   },
   {
     files: ['**/*.mjs'],
     rules: {
-      'import/extensions': 'off',
+      'import-x/extensions': 'off',
+    },
+  },
+  {
+    files: ['**/*.vue'],
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        parser: babelParser,
+        requireConfigFile: false,
+        babelOptions: {
+          babelrc: false,
+          configFile: false,
+          plugins: [
+            '@babel/plugin-syntax-jsx',
+            '@babel/plugin-syntax-import-attributes',
+          ],
+        },
+      },
+    },
+  },
+  {
+    files: ['**/src/preview/entry-template.js'],
+    rules: {
+      'import-x/no-unresolved': 'off',
     },
   },
 ];
-
-
-

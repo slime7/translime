@@ -8,7 +8,9 @@ vi.mock('@main/core/ipcHandler', () => ({
   default: {
     testHandler: vi.fn(() => 'test result'),
     asyncHandler: vi.fn(async () => 'async result'),
-    errorHandler: vi.fn(() => { throw new Error('handler error'); }),
+    errorHandler: vi.fn(() => {
+      throw new Error('handler error');
+    }),
   },
 }));
 
@@ -98,7 +100,6 @@ describe('Ipc', () => {
 
   describe('ipc-msg handler', () => {
     it('应该调用存在的 handler', () => {
-      const { default: ipcHandler } = vi.mocked(import('@main/core/ipcHandler'));
       onCallback({}, { type: 'testHandler', data: 'test data' });
 
       // handler 会被调用并传入 data

@@ -8,6 +8,12 @@ import {
   isPreviewMode as checkPreviewMode,
   initPreviewMock,
 } from './preview-mock';
+import electronNetAdapter from './electronNetAdapter';
+
+const CLIPBOARD_IPC = {
+  readText: 'read-clipboard-text',
+  writeText: 'copy-text',
+};
 
 // ----------------------------------------------------------------------
 // Initialization (Side Effect)
@@ -196,8 +202,27 @@ export function useWindowControl() {
  * @returns {Object|null}
  */
 export function useClipboard() {
-  if (typeof window !== 'undefined' && window.electron?.clipboard) {
-    return window.electron.clipboard;
+  if (typeof window !== 'undefined') {
+    return {
+      async readText() {
+        if (window.electron?.useIpc) {
+          return window.electron.useIpc().invoke(CLIPBOARD_IPC.readText);
+        }
+        if (navigator.clipboard?.readText) {
+          return navigator.clipboard.readText();
+        }
+        return null;
+      },
+      async writeText(text) {
+        if (window.electron?.useIpc) {
+          return window.electron.useIpc().invoke(CLIPBOARD_IPC.writeText, text);
+        }
+        if (navigator.clipboard?.writeText) {
+          return navigator.clipboard.writeText(text);
+        }
+        return null;
+      },
+    };
   }
   return null;
 }
@@ -229,3 +254,4 @@ export function useLogger() {
   return console;
 }
 
+export { electronNetAdapter };

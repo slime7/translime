@@ -181,6 +181,7 @@ export async function startPreview(pluginComponent, options = {}) {
   };
 
   // 设置插件组件到全局变量
+  // eslint-disable-next-line no-underscore-dangle
   window.__PREVIEW_PLUGIN_COMPONENT__ = pluginComponent;
 
   // 创建并挂载应用
@@ -197,6 +198,7 @@ export async function startPreview(pluginComponent, options = {}) {
 
   app.mount(`#${mountId}`);
 
+  // eslint-disable-next-line no-console
   console.log('[Preview] 插件预览模式已启动');
 
   return app;
