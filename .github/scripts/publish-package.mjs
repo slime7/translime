@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -30,17 +30,33 @@ if (!name) {
 }
 
 const repoRoot = process.cwd();
-const packageDir = path.join(repoRoot, 'packages', name);
-const manifestPath = path.join(packageDir, 'package.json');
+const packagesRoot = path.join(repoRoot, 'packages');
+const packageDirs = readdirSync(packagesRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name);
 
-if (!existsSync(manifestPath)) {
-  fail(`Package not found: ${manifestPath}`);
+let packageDir;
+let manifest;
+
+for (const dirName of packageDirs) {
+  const currentDir = path.join(packagesRoot, dirName);
+  const manifestPath = path.join(currentDir, 'package.json');
+
+  if (!existsSync(manifestPath)) {
+    continue;
+  }
+
+  const currentManifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+  if (currentManifest.name === name) {
+    packageDir = currentDir;
+    manifest = currentManifest;
+    break;
+  }
 }
 
-const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-
-if (manifest.name !== name) {
-  fail(`Package name mismatch: expected "${name}", got "${manifest.name}"`);
+if (!packageDir || !manifest) {
+  fail(`Package name not found in packages/*/package.json: ${name}`);
 }
 
 if (manifest.private) {
