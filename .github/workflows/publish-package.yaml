@@ -1,0 +1,59 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - 'translime-*@*.*.*'
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: Package name under packages/
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Resolve package name
+        id: meta
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $packageName = "${{ inputs.package_name }}"
+          } else {
+            $refName = "${{ github.ref_name }}"
+            $packageName = $refName.Split('@')[0]
+          }
+
+          if ([string]::IsNullOrWhiteSpace($packageName)) {
+            throw "Unable to resolve package name"
+          }
+
+          "package_name=$packageName" >> $env:GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish package
+        run: pnpm run publish:package -- --name "${{ steps.meta.outputs.package_name }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
