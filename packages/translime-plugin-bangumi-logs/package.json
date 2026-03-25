@@ -25,9 +25,8 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
     "eslint": "~9.24.0",
-    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-extended": "^3.0.1",
     "eslint-import-resolver-alias": "^1.1.2",
-    "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-vue": "^10.0.0",
     "translime-sdk": "workspace:*",
     "vite": "^8.0.0",

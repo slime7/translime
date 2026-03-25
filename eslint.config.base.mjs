@@ -1,24 +1,15 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import globals from 'globals';
+import * as airbnbExtended from 'eslint-config-airbnb-extended';
 import vue from 'eslint-plugin-vue';
-import js from '@eslint/js';
-import { FlatCompat } from '@eslint/eslintrc';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all,
-});
 
 export default [
   {
     ignores: ['node_modules/**/*', '**/dist/**/*', 'packages/rendererx/**/*'],
   },
-  ...compat.extends('plugin:vue/strongly-recommended', 'airbnb-base'),
+  ...vue.configs['flat/strongly-recommended'],
+  airbnbExtended.plugins.importX,
+  airbnbExtended.plugins.stylistic,
+  ...airbnbExtended.configs.base.recommended,
   {
     languageOptions: {
       globals: {
@@ -67,8 +58,8 @@ export default [
         unnecessary: true,
         numbers: false,
       }],
-      'import/no-commonjs': [0],
-      'import/no-extraneous-dependencies': ['off'],
+      'import-x/no-commonjs': [0],
+      'import-x/no-extraneous-dependencies': ['off'],
       'no-multi-spaces': ['error', { ignoreEOLComments: false }],
       'no-trailing-spaces': ['error'],
       'no-multiple-empty-lines': ['error', { max: 1, maxEOF: 1 }],
@@ -88,16 +79,13 @@ export default [
         props: true,
         ignorePropertyModificationsFor: ['state', 'acc', 'e'],
       }],
-      'import/no-cycle': 'warn',
+      'import-x/no-cycle': 'warn',
     },
   },
   {
     files: ['**/*.mjs'],
     rules: {
-      'import/extensions': 'off',
+      'import-x/extensions': 'off',
     },
   },
 ];
-
-
-
