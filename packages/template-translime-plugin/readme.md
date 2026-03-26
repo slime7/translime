@@ -61,11 +61,44 @@
     "description": "插件的功能描述",
     "icon": "src/icon.svg",      // 插件图标路径（相对于插件根目录）
     "ui": "dist/ui.esm.js",       // 插件前端 UI 入口（如果包含 UI）
+    "activationEvents": ["onView"], // 激活时机，缺省时默认 onStartup
+    "dependencies": ["translime-plugin-foo"], // 硬依赖
+    "optionalDependencies": ["translime-plugin-bar"], // 可选依赖
+    "contributes": {
+      "commands": [
+        {
+          "id": "translime-plugin-example.run",
+          "title": "运行示例命令"
+        }
+      ]
+    },
     "windowUrl": "dist/index.html", // 独立窗口模式的 HTML 入口
     "windowUrl.dev": "http://localhost:3000" // (可选) 开发模式专用入口，此时将覆盖 windowUrl
   }
 }
 ```
+
+### 激活时机说明
+
+当前宿主支持以下激活事件：
+
+- `onStartup`: 启动时激活。旧插件未声明时默认使用这个模式。
+- `onAppReady`: 主窗口稳定后异步激活，适合不必阻塞首屏的后台逻辑。
+- `onView`: 打开插件页面或插件窗口前激活。
+- `onCommand:<id>`: 执行某个静态声明的命令前激活。
+- `onIpc:<type>`: 第一次收到某个插件 IPC 调用前激活。
+
+建议：
+
+- 带 UI 的普通工具型插件优先使用 `onView`。
+- 真正需要驻留后台的插件再使用 `onStartup` 或 `onAppReady`。
+- 不要把昂贵初始化默认放在 `onStartup`。
+
+### 依赖说明
+
+- `dependencies` 是硬依赖，用于声明前置插件。
+- `optionalDependencies` 是可选依赖，只表示“有则使用”。
+- `pluginInterop` 仍然可用，但它负责的是已激活插件之间的通信，不替代 manifest 依赖声明。
 
 ---
 
@@ -140,7 +173,7 @@ export const settingMenu = [
 
 ### 2. 生命周期钩子
 
--   **`pluginDidLoad`**: 插件被启用或应用加载完成后执行。适合进行初始化操作（如检查路径、读取配置）。
+-   **`pluginDidLoad`**: 插件真正被激活时执行。适合进行初始化操作（如检查路径、读取配置）。
 -   **`pluginWillUnload`**: 插件被禁用或应用关闭前执行。适合进行清理工作（如销毁定时器）。
 -   **`pluginSettingSaved`**: 插件设置在 UI 界面保存后触发。
 
@@ -160,6 +193,8 @@ export const pluginWillUnload = () => {
   // 清理逻辑
 };
 ```
+
+建议把重逻辑放到真正需要的激活时机上，不要默认假设宿主一定会在启动后立刻执行 `pluginDidLoad`。
 
 ### 3. IPC 通信 (`ipcHandlers`)
 
@@ -187,6 +222,8 @@ export const ipcHandlers = [
 ];
 ```
 
+如果在 manifest 中声明了 `onIpc:test-ipc`，那么第一次调用 `test-ipc@plugin-id` 前，宿主会先激活你的插件，再把请求路由到对应 handler。
+
 ### 4. 额外菜单 (`pluginMenu`)
 
 你可以在 Translime 的某些位置（依赖具体实现）添加自定义菜单（附加在插件下拉菜单）。
@@ -204,7 +241,24 @@ export const pluginMenu = [
 ];
 ```
 
-### 5. 导出配置
+### 5. 插件命令 (`commands`)
+
+如果你在 `plugin.contributes.commands` 中静态声明了命令，可以在主进程导出对应的运行时命令处理函数：
+
+```javascript
+export const commands = [
+  {
+    id: 'translime-plugin-example.run',
+    handler(...args) {
+      return { ok: true, args };
+    },
+  },
+];
+```
+
+UI 或其他调用方可通过宿主命令入口触发，宿主会先激活插件再执行命令。
+
+### 6. 导出配置
 
 最后，需要将上述成员导出：
 
@@ -216,6 +270,7 @@ export default {
   settingMenu,
   pluginMenu,
   ipcHandlers,
+  commands,
 };
 ```
 
@@ -256,6 +311,16 @@ import { usePluginConfig } from 'translime-sdk';
 
 const config = usePluginConfig('my-plugin-id');
 const myValue = config.get('settingsKey', 'default');
+```
+
+#### 渲染进程命令调用
+
+```javascript
+import { executePluginCommand } from 'translime-sdk';
+
+await executePluginCommand('translime-plugin-example.run', {
+  from: 'ui',
+});
 ```
 
 #### 渲染进程 UI (src/ui/ui.vue)
