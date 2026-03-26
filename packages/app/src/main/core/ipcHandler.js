@@ -103,7 +103,7 @@ const ipcHandler = {
     app.quit();
   },
   async [ipcType.SHOW_OPEN_DIALOG]({ electronOptions } = {}) {
-    return dialog.showSaveDialog(...electronOptions);
+    return dialog.showOpenDialog(...electronOptions);
   },
   [ipcType.OPEN_NEW_WINDOW]({ name, options = {} }) {
     if (appManager.getChildWin(name)) {

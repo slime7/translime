@@ -56,15 +56,6 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('@/utils/createWindow', () => ({
-  default: vi.fn(() => ({
-    on: vi.fn(),
-    webContents: {
-      send: vi.fn(),
-    },
-  })),
-}));
-
 const { mockWin, mockIpc } = vi.hoisted(() => ({
   mockWin: {
     webContents: {
@@ -103,15 +94,16 @@ vi.mock('@main/utils/useAppManager', () => ({
 vi.mock('@main/utils/useMainStore', () => ({
   default: {
     config: {
-      get: vi.fn((key) => {
+      get: vi.fn((key, defaultValue) => {
         if (key === 'setting.registry') return 'https://registry.npmmirror.com/';
-        return undefined;
+        return defaultValue;
       }),
       set: vi.fn(),
       has: vi.fn(),
     },
     APP_VERSION: '1.0.0',
     APPDATA_PATH: '/mock/appdata',
+    ROOT: '/mock/root/main',
   },
 }));
 
@@ -128,7 +120,20 @@ vi.mock('@main/core/netHandler', () => ({
 describe('ipcHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const childWins = {};
     appManager.getWin.mockReturnValue(mockWin);
+    appManager.setChildWin.mockImplementation((name, win) => {
+      childWins[name] = win;
+    });
+    appManager.getChildWin.mockImplementation((name) => {
+      if (typeof name === 'string') {
+        return childWins[name];
+      }
+      return childWins;
+    });
+    appManager.removeChildWin.mockImplementation((name) => {
+      delete childWins[name];
+    });
   });
 
   describe('Window Control', () => {
@@ -167,12 +172,9 @@ describe('ipcHandler', () => {
   });
 
   describe('Dialogs', () => {
-    it('SHOW_OPEN_DIALOG 应该调用 dialog.showSaveDialog (根据源码逻辑)', async () => {
-      // 注意源码中 SHOW_OPEN_DIALOG 调用的是 dialog.showSaveDialog 可能是 bug 或故意为之？
-      // 原文: return dialog.showSaveDialog(...electronOptions);
-      // 测试应该反映实际代码行为
+    it('SHOW_OPEN_DIALOG 应该调用 dialog.showOpenDialog', async () => {
       await ipcHandler[ipcType.SHOW_OPEN_DIALOG]({ electronOptions: [] });
-      expect(mockDialog.showSaveDialog).toHaveBeenCalled();
+      expect(mockDialog.showOpenDialog).toHaveBeenCalled();
     });
 
     it('DIALOG_SHOW_OPEN_DIALOG 应该调用 dialog.showOpenDialog', () => {

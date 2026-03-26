@@ -54,9 +54,23 @@ describe('toastStore', () => {
       store.show({ msg: '测试', timeout: 3000 });
       expect(store.visible).toBe(true);
 
-      // 快进超过默认 timeout (6000ms)
-      vi.advanceTimersByTime(6000);
+      vi.advanceTimersByTime(2999);
+      expect(store.visible).toBe(true);
 
+      vi.advanceTimersByTime(1);
+
+      expect(store.visible).toBe(false);
+    });
+
+    it('未传 timeout 时应该使用默认值 6000ms', () => {
+      const store = useToastStore();
+
+      store.show({ msg: '默认超时' });
+
+      vi.advanceTimersByTime(5999);
+      expect(store.visible).toBe(true);
+
+      vi.advanceTimersByTime(1);
       expect(store.visible).toBe(false);
     });
 

@@ -88,6 +88,32 @@ const getAllDisplaysBounds = () => {
 
 const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
 const getFastResponse = () => pluginConfig.get('fastResponse', true);
+const shortcutModifiers = new Set([
+  'ctrl',
+  'control',
+  'alt',
+  'shift',
+  'super',
+  'meta',
+  'cmd',
+  'command',
+]);
+
+const normalizeShortcut = (accelerator = '') => accelerator
+  .split('+')
+  .map((part) => part.trim())
+  .filter(Boolean)
+  .map((part) => (part === 'Win' ? 'Super' : part))
+  .join('+');
+
+const isIncompleteShortcut = (accelerator = '') => {
+  const parts = accelerator.split('+').map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) {
+    return true;
+  }
+  const lastPart = parts[parts.length - 1].toLowerCase();
+  return shortcutModifiers.has(lastPart);
+};
 
 /**
  * 更新 Overlay 窗口的边界（用于响应屏幕变化）
@@ -126,10 +152,15 @@ const updateOverlayBounds = () => {
 /**
  * 注销全局快捷键
  */
-const unregisterShortcut = () => {
+const unregisterShortcut = (reason = 'unknown') => {
   if (registeredShortcut) {
     globalShortcut.unregister(registeredShortcut);
-    logger.info(`快捷键已注销: ${registeredShortcut}`);
+    logger.info('[shortcut] 快捷键已注销', {
+      data: {
+        reason,
+        accelerator: registeredShortcut,
+      },
+    });
     registeredShortcut = null;
   }
 };
@@ -490,14 +521,16 @@ const startCapture = async (isDebug = false, startTime = Date.now()) => {
 /**
  * 注册全局快捷键
  */
-const registerShortcut = (accelerator) => {
-  let finalAccelerator = accelerator || getShortcut();
+const registerShortcut = (accelerator, reason = 'unknown') => {
+  const finalAccelerator = normalizeShortcut(accelerator || getShortcut());
   if (!finalAccelerator) {
+    logger.info('[shortcut] 未配置全局快捷键，跳过注册', {
+      data: { reason },
+    });
     return false;
   }
 
   // 基础归一化：将 Win 转换为 Super (Electron 规范)
-  finalAccelerator = finalAccelerator.replace(/Win/g, 'Super');
 
   // 基础校验：不能以 '+' 结尾，且最后一位不能是修饰键（如 "Ctrl+Alt" 是非法的）
   const parts = finalAccelerator.split('+');
@@ -514,7 +547,7 @@ const registerShortcut = (accelerator) => {
   }
 
   // 先注销已有快捷键
-  unregisterShortcut();
+  unregisterShortcut(`before-register:${reason}`);
 
   try {
     const success = globalShortcut.register(finalAccelerator, () => {
@@ -542,6 +575,87 @@ const registerShortcut = (accelerator) => {
 /**
  * 关闭截图叠加层
  */
+const syncShortcutRegistration = ({
+  accelerator,
+  reason = 'unknown',
+} = {}) => {
+  const configuredShortcut = typeof accelerator === 'string'
+    ? accelerator
+    : getShortcut();
+  const normalizedShortcut = normalizeShortcut(configuredShortcut);
+
+  logger.info('[shortcut] 开始同步全局快捷键', {
+    data: {
+      reason,
+      configuredShortcut,
+      normalizedShortcut,
+      registeredShortcut,
+      appReady: app.isReady(),
+    },
+  });
+
+  if (!normalizedShortcut) {
+    unregisterShortcut(`sync-empty:${reason}`);
+    logger.info('[shortcut] 当前未配置快捷键', {
+      data: { reason },
+    });
+    return false;
+  }
+
+  if (isIncompleteShortcut(normalizedShortcut)) {
+    logger.warn('[shortcut] 快捷键配置不完整，已跳过注册', {
+      data: {
+        reason,
+        accelerator: normalizedShortcut,
+      },
+    });
+    return false;
+  }
+
+  if (!app.isReady()) {
+    logger.warn('[shortcut] 应用尚未就绪，等待 app.whenReady 后重试', {
+      data: {
+        reason,
+        accelerator: normalizedShortcut,
+      },
+    });
+    app.whenReady()
+      .then(() => {
+        syncShortcutRegistration({
+          accelerator: normalizedShortcut,
+          reason: `${reason}:after-ready`,
+        });
+      })
+      .catch((error) => {
+        logger.error('[shortcut] 等待应用就绪时发生错误', error);
+      });
+    return false;
+  }
+
+  if (registeredShortcut === normalizedShortcut) {
+    const isRegistered = globalShortcut.isRegistered(normalizedShortcut);
+    if (isRegistered) {
+      logger.info('[shortcut] 快捷键已处于注册状态，跳过重复注册', {
+        data: {
+          reason,
+          accelerator: normalizedShortcut,
+        },
+      });
+      return true;
+    }
+
+    logger.warn('[shortcut] 内部记录存在但系统未注册，准备重新注册', {
+      data: {
+        reason,
+        accelerator: normalizedShortcut,
+      },
+    });
+    registeredShortcut = null;
+  }
+
+  return registerShortcut(normalizedShortcut, reason);
+};
+
 const closeOverlay = () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     // 无论普通模式还是快速模式，先通知 UI 重置状态（清空画面）
@@ -577,13 +691,14 @@ const closeOverlay = () => {
  * 插件加载时执行
  */
 export const pluginDidLoad = () => {
-  logger.info('插件已加载');
-
-  // 如果设置了快捷键，则注册
-  const shortcut = getShortcut();
-  if (shortcut) {
-    registerShortcut(shortcut);
-  }
+  logger.info('插件已加载', {
+    data: {
+      shortcut: getShortcut(),
+      fastResponse: getFastResponse(),
+      appReady: app.isReady(),
+    },
+  });
+  syncShortcutRegistration({ reason: 'pluginDidLoad' });
 
   // 快速响应模式下，预创建离屏 Overlay 窗口，消除首次截图冷启动延迟
   if (getFastResponse()) {
@@ -603,7 +718,7 @@ export const pluginWillUnload = () => {
   logger.info('插件正在卸载');
 
   // 注销快捷键
-  unregisterShortcut();
+  unregisterShortcut('pluginWillUnload');
 
   // 移除屏幕监听
   screen.removeListener('display-metrics-changed', updateOverlayBounds);
@@ -621,15 +736,13 @@ export const pluginWillUnload = () => {
  * 设置保存时执行
  */
 export const pluginSettingSaved = () => {
-  logger.info('设置已保存');
-
-  // 重新注册快捷键
-  const shortcut = getShortcut();
-  if (shortcut) {
-    registerShortcut(shortcut);
-  } else {
-    unregisterShortcut();
-  }
+  logger.info('设置已保存', {
+    data: {
+      shortcut: getShortcut(),
+      fastResponse: getFastResponse(),
+    },
+  });
+  syncShortcutRegistration({ reason: 'pluginSettingSaved' });
 
   // 检查快速响应模式设置
   const isFastResponse = getFastResponse();
@@ -685,11 +798,14 @@ export const ipcHandlers = [
   },
   {
     type: 'register-shortcut',
-    handler: () => (accelerator) => registerShortcut(accelerator),
+    handler: () => (accelerator) => syncShortcutRegistration({
+      accelerator,
+      reason: 'ipc:register-shortcut',
+    }),
   },
   {
     type: 'unregister-shortcut',
-    handler: () => () => unregisterShortcut(),
+    handler: () => () => unregisterShortcut('ipc:unregister-shortcut'),
   },
   {
     type: 'get-window-at-point',

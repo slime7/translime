@@ -563,8 +563,11 @@ class PluginLoader extends EventEmitter {
         };
       } catch (err) {
         logger.error('[plugin] enable error: ', err);
-        plugin = applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, err.message);
-        plugin.enabled = false;
+        Object.assign(
+          plugin,
+          applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, err.message),
+          { enabled: false },
+        );
         this.emit('plugin:error', {
           plugin: plugin || null,
           pluginId: packageName,
@@ -574,7 +577,7 @@ class PluginLoader extends EventEmitter {
         return plugin;
       }
     }
-    plugin = applyPluginStatus(plugin);
+    Object.assign(plugin, applyPluginStatus(plugin));
     pluginMain.enabled = true;
     pluginMain.loadTime = Date.now();
     mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
@@ -627,7 +630,11 @@ class PluginLoader extends EventEmitter {
       keepDisabledRecord = !isUninstall,
       persistState = !isUninstall,
     } = normalizedOptions;
-    const plugin = this.getPlugin(packageName) || {};
+    const plugin = this.getPlugin(packageName);
+    if (!plugin) {
+      logger.warn(`[plugin] disable skipped, plugin not found: ${packageName}`);
+      return false;
+    }
     Object.assign(plugin, {
       enabled: false,
     });
@@ -678,7 +685,10 @@ class PluginLoader extends EventEmitter {
       });
     }
     const isDev = plugin.dev;
-    this.plugins.splice(this.plugins.indexOf(plugin), 1);
+    const pluginIndex = this.plugins.indexOf(plugin);
+    if (pluginIndex > -1) {
+      this.plugins.splice(pluginIndex, 1);
+    }
     if (keepDisabledRecord && !isUninstall) {
       const p = readPluginSafe(plugin.pluginPath, {
         source: isDev ? PLUGIN_SOURCE_DEV : PLUGIN_SOURCE_RELEASE,
@@ -697,6 +707,7 @@ class PluginLoader extends EventEmitter {
       pluginId: packageName,
       isUninstall,
     });
+    return true;
   }
 
   refreshDevPlugins() {

@@ -6,7 +6,11 @@
     location="right"
     width="560"
   >
-    <div class="notify-container p-4 h-full flex flex-col" v-scroll.self="onAlertContainerScroll">
+    <div
+      ref="containerRef"
+      class="notify-container p-4 h-full flex flex-col"
+      v-scroll.self="onAlertContainerScroll"
+    >
       <v-spacer />
 
       <div v-if="!alertList.length">
@@ -35,6 +39,7 @@
 <script>
 import {
   computed,
+  nextTick,
   ref,
   watch,
 } from 'vue';
@@ -53,17 +58,18 @@ export default {
   setup() {
     const alert = useAlert();
 
+    const containerRef = ref(null);
     const keepBottom = ref(true);
     const scrollToBottom = () => {
-      /*
-       * go to fun
-      root.$vuetify.goTo('#notify-list-bottom', {
-        container: '.notify-container',
-      });
-      */
+      const container = containerRef.value;
+      if (!container) {
+        return;
+      }
+      container.scrollTop = container.scrollHeight;
+      keepBottom.value = true;
     };
     const onAlertContainerScroll = (ev) => {
-      keepBottom.value = ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight;
+      keepBottom.value = ev.target.scrollTop + ev.target.clientHeight >= ev.target.scrollHeight - 8;
     };
     const alertList = alert.list;
     const onDrawerVisibleChange = (value) => {
@@ -85,7 +91,15 @@ export default {
       () => alert.drawerVisible.value,
       (value) => {
         if (value && keepBottom.value) {
-          scrollToBottom();
+          nextTick(scrollToBottom);
+        }
+      },
+    );
+    watch(
+      () => alertList.length,
+      () => {
+        if (alert.drawerVisible.value && keepBottom.value) {
+          nextTick(scrollToBottom);
         }
       },
     );
@@ -93,6 +107,7 @@ export default {
     const parseAlertTime = (time) => dayjs(time).format('YYYY-MM-DD HH:mm:ss');
 
     return {
+      containerRef,
       keepBottom,
       alertList,
       drawerVisible,

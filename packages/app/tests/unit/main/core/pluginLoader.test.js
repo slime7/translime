@@ -97,6 +97,7 @@ vi.mock('@main/utils/logger', () => ({
     debug: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -329,6 +330,40 @@ describe('pluginLoader', () => {
 
       pluginLoader.disablePlugin(packageName);
       expect(pluginInterop.unregister).toHaveBeenCalledWith(packageName);
+    });
+
+    it('插件不存在时应返回 false', () => {
+      pluginLoader.plugins = [
+        {
+          packageName: 'translime-plugin-existing',
+          pluginPath: '/mock/existing',
+          enabled: true,
+        },
+      ];
+
+      const result = pluginLoader.disablePlugin('translime-plugin-missing');
+
+      expect(result).toBe(false);
+      expect(pluginLoader.plugins).toHaveLength(1);
+      expect(pluginLoader.plugins[0].packageName).toBe('translime-plugin-existing');
+    });
+
+    it('启动阶段初始化插件时也应调用 pluginDidLoad', () => {
+      const pluginDidLoad = vi.fn();
+      mockRequire.mockReturnValue({ pluginDidLoad });
+
+      pluginLoader.enablePlugins([
+        {
+          packageName: 'translime-plugin-startup-test',
+          pluginPath: '/mock/path',
+          exports: 'index.js',
+          enabled: true,
+          available: true,
+        },
+      ]);
+
+      expect(pluginDidLoad).toHaveBeenCalledTimes(1);
+      expect(pluginLoader.plugins[0].pluginDidLoad).toBe(pluginDidLoad);
     });
   });
 
