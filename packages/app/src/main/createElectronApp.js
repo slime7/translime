@@ -68,6 +68,9 @@ class CreateElectronApp extends EventEmitter {
       // 开始加载插件
       appManager.setPluginLoader(pluginLoader);
       appManager.getPluginLoader().getPlugins();
+      setTimeout(() => {
+        appManager.getPluginLoader()?.triggerActivation('onAppReady');
+      }, 0);
 
       autoUpdate.init();
       // 延迟一点检查更新，以免影响启动速度

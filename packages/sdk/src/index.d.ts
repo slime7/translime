@@ -7,6 +7,20 @@ export interface MainStore {
   config: Config;
 }
 
+export interface PluginCommandContribution {
+  id: string;
+  title?: string;
+}
+
+export interface PluginManifest {
+  activationEvents?: string[];
+  dependencies?: string[];
+  optionalDependencies?: string[];
+  contributes?: {
+    commands?: PluginCommandContribution[];
+  };
+}
+
 /**
  * 检查当前是否为 Preview 模式
  */
@@ -88,6 +102,11 @@ export function getPluginSetting(...args: any[]): Promise<any>;
  * 设置插件设置 (仅在渲染进程环境可用)
  */
 export function setPluginSetting(...args: any[]): Promise<any>;
+
+/**
+ * 执行宿主注册的插件命令
+ */
+export function executePluginCommand(...args: any[]): Promise<any>;
 
 /**
  * 获取窗口控制工具 (仅在渲染进程环境可用)

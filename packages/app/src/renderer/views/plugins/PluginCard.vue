@@ -259,6 +259,12 @@ export default {
     ]);
     const hasNewVersion = computed(() => versionList.value.length > 1 && verCompare(versionList.value[1].value, plugin.value.version) > 0);
     const statusMeta = computed(() => {
+      if (plugin.value.status === 'blocked') {
+        return {
+          label: '依赖阻塞',
+          color: 'warning',
+        };
+      }
       if (plugin.value.status === 'build-missing') {
         return {
           label: '需要构建',
@@ -269,6 +275,12 @@ export default {
         return {
           label: '加载失败',
           color: 'error',
+        };
+      }
+      if (plugin.value.dependents?.length) {
+        return {
+          label: '被依赖',
+          color: 'info',
         };
       }
       return null;

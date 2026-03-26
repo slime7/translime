@@ -14,12 +14,16 @@
 <script>
 import {
   computed,
+  onMounted,
+  ref,
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import * as components from 'vuetify/components';
 import * as labsComponents from 'vuetify/labs/components';
 import * as directives from 'vuetify/directives';
+import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { openPluginWindow } from '@/utils';
 import PluginTitleBar from '@/views/Layout/components/PluginTitleBar.vue';
@@ -54,19 +58,37 @@ export default {
     const store = useGlobalStore();
     const router = useRouter();
     const route = useRoute();
+    const ipc = useIpc();
+    const pluginActivated = ref(false);
 
     const plugin = computed(() => (props.packageName ? store.plugin(props.packageName) : null));
     const pluginId = computed(() => (plugin.value ? plugin.value.packageName : undefined));
     const loaderVisible = computed(() => {
+      if (!pluginActivated.value) {
+        return false;
+      }
       if (route.name === 'PluginWindow') {
         return !!(plugin.value && plugin.value.ui);
       }
       return !!(plugin.value && plugin.value.ui && !plugin.value.windowMode);
     });
 
+    const ensurePluginActivated = async () => {
+      if (!pluginId.value) {
+        pluginActivated.value = false;
+        return;
+      }
+      await ipc.invoke(ipcType.ACTIVATE_PLUGIN, pluginId.value, 'view');
+      pluginActivated.value = true;
+    };
+
     watch(
       () => plugin.value,
       (v, prevV) => {
+        if (v?.packageName && v.packageName !== prevV?.packageName) {
+          pluginActivated.value = false;
+          ensurePluginActivated();
+        }
         if (!prevV?.windowMode && v?.windowMode) {
           // 从嵌入模式转为窗口模式
           if (route.name === 'PluginPage' && route.params.packageName === pluginId.value) {
@@ -92,12 +114,17 @@ export default {
       },
     );
 
+    onMounted(() => {
+      ensurePluginActivated();
+    });
+
     return {
       plugin,
       pluginId,
       pluginPath: computed(() => (plugin.value ? plugin.value.ui : undefined)),
       loaderVisible,
       appBarVisible: computed(() => !store.pageTransitionActive),
+      pluginActivated,
     };
   },
 };

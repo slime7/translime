@@ -160,6 +160,12 @@ translime.getPluginSetting = getPluginSetting;
 const setPluginSetting = async (...args) => api.useIpc().invoke(ipcType.SET_PLUGIN_SETTING, ...args);
 translime.setPluginSetting = setPluginSetting;
 
+const executePluginCommand = async (...args) => api.useIpc().invoke(
+  ipcType.EXECUTE_PLUGIN_COMMAND,
+  ...args,
+);
+translime.executePluginCommand = executePluginCommand;
+
 // 窗口控制
 const windowControl = {
   devtools: (win) => api.useIpc().invoke(ipcType.DEVTOOLS, win),

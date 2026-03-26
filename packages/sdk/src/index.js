@@ -182,6 +182,18 @@ export async function setPluginSetting(...args) {
 }
 
 /**
+ * 执行宿主注册的插件命令
+ * @param {...any} args
+ * @returns {Promise<any>}
+ */
+export async function executePluginCommand(...args) {
+  if (typeof window !== 'undefined' && window.ts?.executePluginCommand) {
+    return window.ts.executePluginCommand(...args);
+  }
+  return null;
+}
+
+/**
  * 获取窗口控制工具
  * @description 包含 minimize, maximize, close 等窗口操作
  * @returns {Object|null}

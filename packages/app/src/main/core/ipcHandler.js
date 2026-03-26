@@ -260,6 +260,33 @@ const ipcHandler = {
     }
     throw new Error('插件未初始化');
   },
+  async [ipcType.ACTIVATE_PLUGIN](packageName, reason = 'manual') {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      try {
+        if (reason === 'view') {
+          loader.triggerViewActivation(packageName);
+        } else {
+          loader.enablePlugin(packageName);
+        }
+        return true;
+      } catch (err) {
+        throw new Error(`插件激活出错: ${err.message}`);
+      }
+    }
+    throw new Error('插件未初始化');
+  },
+  async [ipcType.EXECUTE_PLUGIN_COMMAND](commandId, ...args) {
+    const loader = appManager.getPluginLoader();
+    if (loader) {
+      try {
+        return await loader.executeCommand(commandId, ...args);
+      } catch (err) {
+        throw new Error(`插件命令执行出错: ${err.message}`);
+      }
+    }
+    throw new Error('插件未初始化');
+  },
   async [ipcType.REFRESH_DEV_PLUGINS]() {
     const loader = appManager.getPluginLoader();
     if (loader) {

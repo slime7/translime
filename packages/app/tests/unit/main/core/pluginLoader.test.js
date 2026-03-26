@@ -288,10 +288,11 @@ describe('pluginLoader', () => {
     it('应该成功安装插件', async () => {
       // 允许安装继续（假设没有现有插件或卸载成功）
       pluginLoader.plugins = [];
+      mockFs.accessSync.mockReturnValue(undefined);
 
       const result = await pluginLoader.installPlugin(packageName);
 
-      expect(result).toEqual({ success: true, version });
+      expect(result).toEqual({ success: true, version, warnings: [] });
       // 验证元数据获取
       expect(pluginLoader.getPlugin(packageName)).toBeDefined();
     });
@@ -323,6 +324,7 @@ describe('pluginLoader', () => {
         pluginPath: '/mock/path',
         exports: 'index.js',
         enabled: false,
+        dependencies: [],
       }];
 
       pluginLoader.enablePlugin(packageName);
@@ -364,6 +366,75 @@ describe('pluginLoader', () => {
 
       expect(pluginDidLoad).toHaveBeenCalledTimes(1);
       expect(pluginLoader.plugins[0].pluginDidLoad).toBe(pluginDidLoad);
+    });
+
+    it('onAppReady 插件应在触发前保持未激活，触发后再加载', () => {
+      const pluginDidLoad = vi.fn();
+      mockRequire.mockReturnValue({ pluginDidLoad });
+
+      pluginLoader.plugins = [{
+        packageName: 'translime-plugin-app-ready',
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: true,
+        active: false,
+        activationEvents: ['onAppReady'],
+        dependencies: [],
+        optionalDependencies: [],
+        contributes: { commands: [] },
+        ipcActivationTypes: [],
+        commandActivationIds: [],
+        blockedBy: [],
+        missingDependencies: [],
+      }];
+      pluginLoader.rebuildActivationIndexes();
+
+      expect(pluginLoader.plugins[0].active).toBe(false);
+      pluginLoader.triggerActivation('onAppReady');
+      expect(pluginDidLoad).toHaveBeenCalledTimes(1);
+      expect(pluginLoader.plugins[0].active).toBe(true);
+    });
+
+    it('执行命令时应先激活插件再调用处理函数', () => {
+      const commandHandler = vi.fn(() => 'ok');
+      mockRequire.mockReturnValue({
+        commands: [
+          {
+            id: 'translime-plugin-command.run',
+            handler: commandHandler,
+          },
+        ],
+      });
+
+      pluginLoader.plugins = [{
+        packageName: 'translime-plugin-command',
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: true,
+        active: false,
+        activationEvents: ['onCommand:translime-plugin-command.run'],
+        dependencies: [],
+        optionalDependencies: [],
+        contributes: {
+          commands: [
+            {
+              id: 'translime-plugin-command.run',
+              title: 'Run',
+            },
+          ],
+        },
+        ipcActivationTypes: [],
+        commandActivationIds: ['translime-plugin-command.run'],
+        blockedBy: [],
+        missingDependencies: [],
+      }];
+      pluginLoader.rebuildActivationIndexes();
+
+      const result = pluginLoader.executeCommand('translime-plugin-command.run', 1, 2);
+
+      expect(result).toBe('ok');
+      expect(commandHandler).toHaveBeenCalledWith(1, 2);
+      expect(pluginLoader.plugins[0].active).toBe(true);
     });
   });
 

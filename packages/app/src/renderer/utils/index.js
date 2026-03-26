@@ -50,6 +50,7 @@ export const selectFileDialog = (win, options = {}) => {
 };
 
 export const openPluginWindow = (plugin, appSetting = {}) => {
+  ipc.invoke(ipcType.ACTIVATE_PLUGIN, plugin.packageName, 'view');
   const url = plugin.windowUrl
     ? plugin.windowUrl
     : `index.html#/plugin/${plugin.packageName}`;

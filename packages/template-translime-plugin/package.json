@@ -42,6 +42,19 @@
     "title": "plugin title",
     "description": "plugin description",
     "icon": "./icon.png",
+    "activationEvents": [
+      "onView"
+    ],
+    "dependencies": [],
+    "optionalDependencies": [],
+    "contributes": {
+      "commands": [
+        {
+          "id": "translime-plugin-example.increment-counter",
+          "title": "Increase Counter"
+        }
+      ]
+    },
     "//windowUrl": "dist/ui/index.html",
     "ui": "dist/ui.esm.js"
   }

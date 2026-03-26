@@ -60,6 +60,16 @@ const pluginDidLoad = () => {
   }
 };
 
+const commands = [
+  {
+    id: 'translime-plugin-example.increment-counter',
+    handler() {
+      libs.increment();
+      return libs.getCounter();
+    },
+  },
+];
+
 // 禁用时执行
 const pluginWillUnload = () => {
   // eslint-disable-next-line no-console
@@ -200,5 +210,6 @@ export default {
   settingMenu,
   pluginMenu,
   ipcHandlers,
+  commands,
   libs,
 };

@@ -16,7 +16,11 @@ export default class Ipc {
 
     // 注册通用处理通道
     this.listener.handle('ipc-fn', (ev, { type, args }) => {
-      const handler = this.handlerList[type];
+      let handler = this.handlerList[type];
+      if (!handler) {
+        appManager.getPluginLoader()?.ensurePluginIpcReady(type);
+        handler = this.handlerList[type];
+      }
       if (handler) {
         return asyncLocalStorage.run(ev.sender, async () => {
           try {
@@ -31,7 +35,11 @@ export default class Ipc {
     });
 
     this.listener.on('ipc-msg', (ev, { type, data }) => {
-      const handler = this.handlerList[type];
+      let handler = this.handlerList[type];
+      if (!handler) {
+        appManager.getPluginLoader()?.ensurePluginIpcReady(type);
+        handler = this.handlerList[type];
+      }
       if (handler) {
         asyncLocalStorage.run(ev.sender, () => {
           handler(data);
