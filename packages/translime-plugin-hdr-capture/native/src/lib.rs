@@ -30,6 +30,31 @@ pub struct WindowInfo {
     pub height: i32,
 }
 
+/// 暴露给 JavaScript 的界面元素信息结构
+#[napi(object)]
+pub struct UiElementInfo {
+    /// 元素稳定标识
+    pub id: String,
+    /// 元素运行时 ID
+    pub runtime_id: String,
+    /// 元素名称
+    pub name: String,
+    /// 控件类型
+    pub control_type: String,
+    /// 类名
+    pub class_name: String,
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+    pub width: i32,
+    pub height: i32,
+    /// 进程 ID
+    pub process_id: u32,
+    /// 所属窗口句柄
+    pub window_handle: i64,
+}
+
 /// 矩形区域
 #[napi(object)]
 pub struct Rect {
@@ -91,16 +116,32 @@ pub fn get_window_at_point(x: i32, y: i32, ignore_handle: Option<i64>) -> Option
     window::get_window_at_point(x, y, ignore_handle)
 }
 
+/// 获取指定屏幕坐标下的界面元素候选链（从内到外）
+#[napi]
+pub fn get_ui_element_candidates_at_point(
+    x: i32,
+    y: i32,
+    ignore_handle: Option<i64>,
+) -> Vec<UiElementInfo> {
+    window::get_ui_element_candidates_at_point(x, y, ignore_handle)
+}
+
+/// 获取指定窗口下的全部界面元素
+#[napi]
+pub fn get_ui_elements_for_window(window_handle: i64) -> Vec<UiElementInfo> {
+    window::get_ui_elements_for_window(window_handle)
+}
+
 // --- 屏幕捕获相关 API ---
 
 /// 捕获指定显示器的当前画面
-/// 
+///
 /// 返回包含图像数据及元数据的结果对象。
 #[napi]
 pub async fn capture_display(
-    display_id: u32, 
-    hdr_options: Option<HdrMappingOptions>, 
-    capture_cursor: Option<bool>
+    display_id: u32,
+    hdr_options: Option<HdrMappingOptions>,
+    capture_cursor: Option<bool>,
 ) -> napi::Result<CaptureResult> {
     capture::capture_display(display_id, hdr_options, capture_cursor)
         .map_err(|e| napi::Error::from_reason(e.to_string()))

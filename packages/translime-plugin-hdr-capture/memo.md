@@ -143,3 +143,61 @@ if (hdrApi) {
 *   **Vite 配置**: 不同的入口文件使用了不同的 Vite 配置文件 (`ui.vite.config.mjs`, `overlay.vite.config.mjs`)，请确保修改对应配置。
 *   **图标路径**: 插件图标必须在 `package.json` 中准确指定 (`plugin.icon`)。
 *   **Vue External**: Vue 必须在构建时被标记为 external，避免重复打包。
+
+## 2026-03 捕获界面元素功能补充
+
+### 交互模式
+
+Overlay 现在支持两种自动探测模式：
+
+*   **窗口模式**：沿用原有顶层窗口候选逻辑。
+*   **界面元素模式**：基于 Windows UI Automation API 探测鼠标位置下的界面元素层级链。
+
+两种模式通过 **Tab** 键切换，滚轮在两种模式下都可用于切换当前点位的不同层级候选。
+
+### 性能策略
+
+为了避免影响截图编辑窗口响应速度，界面元素检测采用了以下策略：
+
+*   **按需调用**：仅在界面元素模式下触发 UI Automation 探测。
+*   **前端节流**：鼠标移动不会直接同步调用原生接口，而是通过短延迟节流与“只保留最后一次点位”的方式合并请求。
+*   **单飞并发控制**：同一时间只允许一个元素检测请求在进行，旧结果不会覆盖新鼠标位置的状态。
+*   **轻量层级链查找**：原生侧先定位底层目标窗口，再在该窗口的 UI Automation 控件树内沿包含当前点位的最小子节点路径向下查找，只返回从内到外的候选链，而不是扫描整棵桌面树。
+*   **小元素候选复用**：前端会在鼠标仍停留于当前最小候选元素内部时，直接复用上一轮候选链，不继续发起 native 请求。这个规则直接影响悬停延迟，后续修改不要轻易移除。
+*   **大候选 / 整窗复用**：如果当前只有一个候选，或者当前最内层候选面积很大，则在鼠标仅小范围移动时也会复用上一轮结果，而不是每移动 1px 都重新查询。没有这条限制时，WinForms 这类只能识别到整窗的程序会产生非常密集的 IPC 和 UIA 请求，明显拖慢甚至卡住主进程。
+*   **同窗口网格缓存**：前端会基于“窗口句柄 + 外层窗口矩形 + 点位网格”缓存最近一次元素候选链。同一窗口内命中同一网格时，直接复用上一轮候选，不再进入主进程。这一层缓存主要用于压低可识别元素窗口中的悬停延迟。
+*   **多 walker 回退**：原生侧不能只依赖 `ElementFromPoint + RawViewWalker`。当前实现会依次尝试 `RawViewWalker` 父链、`ContentViewWalker` 向下命中链、`ControlViewWalker` 向下命中链，并选择层级更深、最内层矩形更小的结果。
+*   **外层窗口边缘清理**：对于 Electron / Chromium 一类窗口，UIA 最外层 `Window` 候选常常只比内层内容区域大 8px 左右。当前实现会在存在更内层同窗口候选时，剔除这种仅用于阴影或外框的 `Window` 候选，避免滚轮切换时选中窗口外缘。
+
+### 性能边界
+
+界面元素探测运行在截图 Overlay 的主链路上，因此要优先保证“不会卡住截图工具本身”：
+
+*   **深层 walker 不能全量启用**：`ContentViewWalker` / `ControlViewWalker` 在某些 Chromium / DevTools / 复杂窗口上可能非常慢，甚至出现长时间阻塞。当前实现只在 `WindowsForms10.*`、`HwndWrapper*`、`XAML`、`ApplicationFrameWindow`、`Windows.UI.Core.CoreWindow` 这一类更可能受益的窗口上启用深层向下遍历。
+*   **日志必须带耗时**：native 的 `[hdr-capture-native][uia]` 日志需要保留 `elapsed=...ms`，后续出现卡顿时先看单次探测耗时，再决定是否继续扩大 walker 使用范围。
+*   **如果“更深识别”与“响应速度”冲突，先保响应**：宁可暂时只返回窗口候选，也不要让截图 Overlay 出现明显卡顿或假死。
+
+### 原生接口
+
+`native/src/lib.rs` 额外暴露了两组 UI Automation 相关接口：
+
+*   `get_ui_element_candidates_at_point(x, y, ignore_handle)`
+*   `get_ui_elements_for_window(window_handle)`
+
+当前 Overlay 只使用第一组接口来驱动界面元素模式；第二组接口保留给后续调试或扩展用途。
+
+### JS / Rust 通信类型约束
+
+本插件通过 **N-API (`napi-rs`)** 在 JavaScript 和 Rust 之间传递数据，这一层的类型需要严格控制，尤其是窗口句柄和坐标。
+
+*   **坐标字段**：JS 传给 Rust 的 `x`、`y`、`width`、`height`、`left`、`top`、`right`、`bottom` 必须使用普通 `number`。
+*   **窗口句柄 / ignoreHandle**：当前 Rust 导出接口里使用的是 `i64`，而当前插件侧调用时必须传 **普通 `number`**，**不要传 `BigInt`**。
+*   **原因**：这次排查中已经验证，JS 侧把 `BigInt` 传给 `napi-rs` 的 `i64` 参数时，会直接报错：
+    *   `Failed to convert napi value BigInt into rust type i64`
+*   **返回值防守**：JS 侧调用 native 接口后，不能假定返回值一定是数组或对象；在进入 `.map()`、`.slice()` 之前，需要先做 `Array.isArray(...)` 或空值判断。
+*   **建议**：凡是从 Electron / Node Buffer 里读取窗口句柄时，如果最终要传给当前 Rust 导出函数，先显式转换成 `number`，并在日志中保留 `.toString()` 形式用于排查。
+
+这条规则对以下路径尤其重要：
+
+*   `src/main.js` -> `src/capture/index.js` -> `native/src/lib.rs`
+*   Overlay 元素探测 IPC：`get-ui-element-candidates-at-point`

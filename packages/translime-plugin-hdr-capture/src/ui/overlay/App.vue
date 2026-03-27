@@ -43,8 +43,11 @@ const state = reactive({
   // 探测到的窗口
   highlightedWindow: null,
   allWindows: [], // 所有预捕获的窗口信息
-  candidates: [], // 当前坐标下的候选窗口列表
+  candidates: [], // 当前坐标下的候选列表
   candidateIndex: 0, // 当前选中的候选窗口索引
+  captureMode: 'window', // 'window' | 'element'
+  elementDetectionPending: false,
+  lastDetectionSource: 'window',
 
   // 调试模式
   isDebug: false,
@@ -97,6 +100,174 @@ const activeMosaicCanvasRef = ref(null);
 
 /** 预加载的冻结画面 Image 对象 */
 const frozenImages = [];
+let pendingElementDetectPoint = null;
+let elementDetectTimer = null;
+let elementDetectInFlight = false;
+let elementDetectRequestId = 0;
+const ELEMENT_DETECT_DELAY_MS = 12;
+const ELEMENT_REUSE_DISTANCE_PX = 18;
+const ELEMENT_REUSE_DISTANCE_PX_SMALL = 8;
+const ELEMENT_CACHE_GRID_PX = 24;
+let lastElementDetectGlobalPoint = null;
+let cachedElementWindowHandle = null;
+let cachedElementWindowRect = null;
+let cachedElementCellKey = '';
+let cachedElementCandidates = [];
+
+const normalizeElementCandidatesPayload = (payload) => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  if (Array.isArray(payload?.result)) {
+    return payload.result;
+  }
+
+  if (payload && typeof payload === 'object' && Number.isInteger(payload.length)) {
+    const values = [];
+    for (let index = 0; index < payload.length; index += 1) {
+      if (payload[index]) {
+        values.push(payload[index]);
+      }
+    }
+    if (values.length > 0) {
+      return values;
+    }
+  }
+
+  return [];
+};
+
+const getCandidateArea = (candidate) => {
+  if (!candidate) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const width = Math.max(0, (candidate.right ?? 0) - (candidate.left ?? 0));
+  const height = Math.max(0, (candidate.bottom ?? 0) - (candidate.top ?? 0));
+  return width * height;
+};
+
+const sortElementCandidates = (candidates) => (
+  [...candidates].sort((leftCandidate, rightCandidate) => {
+    const areaDiff = getCandidateArea(leftCandidate) - getCandidateArea(rightCandidate);
+    if (areaDiff !== 0) {
+      return areaDiff;
+    }
+    const leftKey = getCandidateKey(leftCandidate);
+    const rightKey = getCandidateKey(rightCandidate);
+    return leftKey.localeCompare(rightKey);
+  })
+);
+
+const candidateContainsGlobalPoint = (candidate, gx, gy) => {
+  if (!candidate) {
+    return false;
+  }
+  return gx >= candidate.left
+    && gx < candidate.right
+    && gy >= candidate.top
+    && gy < candidate.bottom;
+};
+
+const getOutermostCandidate = (candidates) => {
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return null;
+  }
+
+  return candidates.reduce((currentLargest, candidate) => (
+    getCandidateArea(candidate) > getCandidateArea(currentLargest) ? candidate : currentLargest
+  ), candidates[0]);
+};
+
+const getElementWindowHandle = (candidates) => (
+  Array.isArray(candidates) && candidates.length > 0
+    ? String(candidates[0].windowHandle ?? '')
+    : ''
+);
+
+const getElementCellKey = (gx, gy) => (
+  `${Math.floor(gx / ELEMENT_CACHE_GRID_PX)}:${Math.floor(gy / ELEMENT_CACHE_GRID_PX)}`
+);
+
+const clearElementCandidateCache = () => {
+  cachedElementWindowHandle = null;
+  cachedElementWindowRect = null;
+  cachedElementCellKey = '';
+  cachedElementCandidates = [];
+};
+
+const updateElementCandidateCache = (candidates) => {
+  const outermostCandidate = getOutermostCandidate(candidates);
+  const windowHandle = getElementWindowHandle(candidates);
+
+  if (!outermostCandidate || !windowHandle || !lastElementDetectGlobalPoint) {
+    clearElementCandidateCache();
+    return;
+  }
+
+  cachedElementWindowHandle = windowHandle;
+  cachedElementWindowRect = {
+    left: outermostCandidate.left,
+    top: outermostCandidate.top,
+    right: outermostCandidate.right,
+    bottom: outermostCandidate.bottom,
+  };
+  cachedElementCellKey = getElementCellKey(lastElementDetectGlobalPoint.x, lastElementDetectGlobalPoint.y);
+  cachedElementCandidates = candidates;
+};
+
+const getCachedElementCandidates = (lx, ly) => {
+  if (!cachedElementWindowHandle || !cachedElementWindowRect || cachedElementCandidates.length === 0) {
+    return null;
+  }
+
+  const gx = lx + state.offsetX;
+  const gy = ly + state.offsetY;
+  if (!candidateContainsGlobalPoint(cachedElementWindowRect, gx, gy)) {
+    return null;
+  }
+
+  if (getElementCellKey(gx, gy) !== cachedElementCellKey) {
+    return null;
+  }
+
+  return cachedElementCandidates;
+};
+
+const shouldReuseElementCandidates = (lx, ly) => {
+  if (state.captureMode !== 'element' || state.candidates.length === 0) {
+    return false;
+  }
+
+  const primaryCandidate = state.candidates[0];
+  if (!primaryCandidate) {
+    return false;
+  }
+
+  const gx = lx + state.offsetX;
+  const gy = ly + state.offsetY;
+  if (!candidateContainsGlobalPoint(primaryCandidate, gx, gy)) {
+    return false;
+  }
+
+  if (!lastElementDetectGlobalPoint) {
+    return state.candidates.length === 1;
+  }
+
+  const dx = gx - lastElementDetectGlobalPoint.x;
+  const dy = gy - lastElementDetectGlobalPoint.y;
+  const distanceSquared = (dx * dx) + (dy * dy);
+  const area = getCandidateArea(primaryCandidate);
+  const distanceLimit = state.candidates.length === 1 || area > 400000
+    ? ELEMENT_REUSE_DISTANCE_PX
+    : ELEMENT_REUSE_DISTANCE_PX_SMALL;
+
+  return distanceSquared <= (distanceLimit * distanceLimit);
+};
 
 // 计算选区边界 (逻辑坐标)
 const selectionBounds = computed(() => {
@@ -144,6 +315,36 @@ const showMagnifier = computed(() => {
 
 // ==================== 交互逻辑 (Helpers) ====================
 
+const getCandidateKey = (candidate) => {
+  if (!candidate) {
+    return '';
+  }
+  return candidate.runtimeId
+    || candidate.id
+    || candidate.handle
+    || `${candidate.left}:${candidate.top}:${candidate.right}:${candidate.bottom}:${candidate.controlType || ''}`;
+};
+
+const applyCandidates = (newCandidates, source) => {
+  const candidatesChanged = newCandidates.length !== state.candidates.length
+    || newCandidates.some((candidate, index) => getCandidateKey(candidate) !== getCandidateKey(state.candidates[index]));
+
+  state.lastDetectionSource = source;
+  state.elementDetectionPending = false;
+
+  if (candidatesChanged) {
+    state.candidates = newCandidates;
+    state.candidateIndex = 0;
+    state.highlightedWindow = newCandidates.length > 0 ? newCandidates[0] : null;
+  } else if (!state.highlightedWindow && newCandidates.length > 0) {
+    state.candidateIndex = 0;
+    [state.highlightedWindow] = newCandidates;
+  } else if (newCandidates.length === 0) {
+    state.highlightedWindow = null;
+    state.candidateIndex = 0;
+  }
+};
+
 const detectWindow = (lx, ly) => {
   if (state.isSelecting || state.isMoving || state.hasSelection) return;
 
@@ -158,19 +359,101 @@ const detectWindow = (lx, ly) => {
   // 按面积升序排序 (从小到大)
   newCandidates.sort((a, b) => (a.width * a.height) - (b.width * b.height));
 
-  // 比较候选列表是否发生变化（通过句柄判断）
-  const candidatesChanged = newCandidates.length !== state.candidates.length
-    || newCandidates.some((c, i) => c.handle !== state.candidates[i]?.handle);
+  applyCandidates(newCandidates, 'window');
+};
 
-  if (candidatesChanged) {
-    state.candidates = newCandidates;
-    state.candidateIndex = 0;
-    state.highlightedWindow = newCandidates.length > 0 ? newCandidates[0] : null;
-  } else if (!state.highlightedWindow && newCandidates.length > 0) {
-    // 特殊情况：列表没变，但当前未选中任何窗口（例如刚取消选区），强制恢复选中
-    state.candidateIndex = 0;
-    [state.highlightedWindow] = newCandidates;
+const flushElementDetect = async () => {
+  if (elementDetectInFlight || !pendingElementDetectPoint || state.captureMode !== 'element') {
+    return;
   }
+
+  const point = pendingElementDetectPoint;
+  pendingElementDetectPoint = null;
+  elementDetectInFlight = true;
+  state.elementDetectionPending = true;
+  const requestId = elementDetectRequestId + 1;
+  elementDetectRequestId = requestId;
+
+  try {
+    const gx = point.x + state.offsetX;
+    const gy = point.y + state.offsetY;
+    logger.debug(`[uia] 请求元素候选 (${gx}, ${gy}) rid=${requestId}`);
+    const result = await window.hdrCapture.getUiElementCandidatesAtPoint(gx, gy);
+    const candidates = sortElementCandidates(normalizeElementCandidatesPayload(result));
+
+    if (requestId !== elementDetectRequestId || state.captureMode !== 'element') {
+      logger.debug(`[uia] 忽略过期结果 rid=${requestId}`);
+      return;
+    }
+
+    logger.debug(`[uia] 收到候选 count=${candidates.length} rid=${requestId}`);
+    lastElementDetectGlobalPoint = { x: gx, y: gy };
+    updateElementCandidateCache(candidates);
+    applyCandidates(candidates, 'element');
+  } catch (err) {
+    if (requestId === elementDetectRequestId) {
+      state.elementDetectionPending = false;
+      state.candidates = [];
+      state.highlightedWindow = null;
+      state.candidateIndex = 0;
+      lastElementDetectGlobalPoint = null;
+      clearElementCandidateCache();
+    }
+    logger.error('[uia] 界面元素检测失败', {
+      data: {
+        requestId,
+        errorName: err?.name,
+        errorMessage: err?.message,
+        errorStack: err?.stack,
+      },
+    });
+  } finally {
+    elementDetectInFlight = false;
+    if (pendingElementDetectPoint && state.captureMode === 'element') {
+      flushElementDetect();
+    }
+  }
+};
+
+const detectElements = (lx, ly, immediate = false) => {
+  if (state.isSelecting || state.isMoving || state.hasSelection) {
+    return;
+  }
+
+  const cachedCandidates = !immediate ? getCachedElementCandidates(lx, ly) : null;
+  if (cachedCandidates) {
+    applyCandidates(cachedCandidates, 'element-cache');
+    return;
+  }
+
+  if (!immediate && shouldReuseElementCandidates(lx, ly)) {
+    return;
+  }
+
+  pendingElementDetectPoint = { x: lx, y: ly };
+
+  if (elementDetectTimer) {
+    clearTimeout(elementDetectTimer);
+    elementDetectTimer = null;
+  }
+
+  if (immediate) {
+    flushElementDetect();
+    return;
+  }
+
+  elementDetectTimer = setTimeout(() => {
+    elementDetectTimer = null;
+    flushElementDetect();
+  }, ELEMENT_DETECT_DELAY_MS);
+};
+
+const detectCurrentTarget = (lx, ly, immediate = false) => {
+  if (state.captureMode === 'element') {
+    detectElements(lx, ly, immediate);
+    return;
+  }
+  detectWindow(lx, ly);
 };
 
 // ==================== 标注辅助函数 ====================
@@ -557,7 +840,7 @@ function handleCancel() {
 
     // 取消选区后，立即重新检测当前鼠标下的窗口
     if (state.cursorPos) {
-      detectWindow(state.cursorPos.x, state.cursorPos.y);
+      detectCurrentTarget(state.cursorPos.x, state.cursorPos.y, true);
     }
   } else {
     closeOverlay();
@@ -816,7 +1099,7 @@ const onMouseDown = (e) => {
       return;
     }
     state.hasSelection = false;
-    detectWindow(mx, my);
+    detectCurrentTarget(mx, my, true);
   }
 
   state.isSelecting = true;
@@ -899,7 +1182,7 @@ const onMouseMove = (e) => {
       return;
     }
 
-    detectWindow(mx, my);
+    detectCurrentTarget(mx, my);
   } catch (err) {
     logger.error('onMouseMove error', err);
   }
@@ -992,17 +1275,30 @@ function clearBlobUrls() {
 }
 
 function resetState() {
+  if (elementDetectTimer) {
+    clearTimeout(elementDetectTimer);
+    elementDetectTimer = null;
+  }
+  pendingElementDetectPoint = null;
+  elementDetectInFlight = false;
+  elementDetectRequestId += 1;
   state.hasSelection = false;
   state.isSelecting = false;
   state.isDragging = false;
   state.isMoving = false;
   state.isResizing = false;
   state.highlightedWindow = null;
+  state.captureMode = 'window';
+  state.elementDetectionPending = false;
+  state.lastDetectionSource = 'window';
+  lastElementDetectGlobalPoint = null;
+  clearElementCandidateCache();
   state.startX = 0;
   state.startY = 0;
   state.endX = 0;
   state.endY = 0;
   state.candidates = [];
+  state.candidateIndex = 0;
 
   // 重置绘图状态
   state.drawingMode = false;
@@ -1026,6 +1322,25 @@ function resetState() {
 
 /** Ctrl+Z 快捷键 */
 const onKeyDown = (e) => {
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+    return;
+  }
+
+  if (e.key === 'Tab' && !state.hasSelection && !state.isSelecting && !state.isMoving) {
+    e.preventDefault();
+    state.captureMode = state.captureMode === 'window' ? 'element' : 'window';
+    logger.debug(`[uia] 切换捕获模式: ${state.captureMode}`);
+    state.candidates = [];
+    state.highlightedWindow = null;
+    state.candidateIndex = 0;
+    lastElementDetectGlobalPoint = null;
+    clearElementCandidateCache();
+    if (state.cursorPos) {
+      detectCurrentTarget(state.cursorPos.x, state.cursorPos.y, true);
+    }
+    return;
+  }
+
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
     e.preventDefault();
     undo();
@@ -1057,6 +1372,8 @@ onMounted(() => {
       state.startY = 0;
       state.endX = 0;
       state.endY = 0;
+      lastElementDetectGlobalPoint = null;
+      clearElementCandidateCache();
       state.candidates = [];
 
       clearBlobUrls();
@@ -1088,9 +1405,7 @@ onMounted(() => {
 
       // 立即触发一次窗口检测，确保静止状态下也能高亮当前窗口
       if (state.cursorPos) {
-        // 注意：detectWindow 接收的是本地坐标 (相对于 Overlay 左上角)
-        // state.cursorPos 已经在上面转换为本地坐标了
-        detectWindow(state.cursorPos.x, state.cursorPos.y);
+        detectCurrentTarget(state.cursorPos.x, state.cursorPos.y, true);
       }
 
       logger.info(`[Perf] UI 数据处理完成, 等待渲染更新 (T+${Date.now() - startTime}ms)`);
@@ -1116,6 +1431,12 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (elementDetectTimer) {
+    clearTimeout(elementDetectTimer);
+    elementDetectTimer = null;
+  }
+  pendingElementDetectPoint = null;
+  elementDetectRequestId += 1;
   clearBlobUrls();
   window.removeEventListener('mousemove', onMouseMove);
   window.removeEventListener('mouseup', onMouseUp);

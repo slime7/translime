@@ -656,6 +656,31 @@ const syncShortcutRegistration = ({
   return registerShortcut(normalizedShortcut, reason);
 };
 
+const normalizeNativeInteger = (value, fallback = 0) => {
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  return fallback;
+};
+
+const runWithOverlayHitTestDisabled = (fn) => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    return fn();
+  }
+
+  try {
+    overlayWindow.setIgnoreMouseEvents(true);
+    return fn();
+  } finally {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.setIgnoreMouseEvents(false);
+    }
+  }
+};
+
 const closeOverlay = () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     // 无论普通模式还是快速模式，先通知 UI 重置状态（清空画面）
@@ -814,11 +839,10 @@ export const ipcHandlers = [
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         try {
           const handleBuf = overlayWindow.getNativeWindowHandle();
-          // 读取句柄缓冲区
           if (handleBuf.length === 8) {
-            ignoreHandle = handleBuf.readBigInt64LE(0);
+            ignoreHandle = Number(handleBuf.readBigInt64LE(0));
           } else if (handleBuf.length === 4) {
-            ignoreHandle = BigInt(handleBuf.readInt32LE(0));
+            ignoreHandle = handleBuf.readInt32LE(0);
           }
         } catch (e) {
           logger.error('获取 Overlay 窗口句柄失败:', e);
@@ -847,6 +871,72 @@ export const ipcHandlers = [
   {
     type: 'get-top-level-windows',
     handler: () => () => capture.getTopLevelWindows(),
+  },
+  {
+    type: 'get-ui-element-candidates-at-point',
+    handler: () => (x, y) => {
+      let ignoreHandle = null;
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        try {
+          const handleBuf = overlayWindow.getNativeWindowHandle();
+          if (handleBuf.length === 8) {
+            ignoreHandle = Number(handleBuf.readBigInt64LE(0));
+          } else if (handleBuf.length === 4) {
+            ignoreHandle = handleBuf.readInt32LE(0);
+          }
+        } catch (e) {
+          logger.error('获取 Overlay 窗口句柄失败:', e);
+        }
+      }
+
+      const physicalPoint = screen.dipToScreenPoint({ x: Math.round(x), y: Math.round(y) });
+      logger.debug('[uia] 开始元素探测', {
+        data: {
+          logicalPoint: { x, y },
+          physicalPoint,
+        },
+      });
+      try {
+        const result = runWithOverlayHitTestDisabled(() => capture.getUiElementCandidatesAtPoint(
+          physicalPoint.x,
+          physicalPoint.y,
+          ignoreHandle,
+        ));
+        const elements = Array.isArray(result) ? result : [];
+        logger.debug(`[uia] 元素探测完成, count=${elements.length}`);
+
+        return elements.map((element) => {
+          const rawLeft = normalizeNativeInteger(element.left);
+          const rawTop = normalizeNativeInteger(element.top);
+          const rawRight = normalizeNativeInteger(element.right);
+          const rawBottom = normalizeNativeInteger(element.bottom);
+          const topLeft = screen.screenToDipPoint({ x: rawLeft, y: rawTop });
+          const bottomRight = screen.screenToDipPoint({ x: rawRight, y: rawBottom });
+          return {
+            id: element.id?.toString?.() ?? '',
+            runtimeId: element.runtimeId?.toString?.() ?? '',
+            name: element.name ?? '',
+            controlType: element.controlType ?? '',
+            className: element.className ?? '',
+            processId: normalizeNativeInteger(element.processId),
+            windowHandle: normalizeNativeInteger(element.windowHandle),
+            left: topLeft.x,
+            top: topLeft.y,
+            right: bottomRight.x,
+            bottom: bottomRight.y,
+            width: Math.abs(bottomRight.x - topLeft.x),
+            height: Math.abs(bottomRight.y - topLeft.y),
+          };
+        });
+      } catch (error) {
+        logger.error('[uia] 元素探测主进程失败', {
+          data: {
+            errorMessage: error?.message,
+          },
+        });
+        throw error;
+      }
+    },
   },
   {
     type: 'save-capture',

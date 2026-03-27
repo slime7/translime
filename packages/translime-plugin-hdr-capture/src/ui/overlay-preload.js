@@ -45,6 +45,17 @@ contextBridge.exposeInMainWorld('hdrCapture', {
   getTopLevelWindows: () => ipcRenderer.invoke('ipc-fn', { type: `get-top-level-windows@${PLUGIN_ID}`, args: [] }),
 
   /**
+   * 获取指定坐标处的界面元素候选链（从内到外）
+   * @param {number} x
+   * @param {number} y
+   * @returns {Promise<Array>}
+   */
+  getUiElementCandidatesAtPoint: (x, y) => ipcRenderer.invoke('ipc-fn', {
+    type: `get-ui-element-candidates-at-point@${PLUGIN_ID}`,
+    args: [x, y],
+  }),
+
+  /**
    * 保存截图
    * @param {Rect} rect - 选区矩形
    * @returns {Promise<void>}

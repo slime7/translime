@@ -348,6 +348,8 @@ try {
   nativeAddon = {
     getTopLevelWindows: () => [],
     getWindowAtPoint: () => null,
+    getUiElementCandidatesAtPoint: () => [],
+    getUiElementsForWindow: () => [],
     captureDisplay: () => {
       throw new Error('Native addon not loaded');
     },
@@ -410,6 +412,24 @@ export const getTopLevelWindows = () => nativeAddon.getTopLevelWindows();
  * @returns {WindowInfo|null}
  */
 export const getWindowAtPoint = (x, y, ignoreHandle = null) => nativeAddon.getWindowAtPoint(x, y, ignoreHandle);
+
+/**
+ * 获取指定坐标处的界面元素候选链（从内到外）
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number|null} [ignoreHandle=null] - 需要忽略的窗口句柄
+ * @returns {Array}
+ */
+export const getUiElementCandidatesAtPoint = (x, y, ignoreHandle = null) => (
+  nativeAddon.getUiElementCandidatesAtPoint(x, y, ignoreHandle)
+);
+
+/**
+ * 获取指定窗口下的界面元素
+ * @param {number} windowHandle - 窗口句柄
+ * @returns {Array}
+ */
+export const getUiElementsForWindow = (windowHandle) => nativeAddon.getUiElementsForWindow(windowHandle);
 
 /**
  * 获取所有显示器信息

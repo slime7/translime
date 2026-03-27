@@ -128,18 +128,25 @@ watchEffect(() => {
 
 <template>
   <div
-    class="absolute z-50 pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
+    class="absolute z-50 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
     :style="hintStyle"
-    @mouseenter="onMouseEnter"
   >
     <div class="bg-[#121214]/75 text-white/90 px-4 py-3 rounded-xl text-[13px] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] font-medium tracking-wide">
       <p class="mb-1 flex border-b border-white/10 pb-1">
-        ✨ 智能操作提示
+        {{ state.captureMode === 'element' ? '界面元素模式' : '窗口模式' }}
       </p>
       <ul class="space-y-1.5 mt-2 opacity-80 text-xs">
-        <li>• 点击探测到的窗口快速选区</li>
-        <li>• 滚轮切换窗口层次</li>
-        <li>• <kbd class="px-1 py-0.5 bg-white/10 rounded">ESC</kbd> 取消</li>
+        <li>• Tab 切换窗口和界面元素模式</li>
+        <li>• 滚轮切换同一位置的不同层级</li>
+        <li>
+          • {{ state.captureMode === 'element' ? '点击探测到的界面元素快速选区' : '点击探测到的窗口快速选区' }}
+        </li>
+        <li v-if="state.elementDetectionPending">
+          • 正在更新界面元素候选
+        </li>
+        <li>
+          • <kbd class="px-1 py-0.5 bg-white/10 rounded">ESC</kbd> 取消
+        </li>
       </ul>
     </div>
   </div>

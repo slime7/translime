@@ -28,12 +28,68 @@ function generateMockWindows() {
     {
       handle: 1,
       title: 'Desktop',
+      className: 'DesktopWindow',
       left: 0,
       top: 0,
       right: window.innerWidth,
       bottom: window.innerHeight,
       width: window.innerWidth,
       height: window.innerHeight,
+    },
+  ];
+}
+
+function generateMockUiElements(x = window.innerWidth / 2, y = window.innerHeight / 2) {
+  const cardLeft = Math.max(80, x - 170);
+  const cardTop = Math.max(80, y - 120);
+  const cardWidth = 340;
+  const cardHeight = 220;
+
+  return [
+    {
+      id: 'mock-button',
+      runtimeId: 'mock-button',
+      name: '确认按钮',
+      controlType: 'Button',
+      className: 'PreviewButton',
+      left: cardLeft + 210,
+      top: cardTop + 146,
+      right: cardLeft + 306,
+      bottom: cardTop + 186,
+      width: 96,
+      height: 40,
+      processId: 1,
+      windowHandle: 1,
+    },
+    {
+      id: 'mock-panel',
+      runtimeId: 'mock-panel',
+      name: '设置面板',
+      controlType: 'Pane',
+      className: 'PreviewPanel',
+      left: cardLeft + 24,
+      top: cardTop + 24,
+      right: cardLeft + cardWidth - 24,
+      bottom: cardTop + cardHeight - 24,
+      width: cardWidth - 48,
+      height: cardHeight - 48,
+      processId: 1,
+      windowHandle: 1,
+    },
+    {
+      id: 'mock-window',
+      runtimeId: 'mock-window',
+      name: '预览窗口',
+      controlType: 'Window',
+      className: 'PreviewWindow',
+      left: cardLeft,
+      top: cardTop,
+      right: cardLeft + cardWidth,
+      bottom: cardTop + cardHeight,
+      width: cardWidth,
+      height: cardHeight,
+      processId: 1,
+      windowHandle: 1,
     },
   ];
 }
@@ -129,6 +185,11 @@ export async function initOverlayPreviewMock() {
     getTopLevelWindows: async () => {
       console.log('[Mock] getTopLevelWindows()');
       return generateMockWindows();
+    },
+
+    getUiElementCandidatesAtPoint: async (x, y) => {
+      console.log(`[Mock] getUiElementCandidatesAtPoint(${x}, ${y})`);
+      return generateMockUiElements(x, y);
     },
 
     saveCapture: async (rect) => {
