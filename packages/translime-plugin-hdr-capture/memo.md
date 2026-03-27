@@ -201,3 +201,19 @@ Overlay 现在支持两种自动探测模式：
 
 *   `src/main.js` -> `src/capture/index.js` -> `native/src/lib.rs`
 *   Overlay 元素探测 IPC：`get-ui-element-candidates-at-point`
+
+## 2026-03 HDR/SDR 白点处理补充
+
+### SDR 白点优先级
+
+HDR 截图路径中，SDR 输出白点按以下优先级使用：
+
+*   **用户手动设置**：当设置页面关闭“优先使用系统 SDR 白点”时，使用 `sdrWhiteNits` 滑块值。
+*   **系统 SDR 白点**：当开启“优先使用系统 SDR 白点”时，原生层通过 `QueryDisplayConfig + DisplayConfigGetDeviceInfo(DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL)` 读取当前显示器的 SDR 白点，并换算为 nits 后使用。
+*   **兜底默认值**：如果系统读取失败，回退到保持原有行为的默认值 `203 nits`。
+
+### 系统参数作用范围
+
+*   当前仅将系统 SDR 白点用于 HDR 捕获后的 `scRGB -> sRGB` 转换。
+*   `hdrMaxNits` 仍然保留为用户手动调整参数，暂未改为系统自动读取。
+*   日志会记录当前屏幕读取到的 `system_sdr_white_level` 和 `system_sdr_white_nits`，便于排查颜色偏差。

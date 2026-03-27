@@ -178,13 +178,24 @@
               <div class="slider-setting mb-4">
                 <div class="slider-header">
                   <span class="slider-label">SDR 输出最大值</span>
-                  <v-chip
-                    size="small"
-                    color="primary"
-                    variant="tonal"
-                  >
-                    {{ sliderState.sdrWhiteNits }} nits
-                  </v-chip>
+                  <div class="d-flex align-center ga-2">
+                    <v-chip
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                    >
+                      {{ sliderState.sdrWhiteNits }} nits
+                    </v-chip>
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      color="primary"
+                      :loading="systemSdrWhiteLoading"
+                      @click="applySystemSdrWhiteNits"
+                    >
+                      使用系统值
+                    </v-btn>
+                  </div>
                 </div>
                 <v-slider
                   v-model="sliderState.sdrWhiteNits"
@@ -204,7 +215,7 @@
                   </template>
                 </v-slider>
                 <div class="slider-hint text-caption text-grey">
-                  Windows 默认 SDR 白点约为 203 nits
+                  {{ systemSdrWhiteHint }}
                 </div>
               </div>
 
@@ -308,6 +319,7 @@ const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const showDebugUi = false;
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'SettingsUI' }) : baseLogger;
+const ipc = useIpc();
 
 // 设置状态
 const settings = reactive({
@@ -329,6 +341,9 @@ const sliderState = reactive({
   sdrWhiteNits: 203,
   hdrMaxNits: 1000,
 });
+const systemSdrWhiteLoading = ref(false);
+const systemSdrWhiteNits = ref(null);
+const systemSdrWhiteSource = ref('');
 
 // 用于 UI 显示的临时快捷键状态，避免输入过程中频繁触发保存
 const tempShortcut = ref('');
@@ -351,6 +366,46 @@ const previewFilenameResult = computed(() => {
   }
 });
 
+const systemSdrWhiteHint = computed(() => {
+  if (systemSdrWhiteLoading.value) {
+    return '正在读取系统 SDR 白点...';
+  }
+  if (typeof systemSdrWhiteNits.value === 'number') {
+    const hdrState = systemSdrWhiteSource.value ? `，${systemSdrWhiteSource.value}` : '';
+    return `系统当前 SDR 白点约为 ${systemSdrWhiteNits.value.toFixed(0)} nits${hdrState}。点击“使用系统值”可覆盖当前手动设置。`;
+  }
+  return '手动调整 SDR 白点；也可以点击“使用系统值”读取并覆盖当前设置。';
+});
+
+const loadSystemSdrWhiteNits = async () => {
+  systemSdrWhiteLoading.value = true;
+  try {
+    const info = await ipc.invoke(`get-system-sdr-white-nits@${PLUGIN_ID}`);
+    if (info && typeof info.sdrWhiteNits === 'number') {
+      systemSdrWhiteNits.value = info.sdrWhiteNits;
+      systemSdrWhiteSource.value = info.hdrEnabled ? '当前主屏为 HDR 模式' : '当前主屏为 SDR 模式';
+      return info.sdrWhiteNits;
+    }
+  } catch (err) {
+    logger.error('读取系统 SDR 白点失败:', err);
+  } finally {
+    systemSdrWhiteLoading.value = false;
+  }
+
+  systemSdrWhiteNits.value = null;
+  systemSdrWhiteSource.value = '';
+  return null;
+};
+
+const applySystemSdrWhiteNits = async () => {
+  const nits = await loadSystemSdrWhiteNits();
+  if (typeof nits === 'number') {
+    const rounded = Math.round(nits);
+    sliderState.sdrWhiteNits = rounded;
+    settings.sdrWhiteNits = rounded;
+  }
+};
+
 // 加载设置
 onMounted(async () => {
   const savedSettings = await getPluginSetting(PLUGIN_ID);
@@ -363,9 +418,10 @@ onMounted(async () => {
     sliderState.hdrMaxNits = settings.hdrMaxNits;
   }
 
+  await loadSystemSdrWhiteNits();
+
   // 如果保存路径为空，获取默认路径并填入（但不强制保存，除非用户修改了其他设置）
   if (!settings.savePath) {
-    const ipc = useIpc();
     try {
       const defaultPath = await ipc.invoke(`get-default-save-path@${PLUGIN_ID}`);
       if (defaultPath) {
@@ -434,7 +490,6 @@ const selectSavePath = async () => {
 
 // 开始截图
 const startCapture = async (isDebug = false) => {
-  const ipc = useIpc();
   try {
     await ipc.invoke(`start-capture@${PLUGIN_ID}`, { isDebug });
   } catch (err) {

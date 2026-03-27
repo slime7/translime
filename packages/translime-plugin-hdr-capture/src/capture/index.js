@@ -354,6 +354,7 @@ try {
       throw new Error('Native addon not loaded');
     },
     getDisplays: () => [],
+    getDisplayColorInfo: () => null,
     cropImage: () => {
       throw new Error('Native addon not loaded');
     },
@@ -436,6 +437,13 @@ export const getUiElementsForWindow = (windowHandle) => nativeAddon.getUiElement
  * @returns {DisplayInfo[]}
  */
 export const getDisplays = () => nativeAddon.getDisplays();
+
+/**
+ * 获取指定显示器的系统色彩信息
+ * @param {number} displayId - 显示器 ID
+ * @returns {{sdrWhiteLevel: number, sdrWhiteNits: number, hdrEnabled: boolean}|null}
+ */
+export const getDisplayColorInfo = (displayId = 0) => nativeAddon.getDisplayColorInfo(displayId);
 
 /**
  * 捕获指定显示器的屏幕

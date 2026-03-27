@@ -16,7 +16,7 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Resource, ID3D11Texture2D,
 };
 use windows::Win32::Graphics::Dxgi::{
-    Common::{DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_SAMPLE_DESC},
+    Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_SAMPLE_DESC},
     CreateDXGIFactory1, DXGI_OUTPUT_DESC, IDXGIDevice, IDXGIFactory1,
 };
 use windows::Win32::Graphics::Gdi::HMONITOR;
@@ -212,6 +212,33 @@ pub fn capture_display(
     // 准备 D3D 上下文与显示器句柄
     let d3d_ctx = get_or_create_d3d_context(display_id)?;
     let monitor_handle = get_monitor_handle(display_id)?;
+    let display_name = get_displays()
+        .into_iter()
+        .find(|d| d.id == display_id)
+        .map(|d| d.name);
+    let system_color_info = display_name
+        .as_deref()
+        .and_then(|name| crate::display_config::get_display_color_info(name).ok());
+    let effective_hdr_options = hdr_options.as_ref().map(|options| {
+        let mut resolved = options.clone();
+        if resolved.sdr_white_nits.is_none() {
+            resolved.sdr_white_nits = system_color_info.map(|info| info.sdr_white_nits);
+        }
+        resolved
+    });
+
+    if let Some(info) = system_color_info {
+        println!(
+            "[Rust-Color] display_id={} system_sdr_white_level={} system_sdr_white_nits={:.2} hdr_enabled={}",
+            display_id, info.sdr_white_level, info.sdr_white_nits, info.hdr_enabled
+        );
+    }
+    let use_hdr_capture = system_color_info.map(|info| info.hdr_enabled).unwrap_or(true);
+    let frame_pool_format = if use_hdr_capture {
+        DirectXPixelFormat::R16G16B16A16Float
+    } else {
+        DirectXPixelFormat::B8G8R8A8UIntNormalized
+    };
 
     let t_setup = t_start.elapsed();
 
@@ -223,7 +250,7 @@ pub fn capture_display(
         let item_size = item.Size()?;
         let frame_pool = Direct3D11CaptureFramePool::CreateFreeThreaded(
             &d3d_ctx.winrt_device,
-            DirectXPixelFormat::R16G16B16A16Float,
+            frame_pool_format,
             2,
             item_size,
         )?;
@@ -352,6 +379,7 @@ pub fn capture_display(
                             .and_then(|o| o.preserve_raw)
                             .unwrap_or(false);
                         let is_f16 = params.Format == DXGI_FORMAT_R16G16B16A16_FLOAT;
+                        let is_bgra8 = params.Format == DXGI_FORMAT_B8G8R8A8_UNORM;
 
                         // 执行快速的 CPU 内存拷贝，并处理可能的内存步幅 (Stride) 差异
                         let bpp = if is_f16 { 8 } else { 4 };
@@ -388,10 +416,14 @@ pub fn capture_display(
                                 &cpu_buffer,
                                 width,
                                 height,
-                                hdr_options.as_ref(),
+                                effective_hdr_options.as_ref(),
                             );
                             let raw = if preserve_raw { Some(cpu_buffer) } else { None };
                             (processed, raw)
+                        } else if is_bgra8 {
+                            let processed =
+                                crate::sdr_proc::process_bgra8_buffer_parallel(&cpu_buffer, width, height);
+                            (processed, None)
                         } else {
                             (cpu_buffer, None)
                         };

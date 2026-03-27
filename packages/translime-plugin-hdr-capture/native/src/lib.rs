@@ -8,7 +8,9 @@
 #![deny(clippy::all)]
 
 mod capture;
+mod display_config;
 mod image_proc;
+mod sdr_proc;
 mod window;
 
 use napi_derive::napi;
@@ -87,6 +89,13 @@ pub struct HdrMappingOptions {
     pub preserve_raw: Option<bool>,
 }
 
+#[napi(object)]
+pub struct DisplayColorInfo {
+    pub sdr_white_level: u32,
+    pub sdr_white_nits: f64,
+    pub hdr_enabled: bool,
+}
+
 /// 屏幕捕获返回的综合结果
 #[napi(object)]
 pub struct CaptureResult {
@@ -151,6 +160,21 @@ pub async fn capture_display(
 #[napi]
 pub fn get_displays() -> Vec<capture::DisplayInfo> {
     capture::get_displays()
+}
+
+#[napi]
+pub fn get_display_color_info(display_id: u32) -> Option<DisplayColorInfo> {
+    let display_name = capture::get_displays()
+        .into_iter()
+        .find(|display| display.id == display_id)
+        .map(|display| display.name)?;
+    let info = display_config::get_display_color_info(&display_name).ok()?;
+
+    Some(DisplayColorInfo {
+        sdr_white_level: info.sdr_white_level,
+        sdr_white_nits: info.sdr_white_nits,
+        hdr_enabled: info.hdr_enabled,
+    })
 }
 
 // --- 图像处理相关 API ---

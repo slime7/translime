@@ -267,7 +267,11 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
 
   logger.info('HDR 映射配置:', {
     data: {
-      enableHdrMapping, sdrWhiteNits, hdrMaxNits, preserveHdr, captureCursor,
+      enableHdrMapping,
+      sdrWhiteNits,
+      hdrMaxNits,
+      preserveHdr,
+      captureCursor,
     },
   });
 
@@ -1007,6 +1011,27 @@ export const ipcHandlers = [
   {
     type: 'get-default-save-path',
     handler: () => async () => app.getPath('pictures'),
+  },
+  {
+    type: 'get-system-sdr-white-nits',
+    handler: () => async () => {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const nativeDisplays = capture.getDisplays();
+      const centerX = primaryDisplay.bounds.x + (primaryDisplay.bounds.width / 2);
+      const centerY = primaryDisplay.bounds.y + (primaryDisplay.bounds.height / 2);
+      const matchedDisplay = nativeDisplays.find((display) => (
+        centerX >= display.x
+        && centerX <= display.x + display.width
+        && centerY >= display.y
+        && centerY <= display.y + display.height
+      )) || nativeDisplays.find((display) => display.isPrimary) || nativeDisplays[0];
+
+      if (!matchedDisplay) {
+        return null;
+      }
+
+      return capture.getDisplayColorInfo(matchedDisplay.id);
+    },
   },
 ];
 
