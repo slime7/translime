@@ -463,6 +463,28 @@ fn choose_better_path(
     current_best
 }
 
+fn prune_duplicate_bounds(path: &mut Vec<UiElementInfo>) {
+    if path.len() < 2 {
+        return;
+    }
+
+    let mut deduped = Vec::with_capacity(path.len());
+    for candidate in path.drain(..) {
+        let is_duplicate = deduped.last().is_some_and(|previous: &UiElementInfo| {
+            previous.left == candidate.left
+                && previous.top == candidate.top
+                && previous.right == candidate.right
+                && previous.bottom == candidate.bottom
+        });
+
+        if !is_duplicate {
+            deduped.push(candidate);
+        }
+    }
+
+    *path = deduped;
+}
+
 fn prune_redundant_outer_window(path: &mut Vec<UiElementInfo>) {
     if path.len() < 2 {
         return;
@@ -631,6 +653,7 @@ pub fn get_ui_element_candidates_at_point(
         }
     }
 
+    prune_duplicate_bounds(&mut best_path);
     prune_redundant_outer_window(&mut best_path);
 
     let preview = best_path
