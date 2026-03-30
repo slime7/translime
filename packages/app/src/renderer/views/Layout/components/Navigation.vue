@@ -101,7 +101,10 @@ export default {
     const store = useGlobalStore();
     const alert = useAlert();
 
-    const pluginPages = computed(() => store.plugins.filter((p) => p.enabled && !(!p.ui && !p.windowUrl)));
+    const pluginPages = computed(() => {
+      const pinned = store.appSetting?.pinnedPlugins || [];
+      return store.plugins.filter((p) => p.enabled && !(!p.ui && !p.windowUrl) && pinned.includes(p.packageName));
+    });
     const showNotification = () => {
       alert.showDrawer();
     };

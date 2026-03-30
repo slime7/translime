@@ -11,6 +11,7 @@ const useGlobalStore = defineStore('globalStore', {
       theme: 'system',
       showDevPlugin: false,
       useNativeTitleBar: true,
+      pinnedPlugins: [],
       themeColor: {
         name: 'translime',
         source: '#20a6fc',
@@ -51,7 +52,20 @@ const useGlobalStore = defineStore('globalStore', {
           source: '#20a6fc',
           variant: 'SchemeRainbow',
         });
+        state.appSetting.pinnedPlugins = await appConfigStore.get('setting.pinnedPlugins', []);
       });
+    },
+    async togglePinPlugin(packageName) {
+      if (!this.appSetting.pinnedPlugins) {
+        this.appSetting.pinnedPlugins = [];
+      }
+      const index = this.appSetting.pinnedPlugins.indexOf(packageName);
+      if (index > -1) {
+        this.appSetting.pinnedPlugins.splice(index, 1);
+      } else {
+        this.appSetting.pinnedPlugins.push(packageName);
+      }
+      await appConfigStore.set('setting.pinnedPlugins', JSON.parse(JSON.stringify(this.appSetting.pinnedPlugins)));
     },
     setAppOpenAtLogin(open) {
       this.appSetting.openAtLogin = open;

@@ -63,3 +63,17 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 
 *   所有 `ipc.invoke` 调用必须遵循 `事件名@插件ID` 的格式，例如：`ipc.invoke('get-data@translime-plugin-example')`。
 *   在主进程对应的 `ipcHandlers` 中，处理函数会自动解构出 `sendToClient` 等工具。
+
+## 7. 样式隔离与 Tailwind CSS 规范
+
+**严禁全局样式污染**：主程序启用了 Vuetify 并按需禁用了部分功能，且为 Tailwind 配置了 `@layer tailwind` 以降低默认优先级。若插件随意注入（如直接 `@import "tailwindcss";`），其生成的非级联级 (Unlayered) 样式**将直接覆盖并破坏主程序**的响应式网格 (`md:grid-cols-3` 等)。
+
+如果你在插件开发中使用了 Tailwind CSS，**必须**采取以下任意一种样式隔离手段：
+1. **作用域包裹**：在你的 `index.css` 或主样式文件中，将 tailwind 的引入放在唯一的 `@layer` 中（降权）：
+    ```css
+    @layer plugin_your_name {
+      @import "tailwindcss";
+    }
+    ```
+2. **在主组件外层限制 Prefix (针对 v3)**：配置 `prefix: 'tw-'`，并在最外层使用唯一的 wrapper class。
+3. **禁用预设重置 (Preflight)**：如果你不需要全局 reset，不要在样式中包含 preflight，以防修改宿主的 button、svg 默认表现。

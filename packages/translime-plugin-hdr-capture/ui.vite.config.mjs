@@ -1,9 +1,12 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
-import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import vuetify from 'vite-plugin-vuetify';
-import { getPreviewSettingsPath, translimeSdk } from 'translime-sdk/vite';
+import {
+  createPluginCssIsolationPlugins,
+  getPreviewSettingsPath,
+  translimeSdk,
+} from 'translime-sdk/vite';
 
 /**
  * @type {import('vite').UserConfig}
@@ -33,27 +36,7 @@ export default defineConfig(({ mode }) => {
   // 非 preview 模式下添加 CSS 注入插件
   if (!isPreview) {
     plugins.push(
-      cssInjectedByJsPlugin({
-        styleId: 'translime-plugin-hdr-capture',
-        injectCodeFunction: function injectCodeCustomRunTimeFunction(cssCode, options) {
-          try {
-            if (typeof document !== 'undefined') {
-              const elementStyle = document.createElement('style');
-              elementStyle.id = options.styleId;
-
-              const existingElement = document.getElementById(options.styleId);
-              if (existingElement) {
-                existingElement.remove();
-              }
-              elementStyle.appendChild(document.createTextNode(`${cssCode}`));
-              document.head.appendChild(elementStyle);
-            }
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('vite-plugin-css-injected-by-js', e);
-          }
-        },
-      }),
+      ...createPluginCssIsolationPlugins('translime-plugin-hdr-capture'),
     );
   }
 

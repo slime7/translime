@@ -23,6 +23,39 @@ export default defineConfig({
 });
 ```
 
+## 插件 UI 样式隔离
+
+如果插件 UI 通过 `vite-plugin-css-injected-by-js` 注入样式，推荐直接使用 SDK 提供的样式隔离封装，而不是手写注入逻辑。
+
+```javascript
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import tailwindcss from '@tailwindcss/vite';
+import { translimeSdk, createPluginCssIsolationPlugins } from 'translime-sdk/vite';
+
+const pluginId = 'translime-plugin-example';
+
+export default defineConfig(({ mode }) => {
+  const isPreview = mode === 'preview';
+
+  return {
+    plugins: [
+      vue(),
+      tailwindcss(),
+      translimeSdk(),
+      ...(!isPreview ? createPluginCssIsolationPlugins(pluginId) : []),
+    ],
+  };
+});
+```
+
+这套封装会同时处理两件事：
+
+- 构建阶段把插件 CSS 选择器限制在 `.plugin-ui-loader[data-plugin-id="插件ID"]` 下
+- 运行时把插件注入样式包进 `@layer 插件ID`
+
+配合宿主侧的运行时防御后，插件和主程序的样式冲突会明显减少。
+
 ## 代码示例
 
 ### 主进程
