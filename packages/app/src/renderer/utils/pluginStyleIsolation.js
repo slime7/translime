@@ -242,7 +242,7 @@ const processStyleElement = (node, pluginId) => {
 };
 
 const processLinkElement = async (node, pluginId) => {
-  const href = node.href;
+  const { href } = node;
   if (!href) {
     return;
   }

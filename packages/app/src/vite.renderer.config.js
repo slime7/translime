@@ -47,7 +47,13 @@ export default defineConfig(({ mode }) => {
           },
         ],
       }),
-      vue(),
+      vue({
+        template: {
+          compilerOptions: {
+            isCustomElement: (tag) => tag === 'webview',
+          },
+        },
+      }),
       vuetify({
         styles: {
           configFile: resolve(RENDERER_ROOT, 'assets/styles/settings.scss'),

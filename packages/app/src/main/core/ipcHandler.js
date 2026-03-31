@@ -143,10 +143,11 @@ const ipcHandler = {
         skipTaskbar: typeof options.skipTaskbar !== 'undefined' ? options.skipTaskbar : false,
         focusable: typeof options.focusable !== 'undefined' ? options.focusable : true,
         webPreferences: {
-          preload: join(mainStore.ROOT, '../preload/index.cjs'),
+          preload: join(app.getAppPath(), 'dist/preload/index.cjs'),
           nodeIntegration: false,
           contextIsolation: true,
           sandbox: false,
+          webviewTag: true,
         },
       }, null);
       appManager.setChildWin(name, win);
@@ -496,6 +497,9 @@ const ipcHandler = {
       logger.error('Failed to get system accent color', e);
       return null;
     }
+  },
+  [ipcType.GET_PRELOAD_PATH]() {
+    return `file://${join(app.getAppPath(), 'dist/preload/index.cjs').replace(/\\/g, '/')}`;
   },
   ping() {
     logger.debug('pong', new Date());

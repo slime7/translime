@@ -1,24 +1,28 @@
 <script setup>
 import {
+  computed,
   defineComponent,
   h,
   markRaw,
   onMounted,
   onUnmounted,
   ref,
+  watch,
 } from 'vue';
 import { withPluginRuntimeContext } from '@/utils/pluginStyleIsolation';
+import useGlobalStore from '@/store/globalStore';
 
 const props = defineProps({
-  pluginId: {
-    type: String,
-    required: true,
-  },
-  pluginPath: {
+  packageName: {
     type: String,
     required: true,
   },
 });
+
+const store = useGlobalStore();
+const plugin = computed(() => store.plugin(props.packageName));
+const pluginId = computed(() => plugin.value?.packageName);
+const pluginPath = computed(() => plugin.value?.ui);
 
 const visible = ref(false);
 const PluginUi = ref();
@@ -33,30 +37,45 @@ const createScopedPluginComponent = (component, pluginId) => defineComponent({
 });
 
 const mountPlugin = async () => {
+  if (!plugin.value || !pluginPath.value) {
+    return;
+  }
   try {
     const uiBlob = await withPluginRuntimeContext(
-      props.pluginId,
-      () => window.ts.loadPluginUi(props.pluginPath),
+      pluginId.value,
+      () => window.ts.loadPluginUi(pluginPath.value),
     );
+
     if (currentUiUrl) {
       URL.revokeObjectURL(currentUiUrl);
     }
     currentUiUrl = URL.createObjectURL(uiBlob);
+
     const ui = await withPluginRuntimeContext(
-      props.pluginId,
+      pluginId.value,
       () => import(/* @vite-ignore */ currentUiUrl),
     );
+
     const pluginComponent = ui.default || ui;
-    PluginUi.value = markRaw(createScopedPluginComponent(pluginComponent, props.pluginId));
+    PluginUi.value = markRaw(createScopedPluginComponent(pluginComponent, pluginId.value));
     visible.value = true;
+    error.value = null;
   } catch (err) {
     error.value = err.message;
   }
 };
 
 onMounted(() => {
-  mountPlugin();
+  if (plugin.value) {
+    mountPlugin();
+  }
 });
+
+watch(plugin, (newVal) => {
+  if (newVal && !visible.value) {
+    mountPlugin();
+  }
+}, { immediate: true });
 
 onUnmounted(() => {
   if (currentUiUrl) {
@@ -66,19 +85,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="plugin-ui-loader" :data-plugin-id="pluginId">
+  <div class="plugin-ui-loader w-full h-full min-h-screen" :data-plugin-id="pluginId">
     <template v-if="visible">
       <component :is="PluginUi" />
     </template>
 
-    <div v-else>
+    <div v-else-if="error" class="p-4 text-red-500">
       {{ error }}
     </div>
   </div>
 </template>
-
-<style scoped lang="scss">
-.plugin-ui-loader {
-  min-height: calc(100% - 48px);
-}
-</style>

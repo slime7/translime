@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { webContents } from 'electron';
 import ipcHandler from './ipcHandler';
 import appManager from '../utils/useAppManager';
 
@@ -67,20 +68,15 @@ export default class Ipc {
   }
 
   /**
-   * 发送消息到所有已打开的窗口
+   * 发送消息到所有已打开的窗口和Webview
    * @param {string} type 消息类型
    * @param {any} data 消息数据
    */
   sendToAllWindows(type, data) {
-    // 发送到主窗口
-    if (this.sender && !this.sender.isDestroyed()) {
-      this.sender.send('ipc-reply', { type, data });
-    }
-    // 发送到所有子窗口
-    const childWins = appManager.getChildWin();
-    Object.values(childWins).forEach((win) => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('ipc-reply', { type, data });
+    const allWebContents = webContents.getAllWebContents();
+    allWebContents.forEach((wc) => {
+      if (!wc.isDestroyed() && !wc.isDevTools) {
+        wc.send('ipc-reply', { type, data });
       }
     });
   }

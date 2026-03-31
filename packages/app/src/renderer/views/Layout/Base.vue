@@ -16,18 +16,24 @@
       <notification />
 
       <div class="flex flex-col h-full" id="app-main-container">
-        <div class="scroll-content">
-          <router-view v-slot="{ Component, route }">
-            <v-fade-transition
-              mode="out-in"
-              @after-enter="onEnter"
-              @before-leave="onLeave"
-            >
-              <keep-alive>
-                <component :is="Component" :key="route.path" />
-              </keep-alive>
-            </v-fade-transition>
-          </router-view>
+        <div class="scroll-content flex-auto">
+          <div class="content-stage">
+            <router-view v-slot="{ Component, route }">
+              <div :class="['route-stage', { 'route-stage--plugin': route.name === 'PluginPage' }]">
+                <v-fade-transition
+                  mode="out-in"
+                  @after-enter="onEnter"
+                  @before-leave="onLeave"
+                >
+                  <keep-alive>
+                    <component :is="Component" :key="route.path" />
+                  </keep-alive>
+                </v-fade-transition>
+              </div>
+            </router-view>
+
+            <embedded-plugin-webviews />
+          </div>
         </div>
       </div>
     </v-main>
@@ -52,6 +58,7 @@ import Navigation from '@/views/Layout/components/Navigation.vue';
 import Notification from '@/views/Layout/components/Notification.vue';
 import useGlobalStore from '@/store/globalStore';
 import { useIpc } from '@/hooks/electron';
+import EmbeddedPluginWebviews from '@/views/plugins/EmbeddedPluginWebviews.vue';
 
 export default {
   name: 'LayoutBase',
@@ -61,6 +68,7 @@ export default {
     Notification,
     MainFooter,
     WindowControls,
+    EmbeddedPluginWebviews,
   },
 
   setup() {
@@ -129,5 +137,24 @@ export default {
   &::-webkit-scrollbar {
     background-color: transparent;
   }
+}
+
+.content-stage {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.route-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.route-stage--plugin {
+  flex: 0 0 auto;
 }
 </style>

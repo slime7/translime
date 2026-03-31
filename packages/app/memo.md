@@ -47,7 +47,9 @@ src/
   - `onView`
   - `onCommand:<commandId>`
   - `onIpc:<ipcType>`
-- 插件 UI 仍然是页面进入时动态加载；主进程插件逻辑现在也支持在真正需要时再激活。
+- 插件 UI 现已全面迁移至隔离的 `<webview>` 或独立的 `BrowserWindow` 中进行渲染（Out-of-Process）。
+- 这意味着插件拥有完全独立的 DOM 与 CSS 运行环境，从根本上消灭了与宿主程序的样式污染与冲突风险。
+- 对于主界面内嵌的插件页，宿主会缓存对应的 `<webview>` 实例并在路由切换时仅切换显示状态，避免每次返回插件页都重新加载整个插件前端。
 
 ## 插件 Manifest 约定
 
@@ -105,7 +107,8 @@ src/
 
 - **图标**: Material Design Icons (md) 风格，**禁用 `mdi-` 前缀**，写法: `<v-icon icon="home" />`
 - **插件环境隔离**: 主进程用 `getMainStore()`/`usePluginConfig()`，渲染进程用 `useIpc()`/`getPluginSetting()` 等
-- **插件 UI**: 强制 Vuetify 3，CSS 通过 `vite-plugin-css-injected-by-js` 注入
+- **插件 UI**: 强制 Vuetify 3，CSS 通过 `vite-plugin-css-injected-by-js` 注入。由于现在插件运行在 `<webview>` 独立沙箱内，可以安全放心地使用全局生效的样式（如 Tailwind `@layer` 等），不会影响主程序。
+- **初始化边界**: `main-renderer-ready` 只允许主窗口首屏渲染完成后触发，`PluginRender` 这类插件渲染页不能重复触发宿主启动初始化逻辑。
 
 ## 命令
 

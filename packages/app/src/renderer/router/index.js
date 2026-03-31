@@ -6,6 +6,7 @@ import AppLogViewer from '../views/LogViewer.vue';
 import AppPlugins from '../views/plugins/Plugins.vue';
 import AppSetting from '../views/Setting.vue';
 import AppPluginPage from '../views/plugins/PluginPage.vue';
+import AppPluginRender from '../views/plugins/PluginRender.vue';
 
 const routes = [
   {
@@ -60,6 +61,12 @@ const routes = [
         props: true,
       },
     ],
+  },
+  {
+    path: '/plugin-render/:packageName',
+    name: 'PluginRender',
+    component: AppPluginRender,
+    props: true,
   },
 ];
 

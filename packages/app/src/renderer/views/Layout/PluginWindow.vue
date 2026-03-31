@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar class="system-bar p-0" v-if="!appSetting.useNativeTitleBar">
+    <v-system-bar class="system-bar p-0" v-if="!appSetting.useNativeTitleBar && !isEmbedded">
       <div class="px-4">
         {{ plugin ? `${plugin.title} - translime` : 'translime' }}
       </div>
@@ -17,7 +17,7 @@
 
     <v-main class="h-screen">
       <div class="flex flex-col h-full" id="app-main-container">
-        <div class="scroll-content">
+        <div class="scroll-content flex-auto">
           <router-view v-slot="{ Component, route }">
             <v-fade-transition
               mode="out-in"
@@ -77,6 +77,7 @@ export default {
     const plugin = computed(() => store.plugin(packageName.value));
     const isMaximize = ref(false);
     const appSetting = computed(() => store.appSetting);
+    const isEmbedded = computed(() => route.query.embedded === 'true');
 
     const onMaximizeStatusChange = () => {
       ipc.on(`set-maximize-status:plugin-window-${packageName.value}`, (maximize) => {
@@ -124,6 +125,7 @@ export default {
       appSetting,
       onEnter,
       onLeave,
+      isEmbedded,
     };
   },
 };

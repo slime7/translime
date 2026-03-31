@@ -1167,6 +1167,18 @@ class PluginLoader extends EventEmitter {
     return true;
   }
 
+  restartPlugin(packageName) {
+    const plugin = this.getPlugin(packageName);
+    if (!plugin) {
+      throw new Error(`插件 "${packageName}" 不存在`);
+    }
+    this.disablePlugin(packageName, {
+      keepDisabledRecord: false,
+      persistState: false,
+    });
+    return this.enablePlugin(packageName);
+  }
+
   refreshDevPlugins() {
     const previousPlugins = [...this.plugins];
     previousPlugins.forEach((plugin) => {
@@ -1371,8 +1383,7 @@ class PluginLoader extends EventEmitter {
         label: '重启插件',
         visible: plugin.enabled,
         click() {
-          self.disablePlugin(packageName);
-          self.enablePlugin(packageName);
+          self.restartPlugin(packageName);
           ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
         },
       },

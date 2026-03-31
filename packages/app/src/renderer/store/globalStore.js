@@ -22,6 +22,8 @@ const useGlobalStore = defineStore('globalStore', {
     dark: false,
     appArgv: [],
     pageTransitionActive: true,
+    embeddedPluginWebviews: {},
+    embeddedPluginInspectRequest: null,
   }),
   getters: {
     plugin: (state) => (pluginId) => state.plugins.find((plugin) => plugin.packageName === pluginId),
@@ -29,12 +31,54 @@ const useGlobalStore = defineStore('globalStore', {
   actions: {
     setPlugins(plugins) {
       this.plugins = plugins;
+      const availablePluginIds = new Set(
+        plugins
+          .filter((plugin) => plugin.enabled && plugin.ui && !plugin.windowMode)
+          .map((plugin) => plugin.packageName),
+      );
+      this.embeddedPluginWebviews = Object.fromEntries(
+        Object.entries(this.embeddedPluginWebviews)
+          .filter(([packageName]) => availablePluginIds.has(packageName)),
+      );
     },
     updatePlugin(packageName, data) {
       const index = this.plugins.findIndex((p) => p.packageName === packageName);
       if (index !== -1) {
         this.plugins[index] = { ...this.plugins[index], ...data };
       }
+    },
+    setEmbeddedPluginWebview(packageName, webviewInfo) {
+      if (!packageName) {
+        return;
+      }
+      this.embeddedPluginWebviews = {
+        ...this.embeddedPluginWebviews,
+        [packageName]: {
+          packageName,
+          ...this.embeddedPluginWebviews[packageName],
+          ...webviewInfo,
+        },
+      };
+    },
+    removeEmbeddedPluginWebview(packageName) {
+      if (!packageName || !this.embeddedPluginWebviews[packageName]) {
+        return;
+      }
+      const nextWebviews = { ...this.embeddedPluginWebviews };
+      delete nextWebviews[packageName];
+      this.embeddedPluginWebviews = nextWebviews;
+    },
+    requestEmbeddedPluginInspect(packageName) {
+      if (!packageName) {
+        return;
+      }
+      this.embeddedPluginInspectRequest = {
+        packageName,
+        time: Date.now(),
+      };
+    },
+    clearEmbeddedPluginInspectRequest() {
+      this.embeddedPluginInspectRequest = null;
     },
     async initAppConfig() {
       this.$patch(async (state) => {

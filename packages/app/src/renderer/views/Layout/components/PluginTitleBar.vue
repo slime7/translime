@@ -2,6 +2,9 @@
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 
+const isDev = import.meta.env.DEV;
+const emit = defineEmits(['inspect']);
+
 const ipc = useIpc();
 const props = defineProps({
   plugin: {
@@ -34,6 +37,19 @@ const showContextMenu = () => {
         @click="showContextMenu"
       >
         {{ plugin.title }}
+      </v-btn>
+    </template>
+
+    <template #append>
+      <v-btn
+        v-if="isDev"
+        size="small"
+        color="primary"
+        variant="tonal"
+        @click="emit('inspect')"
+      >
+        <v-icon>bug_report</v-icon>
+        Inspect
       </v-btn>
     </template>
   </v-app-bar>
