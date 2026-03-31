@@ -2,11 +2,14 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import vuetify from 'vite-plugin-vuetify';
-import {
+import * as translimeVite from 'translime-sdk/vite';
+
+const {
+  // eslint-disable-next-line import-x/namespace
   createPluginCssIsolationPlugins,
   getPreviewSettingsPath,
   translimeSdk,
-} from 'translime-sdk/vite';
+} = translimeVite;
 
 /**
  * @type {import('vite').UserConfig}

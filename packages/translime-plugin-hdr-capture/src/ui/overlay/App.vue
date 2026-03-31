@@ -8,6 +8,11 @@ import SelectionRect from './components/SelectionRect.vue';
 import ActionToolbar from './components/ActionToolbar.vue';
 import HintBox from './components/HintBox.vue';
 import Magnifier from './components/Magnifier.vue';
+import {
+  buildAnnotationStepsMeta,
+  resolveAnnotationTool,
+  sortAnnotationsByHistory,
+} from './annotation-state';
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();
@@ -467,7 +472,11 @@ const finalizeAnnotation = (overrideTool = null) => {
   const bounds = activeAnnotationBounds.value;
   if (bounds && bounds.w > 2 && bounds.h > 2) {
     annotationIdCounter += 1;
-    const tool = overrideTool || state.activeTool || 'rect';
+    const tool = resolveAnnotationTool({
+      overrideTool,
+      activeAnnotation: state.activeAnnotation,
+      activeTool: state.activeTool,
+    });
 
     if (tool === 'mosaic') {
       state.annotations.push({
@@ -575,6 +584,27 @@ const getAnnotationStyle = (ann) => {
   return style;
 };
 
+const orderedAnnotations = computed(() => sortAnnotationsByHistory(state.annotations));
+
+const getMosaicAnnotationStyle = (ann) => ({
+  position: 'absolute',
+  left: `${ann.x}px`,
+  top: `${ann.y}px`,
+  width: `${ann.w}px`,
+  height: `${ann.h}px`,
+});
+
+const getTextAnnotationStyle = (ann) => ({
+  position: 'absolute',
+  left: `${ann.x}px`,
+  top: `${ann.y}px`,
+  fontSize: `${ann.fontSize}px`,
+  color: ann.color,
+  fontFamily: ann.fontFamily || 'sans-serif',
+  whiteSpace: 'pre-wrap',
+  lineHeight: 1.2,
+});
+
 /** 活动标注样式（响应式跟随当前工具配置） */
 const activeAnnotationStyle = computed(() => {
   const ann = activeAnnotationBounds.value;
@@ -582,7 +612,10 @@ const activeAnnotationStyle = computed(() => {
     return {};
   }
 
-  const tool = state.activeTool || 'rect';
+  const tool = resolveAnnotationTool({
+    activeAnnotation: state.activeAnnotation,
+    activeTool: state.activeTool,
+  });
 
   // 马赛克工具不需要 DOM 样式预览，由单独的 canvas 元素实现
   if (tool === 'mosaic') {
@@ -894,60 +927,34 @@ const onResizeStart = (direction) => {
 
 // ==================== 标注渲染 ====================
 
-/**
- * 将所有标注绘制到离屏 Canvas，返回 RGBA 像素数据
- * @param {number} w - 选区逻辑宽度
- * @param {number} h - 选区逻辑高度
- * @param {number} originX - 选区左上角 X（屏幕逻辑坐标）
- * @param {number} originY - 选区左上角 Y（屏幕逻辑坐标）
- * @returns {{ buffer: Uint8Array, width: number, height: number } | null}
- */
-const renderAnnotationsToBuffer = (w, h, originX, originY) => {
-  // 定型活动标注（如果有）
-  finalizeAnnotation();
-  finalizeTextAnnotation();
-
-  // 筛选 overlay 类型标注（排除 mosaic，它在主进程处理）
-  const overlayAnnotations = state.annotations.filter(
-    (ann) => ann.tool !== 'mosaic',
-  );
-
-  if (overlayAnnotations.length === 0) {
-    return null;
-  }
-
+const renderOverlayAnnotationToBuffer = (ann, w, h, originX, originY) => {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
 
-  overlayAnnotations.forEach((ann) => {
-    // 转换为选区内部坐标
-    const ax = ann.x - originX;
-    const ay = ann.y - originY;
+  const ax = ann.x - originX;
+  const ay = ann.y - originY;
 
-    if (ann.tool === 'text') {
-      // 渲染文本标注
-      ctx.font = `${ann.fontSize}px ${ann.fontFamily || 'sans-serif'}`;
-      ctx.fillStyle = ann.color;
-      ctx.textBaseline = 'top';
+  if (ann.tool === 'text') {
+    ctx.font = `${ann.fontSize}px ${ann.fontFamily || 'sans-serif'}`;
+    ctx.fillStyle = ann.color;
+    ctx.textBaseline = 'top';
 
-      // 处理多行文本
-      const lines = (ann.text || '').split('\n');
-      const lineHeight = ann.fontSize * 1.2;
-      lines.forEach((line, i) => {
-        ctx.fillText(line, ax, ay + i * lineHeight);
-      });
-    } else if (ann.type === 'stroke') {
-      ctx.strokeStyle = ann.color;
-      ctx.lineWidth = ann.strokeWidth;
-      const halfLW = ann.strokeWidth / 2;
-      ctx.strokeRect(ax + halfLW, ay + halfLW, ann.w - ann.strokeWidth, ann.h - ann.strokeWidth);
-    } else {
-      ctx.fillStyle = ann.color;
-      ctx.fillRect(ax, ay, ann.w, ann.h);
-    }
-  });
+    const lines = (ann.text || '').split('\n');
+    const lineHeight = ann.fontSize * 1.2;
+    lines.forEach((line, i) => {
+      ctx.fillText(line, ax, ay + i * lineHeight);
+    });
+  } else if (ann.type === 'stroke') {
+    ctx.strokeStyle = ann.color;
+    ctx.lineWidth = ann.strokeWidth;
+    const halfLW = ann.strokeWidth / 2;
+    ctx.strokeRect(ax + halfLW, ay + halfLW, ann.w - ann.strokeWidth, ann.h - ann.strokeWidth);
+  } else {
+    ctx.fillStyle = ann.color;
+    ctx.fillRect(ax, ay, ann.w, ann.h);
+  }
 
   const imageData = ctx.getImageData(0, 0, w, h);
   return {
@@ -955,6 +962,35 @@ const renderAnnotationsToBuffer = (w, h, originX, originY) => {
     width: w,
     height: h,
   };
+};
+
+/**
+ * 生成按历史顺序排列的导出步骤
+ * @param {number} w - 选区逻辑宽度
+ * @param {number} h - 选区逻辑高度
+ * @param {number} originX - 选区左上角 X（屏幕逻辑坐标）
+ * @param {number} originY - 选区左上角 Y（屏幕逻辑坐标）
+ * @returns {Array}
+ */
+const buildAnnotationSteps = (w, h, originX, originY) => {
+  finalizeAnnotation();
+  finalizeTextAnnotation();
+
+  const annotations = orderedAnnotations.value;
+  if (annotations.length === 0) {
+    return [];
+  }
+
+  return buildAnnotationStepsMeta(annotations, originX, originY).map((step) => {
+    if (step.type === 'mosaic') {
+      return step;
+    }
+
+    return {
+      type: 'overlay',
+      overlayData: renderOverlayAnnotationToBuffer(step.annotation, w, h, originX, originY),
+    };
+  });
 };
 
 // ==================== 操作处理 ====================
@@ -966,8 +1002,7 @@ const handleAction = async (type) => {
 
   const b = selectionBounds.value;
 
-  // 在关闭选区前渲染标注到像素数据
-  const overlayData = renderAnnotationsToBuffer(b.w, b.h, b.x, b.y);
+  const annotationSteps = buildAnnotationSteps(b.w, b.h, b.x, b.y);
 
   // 立即关闭选区显示，防止截图抓取到 Overlay 的黑色遮罩
   state.hasSelection = false;
@@ -980,25 +1015,11 @@ const handleAction = async (type) => {
     borderRadius: state.borderRadius,
   };
 
-  // 附加标注叠加层数据（如果有标注）
-  if (overlayData) {
-    rect.overlayData = overlayData;
+  if (annotationSteps.length > 0) {
+    rect.annotationSteps = annotationSteps;
   }
 
-  // 收集马赛克区域（相对于选区的逻辑坐标）
-  const mosaicAnnotations = state.annotations.filter((ann) => ann.tool === 'mosaic');
-  if (mosaicAnnotations.length > 0) {
-    rect.mosaicRegions = mosaicAnnotations.map((ann) => ({
-      x: ann.x - b.x,
-      y: ann.y - b.y,
-      w: ann.w,
-      h: ann.h,
-      mode: ann.mode || 'pixelate',
-      blockSize: ann.blockSize || 10,
-    }));
-  }
-
-  logger.info(`执行操作: ${type}, 选区:`, { data: { rect: { ...rect, overlayData: overlayData ? '[present]' : null } } });
+  logger.info(`执行操作: ${type}, 选区:`, { data: { rect: { ...rect, annotationSteps: annotationSteps.length > 0 ? `[${annotationSteps.length}]` : null } } });
 
   try {
     if (type === 'save') {
@@ -1075,6 +1096,7 @@ const onMouseDown = (e) => {
       state.isDrawingRect = true;
       state.drawingDragged = false;
       state.activeAnnotation = {
+        tool: state.activeTool || 'rect',
         startX: mx,
         startY: my,
         endX: mx,
@@ -1502,37 +1524,37 @@ const rootCursor = computed(() => {
       v-if="state.hasSelection && (state.annotations.length > 0 || state.activeAnnotation || state.editingTextAnnotation)"
       class="absolute inset-0 z-20 pointer-events-none"
     >
-      <!-- 已定型矩形标注 -->
-      <div
-        v-for="ann in state.annotations"
-        :key="ann.id"
-        :style="getAnnotationStyle(ann)"
-      />
+      <template v-for="ann in orderedAnnotations" :key="ann.id">
+        <div
+          v-if="ann.tool === 'mosaic'"
+          class="mosaic-wrapper"
+          :style="getMosaicAnnotationStyle(ann)"
+        >
+          <canvas
+            :ref="(el) => renderMosaicCanvas(el, ann)"
+            class="mosaic-canvas"
+            :style="{
+              width: '100%',
+              height: '100%',
+              imageRendering: ann.mode === 'blur' ? 'auto' : 'pixelated',
+              filter: ann.mode === 'blur' ? `blur(${Math.max(2, ann.blockSize / 2)}px)` : 'none',
+            }"
+          />
+        </div>
 
-      <!-- 已定型马赛克标注预览 -->
-      <div
-        v-for="ann in state.annotations.filter(a => a.tool === 'mosaic')"
-        :key="'mosaic-' + ann.id"
-        class="mosaic-wrapper"
-        :style="{
-          position: 'absolute',
-          left: ann.x + 'px',
-          top: ann.y + 'px',
-          width: ann.w + 'px',
-          height: ann.h + 'px',
-        }"
-      >
-        <canvas
-          :ref="(el) => renderMosaicCanvas(el, ann)"
-          class="mosaic-canvas"
-          :style="{
-            width: '100%',
-            height: '100%',
-            imageRendering: ann.mode === 'blur' ? 'auto' : 'pixelated',
-            filter: ann.mode === 'blur' ? `blur(${Math.max(2, ann.blockSize / 2)}px)` : 'none',
-          }"
+        <div
+          v-else-if="ann.tool === 'text'"
+          class="text-annotation"
+          :style="getTextAnnotationStyle(ann)"
+        >
+          {{ ann.text }}
+        </div>
+
+        <div
+          v-else
+          :style="getAnnotationStyle(ann)"
         />
-      </div>
+      </template>
 
       <!-- 活动马赛克标注实时预览 -->
       <div
@@ -1556,25 +1578,6 @@ const rootCursor = computed(() => {
             filter: state.mosaicConfig.mode === 'blur' ? `blur(${Math.max(2, state.mosaicConfig.blockSize / 2)}px)` : 'none',
           }"
         />
-      </div>
-
-      <!-- 已定型文本标注 -->
-      <div
-        v-for="ann in state.annotations.filter(a => a.tool === 'text')"
-        :key="'text-' + ann.id"
-        class="text-annotation"
-        :style="{
-          position: 'absolute',
-          left: ann.x + 'px',
-          top: ann.y + 'px',
-          fontSize: ann.fontSize + 'px',
-          color: ann.color,
-          fontFamily: ann.fontFamily || 'sans-serif',
-          whiteSpace: 'pre-wrap',
-          lineHeight: 1.2,
-        }"
-      >
-        {{ ann.text }}
       </div>
 
       <!-- 正在编辑的文本标注 -->

@@ -101,6 +101,14 @@ if (hdrApi) {
     *   推荐使用 **TailwindCSS** 进行布局。
     *   避免全局样式污染，尽量使用 Scoped CSS。
 
+### Overlay 工具栏与标注
+
+*   **工具栏拖动**: `ActionToolbar` 支持通过右侧拖动锚点在当前选区内微调位置，锚点视觉应保持无边框、并紧贴按钮组。
+*   **工具栏重置**: 工具栏拖动位置只对当前一次选区生效；完成新的选区后，工具栏应重置回默认停靠位置。
+*   **绘图工具退出**: 关闭矩形 / 马赛克 / 文本这类绘图二级菜单时，应退出当前绘图工具并恢复可移动选区状态。
+*   **活动标注工具类型**: 活动标注对象需要记录自己的工具类型，避免在关闭工具面板或切换模式后，因为 `activeTool` 被清空而错误回退到默认矩形。
+*   **标注覆盖顺序**: 矩形、马赛克、文本标注在预览层与最终导出中都必须遵循创建顺序，不要按工具类型拆成固定图层或固定后处理阶段。
+
 ### Native 模块 (Native Module)
 
 *   **技术栈**: Rust + NAPI-RS。
@@ -131,11 +139,13 @@ if (hdrApi) {
 *   **Preview UI**: `pnpm run preview:ui` (预览设置界面)
 *   **Preview Overlay**: `pnpm run preview:overlay` (预览覆盖层界面)
 *   **Build Full**: `pnpm build` (清理 dist, 构建 main, ui, overlay, native)
+*   **Run Tests**: `pnpm test` (运行 `vitest.config.mjs` 中的回归测试)
 *   **Build Structure**:
     *   `plugin`: Plugin entry (`vite build`)
     *   `ui`: Settings UI (`vite -c ui.vite.config.mjs`)
     *   `overlay`: Overlay UI (`vite -c overlay.vite.config.mjs`) - 支持 `mode=preload` (构建 preload.js) 和默认模式 (构建 HTML)。
     *   `native`: Rust binary (`napi build`)
+    *   `test`: 包级回归测试（Overlay 工具栏状态、标注顺序、导出图像处理、主进程快捷键逻辑）
 
 ## 特别注意事项 (Special Notes)
 

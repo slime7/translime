@@ -35,7 +35,8 @@
     "build:ui": "vite build -c ui.vite.config.mjs",
     "build:overlay": "vite build -c overlay.vite.config.mjs --mode preload && vite build -c overlay.vite.config.mjs",
     "build:main": "pnpm run build:ui && pnpm run build:plugin && pnpm run build:overlay",
-    "build": "rimraf dist && pnpm run build:main && pnpm build:native"
+    "build": "rimraf dist && pnpm run build:main && pnpm build:native",
+    "test": "pnpm exec vitest run -c vitest.config.mjs"
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",
@@ -51,6 +52,7 @@
     "vite": "^8.0.0",
     "vite-plugin-css-injected-by-js": "^3.4.0",
     "vite-plugin-vuetify": "^2.1.1",
+    "vitest": "^4.0.17",
     "vue": "^3.5.13",
     "vuetify": "^3.11.6"
   },

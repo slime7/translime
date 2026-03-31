@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import EventEmitter from 'node:events';
 import { useLogger, usePluginConfig } from 'translime-sdk';
 import * as capture from './capture';
+import { isIncompleteShortcut, normalizeShortcut } from './main/shortcut-state';
 
 const dirname = typeof __dirname === 'string'
   ? __dirname
@@ -88,33 +89,6 @@ const getAllDisplaysBounds = () => {
 
 const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
 const getFastResponse = () => pluginConfig.get('fastResponse', true);
-const shortcutModifiers = new Set([
-  'ctrl',
-  'control',
-  'alt',
-  'shift',
-  'super',
-  'meta',
-  'cmd',
-  'command',
-]);
-
-const normalizeShortcut = (accelerator = '') => accelerator
-  .split('+')
-  .map((part) => part.trim())
-  .filter(Boolean)
-  .map((part) => (part === 'Win' ? 'Super' : part))
-  .join('+');
-
-const isIncompleteShortcut = (accelerator = '') => {
-  const parts = accelerator.split('+').map((part) => part.trim()).filter(Boolean);
-  if (!parts.length) {
-    return true;
-  }
-  const lastPart = parts[parts.length - 1].toLowerCase();
-  return shortcutModifiers.has(lastPart);
-};
-
 /**
  * 更新 Overlay 窗口的边界（用于响应屏幕变化）
  */
