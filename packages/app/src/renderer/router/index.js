@@ -46,6 +46,9 @@ const routes = [
         path: '/plugins/:packageName',
         name: 'PluginPage',
         component: AppPluginPage,
+        meta: {
+          layoutMode: 'plugin-shell',
+        },
         props: true,
       },
     ],

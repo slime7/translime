@@ -9,7 +9,8 @@ import {
   systemPreferences,
 } from 'electron';
 import fs from 'node:fs';
-import { join, sep } from 'node:path';
+import { dirname, join, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '../utils/createWindow';
 import mainStore from '../utils/useMainStore';
@@ -18,6 +19,10 @@ import logger from '../utils/logger';
 import { listLogDates, readLogRecords } from '../utils/logViewer';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
+
+const dir = typeof __dirname === 'string'
+  ? __dirname
+  : dirname(fileURLToPath(import.meta.url));
 
 const ipcHandler = {
   ...netHandler,
@@ -143,7 +148,7 @@ const ipcHandler = {
         skipTaskbar: typeof options.skipTaskbar !== 'undefined' ? options.skipTaskbar : false,
         focusable: typeof options.focusable !== 'undefined' ? options.focusable : true,
         webPreferences: {
-          preload: join(app.getAppPath(), 'dist/preload/index.cjs'),
+          preload: join(dir, '../preload/index.cjs'),
           nodeIntegration: false,
           contextIsolation: true,
           sandbox: false,
@@ -499,7 +504,7 @@ const ipcHandler = {
     }
   },
   [ipcType.GET_PRELOAD_PATH]() {
-    return `file://${join(app.getAppPath(), 'dist/preload/index.cjs').replace(/\\/g, '/')}`;
+    return `file://${join(dir, '../preload/index.cjs').replace(/\\/g, '/')}`;
   },
   ping() {
     logger.debug('pong', new Date());

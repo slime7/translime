@@ -16,10 +16,21 @@
       <notification />
 
       <div class="flex flex-col h-full" id="app-main-container">
-        <div class="scroll-content flex-auto">
-          <div class="content-stage">
-            <router-view v-slot="{ Component, route }">
-              <div :class="['route-stage', { 'route-stage--plugin': route.name === 'PluginPage' }]">
+        <router-view v-slot="{ Component, route }">
+          <div
+            :class="[
+              'scroll-content',
+              'flex-auto',
+              { 'scroll-content--plugin-shell': route.meta?.layoutMode === 'plugin-shell' },
+            ]"
+          >
+            <div
+              :class="[
+                'content-stage',
+                { 'content-stage--plugin-shell': route.meta?.layoutMode === 'plugin-shell' },
+              ]"
+            >
+              <div :class="['route-stage', { 'route-stage--plugin': route.meta?.layoutMode === 'plugin-shell' }]">
                 <v-fade-transition
                   mode="out-in"
                   @after-enter="onEnter"
@@ -30,11 +41,11 @@
                   </keep-alive>
                 </v-fade-transition>
               </div>
-            </router-view>
 
-            <embedded-plugin-webviews />
+              <embedded-plugin-webviews />
+            </div>
           </div>
-        </div>
+        </router-view>
       </div>
     </v-main>
 
@@ -130,7 +141,7 @@ export default {
   z-index: 300;
 }
 
-#app-main-container > .scroll-content {
+.scroll-content {
   min-height: 0;
   overflow-y: auto;
 
@@ -140,10 +151,20 @@ export default {
 }
 
 .content-stage {
+  width: 100%;
+  min-height: 100%;
+}
+
+.scroll-content--plugin-shell {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100%;
+  overflow: hidden;
+}
+
+.content-stage--plugin-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
 }
 

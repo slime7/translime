@@ -7,7 +7,8 @@ import {
   systemPreferences,
 } from 'electron';
 import Store from 'electron-store';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createProtocol from './utils/createProtocol';
 import mainStore from './utils/useMainStore';
@@ -15,6 +16,9 @@ import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import Ipc from './core/Ipc';
 
+const dir = typeof __dirname === 'string'
+  ? __dirname
+  : dirname(fileURLToPath(import.meta.url));
 const isInDisplay = (winProps) => {
   const displays = screen.getAllDisplays();
   let inDisplay = false;
@@ -71,7 +75,7 @@ export default () => {
     minWidth: 700,
     titleBarStyle: useNativeTitleBar ? 'default' : 'hidden',
     webPreferences: {
-      preload: join(app.getAppPath(), 'dist/preload/index.cjs'),
+      preload: join(dir, '../preload/index.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
