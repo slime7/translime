@@ -81,7 +81,7 @@
                   @click.stop="togglePin(plugin.packageName)"
                 >
                   <v-icon start size="small">
-                    {{ isPinned(plugin.packageName) ? 'push_pin' : 'push_pin' }}
+                    push_pin
                   </v-icon>
                   {{ isPinned(plugin.packageName) ? '已固定' : '固定到侧栏' }}
                 </v-btn>
@@ -111,63 +111,48 @@
   </v-container>
 </template>
 
-<script>
+<script setup>
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import useGlobalStore from '../store/globalStore';
 import { openPluginWindow } from '@/utils';
 
-export default {
-  name: 'AppHome',
+const store = useGlobalStore();
+const router = useRouter();
+const searchQuery = ref('');
 
-  setup() {
-    const store = useGlobalStore();
-    const router = useRouter();
-    const searchQuery = ref('');
+const availablePlugins = computed(() => store.plugins.filter(
+  (plugin) => plugin.enabled && !(!plugin.ui && !plugin.windowUrl),
+));
 
-    // 筛选已启用且带界面的插件
-    const availablePlugins = computed(() => {
-      return store.plugins.filter((p) => p.enabled && !(!p.ui && !p.windowUrl));
-    });
+const filteredPlugins = computed(() => {
+  const query = searchQuery.value.toLowerCase().trim();
 
-    // 按搜索词筛选插件
-    const filteredPlugins = computed(() => {
-      const q = searchQuery.value.toLowerCase().trim();
-      if (!q) {
-        return availablePlugins.value;
-      }
+  if (!query) {
+    return availablePlugins.value;
+  }
 
-      return availablePlugins.value.filter((p) => {
-        const t = (p.plugin?.title || p.title || p.packageName).toLowerCase();
-        const d = (p.plugin?.description || p.description || '').toLowerCase();
-        return t.includes(q) || d.includes(q);
-      });
-    });
+  return availablePlugins.value.filter((plugin) => {
+    const title = (plugin.plugin?.title || plugin.title || plugin.packageName).toLowerCase();
+    const description = (plugin.plugin?.description || plugin.description || '').toLowerCase();
 
-    const isPinned = (packageName) => {
-      return store.appSetting?.pinnedPlugins?.includes(packageName);
-    };
+    return title.includes(query) || description.includes(query);
+  });
+});
 
-    const togglePin = async (packageName) => {
-      await store.togglePinPlugin(packageName);
-    };
+const isPinned = (packageName) => store.appSetting?.pinnedPlugins?.includes(packageName);
 
-    const openPlugin = (plugin) => {
-      if (plugin.windowMode) {
-        openPluginWindow(plugin, store.dark, store.appSetting);
-      } else {
-        router.push({ name: 'PluginPage', params: { packageName: plugin.packageName } });
-      }
-    };
+const togglePin = async (packageName) => {
+  await store.togglePinPlugin(packageName);
+};
 
-    return {
-      searchQuery,
-      filteredPlugins,
-      isPinned,
-      togglePin,
-      openPlugin,
-    };
-  },
+const openPlugin = (plugin) => {
+  if (plugin.windowMode) {
+    openPluginWindow(plugin, store.dark, store.appSetting);
+    return;
+  }
+
+  router.push({ name: 'PluginPage', params: { packageName: plugin.packageName } });
 };
 </script>
 

@@ -20,6 +20,14 @@ const ipcWhiteList = {
 };
 
 const callbackCache = [];
+
+const detachCallbacks = (type) => {
+  for (let index = callbackCache.length - 1; index >= 0; index -= 1) {
+    if (callbackCache[index].type === type) {
+      callbackCache.splice(index, 1);
+    }
+  }
+};
 /**
  * @see https://github.com/electron/electron/issues/21437#issuecomment-573522360
  */
@@ -73,10 +81,7 @@ const api = {
     };
 
     const detach = (type) => {
-      const idx = callbackCache.findIndex((v) => v.type === type);
-      if (idx > -1) {
-        callbackCache.splice(idx, 1);
-      }
+      detachCallbacks(type);
     };
 
     const on = (type, callback) => {
