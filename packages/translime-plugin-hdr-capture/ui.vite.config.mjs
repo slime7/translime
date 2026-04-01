@@ -5,7 +5,6 @@ import vuetify from 'vite-plugin-vuetify';
 import * as translimeVite from 'translime-sdk/vite';
 
 const {
-  // eslint-disable-next-line import-x/namespace
   createPluginCssIsolationPlugins,
   getPreviewSettingsPath,
   translimeSdk,

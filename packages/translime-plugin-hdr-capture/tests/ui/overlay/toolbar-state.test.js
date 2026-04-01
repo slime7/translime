@@ -4,7 +4,9 @@ import {
 import {
   DRAWING_PANELS,
   getDrawingStateForPanelChange,
+  getReservedToolbarHeight,
   toggleToolbarPanel,
+  TOOLBAR_LAYOUT,
 } from '../../../src/ui/overlay/toolbar-state';
 
 describe('toolbar-state', () => {
@@ -32,5 +34,11 @@ describe('toolbar-state', () => {
 
   it('非绘图面板之间切换时不应改动绘图状态', () => {
     expect(getDrawingStateForPanelChange('size', 'radius')).toBeNull();
+  });
+
+  it('动作栏定位占位高度应固定预留次级面板空间', () => {
+    expect(getReservedToolbarHeight()).toBe(
+      TOOLBAR_LAYOUT.mainHeight + TOOLBAR_LAYOUT.spacing + TOOLBAR_LAYOUT.panelHeight,
+    );
   });
 });

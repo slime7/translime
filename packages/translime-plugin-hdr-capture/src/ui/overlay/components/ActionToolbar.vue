@@ -6,7 +6,9 @@ import SliderControl from './SliderControl.vue';
 import ColorPicker from './ColorPicker.vue';
 import {
   getDrawingStateForPanelChange,
+  getReservedToolbarHeight,
   toggleToolbarPanel,
+  TOOLBAR_LAYOUT,
 } from '../toolbar-state';
 
 const props = defineProps({
@@ -33,10 +35,8 @@ const activePanel = ref(null);
 /** 当前悬浮提示的文本 */
 const hoveredTooltip = ref('');
 
-const MAIN_TOOLBAR_WIDTH = 444;
-const MAIN_TOOLBAR_HEIGHT = 68;
-const PANEL_HEIGHT = 56;
-const TOOLBAR_SPACING = 14;
+const MAIN_TOOLBAR_WIDTH = TOOLBAR_LAYOUT.mainWidth;
+const TOOLBAR_SPACING = TOOLBAR_LAYOUT.spacing;
 const SCREEN_MARGIN = 18;
 
 const dragOffset = ref({ x: 0, y: 0 });
@@ -321,10 +321,10 @@ const getDisplayBoundsForSelection = () => {
   };
 };
 
-const getToolbarSize = () => {
+const getToolbarFootprintSize = () => {
   return {
     width: MAIN_TOOLBAR_WIDTH,
-    height: MAIN_TOOLBAR_HEIGHT + (activePanel.value ? TOOLBAR_SPACING + PANEL_HEIGHT : 0),
+    height: getReservedToolbarHeight(),
   };
 };
 
@@ -335,7 +335,7 @@ const baseToolbarPos = computed(() => {
     x: 0, y: 0, w: 0, h: 0,
   };
   const displayBounds = getDisplayBoundsForSelection();
-  const toolbarSize = getToolbarSize();
+  const toolbarSize = getToolbarFootprintSize();
 
   let left = x + w - toolbarSize.width;
   let top = y + h + TOOLBAR_SPACING;
@@ -367,7 +367,7 @@ const baseToolbarPos = computed(() => {
 
 const clampOffset = (offsetX, offsetY) => {
   const displayBounds = activeDisplayBounds.value || getDisplayBoundsForSelection();
-  const toolbarSize = getToolbarSize();
+  const toolbarSize = getToolbarFootprintSize();
   const base = baseToolbarPos.value;
 
   const minX = displayBounds.left + SCREEN_MARGIN - base.left;
@@ -393,7 +393,7 @@ const toolbarPos = computed(() => {
 });
 
 watch(
-  () => [props.bounds?.x, props.bounds?.y, props.bounds?.w, props.bounds?.h, activePanel.value],
+  () => [props.bounds?.x, props.bounds?.y, props.bounds?.w, props.bounds?.h],
   () => {
     dragOffset.value = clampOffset(dragOffset.value.x, dragOffset.value.y);
   },

@@ -7,6 +7,27 @@
 export const DRAWING_PANELS = ['rect', 'mosaic', 'text'];
 
 /**
+ * Overlay 动作栏的固定布局尺寸。
+ * 定位时统一按带二级面板的最大占位计算，避免面板展开后重新换边。
+ */
+export const TOOLBAR_LAYOUT = {
+  mainWidth: 444,
+  mainHeight: 68,
+  panelHeight: 56,
+  spacing: 14,
+};
+
+/**
+ * 返回动作栏在屏幕边界判断时需要使用的占位高度。
+ * 这里始终预留二级面板空间，保证动作栏第一次定位后不会因面板展开而跳动。
+ *
+ * @returns {number}
+ */
+export function getReservedToolbarHeight() {
+  return TOOLBAR_LAYOUT.mainHeight + TOOLBAR_LAYOUT.spacing + TOOLBAR_LAYOUT.panelHeight;
+}
+
+/**
  * 切换工具栏当前展开的二级面板。
  *
  * @param {string|null} currentPanel - 当前展开的面板标识。
