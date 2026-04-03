@@ -1,11 +1,12 @@
 <script setup>
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
+import useGlobalStore from '@/store/globalStore';
 
-const isDev = import.meta.env.DEV;
 const emit = defineEmits(['inspect']);
 
 const ipc = useIpc();
+const store = useGlobalStore();
 const props = defineProps({
   plugin: {
     type: Object,
@@ -42,7 +43,7 @@ const showContextMenu = () => {
 
     <template #append>
       <v-btn
-        v-if="isDev"
+        v-if="store.appSetting.showDevPlugin"
         size="small"
         color="primary"
         variant="tonal"

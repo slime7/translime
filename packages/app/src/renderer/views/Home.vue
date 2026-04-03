@@ -11,7 +11,7 @@
           </p>
         </div>
 
-        <div class="mt-4 md:mt-0" style="min-width: 300px;">
+        <div class="mt-4 md:mt-0 min-w-72">
           <v-text-field
             v-model="searchQuery"
             variant="solo-filled"
@@ -27,7 +27,7 @@
         </div>
       </div>
 
-      <div v-if="filteredPlugins.length > 0" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div v-if="filteredPlugins.length > 0" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
         <div
           v-for="plugin in filteredPlugins"
           :key="plugin.packageName"
@@ -40,52 +40,50 @@
               variant="flat"
               color="surface-container-low"
               rounded
-              class="rounded-[24px] w-full flex flex-col transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)] cursor-pointer"
+              class="plugin-entry ease-standard rounded-3xl w-full cursor-pointer"
               @click="openPlugin(plugin)"
             >
-              <v-card-item class="pt-6 px-6">
-                <template #prepend>
-                  <v-avatar
-                    :color="isHovering ? 'primary' : 'primary-container'"
-                    size="56"
-                    rounded
-                    class="rounded-lg transition-colors border"
-                    :class="isHovering ? 'border-primary' : 'border-transparent'"
+              <div class="flex items-center gap-3 px-3 py-3">
+                <v-avatar
+                  :color="isHovering ? 'primary-container' : 'surface-container-high'"
+                  rounded
+                  class="plugin-entry__avatar ease-standard shrink-0 size-14 rounded-3xl"
+                >
+                  <v-img v-if="plugin.plugin?.icon || plugin.icon" :src="plugin.plugin?.icon || plugin.icon" />
+                  <v-icon
+                    v-else
+                    :color="isHovering ? 'primary' : 'on-surface-variant'"
+                    class="text-2xl"
                   >
-                    <v-img v-if="plugin.plugin?.icon || plugin.icon" :src="plugin.plugin?.icon || plugin.icon" />
-                    <v-icon
-                      v-else
-                      :color="isHovering ? 'on-primary' : 'on-primary-container'"
-                    >
-                      extension
-                    </v-icon>
-                  </v-avatar>
-                </template>
+                    extension
+                  </v-icon>
+                </v-avatar>
 
-                <v-card-title class="text-xl font-bold truncate ml-2">
-                  {{ plugin.plugin?.title || plugin.title || plugin.packageName }}
-                </v-card-title>
-              </v-card-item>
+                <div class="min-w-0 grow">
+                  <div class="text-body-1 font-medium truncate">
+                    {{ plugin.plugin?.title || plugin.title || plugin.packageName }}
+                  </div>
+                </div>
 
-              <v-card-text class="grow px-6 pt-2 pb-0 opacity-80 line-clamp-2">
-                {{ plugin.plugin?.description || plugin.description || '暂无描述信息' }}
-              </v-card-text>
-
-              <v-card-actions class="px-4 pb-4 pt-4 mt-auto">
-                <div class="grow" />
                 <v-btn
                   :color="isPinned(plugin.packageName) ? 'primary' : 'on-surface-variant'"
                   :variant="isPinned(plugin.packageName) ? 'tonal' : 'text'"
-                  rounded
-                  class="rounded-full font-medium px-4 transition-colors lowercase-none"
+                  size="small"
+                  icon
+                  rounded="pill"
+                  class="plugin-entry__pin ease-standard shrink-0"
+                  :aria-label="isPinned(plugin.packageName) ? '取消固定到侧栏' : '固定到侧栏'"
                   @click.stop="togglePin(plugin.packageName)"
                 >
-                  <v-icon start size="small">
+                  <v-icon class="text-lg">
                     push_pin
                   </v-icon>
-                  {{ isPinned(plugin.packageName) ? '已固定' : '固定到侧栏' }}
+
+                  <v-tooltip activator="parent" location="top">
+                    {{ isPinned(plugin.packageName) ? '取消固定到侧栏' : '固定到侧栏' }}
+                  </v-tooltip>
                 </v-btn>
-              </v-card-actions>
+              </div>
             </v-card>
           </v-hover>
         </div>
@@ -95,8 +93,8 @@
         v-else
         class="flex flex-col items-center justify-center py-16 mt-8"
       >
-        <v-avatar color="surface-container-highest" size="80" class="mb-4 rounded-full" rounded>
-          <v-icon size="40" color="on-surface-variant">
+        <v-avatar color="surface-container-highest" class="mb-4 size-20 rounded-full" rounded>
+          <v-icon class="text-4xl" color="on-surface-variant">
             search_off
           </v-icon>
         </v-avatar>
@@ -156,15 +154,27 @@ const openPlugin = (plugin) => {
 };
 </script>
 
-<style scoped>
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+<style scoped lang="scss">
+.plugin-entry {
+  border: 1px solid rgb(var(--v-theme-outline-variant), .65);
+  transition-property: transform, box-shadow, border-color, background-color;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgb(var(--v-theme-outline), .85);
+    background-color: rgb(var(--v-theme-surface-container));
+  }
 }
 
-.lowercase-none {
-  text-transform: none !important;
+.plugin-entry__avatar {
+  transition-property: background-color, transform;
+}
+
+.plugin-entry__pin {
+  transition-property: background-color, color, transform;
+
+  &:hover {
+    transform: scale(1.04);
+  }
 }
 </style>
