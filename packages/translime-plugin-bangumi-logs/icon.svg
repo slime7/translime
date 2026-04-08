@@ -1,9 +1,69 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    svg {
+      color-scheme: light dark;
+      --bg-start: #ff7cac;
+      --bg-end: #f09199;
+      --frame-stroke: rgba(255, 255, 255, 0.2);
+      --chrome-fill: #ffffff;
+      --screen-fill: rgba(240, 145, 153, 0.1);
+      --accent-fill: #f09199;
+      --reflection-fill: rgba(255, 255, 255, 0.15);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      svg {
+        --bg-start: #642844;
+        --bg-end: #25131f;
+        --frame-stroke: rgba(255, 239, 246, 0.14);
+        --chrome-fill: #fff0f5;
+        --screen-fill: rgba(255, 156, 195, 0.2);
+        --accent-fill: #ff9cc3;
+        --reflection-fill: rgba(255, 255, 255, 0.08);
+      }
+    }
+
+    .bg-stop-start {
+      stop-color: var(--bg-start);
+    }
+
+    .bg-stop-end {
+      stop-color: var(--bg-end);
+    }
+
+    .frame-stroke {
+      stroke: var(--frame-stroke);
+    }
+
+    .chrome-fill {
+      fill: var(--chrome-fill);
+    }
+
+    .chrome-stroke {
+      stroke: var(--chrome-fill);
+    }
+
+    .screen-fill {
+      fill: var(--screen-fill);
+    }
+
+    .accent-fill {
+      fill: var(--accent-fill);
+    }
+
+    .accent-stroke {
+      stroke: var(--accent-fill);
+    }
+
+    .reflection-fill {
+      fill: var(--reflection-fill);
+    }
+  </style>
   <!-- Gradient definitions -->
   <defs>
     <linearGradient id="tvPink" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF7CAC"/>
-      <stop offset="1" stop-color="#F09199"/>
+      <stop class="bg-stop-start"/>
+      <stop class="bg-stop-end" offset="1"/>
     </linearGradient>
     <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="6" result="blur" />
@@ -15,35 +75,35 @@
   <rect width="256" height="256" rx="64" fill="url(#tvPink)" />
   
   <!-- Subtle Highlight -->
-  <rect x="20" y="20" width="216" height="216" rx="54" stroke="white" stroke-opacity="0.2" stroke-width="2" />
+  <rect class="frame-stroke" x="20" y="20" width="216" height="216" rx="54" stroke-width="2" />
 
   <!-- The TV Body -->
   <g filter="url(#softGlow)" transform="translate(48, 70)">
     <!-- Antennae -->
-    <path d="M50 0L70 30" stroke="white" stroke-width="12" stroke-linecap="round" />
-    <path d="M110 0L90 30" stroke="white" stroke-width="12" stroke-linecap="round" />
-    <circle cx="50" cy="0" r="10" fill="white" />
-    <circle cx="110" cy="0" r="10" fill="white" />
+    <path class="chrome-stroke" d="M50 0L70 30" stroke-width="12" stroke-linecap="round" />
+    <path class="chrome-stroke" d="M110 0L90 30" stroke-width="12" stroke-linecap="round" />
+    <circle class="chrome-fill" cx="50" cy="0" r="10" />
+    <circle class="chrome-fill" cx="110" cy="0" r="10" />
 
     <!-- TV Box (Main) -->
-    <rect x="0" y="30" width="160" height="120" rx="24" fill="white" />
+    <rect class="chrome-fill" x="0" y="30" width="160" height="120" rx="24" />
     
     <!-- Screen / Face Area -->
-    <rect x="15" y="45" width="130" height="90" rx="16" fill="#F09199" fill-opacity="0.1" />
+    <rect class="screen-fill" x="15" y="45" width="130" height="90" rx="16" />
 
     <!-- Face (The 'Little TV' Expression) -->
     <!-- Eyes -->
-    <circle cx="55" cy="85" r="8" fill="#F09199" />
-    <circle cx="105" cy="85" r="8" fill="#F09199" />
+    <circle class="accent-fill" cx="55" cy="85" r="8" />
+    <circle class="accent-fill" cx="105" cy="85" r="8" />
     
     <!-- Mouth (Cute curve) -->
-    <path d="M65 110C65 110 75 120 80 120C85 120 95 110 95 110" stroke="#F09199" stroke-width="8" stroke-linecap="round" />
+    <path class="accent-stroke" d="M65 110C65 110 75 120 80 120C85 120 95 110 95 110" stroke-width="8" stroke-linecap="round" />
     
     <!-- TV Legs -->
-    <rect x="35" y="150" width="20" height="15" rx="8" fill="white" />
-    <rect x="105" y="150" width="20" height="15" rx="8" fill="white" />
+    <rect class="chrome-fill" x="35" y="150" width="20" height="15" rx="8" />
+    <rect class="chrome-fill" x="105" y="150" width="20" height="15" rx="8" />
   </g>
 
   <!-- Modern Glass Reflection -->
-  <path d="M192 48C216 48 240 72 240 96V64C240 32 224 16 192 16H160C184 16 192 32 192 48Z" fill="white" fill-opacity="0.15" />
+  <path class="reflection-fill" d="M192 48C216 48 240 72 240 96V64C240 32 224 16 192 16H160C184 16 192 32 192 48Z" />
 </svg>
