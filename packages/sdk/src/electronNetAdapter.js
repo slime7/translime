@@ -39,9 +39,48 @@ function normalizeHeaders(headers) {
   );
 }
 
+function appendParam(searchParams, key, value) {
+  if (value == null) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => {
+      appendParam(searchParams, key, item);
+    });
+    return;
+  }
+
+  if (value instanceof Date) {
+    searchParams.append(key, value.toISOString());
+    return;
+  }
+
+  if (typeof value === 'object') {
+    searchParams.append(key, JSON.stringify(value));
+    return;
+  }
+
+  searchParams.append(key, String(value));
+}
+
+function appendParams(url, params) {
+  if (!params || typeof params !== 'object') {
+    return url;
+  }
+
+  const targetUrl = new URL(url);
+  Object.entries(params).forEach(([key, value]) => {
+    appendParam(targetUrl.searchParams, key, value);
+  });
+
+  return targetUrl.toString();
+}
+
 function buildRequestConfig(config) {
   const baseURL = config.baseURL ? config.baseURL.replace(/\/+$/, '') : '';
-  const url = new URL(config.url, baseURL || undefined).toString();
+  const rawUrl = new URL(config.url, baseURL || undefined).toString();
+  const url = appendParams(rawUrl, config.params);
 
   return {
     method: config.method?.toUpperCase() || 'GET',

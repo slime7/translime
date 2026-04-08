@@ -47,6 +47,9 @@ export default defineConfig({
       output: {
         // Keep directory structure
         preserveModules: false,
+        // SDK 的部分入口同时导出了 default 与 named，显式声明 CJS 采用 named 导出语义，
+        // 可以避免构建阶段的 MIXED_EXPORTS 警告，并让输出行为更明确。
+        exports: 'named',
       },
     },
     outDir: 'dist',
