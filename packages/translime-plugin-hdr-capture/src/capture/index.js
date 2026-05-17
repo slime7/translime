@@ -39,6 +39,9 @@ try {
     getWindowAtPoint: () => null,
     getUiElementCandidatesAtPoint: () => [],
     getUiElementsForWindow: () => [],
+    getForegroundWindowHandle: () => 0,
+    setForegroundWindow: () => false,
+    setWindowTopMost: () => false,
     captureDisplay: () => {
       throw new Error('Native addon not loaded');
     },
@@ -120,6 +123,26 @@ export const getUiElementCandidatesAtPoint = (x, y, ignoreHandle = null) => (
  * @returns {Array}
  */
 export const getUiElementsForWindow = (windowHandle) => nativeAddon.getUiElementsForWindow(windowHandle);
+
+/**
+ * 获取当前系统前台窗口句柄
+ * @returns {number}
+ */
+export const getForegroundWindowHandle = () => nativeAddon.getForegroundWindowHandle();
+
+/**
+ * 将指定窗口恢复为系统前台窗口
+ * @param {number} windowHandle - 窗口句柄
+ * @returns {boolean}
+ */
+export const setForegroundWindow = (windowHandle) => nativeAddon.setForegroundWindow(windowHandle);
+
+/**
+ * 将指定窗口提升到 topmost z-order
+ * @param {number} windowHandle - 窗口句柄
+ * @returns {boolean}
+ */
+export const setWindowTopMost = (windowHandle) => nativeAddon.setWindowTopMost(windowHandle);
 
 /**
  * 获取所有显示器信息

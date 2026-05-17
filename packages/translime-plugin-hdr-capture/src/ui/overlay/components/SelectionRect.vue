@@ -22,6 +22,7 @@ const instance = getCurrentInstance();
 const handleRadius = 6;
 const handleHitRadius = 10;
 const strokeWidth = 1.5;
+const svgPadding = handleRadius + Math.ceil(strokeWidth) + 2;
 const handleDefinitions = [
   { direction: 'nw', cx: 0, cy: 0, cursor: 'nw-resize' },
   { direction: 'n', cx: 0.5, cy: 0, cursor: 'n-resize', relativeX: true },
@@ -77,9 +78,9 @@ const selectionContainerStyle = computed(() => ({
 const selectionRadius = computed(() => Math.max(0, props.state.borderRadius || 0));
 const svgWidth = computed(() => Math.max(props.bounds.w, 1));
 const svgHeight = computed(() => Math.max(props.bounds.h, 1));
-const svgCanvasWidth = computed(() => svgWidth.value + (handleRadius * 2));
-const svgCanvasHeight = computed(() => svgHeight.value + (handleRadius * 2));
-const svgViewBox = computed(() => `${-handleRadius} ${-handleRadius} ${svgCanvasWidth.value} ${svgCanvasHeight.value}`);
+const svgCanvasWidth = computed(() => svgWidth.value + (svgPadding * 2));
+const svgCanvasHeight = computed(() => svgHeight.value + (svgPadding * 2));
+const svgViewBox = computed(() => `${-svgPadding} ${-svgPadding} ${svgCanvasWidth.value} ${svgCanvasHeight.value}`);
 const svgMaskId = `selection-handles-mask-${instance?.uid ?? '0'}`;
 const showResizeHandles = computed(() => !props.state.isMoving && props.state.hasSelection && !props.state.drawingMode);
 
@@ -117,8 +118,8 @@ const onHandleMouseDown = (direction) => {
       <svg
         class="absolute pointer-events-none overflow-visible"
         :style="{
-          left: `${-handleRadius}px`,
-          top: `${-handleRadius}px`,
+          left: `${-svgPadding}px`,
+          top: `${-svgPadding}px`,
           width: `${svgCanvasWidth}px`,
           height: `${svgCanvasHeight}px`,
         }"
@@ -127,8 +128,8 @@ const onHandleMouseDown = (direction) => {
         <defs>
           <mask :id="svgMaskId" maskUnits="userSpaceOnUse">
             <rect
-              :x="-handleRadius"
-              :y="-handleRadius"
+              :x="-svgPadding"
+              :y="-svgPadding"
               :width="svgCanvasWidth"
               :height="svgCanvasHeight"
               fill="white"

@@ -141,6 +141,24 @@ pub fn get_ui_elements_for_window(window_handle: i64) -> Vec<UiElementInfo> {
     window::get_ui_elements_for_window(window_handle)
 }
 
+/// 获取当前系统前台窗口句柄
+#[napi]
+pub fn get_foreground_window_handle() -> i64 {
+    window::get_foreground_window_handle()
+}
+
+/// 将指定窗口恢复为系统前台窗口
+#[napi]
+pub fn set_foreground_window(handle: i64) -> bool {
+    window::set_foreground_window(handle)
+}
+
+/// 将指定窗口提升到系统 topmost z-order
+#[napi]
+pub fn set_window_top_most(handle: i64) -> bool {
+    window::set_window_top_most(handle)
+}
+
 // --- 屏幕捕获相关 API ---
 
 /// 捕获指定显示器的当前画面
