@@ -228,7 +228,7 @@
 
     <div
       v-if="!loading.scan && visibleGames.length === 0 && hiddenGames.length === 0"
-      class="flex flex-col items-center justify-center h-full w-full mt-10"
+      class="flex flex-col items-center justify-center w-full mt-10"
     >
       <v-icon
         size="80"
@@ -998,8 +998,8 @@ onMounted(() => {
 /* 引入 Tailwind CSS utilities，放入 tailwind 图层以与主程序统一 */
 @layer tailwind {
   @layer theme, utilities;
-  @import "tailwindcss/theme.css" layer(theme);
-  @import "tailwindcss/utilities.css" layer(utilities);
+  @import 'tailwindcss/theme.css' layer(theme);
+  @import 'tailwindcss/utilities.css' layer(utilities);
 }
 </style>
 
