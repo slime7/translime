@@ -10,6 +10,7 @@ import {
   remove,
   writeJson,
 } from './fs-wrapper';
+import { getBackupSourcesMetadata } from './save-sources';
 
 // 默认备份根目录
 const getDefaultBackupRoot = () => path.join(global.APPDATA_PATH || path.join(os.homedir(), 'Documents'), 'TranslimeSteamBackups');
@@ -25,10 +26,11 @@ export const resolveBackupRoot = async (customPath) => {
  * 备份存档
  * @param {string} gameId 游戏 AppID
  * @param {string} gameName 游戏名称
- * @param {Array<{root: number, relativePath: string, absolutePath: string, files: string[]}>} savePaths 存档路径信息数组
+ * @param {Array<{root: number, relativePath: string, absolutePath: string, files: string[], sourceId?: string, sourceType?: string, sourceLabel?: string}>} savePaths 存档路径信息数组
  * @param {string} [customBackupRoot] 自定义备份根目录
+ * @param {Array<Object>} [saveSources] 存档来源元数据
  */
-export async function backupSave(gameId, gameName, savePaths, customBackupRoot) {
+export async function backupSave(gameId, gameName, savePaths, customBackupRoot, saveSources = []) {
   const backupRoot = await resolveBackupRoot(customBackupRoot);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(backupRoot, gameId.toString(), timestamp);
@@ -74,6 +76,9 @@ export async function backupSave(gameId, gameName, savePaths, customBackupRoot) 
       relativePath: saveInfo.relativePath,
       absolutePath: saveInfo.absolutePath,
       files: actualFiles,
+      sourceId: saveInfo.sourceId,
+      sourceType: saveInfo.sourceType,
+      sourceLabel: saveInfo.sourceLabel,
     };
   }));
 
@@ -85,9 +90,11 @@ export async function backupSave(gameId, gameName, savePaths, customBackupRoot) 
 
   // 3. 生成 info.json
   const info = {
+    schemaVersion: 2,
     gameId,
     gameName,
     savePaths: backedUpPaths,
+    sources: getBackupSourcesMetadata(saveSources, backedUpPaths),
     backupTime: new Date().toISOString(),
     timestamp,
     note: '',

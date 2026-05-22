@@ -15,6 +15,10 @@ import {
   restoreSave,
   updateBackupNote,
 } from './utils/backup';
+import {
+  saveSourcesToSavePaths,
+  steamSavePathsToSaveSources,
+} from './utils/save-sources';
 
 const pluginId = 'translime-plugin-steam-save-backup';
 const { mainStore } = global;
@@ -131,9 +135,12 @@ export const ipcHandlers = [
         // 为每个游戏查找可能的存档路径
         await Promise.all(games.map(async (game) => {
           const savePaths = await findSavePaths(currentSteamPath, game.appid);
+          const saveSources = steamSavePathsToSaveSources(savePaths);
           const backupCount = await getBackupCount(game.appid, backupRoot);
           // eslint-disable-next-line no-param-reassign
           game.savePaths = savePaths;
+          // eslint-disable-next-line no-param-reassign
+          game.saveSources = saveSources;
           // eslint-disable-next-line no-param-reassign
           game.backupCount = backupCount;
         }));
@@ -163,11 +170,26 @@ export const ipcHandlers = [
   },
   {
     type: 'backup-save',
-    handler: () => async ({ gameId, gameName, savePaths }) => {
+    handler: () => async ({
+      gameId,
+      gameName,
+      savePaths,
+      saveSources,
+    }) => {
       try {
         const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
         const backupRoot = getPathSetting(settings, 'customBackupRoot');
-        const result = await backupSave(gameId, gameName, savePaths, backupRoot);
+        const normalizedSources = Array.isArray(saveSources)
+          ? saveSources
+          : steamSavePathsToSaveSources(savePaths);
+        const pathsToBackup = saveSourcesToSavePaths(normalizedSources);
+        const result = await backupSave(
+          gameId,
+          gameName,
+          pathsToBackup,
+          backupRoot,
+          normalizedSources,
+        );
         return result;
       } catch (e) {
         return { success: false, message: e.message };
