@@ -8,7 +8,7 @@
         lines="one"
       >
         <template #text>
-          <span class="text-caption">Preview 模式 - Electron API 已 mock</span>
+          <span class="text-body-small">Preview 模式 - Electron API 已 mock</span>
         </template>
         <template #actions>
           <v-btn

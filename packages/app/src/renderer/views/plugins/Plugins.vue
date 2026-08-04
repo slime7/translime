@@ -71,7 +71,7 @@
           </template>
         </v-row>
 
-        <v-row justify="center">
+        <v-row class="justify-center">
           <v-col sm="auto">
             <v-btn
               color="primary"

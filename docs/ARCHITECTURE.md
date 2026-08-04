@@ -16,7 +16,7 @@
 | 技术 | 用途 |
 | --- | --- |
 | Electron ~39 | 宿主运行时 |
-| Vue 3 + Vuetify 3 | 宿主与插件 UI |
+| Vue 3 + Vuetify 4 | 宿主与插件 UI |
 | Tailwind CSS v4 | 宿主与部分插件的样式 |
 | Vite 8 | 宿主、SDK 与插件的构建 |
 | Pinia | 宿主渲染进程状态 |

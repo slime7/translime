@@ -7,7 +7,7 @@
 - **插件名称**: `translime-plugin-hdr-capture`
 - **功能描述**: 轻松获取 HDR 截图。
 - **技术栈**: 
-    - **Frontend**: Vue 3, Vuetify 3, Vite
+    - **Frontend**: Vue 3, Vuetify 4, Vite
     - **Backend**: Electron (Node.js)
     - **Native**: Rust (NAPI-RS)
 
@@ -87,7 +87,7 @@ if (hdrApi) {
 ### UI 开发 (UI Development)
 
 *   **设置界面 (`src/ui/ui.vue`)**:
-    *   **框架**: Vue 3 + Vuetify 3。
+    *   **框架**: Vue 3 + Vuetify 4。
     *   **图标**: 使用 Material Design Icons (md) 风格 (例如 `<v-icon>home</v-icon>`)。
     *   **样式注入**: 使用 `vite-plugin-css-injected-by-js`，配置 `styleId: 'translime-plugin-hdr-capture'`。
 

@@ -5,7 +5,7 @@
     <v-card
       class="plugin-item-card ease-animation h-full overflow-hidden"
       v-bind="props"
-      :elevation="isHovering ? 10 : 2"
+      :elevation="isHovering ? 5 : 2"
       :disabled="disabled"
       rounded="xl"
       color="tertiary-container"

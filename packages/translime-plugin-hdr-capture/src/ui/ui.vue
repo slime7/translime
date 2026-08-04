@@ -4,7 +4,7 @@
       class="rounded-3xl"
       rounded
     >
-      <v-card-title class="text-h6">
+      <v-card-title class="text-title-large">
         <v-icon start>
           camera
         </v-icon>
@@ -78,7 +78,7 @@
                     class="mr-2 cursor-pointer"
                   />
                 </template>
-                <div class="text-caption">
+                <div class="text-body-small">
                   <div class="mb-2">
                     日期变量说明：
                   </div>
@@ -214,7 +214,7 @@
                     <span class="slider-range-label">400</span>
                   </template>
                 </v-slider>
-                <div class="slider-hint text-caption text-grey">
+                <div class="slider-hint text-body-small text-grey">
                   {{ systemSdrWhiteHint }}
                 </div>
               </div>
@@ -248,7 +248,7 @@
                     <span class="slider-range-label">2000</span>
                   </template>
                 </v-slider>
-                <div class="slider-hint text-caption text-grey">
+                <div class="slider-hint text-body-small text-grey">
                   HDR 内容的最大输入亮度，通常为你的显示器标称值
                 </div>
               </div>

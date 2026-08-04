@@ -5,7 +5,7 @@
     class="mb-2"
   >
     <v-expansion-panel elevation="0">
-      <v-expansion-panel-title class="text-subtitle-2 text-[rgb(var(--v-theme-on-surface-variant))]">
+      <v-expansion-panel-title class="text-title-small text-[rgb(var(--v-theme-on-surface-variant))]">
         <v-icon
           icon="folder_open"
           size="small"

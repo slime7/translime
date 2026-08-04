@@ -3,13 +3,8 @@
  * 必须在所有其他样式之前导入
  */
 
-/* 顶层 layer 顺序：vuetify 优先，然后是 tailwind */
-@layer vuetify, tailwind;
-
-/* Vuetify 内部子层级顺序声明 */
-@layer vuetify {
-  @layer reset, base, components, transitions, overrides, theme, utilities;
-}
+/* 顶层 layer 顺序：vuetify 组件优先，tailwind 位于 overrides 之后、utilities 之前 */
+@layer vuetify-core, vuetify-components, vuetify-overrides, tailwind, vuetify-utilities, vuetify-final;
 
 /* Tailwind 内部子层级顺序声明 */
 @layer tailwind {

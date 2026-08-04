@@ -34,7 +34,7 @@
     "vite": "^8.0.0",
     "vite-plugin-css-injected-by-js": "^3.4.0",
     "vue": "^3.5.13",
-    "vuetify": "^3.11.6"
+    "vuetify": "^4.1.7"
   },
   "plugin": {
     "title": "static server",
@@ -45,7 +45,7 @@
   "peerDependencies": {
     "electron": "~39.2.4",
     "vue": "^3.5.13",
-    "vuetify": "^3.8.1"
+    "vuetify": "^4.1.7"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",

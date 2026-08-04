@@ -6,7 +6,7 @@
           elevation="0"
           class="bg-transparent"
         >
-          <v-expansion-panel-title class="text-subtitle-1 text-[rgb(var(--v-theme-on-surface))] font-bold">
+          <v-expansion-panel-title class="text-body-large text-[rgb(var(--v-theme-on-surface))] font-bold">
             <v-icon
               icon="visibility_off"
               class="mr-2"
@@ -36,13 +36,13 @@
                         color="surface-container-highest"
                         size="40"
                       >
-                        <span class="text-subtitle-1 font-bold">
+                        <span class="text-body-large font-bold">
                           {{ game.name.charAt(0).toUpperCase() }}
                         </span>
                       </v-avatar>
 
                       <div class="mx-2 overflow-hidden grow">
-                        <div class="text-subtitle-2 truncate font-medium text-[rgb(var(--v-theme-on-surface-variant))]">
+                        <div class="text-title-small truncate font-medium text-[rgb(var(--v-theme-on-surface-variant))]">
                           {{ game.name }}
                         </div>
                       </div>

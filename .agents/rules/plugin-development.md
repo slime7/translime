@@ -36,7 +36,7 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 
 ## 4. UI 组件与图标规范
 
-*   **组件库**: 核心 UI 必须基于 `Vuetify 3`。
+*   **组件库**: 核心 UI 必须基于 `Vuetify 4`。
 *   **图标规范**: 
     *   组件库默认选用 **Material Design Icons (md)** 风格，建议写法为 `<v-icon icon="home" />` 或 `<v-icon>home</v-icon>`。
     *   **严禁使用 `mdi-` 前缀的图标名**（例如 `mdi-home` 是无效的）。

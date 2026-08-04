@@ -60,7 +60,7 @@
                 </v-avatar>
 
                 <div class="min-w-0 grow">
-                  <div class="text-body-1 font-medium truncate">
+                  <div class="text-body-large font-medium truncate">
                     {{ plugin.plugin?.title || plugin.title || plugin.packageName }}
                   </div>
                 </div>

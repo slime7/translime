@@ -2,7 +2,7 @@
 @import '../fonts/robot/robot.css';
 @import '../fonts/noto sans sc/noto_sans_sc.css';
 @import '../fonts/source code pro/source_code_pro.css';
-@layer vuetify, tailwind;
+@layer vuetify-core, vuetify-components, vuetify-overrides, tailwind, vuetify-utilities, vuetify-final;
 
 html {
   overflow-y: auto !important;

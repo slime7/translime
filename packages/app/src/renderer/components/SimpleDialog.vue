@@ -47,7 +47,7 @@
         <v-sheet
           class="loader-wrapper m-4 flex items-center justify-center"
           rounded="circle"
-          elevation="6"
+          elevation="5"
         >
           <v-progress-circular
             indeterminate

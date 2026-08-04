@@ -100,6 +100,6 @@ stateDiagram-v2
 
 - 插件 ID 全局唯一且等于包名。
 - 激活时机必须声明，不把重初始化堆到启动阶段。
-- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 Vuetify 3，插件 UI 也要求基于 Vuetify 3。
+- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 Vuetify 4，插件 UI 也要求基于 Vuetify 4。
 - `main-renderer-ready` 只允许主窗口首屏完成后触发，插件渲染页不得重复触发。
 - 真实宿主是主要验证环境，preview 模式不替代宿主内验证。

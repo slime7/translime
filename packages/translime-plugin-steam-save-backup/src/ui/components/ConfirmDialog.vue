@@ -25,7 +25,7 @@
           {{ dialog.title }}
         </div>
 
-        <div class="text-body-2 text-[rgb(var(--v-theme-on-surface-variant))] mb-4">
+        <div class="text-body-medium text-[rgb(var(--v-theme-on-surface-variant))] mb-4">
           {{ dialog.message }}
 
           <div
