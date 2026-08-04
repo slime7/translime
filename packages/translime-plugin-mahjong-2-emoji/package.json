@@ -16,12 +16,12 @@
     "build": "vite build"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.0",
+    "@vitejs/plugin-vue": "^6.0.8",
     "eslint": "~9.24.0",
     "eslint-config-airbnb-extended": "^3.0.1",
     "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-vue": "^10.0.0",
-    "vite": "^8.0.0",
+    "vite": "^8.2.0",
     "vite-plugin-css-injected-by-js": "^3.0.1"
   },
   "plugin": {
@@ -31,6 +31,6 @@
     "ui": "dist/ui.esm.js"
   },
   "peerDependencies": {
-    "vue": "^3.5.13"
+    "vue": "^3.5.40"
   }
 }

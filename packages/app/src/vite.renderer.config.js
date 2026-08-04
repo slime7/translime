@@ -32,7 +32,11 @@ export default defineConfig(({ mode }) => {
         },
         {
           find: /^vue$/,
-          replacement: isProd ? 'app://./libs/vue/vue.esm-browser.js' : 'http://localhost:5173/libs/vue/vue.esm-browser.js',
+          // 开发模式直接指向真实文件（vite 以 /@fs/ 在当前端口提供），避免写死端口；
+          // 生产构建从打包目录加载
+          replacement: isProd
+            ? 'app://./libs/vue/vue.esm-browser.js'
+            : resolve(MODULES_ROOT, './vue/dist/vue.esm-browser.js'),
         },
       ],
     },
