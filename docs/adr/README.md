@@ -48,4 +48,17 @@
 记录正面影响、代价和重新评估条件。
 ~~~
 
+## 创建
+
+仓库内置 ADR 创建脚本 `.agents/adr/create_adr.py`，从仓库根目录运行，保证编号、命名与模板一致：
+
+```text
+python .agents/adr/create_adr.py . "<决策标题>" --slug <slug> --context "<背景>" --decision "<决策>" --option "<候选方案A>" --option "<候选方案B>" --consequence "<影响>"
+```
+
+- 中文标题必须显式提供 `--slug`（小写 ASCII 单词、连字符分隔）。
+- 默认状态为 `proposed`；决策已生效时传入 `--status active`。
+- 替代已有 ADR 时传入 `--supersedes NNNN`，被替代的 ADR 必须已存在。
+- 不确定参数效果时可先加 `--dry-run` 预览，不会写入文件。
+
 本仓库当前没有历史 ADR；首次记录决策时从 `0001` 开始编号。

@@ -63,4 +63,4 @@ translime 是一个基于 Electron 的小功能加载器，用于快速加载以
 - 模块边界、数据流、依赖或部署变化 → 更新 `docs/ARCHITECTURE.md`，必要时在 `docs/adr/` 记录决策
 - 领域模型、公共类型、状态或命名约定变化 → 更新 `docs/ABSTRACTIONS.md`，必要时在 `docs/adr/` 记录决策
 - 环境要求、命令、目录或常见操作变化 → 更新 `docs/GETTING-STARTED.md`
-- 长期架构选择及其取舍 → 按 `docs/adr/README.md` 的格式新增 ADR
+- 长期架构选择及其取舍 → 使用 `.agents/adr/create_adr.py` 创建 ADR（用法与格式见 `docs/adr/README.md`）
