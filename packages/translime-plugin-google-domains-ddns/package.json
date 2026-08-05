@@ -3,6 +3,14 @@
   "version": "1.1.4",
   "description": "谷歌域名动态dns设置",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slime7/translime.git",
+    "directory": "packages/translime-plugin-google-domains-ddns"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "translime",
     "translime-plugin"

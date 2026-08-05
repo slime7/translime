@@ -1,21 +1,30 @@
-name: Publish Package
+name: Publish Packages
 
 on:
   push:
-    tags:
-      - 'translime-*@*.*.*'
+    branches:
+      - dev
+    paths:
+      - 'packages/sdk/package.json'
+      - 'packages/translime-plugin-*/package.json'
   workflow_dispatch:
     inputs:
       package_name:
-        description: Package name under packages/
+        description: Exact npm package name to retry
         required: true
         type: string
 
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-production
+  cancel-in-progress: false
+
 jobs:
   publish:
-    runs-on: windows-latest
-    permissions:
-      contents: read
+    runs-on: windows-2022
 
     steps:
       - name: Check out Git repository
@@ -27,33 +36,31 @@ jobs:
           version: 10
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: 24
+          package-manager-cache: false
           registry-url: https://registry.npmjs.org
 
-      - name: Resolve package name
-        id: meta
-        shell: pwsh
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@11
+
+      - name: Show tool versions
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $packageName = "${{ inputs.package_name }}"
-          } else {
-            $refName = "${{ github.ref_name }}"
-            $packageName = $refName.Split('@')[0]
-          }
-
-          if ([string]::IsNullOrWhiteSpace($packageName)) {
-            throw "Unable to resolve package name"
-          }
-
-          "package_name=$packageName" >> $env:GITHUB_OUTPUT
+          node --version
+          npm --version
+          pnpm --version
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --reporter=append-only
 
-      - name: Publish package
-        run: pnpm run publish:package -- --name "${{ steps.meta.outputs.package_name }}"
+      - name: Publish packages
+        shell: pwsh
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_NAME: ${{ inputs.package_name }}
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            pnpm run publish:package -- --name $env:PACKAGE_NAME
+          } else {
+            pnpm run publish:package
+          }

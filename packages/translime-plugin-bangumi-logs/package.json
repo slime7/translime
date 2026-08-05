@@ -3,6 +3,14 @@
   "version": "1.0.1",
   "description": "Bangumi Logs plugin",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slime7/translime.git",
+    "directory": "packages/translime-plugin-bangumi-logs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "translime",
     "translime-plugin"

@@ -3,6 +3,14 @@
   "version": "1.1.0",
   "description": "轻松获取 HDR 截图",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slime7/translime.git",
+    "directory": "packages/translime-plugin-hdr-capture"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "translime",
     "translime-plugin"

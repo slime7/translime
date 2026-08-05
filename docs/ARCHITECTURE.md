@@ -121,7 +121,7 @@ flowchart TD
 - 自动更新：electron-updater 从 GitHub Releases（slime7/translime）拉取 `latest.yml` 与安装包。
 - CI（.github/workflows）：
   - `build.yaml`：打 tag `v*.*.*` 或手动触发，在 windows-latest + Node 20 上安装依赖并构建宿主，产物上传为 draft release。
-  - `publish-package.yaml`：打 tag `translime-*@*.*.*` 或手动指定包名，通过 `.github/scripts/publish-package.mjs` 构建并发布到 npm。
+  - `publish-package.yaml`：`dev` 上 SDK 或插件的版本清单变化时，在固定的 Windows 2022 runner 上扫描本地版本；只构建、测试、打包并发布 npm 中尚不存在且高于最新版本的包，也可手动指定包名补发。发布使用 npm Trusted Publishing/OIDC，不依赖长期 npm token。
   - `github-page.yaml`：push 到 `dev` 分支时把 `github-page/` 部署到 GitHub Pages。
 - 深链：宿主注册 `translime://` 协议，`translime://open/...` 会转发到主窗口。
 

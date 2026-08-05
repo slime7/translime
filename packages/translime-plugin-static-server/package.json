@@ -3,6 +3,14 @@
   "version": "2.2.1",
   "description": "开启一个临时的静态文件服务器。",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slime7/translime.git",
+    "directory": "packages/translime-plugin-static-server"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "translime",
     "translime-plugin"

@@ -3,6 +3,14 @@
   "version": "1.1.0",
   "description": "将麻将字符串转成方便复制的 emoji",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slime7/translime.git",
+    "directory": "packages/translime-plugin-mahjong-2-emoji"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "translime",
     "translime-plugin"

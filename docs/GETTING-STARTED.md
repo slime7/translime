@@ -32,7 +32,7 @@ pnpm dev
 - SDK lint：`pnpm -C packages/sdk run lint` 与 `pnpm -C packages/sdk run lint:style`
 - 构建插件：`pnpm --filter <插件包名> run build`
 - 插件测试：`pnpm --filter translime-plugin-bangumi-logs run test`、`pnpm --filter translime-plugin-hdr-capture run test`
-- 发布插件包：`pnpm run publish:package -- --name <插件包名>`（CI 通过 tag `translime-*@*.*.*` 或手动触发执行同一脚本）
+- 检查并发布所有新版本：`pnpm run publish:package`；指定包补发：`pnpm run publish:package -- --name <包名>`。本地命令需要 npm 发布凭据，GitHub Actions 使用 Trusted Publishing/OIDC。
 
 根目录 `package.json` 的 `lint` 脚本指向不存在的 `src/`，请使用各包的 lint 脚本。
 
@@ -74,6 +74,16 @@ docs/                         # 项目文档体系
 | `.agents/plugin-scaffold/create-plugin.mjs` | 插件脚手架脚本 |
 
 ## 常见开发任务
+
+### 发布 SDK 或插件
+
+1. 修改 `packages/sdk/package.json` 或对应 `packages/translime-plugin-*/package.json` 的稳定版本号。
+2. 在本地完成对应包的构建与测试。
+3. 将提交推送到 `dev`。当发布包的 `package.json` 变化时，GitHub Actions 会扫描所有允许发布的包。
+4. Action 只发布本地版本高于 npm 最新版本且尚不存在的包；相同版本会跳过，低于 npm 最新版本会报错。
+5. 发布失败时可在 Actions 页面手动运行 `Publish Packages`，输入准确包名进行补发。
+
+发布范围由目录决定，仅包括 `packages/sdk` 与 `packages/translime-plugin-*`。`packages/app` 继续通过 GitHub Releases 分发，模板与文档 submodule 不参与 npm 发布。发布新插件的首个版本时，先使用 npm 2FA 手动发布并在 npmjs 配置该包的 GitHub Actions Trusted Publisher；后续版本由 Action 发布。
 
 ### 创建新插件
 
