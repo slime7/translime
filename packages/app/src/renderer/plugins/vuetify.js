@@ -25,7 +25,6 @@ const vuetify = createVuetify({
   },
   theme: {
     defaultTheme: 'light',
-    utilities: false,
     themes: {
       light: {
         colors: {

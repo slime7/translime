@@ -48,18 +48,6 @@
 @source inline('rounded-{none,sm,md,lg,xl,2xl,3xl,full,pill,circle,shaped}');
 
 /*
-  Vuetify elevation 工具类的 Tailwind 等价物
-*/
-@utility elevation-0 { box-shadow: none }
-@utility elevation-1 { box-shadow: var(--shadow-xs) }
-@utility elevation-2 { box-shadow: var(--shadow-sm) }
-@utility elevation-3 { box-shadow: var(--shadow-md) }
-@utility elevation-4 { box-shadow: var(--shadow-xl) }
-@utility elevation-5 { box-shadow: var(--shadow-2xl) }
-
-@source inline('elevation-{0,1,2,3,4,5}');
-
-/*
   MD3 排版工具类（迁移期保留 Vuetify 类名）
 */
 @utility text-display-large {

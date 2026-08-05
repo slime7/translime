@@ -28,7 +28,7 @@
               {{ icon }}
             </v-icon>
             <img v-else-if="image" :src="image" alt="" width="56">
-            <div v-else class="text-nowrap truncate" :class="isHovering || isExactActive ? 'text-on-primary-container' : 'text-on-secondary-container'">
+            <div v-else class="text-nowrap truncate" :class="isHovering || isExactActive ? 'on-primary-container' : 'on-secondary-container'">
               <slot />
             </div>
           </v-avatar>
@@ -67,7 +67,7 @@
             {{ icon }}
           </v-icon>
           <img v-else-if="image" :src="image" alt="" width="56">
-          <div v-else class="text-nowrap truncate" :class="isHovering ? 'text-on-primary-container' : 'text-on-secondary-container'">
+          <div v-else class="text-nowrap truncate" :class="isHovering ? 'on-primary-container' : 'on-secondary-container'">
             <slot />
           </div>
         </v-avatar>

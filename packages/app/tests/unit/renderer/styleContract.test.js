@@ -101,14 +101,12 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       });
     });
 
-    it('保留 Vuetify rounded/elevation/MD3 排版工具类的 Tailwind 等价物', async () => {
+    it('保留 Vuetify rounded 与 MD3 排版工具类的 Tailwind 等价物', async () => {
       const css = await read('src/renderer/assets/styles/tailwind.css');
 
       expect(css).toContain('@utility rounded-pill');
       expect(css).toContain('@utility rounded-circle');
       expect(css).toContain('@utility rounded-shaped');
-      expect(css).toContain('@utility elevation-0');
-      expect(css).toContain('@utility elevation-5');
       expect(css).toContain('@utility text-body-large');
       expect(css).toContain('@utility text-body-small');
     });
@@ -124,11 +122,13 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(vuetifyIndex).toBeGreaterThan(tailwindIndex);
     });
 
-    it('settings.scss 关闭 Vuetify 内置工具类与调色板，并对齐 grid 断点', async () => {
+    it('settings.scss 按需禁用与 Tailwind 冲突的工具类，关闭调色板并对齐 grid 断点', async () => {
       const scss = await read('src/renderer/assets/styles/settings.scss');
 
       expect(scss).toContain('$color-pack: false');
-      expect(scss).toContain('$utilities: false');
+      expect(scss).not.toContain('$utilities: false');
+      expect(scss).toContain("'display': false");
+      expect(scss).toContain("'margin-top': false");
       expect(scss).toContain('$grid-breakpoints');
       expect(scss).toContain("'sm': 600px");
       expect(scss).toContain("'md': 960px");
@@ -138,10 +138,10 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(scss).toContain('$body-font-family');
     });
 
-    it('vuetify.js 关闭运行时主题工具类并显式对齐 display 阈值', async () => {
+    it('vuetify.js 保留运行时主题工具类并显式对齐 display 阈值', async () => {
       const js = await read('src/renderer/plugins/vuetify.js');
 
-      expect(js).toContain('utilities: false');
+      expect(js).not.toContain('utilities: false');
       expect(js).toContain("mobileBreakpoint: 'md'");
       expect(js).toContain('xs: 0, sm: 600, md: 960, lg: 1280, xl: 1920, xxl: 2560');
     });
@@ -155,8 +155,10 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(vue).not.toContain('text-decoration-none');
       expect(vue).not.toContain('text-no-wrap');
       expect(vue).not.toContain('text-truncate');
-      expect(vue).toContain('text-on-primary-container');
-      expect(vue).toContain('text-on-secondary-container');
+      expect(vue).not.toContain('text-on-primary-container');
+      expect(vue).not.toContain('text-on-secondary-container');
+      expect(vue).toContain("'on-primary-container'");
+      expect(vue).toContain("'on-secondary-container'");
     });
 
     it('Home.vue 使用 xxl 断点前缀', async () => {
@@ -193,18 +195,19 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       const scss = await readSdk('src/preview/settings.scss');
 
       expect(scss).toContain('$color-pack: false');
-      expect(scss).toContain('$utilities: false');
+      expect(scss).not.toContain('$utilities: false');
+      expect(scss).toContain("'display': false");
       expect(scss).toContain('$grid-breakpoints');
       expect(scss).toContain("'md': 960px");
       expect(scss).toContain("'xxl': 2560px");
     });
 
-    it('preview App.vue 不再使用已失效的 Vuetify 工具类', async () => {
+    it('preview App.vue 恢复原 Vuetify 工具类写法', async () => {
       const vue = await readSdk('src/preview/App.vue');
 
-      expect(vue).not.toContain('d-flex');
-      expect(vue).not.toContain('text-medium-emphasis');
-      expect(vue).not.toContain('text-body-small');
+      expect(vue).toContain('d-flex');
+      expect(vue).toContain('text-medium-emphasis');
+      expect(vue).toContain('text-body-small');
     });
   });
 });
