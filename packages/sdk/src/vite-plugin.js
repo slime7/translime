@@ -36,15 +36,16 @@ function cssInjectedByJsPlugin(options = {}) {
     apply: 'build',
     enforce: 'post',
     generateBundle(_, bundle) {
+      const outputBundle = bundle;
       const cssChunks = [];
 
-      Object.entries(bundle).forEach(([fileName, chunk]) => {
+      Object.entries(outputBundle).forEach(([fileName, chunk]) => {
         if (chunk.type !== 'asset' || typeof chunk.source !== 'string' || !fileName.endsWith('.css')) {
           return;
         }
 
         cssChunks.push(chunk.source);
-        delete bundle[fileName];
+        delete outputBundle[fileName];
       });
 
       if (cssChunks.length === 0) {
@@ -55,9 +56,10 @@ function cssInjectedByJsPlugin(options = {}) {
       const injectedOptions = JSON.stringify({ styleId });
       const runtimeCode = `;(function(){const inject=${injectCodeFunction.toString()};inject(${cssCode}, ${injectedOptions});})();\n`;
 
-      Object.values(bundle).forEach((chunk) => {
+      Object.values(outputBundle).forEach((chunk) => {
         if (chunk.type === 'chunk' && chunk.isEntry) {
-          chunk.code = `${runtimeCode}${chunk.code}`;
+          const entryChunk = chunk;
+          entryChunk.code = `${runtimeCode}${entryChunk.code}`;
         }
       });
     },
@@ -157,32 +159,17 @@ const scopePluginCss = (cssCode, styleId) => {
         if (char === quote && prevChar !== '\\') {
           quote = '';
         }
-        continue;
-      }
-
-      if (char === '"' || char === '\'') {
+      } else if (char === '"' || char === '\'') {
         quote = char;
-        continue;
-      }
-
-      if (char === '(') {
+      } else if (char === '(') {
         parenthesesDepth += 1;
-        continue;
-      }
-      if (char === ')') {
+      } else if (char === ')') {
         parenthesesDepth -= 1;
-        continue;
-      }
-      if (char === '[') {
+      } else if (char === '[') {
         bracketsDepth += 1;
-        continue;
-      }
-      if (char === ']') {
+      } else if (char === ']') {
         bracketsDepth -= 1;
-        continue;
-      }
-
-      if (char === ',' && parenthesesDepth === 0 && bracketsDepth === 0) {
+      } else if (char === ',' && parenthesesDepth === 0 && bracketsDepth === 0) {
         selectors.push(current.slice(0, -1));
         current = '';
       }
@@ -214,33 +201,18 @@ const scopePluginCss = (cssCode, styleId) => {
           inComment = false;
           index += 1;
         }
-        continue;
-      }
-
-      if (quote) {
+      } else if (quote) {
         if (char === quote && prevChar !== '\\') {
           quote = '';
         }
-        continue;
-      }
-
-      if (char === '/' && nextChar === '*') {
+      } else if (char === '/' && nextChar === '*') {
         inComment = true;
         index += 1;
-        continue;
-      }
-
-      if (char === '"' || char === '\'') {
+      } else if (char === '"' || char === '\'') {
         quote = char;
-        continue;
-      }
-
-      if (char === '{') {
+      } else if (char === '{') {
         depth += 1;
-        continue;
-      }
-
-      if (char === '}') {
+      } else if (char === '}') {
         depth -= 1;
         if (depth === 0) {
           return index;
@@ -269,82 +241,53 @@ const scopePluginCss = (cssCode, styleId) => {
           inComment = false;
           index += 1;
         }
-        continue;
-      }
-
-      if (quote) {
+      } else if (quote) {
         if (char === quote && prevChar !== '\\') {
           quote = '';
         }
-        continue;
-      }
-
-      if (char === '/' && nextChar === '*') {
+      } else if (char === '/' && nextChar === '*') {
         inComment = true;
         index += 1;
-        continue;
-      }
-
-      if (char === '"' || char === '\'') {
+      } else if (char === '"' || char === '\'') {
         quote = char;
-        continue;
-      }
-
-      if (char === '(') {
+      } else if (char === '(') {
         parenthesesDepth += 1;
-        continue;
-      }
-      if (char === ')') {
+      } else if (char === ')') {
         parenthesesDepth -= 1;
-        continue;
-      }
-      if (char === '[') {
+      } else if (char === '[') {
         bracketsDepth += 1;
-        continue;
-      }
-      if (char === ']') {
+      } else if (char === ']') {
         bracketsDepth -= 1;
-        continue;
-      }
-
-      if (parenthesesDepth > 0 || bracketsDepth > 0) {
-        continue;
-      }
-
-      if (char !== '{') {
-        continue;
-      }
-
-      const prelude = source.slice(cursor, index);
-      const trimmedPrelude = prelude.trim();
-      const closeIndex = findMatchingBrace(source, index);
-      if (closeIndex === -1) {
-        return output + source.slice(cursor);
-      }
-
-      const blockContent = source.slice(index + 1, closeIndex);
-      if (!trimmedPrelude) {
-        output += source.slice(cursor, closeIndex + 1);
-        cursor = closeIndex + 1;
-        index = closeIndex;
-        continue;
-      }
-
-      if (trimmedPrelude.startsWith('@')) {
-        const atRuleName = trimmedPrelude.slice(1).split(/\s|\(/, 1)[0].toLowerCase();
-        if (AT_RULE_WITH_NESTED_RULES.has(atRuleName)) {
-          output += `${prelude}{${processCssBlock(blockContent)}}`;
-        } else if (AT_RULE_WITH_RAW_BLOCK.has(atRuleName) || atRuleName.endsWith('keyframes')) {
-          output += `${prelude}{${blockContent}}`;
-        } else {
-          output += `${prelude}{${blockContent}}`;
+      } else if (parenthesesDepth === 0 && bracketsDepth === 0 && char === '{') {
+        const prelude = source.slice(cursor, index);
+        const trimmedPrelude = prelude.trim();
+        const closeIndex = findMatchingBrace(source, index);
+        if (closeIndex === -1) {
+          return output + source.slice(cursor);
         }
-      } else {
-        output += `${scopeSelectorList(prelude)}{${blockContent}}`;
-      }
 
-      cursor = closeIndex + 1;
-      index = closeIndex;
+        const blockContent = source.slice(index + 1, closeIndex);
+        if (!trimmedPrelude) {
+          output += source.slice(cursor, closeIndex + 1);
+          cursor = closeIndex + 1;
+          index = closeIndex;
+        } else {
+          if (trimmedPrelude.startsWith('@')) {
+            const atRuleName = trimmedPrelude.slice(1).split(/\s|\(/, 1)[0].toLowerCase();
+            if (AT_RULE_WITH_NESTED_RULES.has(atRuleName)) {
+              output += `${prelude}{${processCssBlock(blockContent)}}`;
+            } else if (AT_RULE_WITH_RAW_BLOCK.has(atRuleName) || atRuleName.endsWith('keyframes')) {
+              output += `${prelude}{${blockContent}}`;
+            } else {
+              output += `${prelude}{${blockContent}}`;
+            }
+          } else {
+            output += `${scopeSelectorList(prelude)}{${blockContent}}`;
+          }
+          cursor = closeIndex + 1;
+          index = closeIndex;
+        }
+      }
     }
 
     return output + source.slice(cursor);
@@ -360,15 +303,14 @@ export function createPluginCssScopePlugin(styleId) {
     enforce: 'post',
     generateBundle(_, bundle) {
       Object.values(bundle).forEach((chunk) => {
-        if (chunk.type !== 'asset' || typeof chunk.fileName !== 'string' || !chunk.fileName.endsWith('.css')) {
-          return;
+        const isCssAsset = chunk.type === 'asset'
+          && typeof chunk.fileName === 'string'
+          && chunk.fileName.endsWith('.css')
+          && typeof chunk.source === 'string';
+        if (isCssAsset) {
+          const cssChunk = chunk;
+          cssChunk.source = scopePluginCss(cssChunk.source, styleId);
         }
-
-        if (typeof chunk.source !== 'string') {
-          return;
-        }
-
-        chunk.source = scopePluginCss(chunk.source, styleId);
       });
     },
   };
@@ -468,7 +410,7 @@ export function translimeSdk(options = {}) {
 
       // Preview 模式特殊配置（仅在 serve 阶段生效）
       if (isPreviewMode && command === 'serve') {
-        const settingsPath = resolve(__dirname, 'preview/settings.scss');
+        const settingsPath = getPreviewSettingsPath();
 
         return {
           ...baseConfig,

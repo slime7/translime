@@ -58,7 +58,7 @@
   "scripts": {
     "lint": "eslint src --ext .js,.vue --fix",
     "lint:style": "stylelint src/**/*.{vue,scss} --fix",
-    "build": "vite build && node scripts/post-build.mjs",
+    "build": "vite build && vite build --mode cjs && node scripts/post-build.mjs",
     "prepublishOnly": "npm run build"
   },
   "engines": {

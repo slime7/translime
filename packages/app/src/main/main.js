@@ -16,9 +16,7 @@ import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import Ipc from './core/Ipc';
 
-const dir = typeof __dirname === 'string'
-  ? __dirname
-  : dirname(fileURLToPath(import.meta.url));
+const dir = dirname(fileURLToPath(import.meta.url));
 const isInDisplay = (winProps) => {
   const displays = screen.getAllDisplays();
   let inDisplay = false;

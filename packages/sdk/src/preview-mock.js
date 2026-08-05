@@ -81,7 +81,7 @@ export function createMockDialog() {
     showSaveDialog: async (options) => {
       // eslint-disable-next-line no-console
       console.log('[Preview Mock] showSaveDialog:', options);
-      // eslint-disable-next-line no-alert, no-restricted-globals
+      // eslint-disable-next-line no-alert
       const fileName = prompt('保存文件名：', options?.defaultPath || 'file.txt');
       return {
         canceled: !fileName,
@@ -97,7 +97,7 @@ export function createMockDialog() {
     showErrorBox: (title, content) => {
       // eslint-disable-next-line no-console
       console.error('[Preview Mock] showErrorBox:', title, content);
-      // eslint-disable-next-line no-alert, no-restricted-globals
+      // eslint-disable-next-line no-alert
       alert(`${title}\n\n${content}`);
     },
   };
@@ -117,13 +117,13 @@ export function createMockShell() {
     openPath: async (path) => {
       // eslint-disable-next-line no-console
       console.log('[Preview Mock] shell.openPath:', path);
-      // eslint-disable-next-line no-alert, no-restricted-globals
+      // eslint-disable-next-line no-alert
       alert(`[Preview] 无法在浏览器中打开路径: ${path}`);
     },
     showItemInFolder: (path) => {
       // eslint-disable-next-line no-console
       console.log('[Preview Mock] shell.showItemInFolder:', path);
-      // eslint-disable-next-line no-alert, no-restricted-globals
+      // eslint-disable-next-line no-alert
       alert(`[Preview] 无法在浏览器中显示文件夹: ${path}`);
     },
   };

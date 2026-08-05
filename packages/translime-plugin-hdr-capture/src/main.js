@@ -11,9 +11,7 @@ import { useLogger, usePluginConfig } from 'translime-sdk';
 import * as capture from './capture';
 import { isIncompleteShortcut, normalizeShortcut } from './main/shortcut-state';
 
-const dirname = typeof __dirname === 'string'
-  ? __dirname
-  : path.dirname(fileURLToPath(import.meta.url));
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();

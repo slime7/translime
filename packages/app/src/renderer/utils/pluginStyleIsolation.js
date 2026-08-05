@@ -55,40 +55,21 @@ const splitSelectors = (selectorText) => {
       if (char === quote && prevChar !== '\\') {
         quote = '';
       }
-      continue;
-    }
-
-    if (char === '"' || char === '\'') {
+    } else if (char === '"' || char === '\'') {
       quote = char;
-      continue;
-    }
-
-    if (char === '(') {
+    } else if (char === '(') {
       parenthesesDepth += 1;
-      continue;
-    }
-    if (char === ')') {
+    } else if (char === ')') {
       parenthesesDepth -= 1;
-      continue;
-    }
-    if (char === '[') {
+    } else if (char === '[') {
       bracketsDepth += 1;
-      continue;
-    }
-    if (char === ']') {
+    } else if (char === ']') {
       bracketsDepth -= 1;
-      continue;
-    }
-    if (char === '{') {
+    } else if (char === '{') {
       bracesDepth += 1;
-      continue;
-    }
-    if (char === '}') {
+    } else if (char === '}') {
       bracesDepth -= 1;
-      continue;
-    }
-
-    if (char === ',' && parenthesesDepth === 0 && bracketsDepth === 0 && bracesDepth === 0) {
+    } else if (char === ',' && parenthesesDepth === 0 && bracketsDepth === 0 && bracesDepth === 0) {
       selectors.push(current.slice(0, -1));
       current = '';
     }
@@ -233,8 +214,9 @@ const processStyleElement = (node, pluginId) => {
 
   try {
     const scopedCss = scopeCssText(cssContent, pluginId);
-    node.textContent = `@layer ${HOST_PLUGIN_LAYER_NAME} {\n${scopedCss}\n}`;
-    node.setAttribute(PROCESSED_ATTR, 'true');
+    const styleNode = node;
+    styleNode.textContent = `@layer ${HOST_PLUGIN_LAYER_NAME} {\n${scopedCss}\n}`;
+    styleNode.setAttribute(PROCESSED_ATTR, 'true');
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn(`[CSS Isolation] Failed to scope style for ${pluginId}:`, error);

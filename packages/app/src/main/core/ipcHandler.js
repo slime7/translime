@@ -20,9 +20,7 @@ import { listLogDates, readLogRecords } from '../utils/logViewer';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
 
-const dir = typeof __dirname === 'string'
-  ? __dirname
-  : dirname(fileURLToPath(import.meta.url));
+const dir = dirname(fileURLToPath(import.meta.url));
 
 const PLUGIN_LOADER_NOT_READY_ERROR = '\u63d2\u4ef6\u672a\u521d\u59cb\u5316';
 

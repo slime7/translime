@@ -610,6 +610,9 @@ importers:
       fluent-ffmpeg:
         specifier: ^2.1.3
         version: 2.1.3
+      translime-sdk:
+        specifier: workspace:*
+        version: link:../sdk
       vite:
         specifier: ^8.2.0
         version: 8.2.0(@types/node@22.14.1)(esbuild@0.27.2)(jiti@2.6.1)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0)
@@ -656,6 +659,9 @@ importers:
       serve-handler:
         specifier: ^6.1.5
         version: 6.1.5
+      translime-sdk:
+        specifier: workspace:*
+        version: link:../sdk
       vite:
         specifier: ^8.2.0
         version: 8.2.0(@types/node@22.14.1)(esbuild@0.27.2)(jiti@2.6.1)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0)

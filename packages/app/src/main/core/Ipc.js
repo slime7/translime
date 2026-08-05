@@ -14,6 +14,15 @@ export default class Ipc {
     this.listener = listener;
     this.sender = sender;
     this.handlerList = ipcHandler;
+    // 广播给所有窗口与 Webview，绑定为实例字段以避免类方法未使用 this
+    this.sendToAllWindows = (type, data) => {
+      const allWebContents = webContents.getAllWebContents();
+      allWebContents.forEach((wc) => {
+        if (!wc.isDestroyed() && !wc.isDevTools) {
+          wc.send('ipc-reply', { type, data });
+        }
+      });
+    };
 
     // 注册通用处理通道
     this.listener.handle('ipc-fn', (ev, { type, args }) => {
@@ -62,23 +71,9 @@ export default class Ipc {
     }
     const target = clientWin || asyncLocalStorage.getStore() || this.sender;
     if (target && !target.isDestroyed()) {
-      const webContents = target.webContents || target;
-      webContents.send('ipc-reply', { type, data });
+      const targetContents = target.webContents || target;
+      targetContents.send('ipc-reply', { type, data });
     }
-  }
-
-  /**
-   * 发送消息到所有已打开的窗口和Webview
-   * @param {string} type 消息类型
-   * @param {any} data 消息数据
-   */
-  sendToAllWindows(type, data) {
-    const allWebContents = webContents.getAllWebContents();
-    allWebContents.forEach((wc) => {
-      if (!wc.isDestroyed() && !wc.isDevTools) {
-        wc.send('ipc-reply', { type, data });
-      }
-    });
   }
 
   /**
@@ -101,7 +96,7 @@ export default class Ipc {
     const handler = handlerFn({
       sendToClient: this.sendToClient.bind(this),
       sendToMain: this.sendToMain.bind(this),
-      sendToAllWindows: this.sendToAllWindows.bind(this),
+      sendToAllWindows: this.sendToAllWindows,
     });
     this.handlerList[type] = handler;
     return true;
