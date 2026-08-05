@@ -122,10 +122,7 @@
                 </div>
               </div>
 
-              <div
-                v-if="record.data"
-                class="log-viewer__record-actions"
-              >
+              <div class="log-viewer__record-actions">
                 <v-btn
                   variant="tonal"
                   @click="openDetail(record)"
@@ -166,11 +163,36 @@
             {{ detailDialog.record?.timestamp || '无时间戳' }}
           </div>
 
-          <div class="mt-2 text-base">
+          <div class="mt-2 text-base log-viewer__detail-message">
             {{ detailDialog.record?.message || '' }}
           </div>
 
-          <pre class="mt-4 whitespace-pre-wrap break-all rounded-xl bg-black/5 p-4 text-sm">{{ detailDialog.content }}</pre>
+          <v-treeview
+            v-model:opened="detailDialog.opened"
+            :items="detailDialog.items"
+            :load-children="loadDetailChildren"
+            class="log-viewer__tree"
+            density="compact"
+            :indent="12"
+            item-title="title"
+            item-value="value"
+            :prepend-gap="4"
+            open-on-click
+            slim
+          >
+            <template #title="{ item }">
+              <div class="log-viewer__tree-node">
+                <span class="log-viewer__tree-label">{{ item.label }}</span>
+                <span class="log-viewer__tree-colon text-medium-emphasis">:</span>
+                <span
+                  v-if="item.valueText"
+                  class="log-viewer__tree-value text-medium-emphasis"
+                >
+                  {{ item.valueText }}
+                </span>
+              </div>
+            </template>
+          </v-treeview>
         </v-card-text>
 
         <v-card-actions>
@@ -226,7 +248,9 @@ const syncingDate = ref(false);
 
 const detailDialog = reactive({
   visible: false,
-  content: '',
+  items: [],
+  opened: [],
+  payload: null,
   record: null,
 });
 const copyState = reactive({
@@ -296,6 +320,107 @@ const statusText = computed(() => {
 const copyButtonText = computed(() => (copyState.copied ? '已复制' : '复制日志'));
 const copyButtonIcon = computed(() => (copyState.copied ? 'check' : 'content_copy'));
 
+const getDetailEntries = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index) => ({
+        childPath: index,
+        label: `[${index}]`,
+        value: item,
+      }))
+      .filter(({ value: item }) => typeof item !== 'undefined');
+  }
+
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  return Object.entries(value)
+    .filter(([, childValue]) => typeof childValue !== 'undefined')
+    .map(([key, childValue]) => ({
+      childPath: key,
+      label: key,
+      value: childValue,
+    }));
+};
+
+const formatDetailValue = (value) => {
+  if (Array.isArray(value)) {
+    return value.length ? `数组(${value.length})` : '[]';
+  }
+
+  if (value && typeof value === 'object') {
+    const size = Object.values(value).filter((item) => typeof item !== 'undefined').length;
+    return size ? `对象(${size})` : '{}';
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  if (typeof value === 'undefined') {
+    return 'undefined';
+  }
+
+  return String(value);
+};
+
+const createDetailItem = (label, value, path) => {
+  const entries = getDetailEntries(value);
+  const hasChildren = Boolean(entries?.length);
+
+  return {
+    children: hasChildren ? [] : undefined,
+    childrenLoaded: !hasChildren,
+    label,
+    title: label,
+    value: path,
+    valueSource: value,
+    valueText: formatDetailValue(value),
+  };
+};
+
+const loadDetailChildren = async (item) => {
+  if (!item || item.childrenLoaded) {
+    return;
+  }
+
+  const targetItem = item;
+  const entries = getDetailEntries(targetItem.valueSource);
+  targetItem.children = entries?.map(({ childPath, label, value }) => createDetailItem(label, value, `${targetItem.value}.${childPath}`)) || [];
+  targetItem.childrenLoaded = true;
+};
+
+const buildDetailState = (record) => {
+  const opened = [];
+  const payload = record.raw;
+  const items = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? Object.entries(payload)
+      .filter(([, childValue]) => typeof childValue !== 'undefined')
+      .map(([key, childValue]) => {
+        const item = createDetailItem(key, childValue, key);
+
+        if (key !== 'data' && item.children) {
+          opened.push(key);
+          item.children = getDetailEntries(childValue)?.map(({ childPath, label, value }) => createDetailItem(label, value, `${key}.${childPath}`)) || [];
+          item.childrenLoaded = true;
+        }
+
+        return item;
+      })
+    : [createDetailItem('value', payload, 'value')];
+
+  return {
+    items,
+    opened,
+    payload,
+  };
+};
+
 const ensureSelectedDate = (dates) => {
   if (!dates.length) {
     return;
@@ -350,11 +475,12 @@ const openLogDir = async () => {
 };
 
 const openDetail = (record) => {
+  const detailState = buildDetailState(record);
+
   detailDialog.record = record;
-  detailDialog.content = JSON.stringify({
-    data: record.data,
-    raw: record.raw,
-  }, null, 2);
+  detailDialog.items = detailState.items;
+  detailDialog.opened = detailState.opened;
+  detailDialog.payload = detailState.payload;
   detailDialog.visible = true;
 };
 
@@ -374,7 +500,9 @@ const resetCopyState = () => {
 const closeDetail = () => {
   detailDialog.visible = false;
   detailDialog.record = null;
-  detailDialog.content = '';
+  detailDialog.items = [];
+  detailDialog.opened = [];
+  detailDialog.payload = null;
   resetCopyState();
 };
 
@@ -393,7 +521,7 @@ const scheduleCopyReset = () => {
 };
 
 const copyDetail = async () => {
-  await clipboard.writeText(detailDialog.content);
+  await clipboard.writeText(JSON.stringify(detailDialog.payload, null, 2));
   copyState.copied = true;
   copyState.minVisibleUntil = Date.now() + 1200;
   scheduleCopyReset();
@@ -522,7 +650,42 @@ onMounted(async () => {
   margin-top: 1rem;
 }
 
-@media (width >= 64rem) {
+.log-viewer__tree {
+  margin-top: 1rem;
+  padding: .5rem;
+  border-radius: .75rem;
+  background: rgb(0 0 0 / 3%);
+}
+
+.log-viewer__detail-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.log-viewer__tree-node {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: start;
+  column-gap: .375rem;
+  width: 100%;
+  min-height: 1.5rem;
+}
+
+.log-viewer__tree-label {
+  font-weight: 500;
+}
+
+.log-viewer__tree-colon {
+  margin-inline: -.125rem;
+}
+
+.log-viewer__tree-value {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (width >= 80rem) {
   .log-viewer__toolbar {
     flex-direction: row;
     align-items: center;

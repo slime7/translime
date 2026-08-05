@@ -1,7 +1,10 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import tailwindcss from '@tailwindcss/vite';
+import {
+  createPluginCssIsolationPlugins,
+  translimeSdk,
+} from 'translime-sdk/vite';
 
 /**
  * @type {import('vite').UserConfig}
@@ -11,7 +14,8 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
     tailwindcss(),
-    cssInjectedByJsPlugin(),
+    translimeSdk(),
+    ...createPluginCssIsolationPlugins('translime-plugin-steam-save-backup'),
   ],
   envDir: process.cwd(),
   build: {

@@ -36,7 +36,7 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 
 ## 4. UI 组件与图标规范
 
-*   **组件库**: 核心 UI 必须基于 `Vuetify 3`。
+*   **组件库**: 核心 UI 必须基于 `Vuetify 4`。
 *   **图标规范**: 
     *   组件库默认选用 **Material Design Icons (md)** 风格，建议写法为 `<v-icon icon="home" />` 或 `<v-icon>home</v-icon>`。
     *   **严禁使用 `mdi-` 前缀的图标名**（例如 `mdi-home` 是无效的）。
@@ -63,3 +63,17 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 
 *   所有 `ipc.invoke` 调用必须遵循 `事件名@插件ID` 的格式，例如：`ipc.invoke('get-data@translime-plugin-example')`。
 *   在主进程对应的 `ipcHandlers` 中，处理函数会自动解构出 `sendToClient` 等工具。
+
+## 7. 样式隔离与 Tailwind CSS 规范
+
+**严禁全局样式污染**：主程序按 Vuetify 官方文档采用 Tailwind 主导的样式体系（CSS layer 顺序为 `tailwind-theme → tailwind-reset → vuetify-* → tailwind-utilities → vuetify-final`，`tailwind-utilities` 位于 `vuetify-utilities` 之上；与 Tailwind 冲突的 Vuetify 工具类按需禁用，Vuetify 运行时主题工具类与调色板保留，`dark:`/`light:` 变体跟随 `.v-theme--*`，断点与 Vuetify 阈值对齐）。若插件随意注入样式（如直接 `@import "tailwindcss";`），其生成的非级联级 (Unlayered) 样式**将直接覆盖并破坏主程序**的响应式网格与 Tailwind 工具类。
+
+如果你在插件开发中使用了 Tailwind CSS，**必须**采取以下任意一种样式隔离手段：
+1. **作用域包裹**：在你的 `index.css` 或主样式文件中，将 tailwind 的引入放在唯一的 `@layer` 中（降权）：
+    ```css
+    @layer plugin_your_name {
+      @import "tailwindcss";
+    }
+    ```
+2. **在主组件外层限制 Prefix (针对 v3)**：配置 `prefix: 'tw-'`，并在最外层使用唯一的 wrapper class。
+3. **禁用预设重置 (Preflight)**：如果你不需要全局 reset，不要在样式中包含 preflight，以防修改宿主的 button、svg 默认表现。

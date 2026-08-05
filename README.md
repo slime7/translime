@@ -2,9 +2,16 @@
 
 ## 名称由来
 
-transform 和 slime 的组合词，意为像史莱姆一样拟态。即每个插件都是一个‘史莱姆’。
+transform 和 slime 的组合词，意为像史莱姆一样拟态。即每个插件都是一个'史莱姆'。
 
 ---
+
+### 文档
+
+- [开始使用](./docs/GETTING-STARTED.md)
+- [项目愿景](./docs/VISION.md)
+- [架构](./docs/ARCHITECTURE.md)
+- [核心概念](./docs/ABSTRACTIONS.md)
 
 ### 插件示例
 

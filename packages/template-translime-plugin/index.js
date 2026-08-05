@@ -60,16 +60,6 @@ const pluginDidLoad = () => {
   }
 };
 
-const commands = [
-  {
-    id: 'translime-plugin-example.increment-counter',
-    handler() {
-      libs.increment();
-      return libs.getCounter();
-    },
-  },
-];
-
 // 禁用时执行
 const pluginWillUnload = () => {
   // eslint-disable-next-line no-console
@@ -150,6 +140,7 @@ const settingMenu = [
     type: 'file',
     name: '文件选择1',
     required: false, // 是否必填
+    valueType: 'array', // 保存格式：'array' 返回全部选择结果，'string' 返回第一个选择结果
     placeholder: '输入提示',
     // 选项属性 https://www.electronjs.org/zh/docs/latest/api/dialog#dialogshowopendialogbrowserwindow-options
     dialogOptions: {
@@ -202,6 +193,16 @@ const libs = {
   onCounterChanged: (fn) => bus.on('counter-changed', fn),
   offCounterChanged: (fn) => bus.off('counter-changed', fn),
 };
+
+const commands = [
+  {
+    id: 'translime-plugin-example.increment-counter',
+    handler() {
+      libs.increment();
+      return libs.getCounter();
+    },
+  },
+];
 
 export default {
   pluginDidLoad,

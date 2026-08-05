@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
     mode,
     root: PACKAGE_ROOT,
     envDir: process.cwd(),
+    define: {
+      // 主进程产物为 CJS，把 import.meta.url 替换为等价表达式，
+      // 避免 EMPTY_IMPORT_META 警告（源码保持 ESM 写法）
+      'import.meta.url': 'require("node:url").pathToFileURL(__filename).href',
+    },
     resolve: {
       alias: [
         {

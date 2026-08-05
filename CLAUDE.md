@@ -1,10 +1,3 @@
 # Claude Instructions
 
-Use `.agents/plugin-scaffold/` as the shared plugin bootstrap resource for this repository.
-
-When asked to create a new plugin:
-
-- Enforce the `translime-plugin-` prefix.
-- Run `node .agents/plugin-scaffold/create-plugin.mjs --name translime-plugin-your-name` from the repository root.
-- Default to `packages/template-translime-plugin`.
-- Read `.agents/plugin-scaffold/plugin-variants.md` only when the user explicitly needs a richer UI package, native bindings, overlay windows, or a non-default template.
+本仓库的 agent 规则统一维护在根目录 [AGENTS.md](./AGENTS.md)，请以 AGENTS.md 及其引用的 docs/ 文档为准。

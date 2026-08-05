@@ -21,9 +21,10 @@ use windows::Win32::UI::Accessibility::{
     UIA_CONTROLTYPE_ID,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GW_HWNDNEXT, GWL_EXSTYLE, GetClassNameW, GetTopWindow, GetWindow, GetWindowLongW,
-    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible, WS_EX_TRANSPARENT,
-    WindowFromPoint,
+    EnumWindows, GW_HWNDNEXT, GWL_EXSTYLE, GetClassNameW, GetForegroundWindow, GetTopWindow,
+    GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, HWND_TOPMOST,
+    IsWindowVisible, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SetForegroundWindow,
+    SetWindowPos, WS_EX_TRANSPARENT, WindowFromPoint,
 };
 use windows::core::HRESULT;
 
@@ -109,8 +110,46 @@ fn create_automation() -> Option<IUIAutomation> {
     unsafe { CoCreateInstance(&CUIAutomation8, None, CLSCTX_INPROC_SERVER).ok() }
 }
 
-fn to_hwnd(handle: i64) -> HWND {
-    HWND(handle as isize as *mut c_void)
+fn to_hwnd(handle: i64) -> Option<HWND> {
+    if handle == 0 {
+        return None;
+    }
+
+    Some(HWND(handle as isize as *mut c_void))
+}
+
+/// 获取当前系统前台窗口句柄。
+pub fn get_foreground_window_handle() -> i64 {
+    unsafe { GetForegroundWindow().0 as i64 }
+}
+
+/// 将指定窗口恢复为前台窗口。
+pub fn set_foreground_window(handle: i64) -> bool {
+    let Some(hwnd) = to_hwnd(handle) else {
+        return false;
+    };
+
+    unsafe { SetForegroundWindow(hwnd).as_bool() }
+}
+
+/// 将指定窗口提升到 topmost z-order，不抢占焦点。
+pub fn set_window_top_most(handle: i64) -> bool {
+    let Some(hwnd) = to_hwnd(handle) else {
+        return false;
+    };
+
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+        )
+        .is_ok()
+    }
 }
 
 fn rect_width(rect: &RECT) -> i32 {
@@ -463,6 +502,28 @@ fn choose_better_path(
     current_best
 }
 
+fn prune_duplicate_bounds(path: &mut Vec<UiElementInfo>) {
+    if path.len() < 2 {
+        return;
+    }
+
+    let mut deduped = Vec::with_capacity(path.len());
+    for candidate in path.drain(..) {
+        let is_duplicate = deduped.last().is_some_and(|previous: &UiElementInfo| {
+            previous.left == candidate.left
+                && previous.top == candidate.top
+                && previous.right == candidate.right
+                && previous.bottom == candidate.bottom
+        });
+
+        if !is_duplicate {
+            deduped.push(candidate);
+        }
+    }
+
+    *path = deduped;
+}
+
 fn prune_redundant_outer_window(path: &mut Vec<UiElementInfo>) {
     if path.len() < 2 {
         return;
@@ -579,11 +640,8 @@ pub fn get_ui_element_candidates_at_point(
         }
     };
     let target_rect = window_info_rect(&target_window);
-    let root = unsafe {
-        automation
-            .ElementFromHandle(to_hwnd(target_window.handle))
-            .ok()
-    };
+    let root = to_hwnd(target_window.handle)
+        .and_then(|target_hwnd| unsafe { automation.ElementFromHandle(target_hwnd).ok() });
     let raw_element = unsafe { automation.ElementFromPoint(POINT { x, y }).ok() };
     let raw_walker = unsafe { automation.RawViewWalker().ok() };
     let content_walker = unsafe { automation.ContentViewWalker().ok() };
@@ -631,6 +689,7 @@ pub fn get_ui_element_candidates_at_point(
         }
     }
 
+    prune_duplicate_bounds(&mut best_path);
     prune_redundant_outer_window(&mut best_path);
 
     let preview = best_path
@@ -668,7 +727,11 @@ pub fn get_ui_elements_for_window(window_handle: i64) -> Vec<UiElementInfo> {
         Some(value) => value,
         None => return Vec::new(),
     };
-    let root = match unsafe { automation.ElementFromHandle(to_hwnd(window_handle)).ok() } {
+    let hwnd = match to_hwnd(window_handle) {
+        Some(value) => value,
+        None => return Vec::new(),
+    };
+    let root = match unsafe { automation.ElementFromHandle(hwnd).ok() } {
         Some(value) => value,
         None => return Vec::new(),
     };

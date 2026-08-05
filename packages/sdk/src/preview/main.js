@@ -44,7 +44,6 @@ export async function startPreview(pluginComponent, options = {}) {
     },
     theme: {
       defaultTheme: 'light',
-      layers: true,
       themes: {
         light: {
           colors: {

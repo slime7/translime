@@ -1,5 +1,157 @@
-@layer tailwind {
-  @layer theme, base, components, utilities;
-  @import 'tailwindcss/theme.css' layer(theme);
-  @import 'tailwindcss/utilities.css' layer(utilities);
+@import "tailwindcss/theme" layer(tailwind-theme);
+@import "tailwindcss/utilities" layer(tailwind-utilities);
+
+/* 明暗模式：Vuetify 使用 .v-theme--dark/.v-theme--light 而非 .dark */
+@custom-variant light (&:where(.v-theme--light, .v-theme--light *));
+@custom-variant dark (&:where(.v-theme--dark, .v-theme--dark *));
+
+@theme {
+  --breakpoint-*: initial; /* 重置 Tailwind 默认断点 */
+
+  /* 与 vuetify 插件配置及 settings.scss 保持一致 */
+  --breakpoint-xs:  0px;
+  --breakpoint-sm:  600px;
+  --breakpoint-md:  960px;
+  --breakpoint-lg:  1280px;
+  --breakpoint-xl:  1920px;
+  --breakpoint-xxl: 2560px;
+
+  /* 主题色：包装 Vuetify 的 RGB 通道变量，供 bg-/text-/border- 等工具类使用 */
+  --color-background:      rgb(var(--v-theme-background));
+  --color-surface:         rgb(var(--v-theme-surface));
+  --color-surface-variant: rgb(var(--v-theme-surface-variant));
+  --color-primary:         rgb(var(--v-theme-primary));
+  --color-success:         rgb(var(--v-theme-success));
+  --color-warning:         rgb(var(--v-theme-warning));
+  --color-error:           rgb(var(--v-theme-error));
+  --color-info:            rgb(var(--v-theme-info));
+  --color-on-primary-container:   rgb(var(--v-theme-on-primary-container));
+  --color-on-secondary-container: rgb(var(--v-theme-on-secondary-container));
+}
+
+/* 动态拼接类名的 safelist（如 color="..." prop 场景） */
+@source inline('bg-primary');
+@source inline('text-primary');
+@source inline('bg-success');
+@source inline('text-success');
+@source inline('bg-error');
+@source inline('text-error');
+
+/*
+  Vuetify 圆角工具类的 Tailwind 等价物（迁移期保留类名）
+*/
+@utility rounded-pill   { border-radius: 9999px }
+@utility rounded-circle { border-radius: 50%    }
+@utility rounded-shaped { border-radius: 24px 0 }
+
+@source inline('rounded');
+@source inline('rounded-{none,sm,md,lg,xl,2xl,3xl,full,pill,circle,shaped}');
+
+/*
+  MD3 排版工具类（迁移期保留 Vuetify 类名）
+*/
+@utility text-display-large {
+  font-family: var(--font-heading, inherit);
+  font-size: 3.5625rem;
+  font-weight: 400;
+  line-height: 1.1228070175;
+  letter-spacing: -.0043859649em;
+}
+@utility text-display-medium {
+  font-family: var(--font-heading, inherit);
+  font-size: 2.8125rem;
+  font-weight: 400;
+  line-height: 1.1555555556;
+  letter-spacing: normal;
+}
+@utility text-display-small {
+  font-family: var(--font-heading, inherit);
+  font-size: 2.25rem;
+  font-weight: 400;
+  line-height: 1.2222222222;
+  letter-spacing: normal;
+}
+@utility text-headline-large {
+  font-family: var(--font-heading, inherit);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: normal;
+}
+@utility text-headline-medium {
+  font-family: var(--font-heading, inherit);
+  font-size: 1.75rem;
+  font-weight: 400;
+  line-height: 1.2857142857;
+  letter-spacing: normal;
+}
+@utility text-headline-small {
+  font-family: var(--font-heading, inherit);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.3333333333;
+  letter-spacing: normal;
+}
+@utility text-title-large {
+  font-family: var(--font-heading, inherit);
+  font-size: 1.375rem;
+  font-weight: 400;
+  line-height: 1.2727272727;
+  letter-spacing: normal;
+}
+@utility text-title-medium {
+  font-family: var(--font-body, inherit);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: .009375em;
+}
+@utility text-title-small {
+  font-family: var(--font-body, inherit);
+  font-size: .875rem;
+  font-weight: 500;
+  line-height: 1.4285714286;
+  letter-spacing: .0071428571em;
+}
+@utility text-body-large {
+  font-family: var(--font-body, inherit);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: .03125em;
+}
+@utility text-body-medium {
+  font-family: var(--font-body, inherit);
+  font-size: .875rem;
+  font-weight: 400;
+  line-height: 1.4285714286;
+  letter-spacing: .0178571429em;
+}
+@utility text-body-small {
+  font-family: var(--font-body, inherit);
+  font-size: .75rem;
+  font-weight: 400;
+  line-height: 1.3333333333;
+  letter-spacing: .0333333333em;
+}
+@utility text-label-large {
+  font-family: var(--font-body, inherit);
+  font-size: .875rem;
+  font-weight: 500;
+  line-height: 1.4285714286;
+  letter-spacing: .0071428571em;
+}
+@utility text-label-medium {
+  font-family: var(--font-body, inherit);
+  font-size: .75rem;
+  font-weight: 500;
+  line-height: 1.3333333333;
+  letter-spacing: .0416666667em;
+}
+@utility text-label-small {
+  font-family: var(--font-body, inherit);
+  font-size: .6875rem;
+  font-weight: 500;
+  line-height: 1.4545454545;
+  letter-spacing: .0454545455em;
 }

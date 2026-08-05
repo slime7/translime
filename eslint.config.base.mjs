@@ -89,6 +89,8 @@ export default [
       }],
       'max-len': 'off',
       'no-unsafe-optional-chaining': 'off',
+      // 插件样式隔离有意扩展 Promise.prototype.then 以传播插件上下文
+      'no-extend-native': ['error', { exceptions: ['Promise'] }],
       'vuejs-accessibility/form-control-has-label': 'off',
       'vuejs-accessibility/label-has-for': 'off',
       'no-param-reassign': ['error', {

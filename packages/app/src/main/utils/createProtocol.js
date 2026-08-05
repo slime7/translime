@@ -4,9 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import logger from './logger';
 
-const dir = typeof __dirname === 'string'
-  ? __dirname
-  : path.dirname(fileURLToPath(import.meta.url));
+const dir = path.dirname(fileURLToPath(import.meta.url));
 
 export default (scheme) => {
   if (protocol.isProtocolHandled(scheme)) {

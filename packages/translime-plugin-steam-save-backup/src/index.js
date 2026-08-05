@@ -15,11 +15,26 @@ import {
   restoreSave,
   updateBackupNote,
 } from './utils/backup';
+import {
+  saveSourcesToSavePaths,
+  steamSavePathsToSaveSources,
+} from './utils/save-sources';
 
 const pluginId = 'translime-plugin-steam-save-backup';
 const { mainStore } = global;
 const config = mainStore?.config;
 let steamPath = null;
+
+const getPathSetting = (settings, key) => {
+  const value = settings?.[key];
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  return '';
+};
 
 // 从设置中获取排除列表
 const getExcludeList = () => {
@@ -52,6 +67,7 @@ export const settingMenu = [
     type: 'file',
     name: '自定义 Steam 安装路径',
     required: false,
+    valueType: 'string',
     placeholder: '留空则自动检测 (例如: C:\\Program Files (x86)\\Steam)',
     dialogOptions: {
       properties: ['openDirectory', 'dontAddToRecent'],
@@ -62,6 +78,7 @@ export const settingMenu = [
     type: 'file',
     name: '自定义备份存储位置',
     required: false,
+    valueType: 'string',
     placeholder: '留空则使用默认位置',
     dialogOptions: {
       properties: ['openDirectory', 'dontAddToRecent'],
@@ -79,9 +96,10 @@ export const settingMenu = [
 export const pluginDidLoad = async () => {
   console.log(`${pluginId} loaded`);
   const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
+  const customSteamPath = getPathSetting(settings, 'customSteamPath');
 
-  if (settings.customSteamPath) {
-    steamPath = settings.customSteamPath;
+  if (customSteamPath) {
+    steamPath = customSteamPath;
     console.log('使用自定义 Steam 路径：', steamPath);
   }
 };
@@ -97,8 +115,8 @@ export const ipcHandlers = [
     type: 'scan-games',
     handler: () => async () => {
       const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
-      const currentSteamPath = settings.customSteamPath || await getSteamPath();
-      const backupRoot = settings.customBackupRoot;
+      const currentSteamPath = getPathSetting(settings, 'customSteamPath') || await getSteamPath();
+      const backupRoot = getPathSetting(settings, 'customBackupRoot');
 
       if (!currentSteamPath) {
         return { success: false, message: '未找到 Steam' };
@@ -117,9 +135,12 @@ export const ipcHandlers = [
         // 为每个游戏查找可能的存档路径
         await Promise.all(games.map(async (game) => {
           const savePaths = await findSavePaths(currentSteamPath, game.appid);
+          const saveSources = steamSavePathsToSaveSources(savePaths);
           const backupCount = await getBackupCount(game.appid, backupRoot);
           // eslint-disable-next-line no-param-reassign
           game.savePaths = savePaths;
+          // eslint-disable-next-line no-param-reassign
+          game.saveSources = saveSources;
           // eslint-disable-next-line no-param-reassign
           game.backupCount = backupCount;
         }));
@@ -139,7 +160,7 @@ export const ipcHandlers = [
     handler: () => async (gameId) => {
       try {
         const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
-        const backupRoot = settings.customBackupRoot;
+        const backupRoot = getPathSetting(settings, 'customBackupRoot');
         const backups = await getBackups(gameId, backupRoot);
         return { success: true, backups };
       } catch (e) {
@@ -149,11 +170,26 @@ export const ipcHandlers = [
   },
   {
     type: 'backup-save',
-    handler: () => async ({ gameId, gameName, savePaths }) => {
+    handler: () => async ({
+      gameId,
+      gameName,
+      savePaths,
+      saveSources,
+    }) => {
       try {
         const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
-        const backupRoot = settings.customBackupRoot;
-        const result = await backupSave(gameId, gameName, savePaths, backupRoot);
+        const backupRoot = getPathSetting(settings, 'customBackupRoot');
+        const normalizedSources = Array.isArray(saveSources)
+          ? saveSources
+          : steamSavePathsToSaveSources(savePaths);
+        const pathsToBackup = saveSourcesToSavePaths(normalizedSources);
+        const result = await backupSave(
+          gameId,
+          gameName,
+          pathsToBackup,
+          backupRoot,
+          normalizedSources,
+        );
         return result;
       } catch (e) {
         return { success: false, message: e.message };
@@ -230,7 +266,7 @@ export const ipcHandlers = [
     handler: () => async () => {
       try {
         const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
-        const backupRoot = settings.customBackupRoot;
+        const backupRoot = getPathSetting(settings, 'customBackupRoot');
         const root = await resolveBackupRoot(backupRoot);
 
         // 确保目录存在，避免 shell.openPath 报错

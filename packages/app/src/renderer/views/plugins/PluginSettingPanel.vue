@@ -58,13 +58,13 @@
 
               <v-tooltip
                 v-if="menuItem.type === 'file'"
-                :text="settings[menuItem.key] && settings[menuItem.key].length ? settings[menuItem.key].join(',') : '未选择'"
+                :text="formatFilePaths(settings[menuItem.key]) || '未选择'"
                 location="bottom"
               >
                 <template #activator="{ props }">
                   <v-text-field
                     v-bind="props"
-                    :model-value="settings[menuItem.key] && settings[menuItem.key].length ? settings[menuItem.key].join(',') : ''"
+                    :model-value="formatFilePaths(settings[menuItem.key])"
                     class="mt-2"
                     :label="menuItem.name"
                     :placeholder="menuItem.placeholder"
@@ -197,7 +197,28 @@ export default {
         emit('update:modelValue', value);
       },
     });
-    const requiredRule = [(v) => !!v || '此项必填'];
+    const normalizeFilePaths = (value) => {
+      if (Array.isArray(value)) {
+        return value;
+      }
+      if (typeof value === 'string' && value) {
+        return [value];
+      }
+      return [];
+    };
+    const formatFilePaths = (value) => normalizeFilePaths(value).join(',');
+    const isFileValueArray = (menuItem) => menuItem.valueType !== 'string';
+    const normalizeFileValue = (value, menuItem) => {
+      const filePaths = normalizeFilePaths(value);
+      if (isFileValueArray(menuItem)) {
+        return filePaths;
+      }
+      return filePaths[0] || '';
+    };
+    const requiredRule = [(v) => {
+      const hasValue = Array.isArray(v) ? v.length > 0 : !!v;
+      return hasValue || '此项必填';
+    }];
 
     const loading = reactive({
       getSettings: false,
@@ -263,10 +284,13 @@ export default {
           break;
         }
         parsedSettingMenu.push(parsed);
-        if (!settings[parsed.key]) {
+        if (typeof settings[parsed.key] === 'undefined') {
           let defaultValue = '';
           if (parsed.type === 'switch') {
             defaultValue = false;
+          }
+          if (parsed.type === 'file') {
+            defaultValue = normalizeFileValue([], parsed);
           }
           if (parsed.type === 'checkbox') {
             defaultValue = [];
@@ -278,6 +302,8 @@ export default {
             defaultValue = null;
           }
           settings[parsed.key] = defaultValue;
+        } else if (parsed.type === 'file') {
+          settings[parsed.key] = normalizeFileValue(settings[parsed.key], parsed);
         }
       });
       return parsedSettingMenu;
@@ -310,17 +336,18 @@ export default {
         }
 
         isOpen.value = true;
-        const result = await selectFileDialog('app', toRaw(menuItem.dialogOptions));
-        isOpen.value = false;
-        if (result.err) {
+        try {
+          const result = await selectFileDialog('app', toRaw(menuItem.dialogOptions));
+          if (result.err) {
+            error.value = '读取文件出错';
+          } else if (!result.canceled) {
+            filePath.value = normalizeFilePaths(result.filePaths);
+            settings[menuItem.key] = normalizeFileValue(filePath.value, menuItem);
+          }
+        } catch (err) {
           error.value = '读取文件出错';
-        } else if (!result.data.canceled) {
-          /**
-           * 数组
-           * @type {string[]}
-           */
-          filePath.value = result.data.filePaths;
-          settings[menuItem.key] = filePath.value;
+        } finally {
+          isOpen.value = false;
         }
       };
 
@@ -340,6 +367,7 @@ export default {
       loading,
       settings,
       saveSettings,
+      formatFilePaths,
       showTextEditContextMenu,
       selectFile,
     };

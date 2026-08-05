@@ -3,6 +3,14 @@
   "version": "1.1.0",
   "description": "Steam 游戏存档备份与还原插件",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slime7/translime.git",
+    "directory": "packages/translime-plugin-steam-save-backup"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "translime",
     "translime-plugin"
@@ -27,12 +35,13 @@
     "preview": "npm run preview:plugin && npm run preview:ui"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.0",
+    "@vitejs/plugin-vue": "^6.0.8",
     "electron": "~39.2.4",
-    "vite": "^8.0.0",
+    "translime-sdk": "workspace:*",
+    "vite": "^8.2.0",
     "vite-plugin-css-injected-by-js": "^3.4.0",
-    "vue": "^3.5.13",
-    "vuetify": "^3.11.6"
+    "vue": "^3.5.40",
+    "vuetify": "^4.1.7"
   },
   "plugin": {
     "title": "Steam Save Backup",
@@ -42,8 +51,8 @@
   },
   "peerDependencies": {
     "electron": "~39.2.4",
-    "vue": "^3.5.13",
-    "vuetify": "^3.11.6"
+    "vue": "^3.5.40",
+    "vuetify": "^4.1.7"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",

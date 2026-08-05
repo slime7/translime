@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
-import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
+import { createPluginCssIsolationPlugins } from 'translime-sdk/vite';
 
 /**
  * @type {import('vite').UserConfig}
@@ -11,26 +11,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
     tailwindcss(),
-    cssInjectedByJsPlugin({
-      styleId: 'translime-plugin-static-server',
-      injectCodeFunction: function injectCodeCustomRunTimeFunction(cssCode, options) {
-        try {
-          if (typeof document !== 'undefined') {
-            const elementStyle = document.createElement('style');
-            elementStyle.id = options.styleId;
-
-            const existingElement = document.getElementById(options.styleId);
-            if (existingElement) {
-              existingElement.remove();
-            }
-            elementStyle.appendChild(document.createTextNode(`${cssCode}`));
-            document.head.appendChild(elementStyle);
-          }
-        } catch (e) {
-          console.error('vite-plugin-css-injected-by-js', e);
-        }
-      },
-    }),
+    ...createPluginCssIsolationPlugins('translime-plugin-static-server'),
   ],
   envDir: process.cwd(),
   build: {

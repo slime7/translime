@@ -24,3 +24,4 @@ yarn-error.log*
 /dist_electron
 
 /agent_temp
+packages/translime-plugin-lzdxedu-auto

@@ -9,10 +9,9 @@ import { fileURLToPath } from 'node:url';
 import EventEmitter from 'node:events';
 import { useLogger, usePluginConfig } from 'translime-sdk';
 import * as capture from './capture';
+import { isIncompleteShortcut, normalizeShortcut } from './main/shortcut-state';
 
-const dirname = typeof __dirname === 'string'
-  ? __dirname
-  : path.dirname(fileURLToPath(import.meta.url));
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PLUGIN_ID = 'translime-plugin-hdr-capture';
 const baseLogger = useLogger();
@@ -37,6 +36,9 @@ let registeredShortcut = null;
 // 缓存当前截图会话的原始数据 (Raw Buffers + Metadata)
 // 用于 save 和 copy 时直接裁剪，不需要重新捕获屏幕
 let currentCaptureSession = null;
+
+// 覆盖层显示前的系统前台窗口，用于关闭截图后恢复输入焦点
+let previousForegroundWindowHandle = null;
 
 /**
  * 获取插件设置
@@ -88,33 +90,6 @@ const getAllDisplaysBounds = () => {
 
 const getSaveFilenameTemplate = () => pluginConfig.get('saveFilenameTemplate', '');
 const getFastResponse = () => pluginConfig.get('fastResponse', true);
-const shortcutModifiers = new Set([
-  'ctrl',
-  'control',
-  'alt',
-  'shift',
-  'super',
-  'meta',
-  'cmd',
-  'command',
-]);
-
-const normalizeShortcut = (accelerator = '') => accelerator
-  .split('+')
-  .map((part) => part.trim())
-  .filter(Boolean)
-  .map((part) => (part === 'Win' ? 'Super' : part))
-  .join('+');
-
-const isIncompleteShortcut = (accelerator = '') => {
-  const parts = accelerator.split('+').map((part) => part.trim()).filter(Boolean);
-  if (!parts.length) {
-    return true;
-  }
-  const lastPart = parts[parts.length - 1].toLowerCase();
-  return shortcutModifiers.has(lastPart);
-};
-
 /**
  * 更新 Overlay 窗口的边界（用于响应屏幕变化）
  */
@@ -339,11 +314,101 @@ const preCaptureAllScreens = async (startTime = Date.now(), isDebug = false) => 
   return finalResults;
 };
 
+const normalizeNativeInteger = (value, fallback = 0) => {
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  return fallback;
+};
+
+const getOverlayNativeWindowHandle = () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    return 0;
+  }
+
+  const nativeHandle = overlayWindow.getNativeWindowHandle();
+  if (!Buffer.isBuffer(nativeHandle)) {
+    return normalizeNativeInteger(nativeHandle, 0);
+  }
+
+  if (nativeHandle.length >= 8) {
+    return Number(nativeHandle.readBigInt64LE(0));
+  }
+
+  if (nativeHandle.length >= 4) {
+    return nativeHandle.readInt32LE(0);
+  }
+
+  return 0;
+};
+
+const rememberPreviousForegroundWindow = () => {
+  const foregroundHandle = normalizeNativeInteger(capture.getForegroundWindowHandle(), 0);
+  const overlayHandle = getOverlayNativeWindowHandle();
+
+  if (foregroundHandle && foregroundHandle !== overlayHandle) {
+    previousForegroundWindowHandle = foregroundHandle;
+  }
+};
+
+const enforceOverlayTopMost = (isDebug = false) => {
+  if (isDebug || !overlayWindow || overlayWindow.isDestroyed()) {
+    return;
+  }
+
+  try {
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+    overlayWindow.moveTop();
+
+    const overlayHandle = getOverlayNativeWindowHandle();
+    if (overlayHandle) {
+      capture.setWindowTopMost(overlayHandle);
+    }
+  } catch (e) {
+    logger.warn('Overlay 置顶失败:', e);
+  }
+};
+
+const prepareOverlayForInteraction = (isDebug = false) => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    return;
+  }
+
+  overlayWindow.setFocusable(true);
+  overlayWindow.setIgnoreMouseEvents(false);
+  enforceOverlayTopMost(isDebug);
+};
+
+const restorePreviousForegroundWindow = () => {
+  const targetHandle = previousForegroundWindowHandle;
+  previousForegroundWindowHandle = null;
+
+  if (!targetHandle) {
+    return false;
+  }
+
+  const overlayHandle = getOverlayNativeWindowHandle();
+  if (targetHandle === overlayHandle) {
+    return false;
+  }
+
+  try {
+    return capture.setForegroundWindow(targetHandle);
+  } catch (e) {
+    logger.warn('恢复原前台窗口失败:', e);
+    return false;
+  }
+};
+
 /**
  * 启动截图流程
  */
 const startCapture = async (isDebug = false, startTime = Date.now()) => {
   logger.info(`[Perf] startCapture 开始 (T+${Date.now() - startTime}ms)`);
+  rememberPreviousForegroundWindow();
 
   // [性能优化] 尽早确保窗口已创建，让 WebContents 加载与截图过程并行
   if (!overlayWindow || overlayWindow.isDestroyed()) {
@@ -363,6 +428,7 @@ const startCapture = async (isDebug = false, startTime = Date.now()) => {
     // 如果 y 坐标小于 maxY，说明窗口当前在某个显示器范围内，即正在截图中
     // 只有当它真的在屏幕内时才直接 focus
     if (y < maxY) {
+      prepareOverlayForInteraction(isDebug);
       overlayWindow.focus();
       return;
     }
@@ -497,15 +563,10 @@ const startCapture = async (isDebug = false, startTime = Date.now()) => {
       overlayWindow.showInactive();
     }
 
-    // 在发送完数据之后，立刻允许交互，但如果是开启快速模式，则立即调焦
-    // 不管是什么模式，先让平台停止穿透
-    overlayWindow.setIgnoreMouseEvents(false);
+    // 在发送完数据之后，立刻允许交互，并尽可能提升到系统顶层。
+    prepareOverlayForInteraction(isDebug);
 
     if (getFastResponse()) {
-      if (!isDebug) {
-        // 强制确保置顶后再 focus 避免在系统最底层
-        overlayWindow.setAlwaysOnTop(true, 'screen-saver');
-      }
       overlayWindow.focus();
       logger.info(`[Perf] 窗口已显示并聚焦 (T+${Date.now() - startTime}ms)`);
     } else {
@@ -660,16 +721,6 @@ const syncShortcutRegistration = ({
   return registerShortcut(normalizedShortcut, reason);
 };
 
-const normalizeNativeInteger = (value, fallback = 0) => {
-  if (typeof value === 'bigint') {
-    return Number(value);
-  }
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  return fallback;
-};
-
 const runWithOverlayHitTestDisabled = (fn) => {
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     return fn();
@@ -701,9 +752,14 @@ const closeOverlay = () => {
       const { maxY } = getAllDisplaysBounds();
 
       overlayWindow.setIgnoreMouseEvents(true);
+      overlayWindow.blur();
+      overlayWindow.setFocusable(false);
       overlayWindow.setPosition(0, maxY + 100);
+      restorePreviousForegroundWindow();
       logger.info(`快速响应模式: Overlay 已移至离屏常驻 (0, ${maxY + 100})`);
     } else {
+      overlayWindow.blur();
+      restorePreviousForegroundWindow();
       // 普通模式：销毁窗口
       overlayWindow.close();
       overlayWindow = null;
@@ -811,16 +867,9 @@ export const ipcHandlers = [
         if (opacity < 1) {
           overlayWindow.setOpacity(1);
         }
-        // 确保能进行交互，并强制置顶
-        // 这里不检测 isDebug，是因为我们在 getWindowAtPoint 也不会受到这行影响
-        // 但如果是在开发模式下一直顶层有点烦，所以还是保留判断比较好
-        // 由于 ipcRenderer 传不来 isDebug，我们可以去判断一下 window options
-        if (overlayWindow.isAlwaysOnTop() || overlayWindow.webContents.isDevToolsOpened() === false) {
-          overlayWindow.setAlwaysOnTop(true, 'screen-saver');
-        }
+        prepareOverlayForInteraction(overlayWindow.webContents.isDevToolsOpened());
 
         overlayWindow.focus();
-        overlayWindow.setIgnoreMouseEvents(false);
         logger.info('[Perf] 收到 overlay-ready，已重置透明度并确保聚焦');
       }
     },

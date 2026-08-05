@@ -7,7 +7,7 @@
 - **插件名称**: `translime-plugin-steam-save-backup`
 - **功能描述**: 自动/手动备份和还原 Steam 游戏存档。
 - **技术栈**:
-    - **Frontend**: Vue 3, Vuetify 3, Vite
+    - **Frontend**: Vue 3, Vuetify 4, Vite
     - **Backend**: Electron (Node.js)
 
 ## 2. 目录结构说明 (Directory Structure)
@@ -45,7 +45,7 @@ packages/translime-plugin-steam-save-backup/
 
 *   **渲染进程 (Renderer Process)**
     *   **入口文件**: `src/ui/ui.vue`
-    *   **可用 API**: Vue 3, Vuetify 3, `useIpc()`, `getPluginSetting()`
+    *   **可用 API**: Vue 3, Vuetify 4, `useIpc()`, `getPluginSetting()`
     *   **禁用 API**: 直接 Node.js API (除非通过 IPC), `getMainStore()`
 
 ### 3.2 IPC 通信 (IPC Communication)
@@ -57,7 +57,7 @@ packages/translime-plugin-steam-save-backup/
 ### 3.3 UI 开发 (UI Development)
 
 *   **1. 设置界面 (`src/ui/ui.vue`)**:
-    *   **框架**: Vue 3 + Vuetify 3。
+    *   **框架**: Vue 3 + Vuetify 4。
     *   **图标**: 直接使用 Material Design Icons 名称 (例如 `<v-icon>home</v-icon>`)，**不要**使用 `mdi-home`。
     *   **样式注入**: 使用 `vite-plugin-css-injected-by-js`，配置唯一的 `styleId`。
     *   **CSS**: 使用 `<style scoped>`。

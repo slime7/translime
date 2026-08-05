@@ -9,7 +9,8 @@ import {
   systemPreferences,
 } from 'electron';
 import fs from 'node:fs';
-import { join, sep } from 'node:path';
+import { dirname, join, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createWindow from '../utils/createWindow';
 import mainStore from '../utils/useMainStore';
@@ -18,6 +19,34 @@ import logger from '../utils/logger';
 import { listLogDates, readLogRecords } from '../utils/logViewer';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
+
+const dir = dirname(fileURLToPath(import.meta.url));
+
+const PLUGIN_LOADER_NOT_READY_ERROR = '\u63d2\u4ef6\u672a\u521d\u59cb\u5316';
+
+const getPluginLoaderOrThrow = () => {
+  const loader = appManager.getPluginLoader();
+
+  if (!loader) {
+    throw new Error(PLUGIN_LOADER_NOT_READY_ERROR);
+  }
+
+  return loader;
+};
+
+const withPluginLoader = async (action, errorPrefix = '') => {
+  const loader = getPluginLoaderOrThrow();
+
+  try {
+    return await action(loader);
+  } catch (err) {
+    if (!errorPrefix) {
+      throw err;
+    }
+
+    throw new Error(`${errorPrefix}: ${err.message}`);
+  }
+};
 
 const ipcHandler = {
   ...netHandler,
@@ -143,10 +172,11 @@ const ipcHandler = {
         skipTaskbar: typeof options.skipTaskbar !== 'undefined' ? options.skipTaskbar : false,
         focusable: typeof options.focusable !== 'undefined' ? options.focusable : true,
         webPreferences: {
-          preload: join(mainStore.ROOT, '../preload/index.cjs'),
+          preload: join(dir, '../preload/index.cjs'),
           nodeIntegration: false,
           contextIsolation: true,
           sandbox: false,
+          webviewTag: true,
         },
       }, null);
       appManager.setChildWin(name, win);
@@ -192,112 +222,57 @@ const ipcHandler = {
     return app.getPath(name);
   },
   async [ipcType.GET_PLUGINS](packageName) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
+    return withPluginLoader(async (loader) => {
       const plugins = packageName ? await loader.getPlugin(packageName) : await loader.getPlugins();
       return JSON.parse(JSON.stringify(plugins));
-    }
-    throw new Error('插件未初始化');
+    });
   },
   async [ipcType.INSTALL_PLUGIN](packageString) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        const [packageName, version] = packageString.split('@');
-        const result = await loader.installPlugin(packageName, version);
-        return result;
-      } catch (err) {
-        throw new Error(`插件安装出错: ${err.message}`);
-      }
-    }
-    throw new Error('插件未初始化');
+    return withPluginLoader((loader) => {
+      const [packageName, version] = packageString.split('@');
+
+      return loader.installPlugin(packageName, version);
+    }, '插件安装出错');
   },
   async [ipcType.INSTALL_LOCAL_PLUGIN](packagePath) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        const result = await loader.installLocalPlugin(packagePath);
-        return result;
-      } catch (err) {
-        throw new Error(`插件安装出错: ${err.message}`);
-      }
-    }
-    throw new Error('插件未初始化');
+    return withPluginLoader((loader) => loader.installLocalPlugin(packagePath), '插件安装出错');
   },
   async [ipcType.UNINSTALL_PLUGIN](packageName) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        const result = await loader.uninstallPlugin(packageName);
-        return result;
-      } catch (err) {
-        throw new Error(`插件卸载出错: ${err.message}`);
-      }
-    }
-    throw new Error('插件未初始化');
+    return withPluginLoader((loader) => loader.uninstallPlugin(packageName), '插件卸载出错');
   },
   async [ipcType.DISABLE_PLUGIN](packageName) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        loader.disablePlugin(packageName);
-        return true;
-      } catch (err) {
-        throw new Error(`插件停用出错: ${err.message}`);
-      }
-    }
-    throw new Error('插件未初始化');
+    return withPluginLoader((loader) => {
+      loader.disablePlugin(packageName);
+      return true;
+    }, '插件停用出错');
   },
   async [ipcType.ENABLE_PLUGIN](packageName) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        await loader.enablePlugin(packageName);
-        return true;
-      } catch (err) {
-        throw new Error(`插件启用出错: ${err.message}`);
-      }
-    }
-    throw new Error('插件未初始化');
+    return withPluginLoader(async (loader) => {
+      await loader.enablePlugin(packageName);
+      return true;
+    }, '插件启用出错');
   },
   async [ipcType.ACTIVATE_PLUGIN](packageName, reason = 'manual') {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        if (reason === 'view') {
-          loader.triggerViewActivation(packageName);
-        } else {
-          loader.enablePlugin(packageName);
-        }
-        return true;
-      } catch (err) {
-        throw new Error(`插件激活出错: ${err.message}`);
+    return withPluginLoader((loader) => {
+      if (reason === 'view') {
+        loader.triggerViewActivation(packageName);
+      } else {
+        loader.enablePlugin(packageName);
       }
-    }
-    throw new Error('插件未初始化');
+      return true;
+    }, '插件激活出错');
   },
   async [ipcType.EXECUTE_PLUGIN_COMMAND](commandId, ...args) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        return await loader.executeCommand(commandId, ...args);
-      } catch (err) {
-        throw new Error(`插件命令执行出错: ${err.message}`);
-      }
-    }
-    throw new Error('插件未初始化');
+    return withPluginLoader(
+      (loader) => loader.executeCommand(commandId, ...args),
+      '插件命令执行出错',
+    );
   },
   async [ipcType.REFRESH_DEV_PLUGINS]() {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      try {
-        loader.refreshDevPlugins();
-        return true;
-      } catch (err) {
-        throw new Error(`开发插件刷新失败: ${err.message}`);
-      }
-    }
-    throw new Error('插件未初始化');
+    return withPluginLoader((loader) => {
+      loader.refreshDevPlugins();
+      return true;
+    }, '开发插件刷新失败');
   },
   async [ipcType.GET_PLUGIN_SETTING](packageName) {
     const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
@@ -316,10 +291,8 @@ const ipcHandler = {
     return true;
   },
   [ipcType.OPEN_PLUGIN_CONTEXT_MENU](packageName) {
-    const loader = appManager.getPluginLoader();
-    if (loader) {
-      loader.popPluginMenu(packageName, appManager.getIpc());
-    }
+    const loader = getPluginLoaderOrThrow();
+    loader.popPluginMenu(packageName, appManager.getIpc());
   },
   [ipcType.DIALOG_SHOW_OPEN_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
@@ -496,6 +469,9 @@ const ipcHandler = {
       logger.error('Failed to get system accent color', e);
       return null;
     }
+  },
+  [ipcType.GET_PRELOAD_PATH]() {
+    return `file://${join(dir, '../preload/index.cjs').replace(/\\/g, '/')}`;
   },
   ping() {
     logger.debug('pong', new Date());

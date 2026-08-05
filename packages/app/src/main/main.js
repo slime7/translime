@@ -16,9 +16,7 @@ import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import Ipc from './core/Ipc';
 
-const dir = typeof __dirname === 'string'
-  ? __dirname
-  : dirname(fileURLToPath(import.meta.url));
+const dir = dirname(fileURLToPath(import.meta.url));
 const isInDisplay = (winProps) => {
   const displays = screen.getAllDisplays();
   let inDisplay = false;
@@ -105,10 +103,7 @@ export default () => {
         dark: nativeTheme.shouldUseDarkColors,
         color: `#${systemPreferences.getAccentColor().substring(0, 6)}`,
       };
-      appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, themeAndColor);
-      Object.keys(appManager.getChildWin()).forEach((windowKey) => {
-        appManager.getIpc().sendToClient(ipcType.THEME_UPDATED, themeAndColor, appManager.getChildWin(windowKey).webContents);
-      });
+      appManager.getIpc().sendToAllWindows(ipcType.THEME_UPDATED, themeAndColor);
     }
   });
 

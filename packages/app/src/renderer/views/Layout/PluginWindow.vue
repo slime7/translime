@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-system-bar class="system-bar p-0" v-if="!appSetting.useNativeTitleBar">
+    <v-system-bar class="system-bar p-0" v-if="!appSetting.useNativeTitleBar && !isEmbedded">
       <div class="px-4">
         {{ plugin ? `${plugin.title} - translime` : 'translime' }}
       </div>
@@ -17,15 +17,17 @@
 
     <v-main class="h-screen">
       <div class="flex flex-col h-full" id="app-main-container">
-        <div class="scroll-content">
+        <div class="scroll-content scroll-content--plugin-window flex-auto">
           <router-view v-slot="{ Component, route }">
-            <v-fade-transition
-              mode="out-in"
-              @after-enter="onEnter"
-              @before-leave="onLeave"
-            >
-              <component :is="Component" :key="route.path" />
-            </v-fade-transition>
+            <div class="route-stage route-stage--plugin-window">
+              <v-fade-transition
+                mode="out-in"
+                @after-enter="onEnter"
+                @before-leave="onLeave"
+              >
+                <component :is="Component" :key="route.path" />
+              </v-fade-transition>
+            </div>
           </router-view>
         </div>
       </div>
@@ -77,6 +79,7 @@ export default {
     const plugin = computed(() => store.plugin(packageName.value));
     const isMaximize = ref(false);
     const appSetting = computed(() => store.appSetting);
+    const isEmbedded = computed(() => route.query.embedded === 'true');
 
     const onMaximizeStatusChange = () => {
       ipc.on(`set-maximize-status:plugin-window-${packageName.value}`, (maximize) => {
@@ -124,6 +127,7 @@ export default {
       appSetting,
       onEnter,
       onLeave,
+      isEmbedded,
     };
   },
 };
@@ -135,12 +139,36 @@ export default {
   z-index: 300;
 }
 
-#app-main-container > .scroll-content {
+.scroll-content {
   min-height: 0;
   overflow-y: auto;
 
   &::-webkit-scrollbar {
     background-color: transparent;
   }
+}
+
+.scroll-content--plugin-window {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.route-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.route-stage--plugin-window {
+  flex: 1 1 auto;
+}
+
+.route-stage--plugin-window > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>

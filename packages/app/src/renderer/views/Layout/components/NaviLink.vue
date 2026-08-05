@@ -45,7 +45,7 @@
     </router-link>
 
     <div
-      class="navi-btn text-decoration-none d-block ease-animation"
+      class="navi-btn no-underline block ease-animation"
       v-else-if="open"
       v-bind="props"
       @click="openPluginWindow"
@@ -67,7 +67,7 @@
             {{ icon }}
           </v-icon>
           <img v-else-if="image" :src="image" alt="" width="56">
-          <div v-else class="text-no-wrap text-truncate" :class="isHovering ? 'on-primary-container' : 'on-secondary-container'">
+          <div v-else class="text-nowrap truncate" :class="isHovering ? 'on-primary-container' : 'on-secondary-container'">
             <slot />
           </div>
         </v-avatar>

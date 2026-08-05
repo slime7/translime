@@ -120,6 +120,7 @@
  * @property {boolean} [required] - 是否必填
  * @property {Array} [choices] - 当 type 为 'checkbox' | 'radio' | 'list' 时必填
  * @property {object} [dialogOptions] - 当 type 为 'file' 时，透传给 Electron dialog 的参数
+ * @property {'array'|'string'} [valueType] - 当 type 为 'file' 时，保存选择结果的格式；默认 'array'，设为 'string' 时保存第一个路径
  */
 export const settingMenu = [
   // 文本框
@@ -164,6 +165,7 @@ export const settingMenu = [
     key: 'path-key',
     type: 'file',
     name: '路径选择',
+    valueType: 'string',
     dialogOptions: {
       properties: ['openDirectory'],
     },

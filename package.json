@@ -10,6 +10,7 @@
     "dev:app": "pnpm -C packages/app run dev",
     "build:app": "pnpm -C packages/app run build",
     "publish:package": "node .github/scripts/publish-package.mjs",
+    "test:publish-package": "node --test .github/scripts/publish-package.test.mjs",
     "lint": "eslint --ext js,jsx,ts,vue src/"
   },
   "workspaces": {

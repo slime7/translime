@@ -6,6 +6,9 @@ import '@/assets/styles/tailwind.css';
 import App from './App.vue';
 import router from './router';
 import createNaviDirective from './plugins/directive/navi';
+import { installPluginStyleIsolation } from './utils/pluginStyleIsolation';
+
+installPluginStyleIsolation();
 
 const pinia = createPinia();
 

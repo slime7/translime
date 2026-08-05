@@ -4,6 +4,12 @@ import {
 } from 'vue';
 import SliderControl from './SliderControl.vue';
 import ColorPicker from './ColorPicker.vue';
+import {
+  getDrawingStateForPanelChange,
+  getReservedToolbarHeight,
+  toggleToolbarPanel,
+  TOOLBAR_LAYOUT,
+} from '../toolbar-state';
 
 const props = defineProps({
   bounds: {
@@ -29,24 +35,33 @@ const activePanel = ref(null);
 /** 当前悬浮提示的文本 */
 const hoveredTooltip = ref('');
 
+const MAIN_TOOLBAR_WIDTH = TOOLBAR_LAYOUT.mainWidth;
+const TOOLBAR_SPACING = TOOLBAR_LAYOUT.spacing;
+const SCREEN_MARGIN = 18;
+
+const dragOffset = ref({ x: 0, y: 0 });
+const isDraggingToolbar = ref(false);
+const dragStart = ref({
+  pointerX: 0,
+  pointerY: 0,
+  offsetX: 0,
+  offsetY: 0,
+});
+const activeDisplayBounds = ref(null);
+
 /**
  * 切换子面板展开状态（互斥逻辑）
  * @param {'size' | 'radius' | 'rect'} panel - 面板标识
  */
 const togglePanel = (panel) => {
-  activePanel.value = activePanel.value === panel ? null : panel;
+  activePanel.value = toggleToolbarPanel(activePanel.value, panel);
 };
 
-// 监听面板切换，同步绘图模式与工具类型
-const DRAWING_PANELS = ['rect', 'mosaic', 'text'];
-
 watch(activePanel, (newVal, oldVal) => {
-  if (DRAWING_PANELS.includes(newVal)) {
-    state.drawingMode = true;
-    state.activeTool = newVal;
-  } else if (DRAWING_PANELS.includes(oldVal)) {
-    state.drawingMode = false;
-    state.activeTool = null;
+  const nextState = getDrawingStateForPanelChange(newVal, oldVal);
+  if (nextState) {
+    state.drawingMode = nextState.drawingMode;
+    state.activeTool = nextState.activeTool;
   }
 });
 
@@ -288,51 +303,169 @@ onUnmounted(() => {
 });
 
 // ======================== 工具栏定位 ========================
-const toolbarPos = computed(() => {
+const getDisplayBoundsForSelection = () => {
   const {
     x, y, w, h,
   } = props.bounds || {
     x: 0, y: 0, w: 0, h: 0,
   };
 
-  const tbWidth = 170;
-  const tbHeight = 76;
-  const spacing = 8;
-  const margin = 12;
-
   const display = findDisplayAtLocalPoint(x + w / 2, y + h / 2);
   const db = display.bounds;
 
-  const localDb = {
+  return {
     left: db.x - state.offsetX,
     top: db.y - state.offsetY,
     right: db.x + db.width - state.offsetX,
     bottom: db.y + db.height - state.offsetY,
   };
+};
 
-  let left = x + w - tbWidth;
-  let top = y + h + spacing;
+const getToolbarFootprintSize = () => {
+  return {
+    width: MAIN_TOOLBAR_WIDTH,
+    height: getReservedToolbarHeight(),
+  };
+};
 
-  if (top + tbHeight + margin > localDb.bottom) {
-    top = y - tbHeight - spacing;
-    if (top < localDb.top + margin) {
-      top = y + h - tbHeight - margin - 10;
-      left = x + w - tbWidth - margin - 10;
-    }
+const baseToolbarPos = computed(() => {
+  const {
+    x, y, w, h,
+  } = props.bounds || {
+    x: 0, y: 0, w: 0, h: 0,
+  };
+  const displayBounds = getDisplayBoundsForSelection();
+  const toolbarSize = getToolbarFootprintSize();
+
+  let left = x + w - toolbarSize.width;
+  let top = y + h + TOOLBAR_SPACING;
+
+  if (top + toolbarSize.height + SCREEN_MARGIN > displayBounds.bottom) {
+    top = y - toolbarSize.height - TOOLBAR_SPACING;
   }
 
-  left = Math.max(localDb.left + margin, Math.min(left, localDb.right - tbWidth - margin));
-  top = Math.max(localDb.top + margin, Math.min(top, localDb.bottom - tbHeight - margin));
+  if (top < displayBounds.top + SCREEN_MARGIN) {
+    top = y + h - toolbarSize.height;
+  }
+
+  left = Math.max(
+    displayBounds.left + SCREEN_MARGIN,
+    Math.min(left, displayBounds.right - toolbarSize.width - SCREEN_MARGIN),
+  );
+  top = Math.max(
+    displayBounds.top + SCREEN_MARGIN,
+    Math.min(top, displayBounds.bottom - toolbarSize.height - SCREEN_MARGIN),
+  );
 
   return {
-    left, top, tbWidth, tbHeight,
+    left,
+    top,
+    width: toolbarSize.width,
+    height: toolbarSize.height,
   };
+});
+
+const clampOffset = (offsetX, offsetY) => {
+  const displayBounds = activeDisplayBounds.value || getDisplayBoundsForSelection();
+  const toolbarSize = getToolbarFootprintSize();
+  const base = baseToolbarPos.value;
+
+  const minX = displayBounds.left + SCREEN_MARGIN - base.left;
+  const maxX = displayBounds.right - SCREEN_MARGIN - toolbarSize.width - base.left;
+  const minY = displayBounds.top + SCREEN_MARGIN - base.top;
+  const maxY = displayBounds.bottom - SCREEN_MARGIN - toolbarSize.height - base.top;
+
+  return {
+    x: Math.min(Math.max(offsetX, minX), maxX),
+    y: Math.min(Math.max(offsetY, minY), maxY),
+  };
+};
+
+const toolbarPos = computed(() => {
+  const base = baseToolbarPos.value;
+  const offset = clampOffset(dragOffset.value.x, dragOffset.value.y);
+  return {
+    left: base.left + offset.x,
+    top: base.top + offset.y,
+    width: base.width,
+    height: base.height,
+  };
+});
+
+watch(
+  () => [props.bounds?.x, props.bounds?.y, props.bounds?.w, props.bounds?.h],
+  () => {
+    dragOffset.value = clampOffset(dragOffset.value.x, dragOffset.value.y);
+  },
+  { immediate: true },
+);
+
+watch(() => props.visible, (visible) => {
+  if (!visible) {
+    activeDisplayBounds.value = null;
+    isDraggingToolbar.value = false;
+  }
+});
+
+watch(() => state.isSelecting, (isSelecting, wasSelecting) => {
+  if (wasSelecting && !isSelecting && state.hasSelection) {
+    dragOffset.value = { x: 0, y: 0 };
+    activeDisplayBounds.value = null;
+    isDraggingToolbar.value = false;
+  }
+});
+
+const stopToolbarDrag = () => {
+  if (!isDraggingToolbar.value) {
+    return;
+  }
+
+  isDraggingToolbar.value = false;
+  activeDisplayBounds.value = null;
+};
+
+const handleToolbarDrag = (e) => {
+  if (!isDraggingToolbar.value) {
+    return;
+  }
+
+  dragOffset.value = clampOffset(
+    dragStart.value.offsetX + (e.clientX - dragStart.value.pointerX),
+    dragStart.value.offsetY + (e.clientY - dragStart.value.pointerY),
+  );
+};
+
+const startToolbarDrag = (e) => {
+  if (!props.visible) {
+    return;
+  }
+
+  activeDisplayBounds.value = getDisplayBoundsForSelection();
+  isDraggingToolbar.value = true;
+  dragStart.value = {
+    pointerX: e.clientX,
+    pointerY: e.clientY,
+    offsetX: dragOffset.value.x,
+    offsetY: dragOffset.value.y,
+  };
+  hoveredTooltip.value = '拖动工具栏';
+  e.preventDefault();
+};
+
+onMounted(() => {
+  window.addEventListener('mousemove', handleToolbarDrag);
+  window.addEventListener('mouseup', stopToolbarDrag);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('mousemove', handleToolbarDrag);
+  window.removeEventListener('mouseup', stopToolbarDrag);
 });
 
 const toolbarStyle = computed(() => {
   const pos = toolbarPos.value;
   return {
-    left: `${pos.left + pos.tbWidth}px`,
+    left: `${pos.left + pos.width}px`,
     top: `${pos.top}px`,
     transform: 'translateX(-100%)',
   };
@@ -346,13 +479,13 @@ const debugLine = computed(() => {
     x, y, w, h,
   } = props.bounds;
   const {
-    left, top, tbWidth, tbHeight,
+    left, top, width, height,
   } = toolbarPos.value;
   return {
     x1: x + w / 2,
     y1: y + h / 2,
-    x2: left + tbWidth / 2,
-    y2: top + tbHeight / 2,
+    x2: left + width / 2,
+    y2: top + height / 2,
   };
 });
 </script>
@@ -381,251 +514,265 @@ const debugLine = computed(() => {
       class="action-toolbar-container"
       :style="toolbarStyle"
     >
-      <!-- 主工具栏 -->
-      <div class="action-toolbar-main">
-        <div v-if="state.isDebug" class="absolute -top-6 left-0 text-[10px] text-[#FF5252] font-mono whitespace-nowrap">
-          Monitor: {{ Math.round(toolbarPos.left) }},{{ Math.round(toolbarPos.top) }}
-        </div>
-
-        <!-- 动态提示区域 -->
-        <div class="toolbar-tooltip-container" :class="{ 'is-active': hoveredTooltip }">
-          <div class="toolbar-tooltip-text">
-            {{ hoveredTooltip }}
+      <div class="action-toolbar-shell">
+        <!-- 主工具栏 -->
+        <div class="action-toolbar-main" :class="{ 'is-dragging': isDraggingToolbar }">
+          <div v-if="state.isDebug" class="absolute -top-6 left-0 text-[10px] text-[#FF5252] font-mono whitespace-nowrap">
+            Monitor: {{ Math.round(toolbarPos.left) }},{{ Math.round(toolbarPos.top) }}
           </div>
-        </div>
 
-        <div class="btn-group">
-          <!-- 设置尺寸按钮 -->
-          <button
-            class="btn btn-settings"
-            :class="{ 'active': activePanel === 'size' }"
-            @mouseenter="hoveredTooltip = '设置尺寸'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="togglePanel('size')"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M15 3h6v6" />
-              <path d="M9 21H3v-6" />
-              <path d="M21 3l-7 7" />
-              <path d="M3 21l7-7" />
-            </svg>
-          </button>
+          <!-- 动态提示区域 -->
+          <div class="toolbar-tooltip-container" :class="{ 'is-active': hoveredTooltip }">
+            <div class="toolbar-tooltip-text">
+              {{ hoveredTooltip }}
+            </div>
+          </div>
 
-          <!-- 设置圆角按钮 -->
-          <button
-            class="btn btn-settings"
-            :class="{ 'active': activePanel === 'radius' }"
-            @mouseenter="hoveredTooltip = '设置圆角'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="togglePanel('radius')"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+          <div class="btn-group">
+            <!-- 设置尺寸按钮 -->
+            <button
+              class="btn btn-settings"
+              :class="{ 'active': activePanel === 'size' }"
+              @mouseenter="hoveredTooltip = '设置尺寸'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="togglePanel('size')"
             >
-              <path d="M3 21v-9a9 9 0 0 1 9-9h9" />
-            </svg>
-          </button>
-
-          <!-- 矩形工具按钮 -->
-          <button
-            class="btn btn-settings"
-            :class="{ 'active': activePanel === 'rect' }"
-            @mouseenter="hoveredTooltip = '矩形工具'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="togglePanel('rect')"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect
-                x="3"
-                y="3"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
                 width="18"
                 height="18"
-                rx="2"
-                ry="2"
-              />
-            </svg>
-          </button>
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M15 3h6v6" />
+                <path d="M9 21H3v-6" />
+                <path d="M21 3l-7 7" />
+                <path d="M3 21l7-7" />
+              </svg>
+            </button>
 
-          <!-- 马赛克工具按钮 -->
-          <button
-            class="btn btn-settings"
-            :class="{ 'active': activePanel === 'mosaic' }"
-            @mouseenter="hoveredTooltip = '马赛克/模糊'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="togglePanel('mosaic')"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              stroke="none"
+            <!-- 设置圆角按钮 -->
+            <button
+              class="btn btn-settings"
+              :class="{ 'active': activePanel === 'radius' }"
+              @mouseenter="hoveredTooltip = '设置圆角'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="togglePanel('radius')"
             >
-              <rect x="2" y="2" width="5" height="5" />
-              <rect x="9" y="2" width="5" height="5" opacity="0.6" />
-              <rect x="16" y="2" width="5" height="5" />
-              <rect x="2" y="9" width="5" height="5" opacity="0.6" />
-              <rect x="9" y="9" width="5" height="5" />
-              <rect x="16" y="9" width="5" height="5" opacity="0.6" />
-              <rect x="2" y="16" width="5" height="5" />
-              <rect x="9" y="16" width="5" height="5" opacity="0.6" />
-              <rect x="16" y="16" width="5" height="5" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M3 21v-9a9 9 0 0 1 9-9h9" />
+              </svg>
+            </button>
 
-          <!-- 文本工具按钮 -->
-          <button
-            class="btn btn-settings"
-            :class="{ 'active': activePanel === 'text' }"
-            @mouseenter="hoveredTooltip = '文本标注'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="togglePanel('text')"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <!-- 矩形工具按钮 -->
+            <button
+              class="btn btn-settings"
+              :class="{ 'active': activePanel === 'rect' }"
+              @mouseenter="hoveredTooltip = '矩形工具'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="togglePanel('rect')"
             >
-              <polyline points="4 7 4 4 20 4 20 7" />
-              <line x1="9" y1="20" x2="15" y2="20" />
-              <line x1="12" y1="4" x2="12" y2="20" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect
+                  x="3"
+                  y="3"
+                  width="18"
+                  height="18"
+                  rx="2"
+                  ry="2"
+                />
+              </svg>
+            </button>
 
-          <div class="divider" />
-
-          <!-- 撤销按钮 -->
-          <button
-            class="btn btn-settings"
-            :disabled="state.history.length === 0"
-            @mouseenter="hoveredTooltip = '撤销 (Ctrl+Z)'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="actions.undo()"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <!-- 马赛克工具按钮 -->
+            <button
+              class="btn btn-settings"
+              :class="{ 'active': activePanel === 'mosaic' }"
+              @mouseenter="hoveredTooltip = '马赛克/模糊'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="togglePanel('mosaic')"
             >
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="none"
+              >
+                <rect x="2" y="2" width="5" height="5" />
+                <rect x="9" y="2" width="5" height="5" opacity="0.6" />
+                <rect x="16" y="2" width="5" height="5" />
+                <rect x="2" y="9" width="5" height="5" opacity="0.6" />
+                <rect x="9" y="9" width="5" height="5" />
+                <rect x="16" y="9" width="5" height="5" opacity="0.6" />
+                <rect x="2" y="16" width="5" height="5" />
+                <rect x="9" y="16" width="5" height="5" opacity="0.6" />
+                <rect x="16" y="16" width="5" height="5" />
+              </svg>
+            </button>
 
-          <!-- 功能按钮 -->
-          <button
-            class="btn btn-save"
-            @mouseenter="hoveredTooltip = '保存 (Ctrl+S)'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="actions.handleAction('save')"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <!-- 文本工具按钮 -->
+            <button
+              class="btn btn-settings"
+              :class="{ 'active': activePanel === 'text' }"
+              @mouseenter="hoveredTooltip = '文本标注'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="togglePanel('text')"
             >
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="4 7 4 4 20 4 20 7" />
+                <line x1="9" y1="20" x2="15" y2="20" />
+                <line x1="12" y1="4" x2="12" y2="20" />
+              </svg>
+            </button>
+
+            <div class="divider" />
+
+            <!-- 撤销按钮 -->
+            <button
+              class="btn btn-settings"
+              :disabled="state.history.length === 0"
+              @mouseenter="hoveredTooltip = '撤销 (Ctrl+Z)'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="actions.undo()"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+            </button>
+
+            <!-- 功能按钮 -->
+            <button
+              class="btn btn-save"
+              @mouseenter="hoveredTooltip = '保存 (Ctrl+S)'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="actions.handleAction('save')"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+            </button>
+
+            <button
+              class="btn btn-copy"
+              @mouseenter="hoveredTooltip = '复制 (Ctrl+C)'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="actions.handleAction('copy')"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect
+                  x="9"
+                  y="9"
+                  width="13"
+                  height="13"
+                  rx="2"
+                  ry="2"
+                />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+
+            <button
+              class="btn btn-cancel"
+              @mouseenter="hoveredTooltip = '取消 (Esc)'"
+              @mouseleave="hoveredTooltip = ''"
+              @click.stop="actions.handleAction('cancel')"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
 
           <button
-            class="btn btn-copy"
-            @mouseenter="hoveredTooltip = '复制 (Ctrl+C)'"
+            class="toolbar-drag-handle"
+            title="拖动工具栏"
+            @mouseenter="hoveredTooltip = '拖动工具栏'"
             @mouseleave="hoveredTooltip = ''"
-            @click.stop="actions.handleAction('copy')"
+            @mousedown.stop.prevent="startToolbarDrag"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect
-                x="9"
-                y="9"
-                width="13"
-                height="13"
-                rx="2"
-                ry="2"
-              />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-          </button>
-
-          <button
-            class="btn btn-cancel"
-            @mouseenter="hoveredTooltip = '取消 (Esc)'"
-            @mouseleave="hoveredTooltip = ''"
-            @click.stop="actions.handleAction('cancel')"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <span class="drag-dots">
+              <span v-for="dot in 6" :key="dot" class="drag-dot" />
+            </span>
           </button>
         </div>
       </div>
@@ -848,21 +995,38 @@ const debugLine = computed(() => {
   pointer-events: none;
 }
 
+.action-toolbar-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+
 .action-toolbar-main {
   display: flex;
-  padding: 6px;
-  background: rgb(18 18 20 / 75%);
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgb(0 0 0 / 50%), inset 0 1px 0 rgb(255 255 255 / 10%);
-  backdrop-filter: blur(24px) saturate(150%);
-  border: 1px solid rgb(255 255 255 / 8%);
+  position: relative;
+  align-items: center;
+  min-width: 444px;
+  min-height: 68px;
+  padding: 8px 10px 8px 18px;
+  background: rgb(28 27 31 / 88%);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 28%);
+  backdrop-filter: blur(18px) saturate(130%);
+  border: 1px solid rgb(255 255 255 / 7%);
   pointer-events: auto;
-  transition: all .3s cubic-bezier(.4, 0, .2, 1);
+  transition: box-shadow .2s cubic-bezier(.2, 0, 0, 1), background .2s cubic-bezier(.2, 0, 0, 1), border-color .2s cubic-bezier(.2, 0, 0, 1);
+}
+
+.action-toolbar-main.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 34%);
 }
 
 .toolbar-tooltip-container {
-  max-width: 0;
-  opacity: 0;
+  max-width: 148px;
+  min-width: 0;
+  opacity: .72;
   overflow: hidden;
   pointer-events: none;
   transition: max-width .3s cubic-bezier(.4, 0, .2, 1), opacity .2s ease;
@@ -872,55 +1036,62 @@ const debugLine = computed(() => {
 }
 
 .toolbar-tooltip-container.is-active {
-  max-width: 150px;
+  max-width: 148px;
   opacity: 1;
 }
 
 .toolbar-tooltip-text {
   font-size: 12px;
-  color: rgb(255 255 255 / 90%);
-  padding: 0 8px 0 6px;
+  color: rgb(232 224 233 / 82%);
+  padding: 0 12px 0 0;
   font-weight: 500;
+  letter-spacing: .01em;
 }
 
 .btn-group {
   display: flex;
   align-items: center;
+  gap: 2px;
 }
 
 .btn {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgb(255 255 255 / 90%);
-  transition: all .2s cubic-bezier(.4, 0, .2, 1);
+  color: rgb(232 224 233 / 86%);
+  transition: background-color .2s cubic-bezier(.2, 0, 0, 1), color .2s cubic-bezier(.2, 0, 0, 1), opacity .2s cubic-bezier(.2, 0, 0, 1);
   background: transparent;
-  border-radius: 8px;
-  margin: 0 2px;
+  border-radius: 999px;
 }
 
 .btn:hover {
-  background: rgb(255 255 255 / 12%);
-  color: white;
+  background: rgb(232 224 233 / 8%);
+  color: rgb(255 251 254 / 96%);
 }
 
-.btn:active { transform: scale(.92); }
+.btn:active {
+  background: rgb(232 224 233 / 12%);
+}
 
 .btn.active {
-  background: rgb(255 255 255 / 15%);
-  color: #38bdf8;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
+  background: rgb(79 55 139 / 28%);
+  color: rgb(210 194 255 / 98%);
+}
+
+.btn:disabled {
+  opacity: .35;
+  cursor: default;
 }
 
 .divider {
   width: 1px;
-  height: 16px;
-  background: rgb(255 255 255 / 20%);
-  margin: 0 4px;
+  height: 24px;
+  background: rgb(202 196 208 / 22%);
+  margin: 0 6px;
 }
 
 .sub-divider {
@@ -930,27 +1101,71 @@ const debugLine = computed(() => {
   flex-shrink: 0;
 }
 
-.btn-save:hover { background: rgb(76 175 80 / 60%); }
+.btn-save:hover { background: rgb(103 80 164 / 18%); }
 
-.btn-copy:hover { background: rgb(33 150 243 / 60%); }
+.btn-copy:hover { background: rgb(103 80 164 / 18%); }
 
-.btn-cancel:hover { background: rgb(244 67 54 / 60%); }
+.btn-cancel:hover {
+  background: rgb(140 29 24 / 22%);
+  color: rgb(255 180 171 / 96%);
+}
+
+.toolbar-drag-handle {
+  width: 42px;
+  height: 42px;
+  margin-left: 2px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: rgb(232 224 233 / 74%);
+  transition: background-color .2s cubic-bezier(.2, 0, 0, 1), color .2s cubic-bezier(.2, 0, 0, 1), border-color .2s cubic-bezier(.2, 0, 0, 1);
+}
+
+.toolbar-drag-handle:hover {
+  color: rgb(255 251 254 / 96%);
+  background: transparent;
+}
+
+.toolbar-drag-handle:active {
+  cursor: grabbing;
+  background: transparent;
+  color: rgb(255 251 254 / 90%);
+}
+
+.drag-dots {
+  display: grid;
+  grid-template-columns: repeat(2, 4px);
+  grid-auto-rows: 4px;
+  gap: 3px;
+}
+
+.drag-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentcolor;
+  opacity: .8;
+}
 
 /* 通用子面板 */
 .sub-panel {
-  margin-top: 6px;
-  padding: 6px 12px;
-  background: rgb(18 18 20 / 75%);
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgb(0 0 0 / 50%), inset 0 1px 0 rgb(255 255 255 / 10%);
-  backdrop-filter: blur(24px) saturate(150%);
-  border: 1px solid rgb(255 255 255 / 8%);
+  padding: 10px 14px;
+  background: rgb(28 27 31 / 88%);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 28%);
+  backdrop-filter: blur(18px) saturate(130%);
+  border: 1px solid rgb(255 255 255 / 7%);
   pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 40px;
+  min-height: 56px;
   box-sizing: border-box;
+  max-width: 100%;
 }
 
 .sub-panel__row {
@@ -962,8 +1177,9 @@ const debugLine = computed(() => {
 
 .sub-panel__label {
   font-size: 12px;
-  color: rgb(255 255 255 / 70%);
+  color: rgb(232 224 233 / 78%);
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .size-inputs {
@@ -976,11 +1192,11 @@ const debugLine = computed(() => {
 }
 
 .size-input {
-  background: rgb(0 0 0 / 30%);
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 4px;
-  color: white;
-  padding: 2px 4px;
+  background: rgb(17 16 20 / 56%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  color: rgb(255 251 254 / 96%);
+  padding: 2px 8px;
   text-align: center;
   outline: none;
   font-family: inherit;
@@ -1013,34 +1229,32 @@ const debugLine = computed(() => {
 }
 
 .btn-confirm {
-  border: 1px solid rgb(255 255 255 / 10%);
-  background: rgb(14 165 233 / 90%);
-  color: white;
-  border-radius: 6px;
-  padding: 2px 12px;
+  border: 1px solid transparent;
+  background: rgb(103 80 164 / 92%);
+  color: rgb(255 251 254 / 96%);
+  border-radius: 999px;
+  padding: 2px 14px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   height: 26px;
   line-height: 20px;
-  transition: all .2s ease;
+  transition: background-color .2s cubic-bezier(.2, 0, 0, 1), color .2s cubic-bezier(.2, 0, 0, 1);
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgb(14 165 233 / 30%);
 }
 
 .btn-confirm:hover {
-  background: rgb(56 189 248 / 100%);
-  box-shadow: 0 4px 12px rgb(14 165 233 / 40%);
+  background: rgb(117 92 184 / 96%);
 }
 
-.btn-confirm:active { background: rgb(2 132 199 / 100%); }
+.btn-confirm:active { background: rgb(90 69 145 / 96%); }
 
 /* 矩形类型切换 */
 .rect-type-toggle {
   display: flex;
   gap: 2px;
-  background: rgb(255 255 255 / 8%);
-  border-radius: 4px;
+  background: rgb(232 224 233 / 7%);
+  border-radius: 999px;
   padding: 2px;
   flex-shrink: 0;
 }
@@ -1053,20 +1267,19 @@ const debugLine = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgb(255 255 255 / 60%);
+  color: rgb(232 224 233 / 72%);
   background: transparent;
-  border-radius: 6px;
-  transition: all .2s ease;
+  border-radius: 999px;
+  transition: background-color .2s cubic-bezier(.2, 0, 0, 1), color .2s cubic-bezier(.2, 0, 0, 1);
 }
 
 .rect-type-btn:hover {
-  color: white;
-  background: rgb(255 255 255 / 12%);
+  color: rgb(255 251 254 / 96%);
+  background: rgb(232 224 233 / 8%);
 }
 
 .rect-type-btn--active {
-  color: #38bdf8;
-  background: rgb(255 255 255 / 15%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
+  color: rgb(210 194 255 / 98%);
+  background: rgb(79 55 139 / 28%);
 }
 </style>

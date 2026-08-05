@@ -7,7 +7,7 @@
 - **插件名称**: `translime-plugin-hdr-capture`
 - **功能描述**: 轻松获取 HDR 截图。
 - **技术栈**: 
-    - **Frontend**: Vue 3, Vuetify 3, Vite
+    - **Frontend**: Vue 3, Vuetify 4, Vite
     - **Backend**: Electron (Node.js)
     - **Native**: Rust (NAPI-RS)
 
@@ -87,7 +87,7 @@ if (hdrApi) {
 ### UI 开发 (UI Development)
 
 *   **设置界面 (`src/ui/ui.vue`)**:
-    *   **框架**: Vue 3 + Vuetify 3。
+    *   **框架**: Vue 3 + Vuetify 4。
     *   **图标**: 使用 Material Design Icons (md) 风格 (例如 `<v-icon>home</v-icon>`)。
     *   **样式注入**: 使用 `vite-plugin-css-injected-by-js`，配置 `styleId: 'translime-plugin-hdr-capture'`。
 
@@ -100,6 +100,15 @@ if (hdrApi) {
 *   **通用样式**:
     *   推荐使用 **TailwindCSS** 进行布局。
     *   避免全局样式污染，尽量使用 Scoped CSS。
+
+### Overlay 工具栏与标注
+
+*   **工具栏拖动**: `ActionToolbar` 支持通过右侧拖动锚点在当前选区内微调位置，锚点视觉应保持无边框、并紧贴按钮组。
+*   **工具栏重置**: 工具栏拖动位置只对当前一次选区生效；完成新的选区后，工具栏应重置回默认停靠位置。
+*   **二级面板占位**: 动作栏初次定位时必须按“主栏 + 次级面板”的固定占位高度进行边界判断，不能在打开二级面板后再因为高度变化重新换边或跳动。
+*   **绘图工具退出**: 关闭矩形 / 马赛克 / 文本这类绘图二级菜单时，应退出当前绘图工具并恢复可移动选区状态。
+*   **活动标注工具类型**: 活动标注对象需要记录自己的工具类型，避免在关闭工具面板或切换模式后，因为 `activeTool` 被清空而错误回退到默认矩形。
+*   **标注覆盖顺序**: 矩形、马赛克、文本标注在预览层与最终导出中都必须遵循创建顺序，不要按工具类型拆成固定图层或固定后处理阶段。
 
 ### Native 模块 (Native Module)
 
@@ -131,11 +140,13 @@ if (hdrApi) {
 *   **Preview UI**: `pnpm run preview:ui` (预览设置界面)
 *   **Preview Overlay**: `pnpm run preview:overlay` (预览覆盖层界面)
 *   **Build Full**: `pnpm build` (清理 dist, 构建 main, ui, overlay, native)
+*   **Run Tests**: `pnpm test` (运行 `vitest.config.mjs` 中的回归测试)
 *   **Build Structure**:
     *   `plugin`: Plugin entry (`vite build`)
     *   `ui`: Settings UI (`vite -c ui.vite.config.mjs`)
     *   `overlay`: Overlay UI (`vite -c overlay.vite.config.mjs`) - 支持 `mode=preload` (构建 preload.js) 和默认模式 (构建 HTML)。
     *   `native`: Rust binary (`napi build`)
+    *   `test`: 包级回归测试（Overlay 工具栏状态、标注顺序、导出图像处理、主进程快捷键逻辑）
 
 ## 特别注意事项 (Special Notes)
 
@@ -168,6 +179,7 @@ Overlay 现在支持两种自动探测模式：
 *   **同窗口网格缓存**：前端会基于“窗口句柄 + 外层窗口矩形 + 点位网格”缓存最近一次元素候选链。同一窗口内命中同一网格时，直接复用上一轮候选，不再进入主进程。这一层缓存主要用于压低可识别元素窗口中的悬停延迟。
 *   **多 walker 回退**：原生侧不能只依赖 `ElementFromPoint + RawViewWalker`。当前实现会依次尝试 `RawViewWalker` 父链、`ContentViewWalker` 向下命中链、`ControlViewWalker` 向下命中链，并选择层级更深、最内层矩形更小的结果。
 *   **外层窗口边缘清理**：对于 Electron / Chromium 一类窗口，UIA 最外层 `Window` 候选常常只比内层内容区域大 8px 左右。当前实现会在存在更内层同窗口候选时，剔除这种仅用于阴影或外框的 `Window` 候选，避免滚轮切换时选中窗口外缘。
+*   **重复矩形折叠**：原生侧会在返回“从内到外”的界面元素候选链前，合并相邻且矩形边界完全一致的候选，避免滚轮在视觉上完全相同的父子级选区之间来回切换。
 
 ### 性能边界
 
