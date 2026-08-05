@@ -122,10 +122,10 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(vuetifyIndex).toBeGreaterThan(tailwindIndex);
     });
 
-    it('settings.scss 按需禁用与 Tailwind 冲突的工具类，关闭调色板并对齐 grid 断点', async () => {
+    it('settings.scss 按需禁用与 Tailwind 冲突的工具类并对齐 grid 断点', async () => {
       const scss = await read('src/renderer/assets/styles/settings.scss');
 
-      expect(scss).toContain('$color-pack: false');
+      expect(scss).not.toContain('$color-pack: false');
       expect(scss).not.toContain('$utilities: false');
       expect(scss).toContain("'display': false");
       expect(scss).toContain("'margin-top': false");
@@ -194,7 +194,7 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
     it('preview settings.scss 与宿主保持一致', async () => {
       const scss = await readSdk('src/preview/settings.scss');
 
-      expect(scss).toContain('$color-pack: false');
+      expect(scss).not.toContain('$color-pack: false');
       expect(scss).not.toContain('$utilities: false');
       expect(scss).toContain("'display': false");
       expect(scss).toContain('$grid-breakpoints');
