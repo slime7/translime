@@ -27,7 +27,7 @@
         </div>
       </div>
 
-      <div v-if="filteredPlugins.length > 0" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
+      <div v-if="filteredPlugins.length > 0" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 xxl:grid-cols-4 gap-3 md:gap-4">
         <div
           v-for="plugin in filteredPlugins"
           :key="plugin.packageName"

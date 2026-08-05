@@ -8,7 +8,7 @@
         lines="one"
       >
         <template #text>
-          <span class="text-body-small">Preview 模式 - Electron API 已 mock</span>
+          <span style="font-size: 12px;">Preview 模式 - Electron API 已 mock</span>
         </template>
         <template #actions>
           <v-btn
@@ -26,10 +26,9 @@
       />
       <div
         v-else
-        class="d-flex align-center justify-center"
-        style="height: 200px;"
+        style="display: flex; align-items: center; justify-content: center; height: 200px;"
       >
-        <span class="text-medium-emphasis">加载中...</span>
+        <span style="opacity: .6;">加载中...</span>
       </div>
     </v-main>
   </v-app>

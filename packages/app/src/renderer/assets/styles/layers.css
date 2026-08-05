@@ -1,0 +1,22 @@
+/**
+ * CSS layer 顺序声明
+ * 必须在所有其他样式之前导入（在 plugins/vuetify.js 中位于 vuetify/styles 之前）
+ *
+ * 顺序参考 Vuetify 官方文档：
+ * https://vuetifyjs.com/en/features/css-utilities/tailwindcss/
+ */
+
+/* tailwind 主题与重置位于最底层 */
+@layer tailwind-theme;
+@layer tailwind-reset;
+
+/* vuetify 层级 */
+@layer vuetify-core;
+@layer vuetify-components;
+@layer vuetify-overrides;
+@layer vuetify-utilities;
+
+/* tailwind 工具类位于 vuetify-utilities 之上、vuetify-final 之下 */
+@layer tailwind-utilities;
+
+@layer vuetify-final;

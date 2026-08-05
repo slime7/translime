@@ -685,7 +685,7 @@ onMounted(async () => {
   overflow-wrap: anywhere;
 }
 
-@media (width >= 64rem) {
+@media (width >= 80rem) {
   .log-viewer__toolbar {
     flex-direction: row;
     align-items: center;

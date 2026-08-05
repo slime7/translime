@@ -58,12 +58,12 @@ export default defineConfig(({ mode }) => {
           },
         },
       }),
+      tailwindcss(),
       vuetify({
         styles: {
           configFile: resolve(RENDERER_ROOT, 'assets/styles/settings.scss'),
         },
       }),
-      tailwindcss(),
     ],
     css: {
       preprocessorOptions: {

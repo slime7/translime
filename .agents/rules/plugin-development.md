@@ -66,7 +66,7 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 
 ## 7. 样式隔离与 Tailwind CSS 规范
 
-**严禁全局样式污染**：主程序启用了 Vuetify 并按需禁用了部分功能，且为 Tailwind 配置了 `@layer tailwind` 以降低默认优先级。若插件随意注入（如直接 `@import "tailwindcss";`），其生成的非级联级 (Unlayered) 样式**将直接覆盖并破坏主程序**的响应式网格 (`md:grid-cols-3` 等)。
+**严禁全局样式污染**：主程序按 Vuetify 官方文档采用 Tailwind 主导的样式体系（CSS layer 顺序为 `tailwind-theme → tailwind-reset → vuetify-* → tailwind-utilities → vuetify-final`，`tailwind-utilities` 位于 `vuetify-utilities` 之上；Vuetify 内置工具类与调色板已关闭，`dark:`/`light:` 变体跟随 `.v-theme--*`，断点与 Vuetify 阈值对齐）。若插件随意注入样式（如直接 `@import "tailwindcss";`），其生成的非级联级 (Unlayered) 样式**将直接覆盖并破坏主程序**的响应式网格与 Tailwind 工具类。
 
 如果你在插件开发中使用了 Tailwind CSS，**必须**采取以下任意一种样式隔离手段：
 1. **作用域包裹**：在你的 `index.css` 或主样式文件中，将 tailwind 的引入放在唯一的 `@layer` 中（降权）：
