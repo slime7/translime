@@ -118,7 +118,7 @@ export default {
     return {
       openPluginWindow: () => {
         const plugin = store.plugin(props.open);
-        openPluginWindow(plugin, store.dark, store.appSetting);
+        openPluginWindow(plugin);
       },
     };
   },

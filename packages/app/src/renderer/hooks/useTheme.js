@@ -4,12 +4,56 @@ import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { appConfigStore } from '@/utils';
 
+const DEFAULT_SYMBOL_COLORS = {
+  dark: '#ffffff',
+  light: '#1f1f1f',
+};
+
+/**
+ * 将任意合法 CSS 颜色规范化为 #rrggbb；非法输入或环境无 canvas2D 时返回 null
+ * @param {string} cssColor
+ * @returns {string | null}
+ */
+const toRgbHex = (cssColor) => {
+  if (!cssColor) return null;
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#000000';
+  ctx.fillStyle = cssColor.trim();
+  return /^#[0-9a-f]{6}$/i.test(ctx.fillStyle)
+    ? ctx.fillStyle
+    : null;
+};
+
 const useTheme = () => {
   const ipc = useIpc();
   const store = useGlobalStore();
   const vTheme = useVTheme();
 
   const getNativeTheme = () => ipc.invoke(ipcType.GET_NATIVE_THEME);
+
+  /**
+   * 把当前主题的系统栏前景色同步为原生 caption 按钮图标色，
+   * 背景保持透明，高度从 WCO API 读取。
+   * @param {string} [win] - 目标窗口名，默认主窗口 'app'
+   */
+  const syncOverlayColor = (win = 'app') => {
+    const scheme = vTheme.themes.value[store.dark ? 'dark' : 'light'];
+    const rawColor = scheme?.colors?.['on-surface-light'] || scheme?.colors?.['on-surface'];
+    const symbolHex = toRgbHex(rawColor) || DEFAULT_SYMBOL_COLORS[store.dark ? 'dark' : 'light'];
+    const payload = {
+      win,
+      symbolColor: symbolHex,
+    };
+    const wco = navigator.windowControlsOverlay;
+    if (wco?.getTitlebarAreaRect) {
+      const { height } = wco.getTitlebarAreaRect();
+      if (height > 0) {
+        payload.height = height;
+      }
+    }
+    ipc.send(ipcType.SET_TITLE_BAR_OVERLAY, payload);
+  };
 
   const setDark = (dark) => {
     store.dark = dark;
@@ -59,6 +103,7 @@ const useTheme = () => {
     setTheme,
     setDark,
     setCustomTheme,
+    syncOverlayColor,
   };
 };
 

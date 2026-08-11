@@ -146,7 +146,7 @@ const togglePin = async (packageName) => {
 
 const openPlugin = (plugin) => {
   if (plugin.windowMode) {
-    openPluginWindow(plugin, store.dark, store.appSetting);
+    openPluginWindow(plugin);
     return;
   }
 

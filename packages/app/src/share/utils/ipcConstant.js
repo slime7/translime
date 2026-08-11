@@ -4,6 +4,7 @@ export const APP_UNMAXIMIZE = 'app-unmaximize';
 export const APP_MINIMIZE = 'app-minimize';
 export const APP_CLOSE = 'app-close';
 export const APP_IS_MAXIMIZE = 'app-is-maximize';
+export const SET_TITLE_BAR_OVERLAY = 'set-title-bar-overlay';
 export const APP_VERSIONS = 'app-versions';
 export const OPEN_LINK = 'open-link';
 export const OPEN_DIR = 'open-dir';
@@ -72,6 +73,7 @@ export default {
   APP_MINIMIZE,
   APP_CLOSE,
   APP_IS_MAXIMIZE,
+  SET_TITLE_BAR_OVERLAY,
   APP_VERSIONS,
   OPEN_LINK,
   OPEN_DIR,

@@ -10,7 +10,6 @@ const useGlobalStore = defineStore('globalStore', {
       registry: '',
       theme: 'system',
       showDevPlugin: false,
-      useNativeTitleBar: true,
       pinnedPlugins: [],
       themeColor: {
         name: 'translime',
@@ -90,7 +89,6 @@ const useGlobalStore = defineStore('globalStore', {
         state.appSetting.registry = registry;
         state.appSetting.theme = await appConfigStore.get('setting.theme', 'system');
         state.appSetting.showDevPlugin = await appConfigStore.get('setting.showDevPlugin', false);
-        state.appSetting.useNativeTitleBar = await appConfigStore.get('setting.useNativeTitleBar', false);
         state.appSetting.themeColor = await appConfigStore.get('setting.themeColor', {
           name: 'translime',
           source: '#20a6fc',
@@ -128,9 +126,6 @@ const useGlobalStore = defineStore('globalStore', {
     },
     setAppArgv(argv) {
       this.appArgv = argv;
-    },
-    setUseNativeTitleBar(v) {
-      this.appSetting.useNativeTitleBar = v;
     },
     setAppThemeColor(themeColor) {
       this.appSetting.themeColor = Object.assign(this.appSetting.themeColor, themeColor);

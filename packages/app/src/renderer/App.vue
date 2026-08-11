@@ -41,10 +41,15 @@ const getPlugins = async () => {
     alert.show(err.message, 'error');
   }
 };
+const syncOverlayColor = () => {
+  const win = route.name === 'PluginWindow' ? `plugin-window-${route.params.packageName}` : 'app';
+  theme.syncOverlayColor(win);
+};
 const getTheme = async () => {
   theme.setTheme(await appConfigStore.get('setting.theme', 'system'));
   const { shouldUseDarkColors: dark } = await theme.getNativeTheme();
   theme.setDark(dark);
+  syncOverlayColor();
 };
 /**
  * 读取设置中的主题配色并应用
@@ -69,6 +74,7 @@ const getThemeColors = async () => {
     const vuetifyColors = mdColor.getVuetifyColors(themeResult);
     theme.setCustomTheme(vuetifyColors);
   }
+  syncOverlayColor();
 };
 const themeUpdated = () => {
   ipc.on(ipcType.THEME_UPDATED, ({ dark }) => {

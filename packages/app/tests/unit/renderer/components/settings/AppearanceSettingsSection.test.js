@@ -8,14 +8,12 @@ const { appConfigStoreMock, storeMock } = vi.hoisted(() => ({
   storeMock: {
     appSetting: {
       theme: 'system',
-      useNativeTitleBar: false,
       themeColor: {
         name: 'custom',
         source: '#123456',
         variant: 'SchemeVibrant',
       },
     },
-    setUseNativeTitleBar: vi.fn(),
   },
   appConfigStoreMock: {
     set: vi.fn(),
@@ -54,7 +52,6 @@ describe('AppearanceSettingsSection.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     storeMock.appSetting.theme = 'system';
-    storeMock.appSetting.useNativeTitleBar = false;
     storeMock.appSetting.themeColor = {
       name: 'custom',
       source: '#123456',
@@ -78,15 +75,5 @@ describe('AppearanceSettingsSection.vue', () => {
 
     expect(wrapper.find('.theme-dialog').text()).toContain('true');
     expect(wrapper.find('.color-dialog').text()).toContain('true');
-  });
-
-  it('切换系统标题栏时应该更新 store 和配置', async () => {
-    const wrapper = mount(AppearanceSettingsSection, globalMountOptions);
-    const buttons = wrapper.findAll('.setting-item');
-
-    await buttons[2].trigger('click');
-
-    expect(storeMock.setUseNativeTitleBar).toHaveBeenCalledWith(true);
-    expect(appConfigStoreMock.set).toHaveBeenCalledWith('setting.useNativeTitleBar', true);
   });
 });

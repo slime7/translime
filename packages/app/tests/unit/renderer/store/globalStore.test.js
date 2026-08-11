@@ -150,13 +150,6 @@ describe('globalStore', () => {
       expect(store.appArgv).toEqual(argv);
     });
 
-    it('setUseNativeTitleBar 应该正确设置原生标题栏', () => {
-      const store = useGlobalStore();
-
-      store.setUseNativeTitleBar(true);
-      expect(store.appSetting.useNativeTitleBar).toBe(true);
-    });
-
     it('setAppThemeColor 应该正确设置主题颜色', () => {
       const store = useGlobalStore();
       const themeColor = {

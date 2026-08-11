@@ -1,15 +1,20 @@
 import {
-  beforeEach, describe, expect, it, vi,
+  afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
+
+const { mockIpc } = vi.hoisted(() => ({
+  mockIpc: {
+    invoke: vi.fn().mockResolvedValue({ shouldUseDarkColors: false }),
+    send: vi.fn(),
+  },
+}));
 
 // Mock electron hooks
 vi.mock('@/hooks/electron', () => ({
-  useIpc: () => ({
-    invoke: vi.fn().mockResolvedValue({ shouldUseDarkColors: false }),
-    send: vi.fn(),
-  }),
+  useIpc: () => mockIpc,
 }));
 
 // Mock Vuetify useTheme
@@ -18,8 +23,8 @@ vi.mock('vuetify', () => ({
     change: vi.fn(),
     themes: {
       value: {
-        light: { colors: {} },
-        dark: { colors: {} },
+        light: { colors: { 'on-surface-light': '#1d1b20' } },
+        dark: { colors: { 'on-surface-light': '#e6e0e9' } },
       },
     },
   }),
@@ -39,6 +44,10 @@ describe('useTheme', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('应该返回所需的方法', () => {
     const theme = useTheme();
 
@@ -46,6 +55,7 @@ describe('useTheme', () => {
     expect(theme).toHaveProperty('setTheme');
     expect(theme).toHaveProperty('setDark');
     expect(theme).toHaveProperty('setCustomTheme');
+    expect(theme).toHaveProperty('syncOverlayColor');
   });
 
   describe('setTheme', () => {
@@ -108,6 +118,66 @@ describe('useTheme', () => {
       const result = theme.getNativeTheme();
 
       expect(result).toBeInstanceOf(Promise);
+    });
+  });
+
+  describe('syncOverlayColor', () => {
+    it('主题色可规范化时发送 hex 图标色', () => {
+      const fakeCtx = { fillStyle: '#000000' };
+      vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        if (tag === 'canvas') {
+          return { getContext: () => fakeCtx };
+        }
+        return document.createElement(tag);
+      });
+      const theme = useTheme();
+
+      theme.syncOverlayColor();
+
+      expect(mockIpc.send).toHaveBeenCalledWith(ipcType.SET_TITLE_BAR_OVERLAY, {
+        win: 'app',
+        symbolColor: '#1d1b20',
+      });
+    });
+
+    it('环境无法规范化颜色时回退模式默认色', () => {
+      vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        if (tag === 'canvas') {
+          return { getContext: () => null };
+        }
+        return document.createElement(tag);
+      });
+      const theme = useTheme();
+
+      theme.syncOverlayColor('plugin-window-demo');
+
+      expect(mockIpc.send).toHaveBeenCalledWith(ipcType.SET_TITLE_BAR_OVERLAY, {
+        win: 'plugin-window-demo',
+        symbolColor: '#1f1f1f',
+      });
+    });
+
+    it('WCO 可用时附带实测高度', () => {
+      const fakeCtx = { fillStyle: '#000000' };
+      vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        if (tag === 'canvas') {
+          return { getContext: () => fakeCtx };
+        }
+        return document.createElement(tag);
+      });
+      Object.defineProperty(navigator, 'windowControlsOverlay', {
+        configurable: true,
+        value: { getTitlebarAreaRect: () => ({ height: 40, width: 150 }) },
+      });
+      const theme = useTheme();
+
+      theme.syncOverlayColor();
+
+      expect(mockIpc.send).toHaveBeenCalledWith(ipcType.SET_TITLE_BAR_OVERLAY, {
+        win: 'app',
+        symbolColor: '#1d1b20',
+        height: 40,
+      });
     });
   });
 });

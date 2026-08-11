@@ -69,10 +69,10 @@ a {
 }
 
 .custom-title-bar .v-overlay-container .v-overlay {
-  top: 24px;
+  top: var(--title-bar-height, 32px);
 
   .v-overlay__scrim {
-    top: 24px;
+    top: var(--title-bar-height, 32px);
   }
 
   &.v-overlay--absolute .v-overlay__scrim {

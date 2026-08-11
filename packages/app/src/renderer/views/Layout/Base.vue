@@ -1,13 +1,14 @@
 <template>
   <v-app>
-    <v-system-bar v-if="!useNativeTileBar" class="system-bar p-0">
+    <v-system-bar class="system-bar p-0">
       <div class="px-4">
         translime
       </div>
 
       <v-spacer />
 
-      <window-controls :is-maximize="isMaximize" />
+      <!-- 预留原生 caption 按钮区域，避免内容被遮挡 -->
+      <div class="window-control-placeholder shrink-0" />
     </v-system-bar>
 
     <navigation />
@@ -55,24 +56,20 @@
 
 <script setup>
 import {
-  computed,
   nextTick,
   onMounted,
   onUnmounted,
-  ref,
-  watch,
 } from 'vue';
-import WindowControls from '@/components/WindowControls.vue';
 import MainFooter from '@/components/MainFooter.vue';
 import Navigation from '@/views/Layout/components/Navigation.vue';
 import Notification from '@/views/Layout/components/Notification.vue';
 import useGlobalStore from '@/store/globalStore';
-import { useIpc } from '@/hooks/electron';
 import EmbeddedPluginWebviews from '@/views/plugins/EmbeddedPluginWebviews.vue';
+import { watchWindowControlsOverlay } from '@/utils/windowControlsOverlay';
 
 const store = useGlobalStore();
-const ipc = useIpc();
-const isMaximize = ref(false);
+
+let stopWindowControlsWatch = null;
 
 const onEnter = () => {
   nextTick(() => {
@@ -84,25 +81,13 @@ const onLeave = () => {
   store.pageTransitionActive = true;
 };
 
-const useNativeTileBar = computed(() => store.appSetting.useNativeTitleBar);
-
-watch(() => store.appSetting.useNativeTitleBar, () => {
-  if (useNativeTileBar.value) {
-    document.body.className = '';
-    return;
-  }
-
-  document.body.className = 'custom-title-bar';
-});
-
 onMounted(() => {
-  ipc.on('set-maximize-status', (maximize) => {
-    isMaximize.value = maximize;
-  });
+  document.body.className = 'custom-title-bar';
+  stopWindowControlsWatch = watchWindowControlsOverlay();
 });
 
 onUnmounted(() => {
-  ipc.detach('set-maximize-status');
+  stopWindowControlsWatch?.();
 });
 </script>
 
@@ -110,6 +95,12 @@ onUnmounted(() => {
 .system-bar {
   -webkit-app-region: drag;
   z-index: 300;
+  height: var(--title-bar-height, 32px);
+}
+
+.window-control-placeholder {
+  width: var(--window-control-width, 138px);
+  flex-shrink: 0;
 }
 
 .scroll-content {

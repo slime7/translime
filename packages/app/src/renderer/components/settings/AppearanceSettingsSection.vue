@@ -17,12 +17,6 @@
         :selected="themeColorName"
         @click="colorDialogVisible = true"
       />
-      <mde-list-item
-        title="使用系统标题栏(重启后生效)"
-        item-type="switch"
-        :is-active="settings.useNativeTitleBar"
-        @click="onUseNativeTitleBar(!settings.useNativeTitleBar)"
-      />
     </mde-list>
 
     <theme-select-dialog v-model="themeDialogVisible" />
@@ -33,7 +27,6 @@
 <script setup>
 import { computed, ref } from 'vue';
 import useGlobalStore from '@/store/globalStore';
-import { appConfigStore } from '@/utils';
 import MdeList from '@/components/MdeList.vue';
 import MdeListItem from '@/components/MdeListItem.vue';
 import ThemeSelectDialog from './ThemeSelectDialog.vue';
@@ -66,8 +59,4 @@ const themeColorName = computed(() => {
   }
 });
 
-const onUseNativeTitleBar = (value) => {
-  store.setUseNativeTitleBar(!!value);
-  appConfigStore.set('setting.useNativeTitleBar', !!value);
-};
 </script>

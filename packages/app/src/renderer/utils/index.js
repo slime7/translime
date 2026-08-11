@@ -49,7 +49,7 @@ export const selectFileDialog = (win, options = {}) => {
   });
 };
 
-export const openPluginWindow = (plugin, appSetting = {}) => {
+export const openPluginWindow = (plugin) => {
   ipc.invoke(ipcType.ACTIVATE_PLUGIN, plugin.packageName, 'view');
   const url = plugin.windowUrl
     ? plugin.windowUrl
@@ -68,7 +68,6 @@ export const openPluginWindow = (plugin, appSetting = {}) => {
       windowUrl: url,
       appMenu: null,
       frame: true,
-      titleBarStyle: appSetting?.useNativeTitleBar ? 'default' : 'hidden',
       title: plugin.title,
       ...options,
     },

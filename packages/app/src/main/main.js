@@ -15,6 +15,10 @@ import mainStore from './utils/useMainStore';
 import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import Ipc from './core/Ipc';
+import {
+  resolveOverlayMode,
+  resolveTitleBarOverlay,
+} from './utils/titleBarOverlay';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const isInDisplay = (winProps) => {
@@ -54,7 +58,12 @@ export default () => {
     maximize,
   } = mainStore.config.get('window', defaultWin);
   maximize = false;
-  const useNativeTitleBar = mainStore.config.get('setting.useNativeTitleBar', false);
+  const settingTheme = mainStore.config.get('setting.theme', 'system');
+  const overlayMode = resolveOverlayMode(settingTheme, nativeTheme.shouldUseDarkColors);
+  const titleBarOverlay = resolveTitleBarOverlay({
+    overlayMode,
+    savedOverlay: mainStore.config.get(`window.overlayColor.${overlayMode}`),
+  });
   // 判断是否在屏幕视野内
   if (!isInDisplay({
     x, y, width, height,
@@ -71,7 +80,8 @@ export default () => {
     frame: true,
     show: false,
     minWidth: 700,
-    titleBarStyle: useNativeTitleBar ? 'default' : 'hidden',
+    titleBarStyle: 'hidden',
+    titleBarOverlay,
     webPreferences: {
       preload: join(dir, '../preload/index.cjs'),
       nodeIntegration: false,

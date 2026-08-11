@@ -17,6 +17,11 @@ import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';
 import logger from '../utils/logger';
 import { listLogDates, readLogRecords } from '../utils/logViewer';
+import {
+  resolveOverlayMode,
+  resolveTitleBarOverlay,
+  TITLE_BAR_OVERLAY_COLOR,
+} from '../utils/titleBarOverlay';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
 
@@ -97,6 +102,25 @@ const ipcHandler = {
     }
     throw new Error('targetWin is null');
   },
+  [ipcType.SET_TITLE_BAR_OVERLAY]({ win = 'app', symbolColor, height } = {}) {
+    const targetWin = win === 'app' ? appManager.getWin() : appManager.getChildWin(win);
+    if (!targetWin) {
+      return;
+    }
+    const overlayOptions = {
+      ...(symbolColor && { symbolColor }),
+      ...(height && { height }),
+    };
+    if (Object.keys(overlayOptions).length === 0) {
+      return;
+    }
+    const modeKey = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+    mainStore.config.set(`window.overlayColor.${modeKey}`, overlayOptions);
+    targetWin.setTitleBarOverlay({
+      color: TITLE_BAR_OVERLAY_COLOR,
+      ...overlayOptions,
+    });
+  },
   [ipcType.APP_VERSIONS]() {
     return {
       app: mainStore.APP_VERSION,
@@ -150,6 +174,17 @@ const ipcHandler = {
         height: options.height ? options.height : mainWinBound.height,
       });
       const indexPage = options.windowUrl || 'child-window.html';
+      const overlayMode = resolveOverlayMode(
+        mainStore.config.get('setting.theme', 'system'),
+        nativeTheme.shouldUseDarkColors,
+      );
+      const savedOverlay = mainStore.config.get(`window.overlayColor.${overlayMode}`);
+      let titleBarOverlay = false;
+      if (typeof options.titleBarOverlay !== 'undefined') {
+        titleBarOverlay = options.titleBarOverlay;
+      } else if ((options.titleBarStyle || 'hidden') === 'hidden') {
+        titleBarOverlay = resolveTitleBarOverlay({ overlayMode, savedOverlay });
+      }
       const win = createWindow(indexPage, {
         x: winBound.x,
         y: winBound.y,
@@ -159,9 +194,8 @@ const ipcHandler = {
         useContentSize:
           typeof options.useContentSize !== 'undefined' ? options.useContentSize : false,
         frame: typeof options.frame !== 'undefined' ? options.frame : true,
-        titleBarStyle: options.titleBarStyle || 'default',
-        titleBarOverlay:
-          typeof options.titleBarOverlay !== 'undefined' ? options.titleBarOverlay : false,
+        titleBarStyle: options.titleBarStyle || 'hidden',
+        titleBarOverlay,
         title: options.title || 'translime',
         resizable: typeof options.resizable !== 'undefined' ? options.resizable : true,
         transparent:

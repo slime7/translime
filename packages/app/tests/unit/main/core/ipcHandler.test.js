@@ -4,6 +4,7 @@ import {
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import ipcHandler from '@main/core/ipcHandler';
 import appManager from '@main/utils/useAppManager';
+import mainStore from '@main/utils/useMainStore';
 
 const {
   mockShell, mockApp, mockDialog, mockNativeTheme, NotificationMock,
@@ -69,6 +70,7 @@ const { mockWin, mockIpc } = vi.hoisted(() => ({
     minimize: vi.fn(),
     close: vi.fn(),
     reload: vi.fn(),
+    setTitleBarOverlay: vi.fn(),
     getBounds: vi.fn(() => ({
       x: 0, y: 0, width: 800, height: 600,
     })),
@@ -80,6 +82,10 @@ const { mockWin, mockIpc } = vi.hoisted(() => ({
   },
 }));
 
+const { mockCreateWindow } = vi.hoisted(() => ({
+  mockCreateWindow: vi.fn(),
+}));
+
 vi.mock('@main/utils/useAppManager', () => ({
   default: {
     getWin: vi.fn(() => mockWin),
@@ -89,6 +95,10 @@ vi.mock('@main/utils/useAppManager', () => ({
     removeChildWin: vi.fn(),
     setChildWin: vi.fn(),
   },
+}));
+
+vi.mock('@main/utils/createWindow', () => ({
+  default: mockCreateWindow,
 }));
 
 vi.mock('@main/utils/useMainStore', () => ({
@@ -120,6 +130,7 @@ vi.mock('@main/core/netHandler', () => ({
 describe('ipcHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNativeTheme.shouldUseDarkColors = false;
     const childWins = {};
     appManager.getWin.mockReturnValue(mockWin);
     appManager.setChildWin.mockImplementation((name, win) => {
@@ -155,6 +166,70 @@ describe('ipcHandler', () => {
       mockWin.isMaximized.mockReturnValue(true);
       ipcHandler[ipcType.APP_MAXIMIZE]('app');
       expect(mockWin.unmaximize).toHaveBeenCalled();
+    });
+
+    it('SET_TITLE_BAR_OVERLAY 应该更新目标窗口并持久化', () => {
+      mockNativeTheme.shouldUseDarkColors = true;
+
+      ipcHandler[ipcType.SET_TITLE_BAR_OVERLAY]({
+        win: 'app',
+        symbolColor: '#abcdef',
+        height: 32,
+      });
+
+      expect(mockWin.setTitleBarOverlay).toHaveBeenCalledWith({
+        color: '#00000000',
+        symbolColor: '#abcdef',
+        height: 32,
+      });
+      expect(mainStore.config.set).toHaveBeenCalledWith('window.overlayColor.dark', {
+        symbolColor: '#abcdef',
+        height: 32,
+      });
+    });
+
+    it('SET_TITLE_BAR_OVERLAY 空 payload 应该跳过', () => {
+      ipcHandler[ipcType.SET_TITLE_BAR_OVERLAY]({ win: 'app' });
+
+      expect(mockWin.setTitleBarOverlay).not.toHaveBeenCalled();
+      expect(mainStore.config.set).not.toHaveBeenCalled();
+    });
+
+    it('SET_TITLE_BAR_OVERLAY 目标窗口不存在时应该跳过', () => {
+      ipcHandler[ipcType.SET_TITLE_BAR_OVERLAY]({
+        win: 'plugin-window-missing',
+        symbolColor: '#ffffff',
+      });
+
+      expect(mainStore.config.set).not.toHaveBeenCalled();
+    });
+
+    it('OPEN_NEW_WINDOW 应该默认启用覆盖式标题栏', () => {
+      const childWin = {
+        webContents: {},
+        isMinimized: vi.fn(() => false),
+        isMaximized: vi.fn(() => false),
+        restore: vi.fn(),
+        focus: vi.fn(),
+        on: vi.fn(),
+        getPosition: vi.fn(() => [0, 0]),
+        getSize: vi.fn(() => [800, 600]),
+      };
+      mockCreateWindow.mockReturnValue(childWin);
+
+      ipcHandler[ipcType.OPEN_NEW_WINDOW]({
+        name: 'plugin-window-demo',
+        options: { title: 'Demo' },
+      });
+
+      expect(mockCreateWindow).toHaveBeenCalledTimes(1);
+      const options = mockCreateWindow.mock.calls[0][1];
+      expect(options.titleBarStyle).toBe('hidden');
+      expect(options.titleBarOverlay).toMatchObject({
+        color: '#00000000',
+        symbolColor: '#1f1f1f',
+        height: 32,
+      });
     });
   });
 
