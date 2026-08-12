@@ -1,6 +1,10 @@
 <template>
   <v-app>
-    <v-system-bar class="system-bar p-0" v-if="!isEmbedded">
+    <v-system-bar
+      v-if="!isEmbedded"
+      class="system-bar p-0"
+      :height="titleBarHeight"
+    >
       <div class="px-4">
         {{ plugin ? `${plugin.title} - translime` : 'translime' }}
       </div>
@@ -43,7 +47,7 @@ import * as components from 'vuetify/components';
 import * as labsComponents from 'vuetify/labs/components';
 import * as directives from 'vuetify/directives';
 import globalStore from '@/store/globalStore';
-import { watchWindowControlsOverlay } from '@/utils/windowControlsOverlay';
+import { useTitleBarHeight } from '@/hooks/useTitleBarHeight';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
@@ -65,8 +69,7 @@ export default {
     const packageName = computed(() => route.params.packageName);
     const plugin = computed(() => store.plugin(packageName.value));
     const isEmbedded = computed(() => route.query.embedded === 'true');
-
-    let stopWindowControlsWatch = null;
+    const { height: titleBarHeight } = useTitleBarHeight();
 
     const applyCustomTitleBar = () => {
       document.body.className = isEmbedded.value ? '' : 'custom-title-bar';
@@ -83,12 +86,10 @@ export default {
 
     onMounted(() => {
       applyCustomTitleBar();
-      stopWindowControlsWatch = watchWindowControlsOverlay();
       store.pageTransitionActive = false;
     });
 
     onUnmounted(() => {
-      stopWindowControlsWatch?.();
       store.pageTransitionActive = false;
     });
 
@@ -97,6 +98,7 @@ export default {
       onEnter,
       onLeave,
       isEmbedded,
+      titleBarHeight,
     };
   },
 };
@@ -105,12 +107,10 @@ export default {
 <style scoped lang="scss">
 .system-bar {
   -webkit-app-region: drag;
-  z-index: 300;
-  height: var(--title-bar-height, 32px);
 }
 
 .window-control-placeholder {
-  width: var(--window-control-width, 138px);
+  width: calc(100vw - env(titlebar-area-width, 100vw));
   flex-shrink: 0;
 }
 

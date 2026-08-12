@@ -3,7 +3,6 @@
  * 背景色始终透明，图标色按深浅模式持久化，供主窗口与插件窗口复用。
  */
 
-export const DEFAULT_TITLE_BAR_OVERLAY_HEIGHT = 32;
 export const TITLE_BAR_OVERLAY_COLOR = '#00000000';
 export const DEFAULT_SYMBOL_COLOR = {
   dark: '#ffffff',
@@ -26,14 +25,13 @@ export const resolveOverlayMode = (settingTheme = 'system', shouldUseDarkColors 
  * 解析 BrowserWindow 的 titleBarOverlay 配置
  * @param {object} [params]
  * @param {'dark' | 'light'} [params.overlayMode] - 深浅模式
- * @param {{ symbolColor?: string, height?: number }|undefined} [params.savedOverlay] - 持久化的 overlay 配置
- * @returns {{ height: number, color: string, symbolColor: string }}
+ * @param {{ symbolColor?: string }|undefined} [params.savedOverlay] - 持久化的 overlay 配置
+ * @returns {{ color: string, symbolColor: string }}
  */
 export const resolveTitleBarOverlay = ({
   overlayMode = 'light',
   savedOverlay,
 } = {}) => ({
-  height: savedOverlay?.height || DEFAULT_TITLE_BAR_OVERLAY_HEIGHT,
   color: TITLE_BAR_OVERLAY_COLOR,
   symbolColor: savedOverlay?.symbolColor || DEFAULT_SYMBOL_COLOR[overlayMode],
 });

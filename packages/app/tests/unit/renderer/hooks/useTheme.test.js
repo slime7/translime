@@ -157,7 +157,7 @@ describe('useTheme', () => {
       });
     });
 
-    it('WCO 可用时附带实测高度', () => {
+    it('WCO 可用时也不回写高度（高度由系统决定）', () => {
       const fakeCtx = { fillStyle: '#000000' };
       vi.spyOn(document, 'createElement').mockImplementation((tag) => {
         if (tag === 'canvas') {
@@ -176,7 +176,6 @@ describe('useTheme', () => {
       expect(mockIpc.send).toHaveBeenCalledWith(ipcType.SET_TITLE_BAR_OVERLAY, {
         win: 'app',
         symbolColor: '#1d1b20',
-        height: 40,
       });
     });
   });
