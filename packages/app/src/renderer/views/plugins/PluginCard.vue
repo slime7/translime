@@ -315,7 +315,7 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .version-selector {
   max-width: 135px;
 }

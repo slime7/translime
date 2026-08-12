@@ -125,7 +125,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .transition-radius {
   transition-property: border-radius;
 }

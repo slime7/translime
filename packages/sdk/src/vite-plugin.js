@@ -71,15 +71,6 @@ function cssInjectedByJsPlugin(options = {}) {
 // ----------------------------------------------------------------------
 
 /**
- * 获取 Preview 模式的 Vuetify 样式配置文件路径
- * @description 用于 vite-plugin-vuetify 的 styles.configFile 配置
- * @returns {string} 绝对路径
- */
-export function getPreviewSettingsPath() {
-  return resolve(currentDir, 'preview/settings.scss');
-}
-
-/**
  * 内联的 HTML 模板
  * @description 当项目目录下找不到 preview-template.html 时使用的默认模板
  */
@@ -410,8 +401,6 @@ export function translimeSdk(options = {}) {
 
       // Preview 模式特殊配置（仅在 serve 阶段生效）
       if (isPreviewMode && command === 'serve') {
-        const settingsPath = getPreviewSettingsPath();
-
         return {
           ...baseConfig,
           // 切换为 SPA 模式（非库模式）
@@ -421,20 +410,9 @@ export function translimeSdk(options = {}) {
               external: [], // Preview 模式下需要打包所有依赖
             },
           },
-          // 启用现代 Sass 编译器（消除废弃提示）
-          css: {
-            preprocessorOptions: {
-              sass: { api: 'modern-compiler' },
-              scss: { api: 'modern-compiler' },
-            },
-          },
           // 优化依赖: 排除 vuetify (使用我们注入的 mock/core)
           optimizeDeps: {
             exclude: ['vuetify'],
-          },
-          // 向下游插件传递配置（如 vite-plugin-vuetify）
-          __translimeSdkPreview: {
-            settingsPath,
           },
         };
       }

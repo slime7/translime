@@ -64,7 +64,7 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .embedded-plugin-webviews {
   width: 100%;
   flex: 1 1 auto;

@@ -40,7 +40,7 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .plugin-main {
   .red {
     color: red;

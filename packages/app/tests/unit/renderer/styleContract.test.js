@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +9,21 @@ const sdkRoot = resolve(appRoot, '../sdk');
 
 const read = (relativePath) => readFile(resolve(appRoot, relativePath), 'utf8');
 const readSdk = (relativePath) => readFile(resolve(sdkRoot, relativePath), 'utf8');
+
+const listFiles = async (dir) => {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => listFiles(resolve(dir, entry.name))),
+  );
+  return [
+    ...nested.flat(),
+    ...entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => resolve(dir, entry.name)),
+  ];
+};
 
 describe('宿主 Vuetify + Tailwind 样式契约', () => {
   describe('CSS layer 顺序（官方文档结构）', () => {
@@ -44,9 +59,9 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(stylesImport).toBeGreaterThan(layersImport);
     });
 
-    it('app.scss 不再声明旧的 tailwind 中间层顺序', async () => {
-      const scss = await read('src/renderer/assets/styles/app.scss');
-      expect(scss).not.toContain('vuetify-overrides, tailwind');
+    it('app.css 不再声明旧的 tailwind 中间层顺序', async () => {
+      const css = await read('src/renderer/assets/styles/app.css');
+      expect(css).not.toContain('vuetify-overrides, tailwind');
     });
   });
 
@@ -116,26 +131,19 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
     it('vite 插件中 tailwindcss() 注册在 vuetify() 之前', async () => {
       const js = await read('src/vite.renderer.config.js');
       const tailwindIndex = js.indexOf('tailwindcss(),');
-      const vuetifyIndex = js.indexOf('vuetify({');
+      const vuetifyIndex = js.indexOf('vuetify(),');
 
       expect(tailwindIndex).toBeGreaterThan(-1);
       expect(vuetifyIndex).toBeGreaterThan(tailwindIndex);
     });
 
-    it('settings.scss 按需禁用与 Tailwind 冲突的工具类并对齐 grid 断点', async () => {
-      const scss = await read('src/renderer/assets/styles/settings.scss');
+    it('vite 渲染配置不再使用 styles.configFile 与 preprocessorOptions', async () => {
+      const js = await read('src/vite.renderer.config.js');
 
-      expect(scss).not.toContain('$color-pack: false');
-      expect(scss).not.toContain('$utilities: false');
-      expect(scss).toContain("'display': false");
-      expect(scss).toContain("'margin-top': false");
-      expect(scss).toContain('$grid-breakpoints');
-      expect(scss).toContain("'sm': 600px");
-      expect(scss).toContain("'md': 960px");
-      expect(scss).toContain("'lg': 1280px");
-      expect(scss).toContain("'xl': 1920px");
-      expect(scss).toContain("'xxl': 2560px");
-      expect(scss).toContain('$body-font-family');
+      expect(js).not.toContain('configFile');
+      expect(js).not.toContain('preprocessorOptions');
+      expect(js).not.toContain('settings.scss');
+      expect(js).toContain('vuetify(),');
     });
 
     it('vuetify.js 保留运行时主题工具类并显式对齐 display 阈值', async () => {
@@ -175,6 +183,16 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
     });
   });
 
+  describe('原生 CSS 嵌套契约', () => {
+    it('Navigation.vue 的 :deep 保持顶层写法，不嵌在原生嵌套中', async () => {
+      const vue = await read('src/renderer/views/Layout/components/Navigation.vue');
+
+      expect(vue).toContain('.navi-panel :deep(.navi-btn) {');
+      expect(vue).toContain('.navi-panel :deep(.navi-btn) + .navi-btn {');
+      expect(vue).not.toMatch(/\{[^}]*:deep\(/s);
+    });
+  });
+
   describe('SDK preview 同步', () => {
     it('preview layers.css 使用官方 layer 顺序', async () => {
       const css = await readSdk('src/preview/layers.css');
@@ -191,15 +209,15 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(themeIndex).toBeLessThan(vuetifyUtilitiesIndex);
     });
 
-    it('preview settings.scss 与宿主保持一致', async () => {
-      const scss = await readSdk('src/preview/settings.scss');
+    it('preview 使用预编译 vuetify/styles，不再依赖 settings.scss', async () => {
+      const main = await readSdk('src/preview/main.js');
+      const plugin = await readSdk('src/vite-plugin.js');
 
-      expect(scss).not.toContain('$color-pack: false');
-      expect(scss).not.toContain('$utilities: false');
-      expect(scss).toContain("'display': false");
-      expect(scss).toContain('$grid-breakpoints');
-      expect(scss).toContain("'md': 960px");
-      expect(scss).toContain("'xxl': 2560px");
+      expect(main).toContain("import 'vuetify/styles'");
+      expect(main).not.toContain('settings.scss');
+      expect(plugin).not.toContain('getPreviewSettingsPath');
+      expect(plugin).not.toContain('preprocessorOptions');
+      expect(plugin).not.toContain('settings.scss');
     });
 
     it('preview App.vue 恢复原 Vuetify 工具类写法', async () => {
@@ -208,6 +226,42 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(vue).toContain('d-flex');
       expect(vue).toContain('text-medium-emphasis');
       expect(vue).toContain('text-body-small');
+    });
+  });
+
+  describe('Sass 移除守卫', () => {
+    it('app 与 sdk 源码目录不存在 .scss/.sass 文件', async () => {
+      const files = [
+        ...await listFiles(resolve(appRoot, 'src')),
+        ...await listFiles(resolve(sdkRoot, 'src')),
+      ];
+
+      expect(files.some((file) => /\.(scss|sass)$/.test(file))).toBe(false);
+    });
+
+    it('宿主与 SDK 的 Vue 组件不再使用 lang="scss"', async () => {
+      const vueFiles = [
+        ...(await listFiles(resolve(appRoot, 'src'))).filter((file) => file.endsWith('.vue')),
+        ...(await listFiles(resolve(sdkRoot, 'src'))).filter((file) => file.endsWith('.vue')),
+        resolve(appRoot, '../template-translime-plugin/ui.vue'),
+        resolve(appRoot, '../translime-plugin-steam-save-backup/src/ui/ui.vue'),
+      ];
+      const contents = await Promise.all(vueFiles.map((file) => readFile(file, 'utf8')));
+
+      expect(contents.every((code) => !code.includes('lang="scss"') && !code.includes('lang="sass"'))).toBe(true);
+    });
+
+    it('app.css 通过 --v-font-body/--v-font-heading 覆盖字体栈', async () => {
+      const css = await read('src/renderer/assets/styles/app.css');
+
+      expect(css).toContain("--v-font-body: 'Roboto', 'Noto Sans SC'");
+      expect(css).toContain("--v-font-heading: 'Roboto', 'Noto Sans SC'");
+    });
+
+    it('SDK post-build 不再拷贝 settings.scss', async () => {
+      const script = await readFile(resolve(sdkRoot, 'scripts/post-build.mjs'), 'utf8');
+
+      expect(script).not.toContain('settings.scss');
     });
   });
 });

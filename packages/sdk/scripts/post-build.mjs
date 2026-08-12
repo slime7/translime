@@ -26,13 +26,6 @@ if (fs.existsSync(templateSrc)) {
   copyFile(templateSrc, templateDest);
 }
 
-// Copy settings.scss
-const settingsSrc = path.resolve(srcDir, 'preview/settings.scss');
-const settingsDest = path.resolve(distDir, 'preview/settings.scss');
-if (fs.existsSync(settingsSrc)) {
-  copyFile(settingsSrc, settingsDest);
-}
-
 // Copy .d.ts files
 const copyDts = (dir) => {
   const files = fs.readdirSync(dir);

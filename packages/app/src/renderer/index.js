@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
-import '@/assets/styles/app.scss';
+import '@/assets/styles/app.css';
 import vuetify from '@/plugins/vuetify';
 import '@/assets/styles/tailwind.css';
 import App from './App.vue';

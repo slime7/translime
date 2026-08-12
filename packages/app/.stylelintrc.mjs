@@ -9,7 +9,7 @@ export default {
       // Tailwind v4 方言（@theme/@utility/@custom-variant/@source、--breakpoint-* 通配符等）
       files: ['src/renderer/assets/styles/tailwind.css'],
       rules: {
-        'scss/at-rule-no-unknown': [true, {
+        'at-rule-no-unknown': [true, {
           ignoreAtRules: ['theme', 'source', 'utility', 'custom-variant'],
         }],
         'custom-property-pattern': null,

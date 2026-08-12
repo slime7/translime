@@ -1,9 +1,7 @@
 /** @type {import('stylelint').Config} */
 export default {
-  customSyntax: 'postcss-scss',
   extends: [
-    'stylelint-config-standard-scss', // SCSS 标准规则
-    'stylelint-config-recommended-vue/scss', // Vue SFC 中的 SCSS 支持
+    'stylelint-config-recommended-vue', // Vue SFC 支持（纯 CSS 方言）
   ],
   plugins: [
     '@stylistic/stylelint-plugin', // 必须：用于解析旧版本的样式规则
@@ -48,7 +46,6 @@ export default {
     '@stylistic/selector-combinator-space-after': 'always',
 
     // 基础覆盖设定
-    'scss/at-import-partial-extension': null,
     'selector-class-pattern': null,
     'no-descending-specificity': null,
   },

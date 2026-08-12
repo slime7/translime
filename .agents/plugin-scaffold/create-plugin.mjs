@@ -12,7 +12,6 @@ const TEXT_FILE_EXTENSIONS = new Set([
   '.vue',
   '.html',
   '.css',
-  '.scss',
   '.yml',
   '.yaml',
   '.txt',

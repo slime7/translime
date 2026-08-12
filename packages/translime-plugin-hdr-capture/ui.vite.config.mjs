@@ -6,7 +6,6 @@ import * as translimeVite from 'translime-sdk/vite';
 
 const {
   createPluginCssIsolationPlugins,
-  getPreviewSettingsPath,
   translimeSdk,
 } = translimeVite;
 
@@ -26,13 +25,7 @@ export default defineConfig(({ mode }) => {
 
   // preview 模式下添加 vuetify 插件来正确处理样式
   if (isPreview) {
-    plugins.push(
-      vuetify({
-        styles: {
-          configFile: getPreviewSettingsPath(),
-        },
-      }),
-    );
+    plugins.push(vuetify());
   }
 
   // 非 preview 模式下添加 CSS 注入插件

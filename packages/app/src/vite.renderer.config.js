@@ -59,22 +59,8 @@ export default defineConfig(({ mode }) => {
         },
       }),
       tailwindcss(),
-      vuetify({
-        styles: {
-          configFile: resolve(RENDERER_ROOT, 'assets/styles/settings.scss'),
-        },
-      }),
+      vuetify(),
     ],
-    css: {
-      preprocessorOptions: {
-        sass: {
-          api: 'modern-compiler',
-        },
-        scss: {
-          api: 'modern-compiler',
-        },
-      },
-    },
     optimizeDeps: {
       exclude: [
         'vuetify',

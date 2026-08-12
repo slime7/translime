@@ -118,7 +118,7 @@ export default {
 };
 </script>
 
-<style lang="scss">
+<style>
 .v-dialog.no-shadow {
   box-shadow: none;
 }

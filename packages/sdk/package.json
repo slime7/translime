@@ -1,6 +1,6 @@
 {
   "name": "translime-sdk",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "SDK for Translime plugins",
   "type": "module",
   "repository": {
@@ -65,7 +65,7 @@
   ],
   "scripts": {
     "lint": "eslint src --ext .js,.vue --fix",
-    "lint:style": "stylelint src/**/*.{vue,scss} --fix",
+    "lint:style": "stylelint src/**/*.{vue,css} --fix",
     "build": "vite build && vite build --mode cjs && node scripts/post-build.mjs",
     "prepublishOnly": "npm run build"
   },
@@ -94,11 +94,8 @@
     "eslint-plugin-vue": "^10.0.0",
     "globals": "^16.0.0",
     "postcss-html": "^1.5.0",
-    "postcss-scss": "^4.0.0",
     "stylelint": "^16.0.0",
     "stylelint-config-recommended-vue": "^1.5.0",
-    "stylelint-config-standard-scss": "^14.0.0",
-    "stylelint-scss": "^6.0.0",
     "vite": "^8.2.0",
     "vite-plugin-vuetify": "^2.1.3",
     "vuetify": "^4.1.7"

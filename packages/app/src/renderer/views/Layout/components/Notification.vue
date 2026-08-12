@@ -118,7 +118,7 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .notify-container {
   height: 100%;
   overflow-y: auto;

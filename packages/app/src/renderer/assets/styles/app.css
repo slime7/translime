@@ -3,6 +3,12 @@
 @import '../fonts/noto sans sc/noto_sans_sc.css';
 @import '../fonts/source code pro/source_code_pro.css';
 
+/* Vuetify 4 预编译样式通过这两个变量读取字体栈（替代原 settings.scss 的 $body-font-family） */
+:root {
+  --v-font-body: 'Roboto', 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
+  --v-font-heading: 'Roboto', 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
+}
+
 html {
   overflow-y: auto !important;
 }

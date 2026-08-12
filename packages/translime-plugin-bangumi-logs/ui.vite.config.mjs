@@ -4,7 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 import vuetify from 'vite-plugin-vuetify';
 import {
   createPluginCssIsolationPlugins,
-  getPreviewSettingsPath,
   translimeSdk,
 } from 'translime-sdk/vite';
 
@@ -22,13 +21,7 @@ export default defineConfig(({ mode }) => {
   ];
 
   if (isPreview) {
-    plugins.push(
-      vuetify({
-        styles: {
-          configFile: getPreviewSettingsPath(),
-        },
-      }),
-    );
+    plugins.push(vuetify());
   } else {
     plugins.push(
       ...createPluginCssIsolationPlugins('translime-plugin-bangumi-logs'),

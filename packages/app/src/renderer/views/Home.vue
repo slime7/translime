@@ -154,7 +154,7 @@ const openPlugin = (plugin) => {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .plugin-entry {
   border: 1px solid rgb(var(--v-theme-outline-variant), .65);
   transition-property: transform, box-shadow, border-color, background-color;

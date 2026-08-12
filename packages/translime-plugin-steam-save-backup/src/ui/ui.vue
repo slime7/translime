@@ -131,7 +131,7 @@ const {
 }
 </style>
 
-<style scoped lang="scss">
+<style scoped>
 .overflow-y-auto::-webkit-scrollbar {
   width: 8px;
 }

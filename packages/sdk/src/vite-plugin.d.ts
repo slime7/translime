@@ -14,12 +14,6 @@ interface TranslimeSdkOptions {
 export function translimeSdk(options?: TranslimeSdkOptions): Plugin;
 
 /**
- * 获取 Preview 模式的 Vuetify 样式配置文件路径
- * 用于 vite-plugin-vuetify 的 styles.configFile 配置
- */
-export function getPreviewSettingsPath(): string;
-
-/**
  * 创建构建阶段 CSS 作用域隔离插件
  * 会将插件产出的选择器限制在 `.plugin-ui-loader[data-plugin-id="..."]` 下
  */

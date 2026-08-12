@@ -8,7 +8,7 @@
 @theme {
   --breakpoint-*: initial; /* 重置 Tailwind 默认断点 */
 
-  /* 与 vuetify 插件配置及 settings.scss 保持一致 */
+  /* 与 vuetify 运行时 display 阈值保持一致 */
   --breakpoint-xs:  0px;
   --breakpoint-sm:  600px;
   --breakpoint-md:  960px;

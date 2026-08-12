@@ -117,24 +117,22 @@ export default {
 };
 </script>
 
-<style lang="scss">
+<style>
 .navi-drawer .v-navigation-drawer__content::-webkit-scrollbar {
   display: none;
 }
 </style>
 
-<style scoped lang="scss">
+<style scoped>
 .transition-radius {
   transition-property: border-radius;
 }
 
-.navi-panel {
-  :deep(.navi-btn) {
-    height: 56px;
+.navi-panel :deep(.navi-btn) {
+  height: 56px;
+}
 
-    & + .navi-btn {
-      margin-top: 8px;
-    }
-  }
+.navi-panel :deep(.navi-btn) + .navi-btn {
+  margin-top: 8px;
 }
 </style>

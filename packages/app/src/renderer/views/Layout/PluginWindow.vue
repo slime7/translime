@@ -102,7 +102,7 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .system-bar {
   -webkit-app-region: drag;
   z-index: 300;
