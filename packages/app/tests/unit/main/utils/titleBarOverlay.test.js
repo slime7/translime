@@ -3,7 +3,6 @@ import {
 } from 'vitest';
 import {
   DEFAULT_SYMBOL_COLOR,
-  DEFAULT_TITLE_BAR_OVERLAY_HEIGHT,
   resolveOverlayMode,
   resolveTitleBarOverlay,
   TITLE_BAR_OVERLAY_COLOR,
@@ -24,7 +23,6 @@ describe('resolveOverlayMode', () => {
 describe('resolveTitleBarOverlay', () => {
   it('浅色模式使用默认浅色图标与透明背景', () => {
     expect(resolveTitleBarOverlay({ overlayMode: 'light' })).toEqual({
-      height: DEFAULT_TITLE_BAR_OVERLAY_HEIGHT,
       color: TITLE_BAR_OVERLAY_COLOR,
       symbolColor: DEFAULT_SYMBOL_COLOR.light,
     });
@@ -39,13 +37,21 @@ describe('resolveTitleBarOverlay', () => {
   it('持久化配置优先于默认值', () => {
     const overlay = resolveTitleBarOverlay({
       overlayMode: 'dark',
-      savedOverlay: { symbolColor: '#123456', height: 40 },
+      savedOverlay: { symbolColor: '#123456' },
     });
     expect(overlay).toEqual({
-      height: 40,
       color: TITLE_BAR_OVERLAY_COLOR,
       symbolColor: '#123456',
     });
+  });
+
+  it('持久化的 height 不再生效，标题栏高度由系统决定', () => {
+    const overlay = resolveTitleBarOverlay({
+      overlayMode: 'dark',
+      savedOverlay: { symbolColor: '#123456', height: 40 },
+    });
+    expect(overlay).not.toHaveProperty('height');
+    expect(overlay.symbolColor).toBe('#123456');
   });
 
   it('空持久化配置回退默认值', () => {

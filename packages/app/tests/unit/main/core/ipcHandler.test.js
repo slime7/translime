@@ -228,7 +228,6 @@ describe('ipcHandler', () => {
       expect(options.titleBarOverlay).toMatchObject({
         color: '#00000000',
         symbolColor: '#1f1f1f',
-        height: 32,
       });
     });
   });

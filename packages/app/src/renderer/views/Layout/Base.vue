@@ -1,6 +1,9 @@
 <template>
   <v-app>
-    <v-system-bar class="system-bar p-0">
+    <v-system-bar
+      class="system-bar p-0"
+      :height="titleBarHeight"
+    >
       <div class="px-4">
         translime
       </div>
@@ -58,18 +61,16 @@
 import {
   nextTick,
   onMounted,
-  onUnmounted,
 } from 'vue';
 import MainFooter from '@/components/MainFooter.vue';
 import Navigation from '@/views/Layout/components/Navigation.vue';
 import Notification from '@/views/Layout/components/Notification.vue';
 import useGlobalStore from '@/store/globalStore';
 import EmbeddedPluginWebviews from '@/views/plugins/EmbeddedPluginWebviews.vue';
-import { watchWindowControlsOverlay } from '@/utils/windowControlsOverlay';
+import { useTitleBarHeight } from '@/hooks/useTitleBarHeight';
 
 const store = useGlobalStore();
-
-let stopWindowControlsWatch = null;
+const { height: titleBarHeight } = useTitleBarHeight();
 
 const onEnter = () => {
   nextTick(() => {
@@ -83,23 +84,16 @@ const onLeave = () => {
 
 onMounted(() => {
   document.body.className = 'custom-title-bar';
-  stopWindowControlsWatch = watchWindowControlsOverlay();
-});
-
-onUnmounted(() => {
-  stopWindowControlsWatch?.();
 });
 </script>
 
 <style scoped>
 .system-bar {
   -webkit-app-region: drag;
-  z-index: 300;
-  height: var(--title-bar-height, 32px);
 }
 
 .window-control-placeholder {
-  width: var(--window-control-width, 138px);
+  width: calc(100vw - env(titlebar-area-width, 100vw));
   flex-shrink: 0;
 }
 

@@ -33,26 +33,18 @@ const useTheme = () => {
   const getNativeTheme = () => ipc.invoke(ipcType.GET_NATIVE_THEME);
 
   /**
-   * 把当前主题的系统栏前景色同步为原生 caption 按钮图标色，
-   * 背景保持透明，高度从 WCO API 读取。
+   * 把当前主题的系统栏前景色同步为原生 caption 按钮图标色，背景保持透明。
+   * 标题栏高度由系统决定，渲染端通过 CSS env(titlebar-area-*) 自适应，不回写。
    * @param {string} [win] - 目标窗口名，默认主窗口 'app'
    */
   const syncOverlayColor = (win = 'app') => {
     const scheme = vTheme.themes.value[store.dark ? 'dark' : 'light'];
     const rawColor = scheme?.colors?.['on-surface-light'] || scheme?.colors?.['on-surface'];
     const symbolHex = toRgbHex(rawColor) || DEFAULT_SYMBOL_COLORS[store.dark ? 'dark' : 'light'];
-    const payload = {
+    ipc.send(ipcType.SET_TITLE_BAR_OVERLAY, {
       win,
       symbolColor: symbolHex,
-    };
-    const wco = navigator.windowControlsOverlay;
-    if (wco?.getTitlebarAreaRect) {
-      const { height } = wco.getTitlebarAreaRect();
-      if (height > 0) {
-        payload.height = height;
-      }
-    }
-    ipc.send(ipcType.SET_TITLE_BAR_OVERLAY, payload);
+    });
   };
 
   const setDark = (dark) => {
