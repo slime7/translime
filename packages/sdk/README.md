@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => {
 - 构建阶段把插件 CSS 选择器限制在 `.plugin-ui-loader[data-plugin-id="插件ID"]` 下
 - 运行时把插件注入样式包进 `@layer 插件ID`
 
-配合宿主侧的运行时防御后，插件和主程序的样式冲突会明显减少。
+宿主和 Preview 会预声明 `translime-plugin` layer，并将 SDK 已隔离的样式直接放入该层，避免二次 CSSOM 序列化影响 Tailwind 的圆角、间距和其他 utility。旧式动态样式仍由宿主运行时继续作用域化。
 
 ## 代码示例
 

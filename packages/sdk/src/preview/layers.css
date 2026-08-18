@@ -16,6 +16,9 @@
 
 @layer vuetify-final;
 
+/* 与宿主保持一致，插件注入样式位于宿主层级之后 */
+@layer translime-plugin;
+
 /* 基础字体大小，Tailwind 的 rem 单位依赖此值 */
 html {
   font-size: 16px;

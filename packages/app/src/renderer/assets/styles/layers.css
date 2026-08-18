@@ -20,3 +20,6 @@
 @layer tailwind-utilities;
 
 @layer vuetify-final;
+
+/* SDK 插件样式在运行时注入，固定在宿主层级之后 */
+@layer translime-plugin;

@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +37,7 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       'vuetify-utilities',
       'tailwind-utilities',
       'vuetify-final',
+      'translime-plugin',
     ];
 
     it('layers.css 以官方顺序声明全部 layer', async () => {
@@ -167,6 +169,13 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(config).toMatch(/exclude:\s*\[[\s\S]*'vue',[\s\S]*'vuetify'/);
       expect(html).toContain('"vue": "./libs/vue/vue.esm-browser.js"');
     });
+
+    it('插件 CSS layer 应位于宿主层级之后', async () => {
+      const css = await read('src/renderer/assets/styles/layers.css');
+
+      expect(css).toContain('@layer translime-plugin;');
+      expect(css.indexOf('@layer translime-plugin;')).toBeGreaterThan(css.indexOf('@layer vuetify-final;'));
+    });
   });
 
   describe('组件类迁移（Tailwind 为主）', () => {
@@ -226,12 +235,14 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
     it('preview 使用预编译 vuetify/styles，不再依赖 settings.scss', async () => {
       const main = await readSdk('src/preview/main.js');
       const plugin = await readSdk('src/vite-plugin.js');
+      const layers = await readSdk('src/preview/layers.css');
 
       expect(main).toContain("import 'vuetify/styles'");
       expect(main).not.toContain('settings.scss');
       expect(plugin).not.toContain('getPreviewSettingsPath');
       expect(plugin).not.toContain('preprocessorOptions');
       expect(plugin).not.toContain('settings.scss');
+      expect(layers).toContain('@layer translime-plugin;');
     });
 
     it('preview App.vue 恢复原 Vuetify 工具类写法', async () => {

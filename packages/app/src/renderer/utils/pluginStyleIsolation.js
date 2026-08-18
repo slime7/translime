@@ -213,7 +213,8 @@ const processStyleElement = (node, pluginId) => {
   }
 
   try {
-    const scopedCss = scopeCssText(cssContent, pluginId);
+    const isBuildScopedStyle = node.dataset.pluginStyleId === pluginId;
+    const scopedCss = isBuildScopedStyle ? cssContent : scopeCssText(cssContent, pluginId);
     const styleNode = node;
     styleNode.textContent = `@layer ${HOST_PLUGIN_LAYER_NAME} {\n${scopedCss}\n}`;
     styleNode.setAttribute(PROCESSED_ATTR, 'true');
