@@ -77,3 +77,12 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
     ```
 2. **在主组件外层限制 Prefix (针对 v3)**：配置 `prefix: 'tw-'`，并在最外层使用唯一的 wrapper class。
 3. **禁用预设重置 (Preflight)**：如果你不需要全局 reset，不要在样式中包含 preflight，以防修改宿主的 button、svg 默认表现。
+
+## 8. Sass 移除后的 UI 迁移规范
+
+项目不再提供 Sass 编译链。插件 UI 应使用普通 CSS：
+
+* 不要在 Vue 样式块中使用 `lang="scss"` 或 `lang="sass"`。
+* 不要使用 Sass 专用的变量、`@use`、`@forward`、mixin 或嵌套语法；嵌套选择器改写为完整的扁平选择器，例如 `.plugin-main .red {}`。
+* UI 构建必须将 `vue` externalize，并保留 SDK 提供的 CSS 注入与隔离插件。
+* 修改 UI 构建后，应重新构建插件并在宿主内重载；`preview:ui` 只能用于辅助验证。

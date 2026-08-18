@@ -41,9 +41,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.plugin-main {
-  .red {
-    color: red;
-  }
+.plugin-main .red {
+  color: red;
 }
 </style>

@@ -392,3 +392,12 @@ SDK 封装了常用的系统操作：
 - **`window.electron`**: 提供 Electron 底层属性，如 `electron.versions` 和 `electron.APPDATA_PATH`。
 
 有关 API 的完整列表和详细参数，请参阅 [Translime SDK 文档](../sdk/README.md)。
+
+## Sass 移除后的 UI 样式规则
+
+模板和宿主已经移除 Sass 编译依赖。插件 UI 样式请遵循以下规则：
+
+- 使用 `<style>` 或 `<style scoped>`，不要使用 `lang="scss"`、`lang="sass"`。
+- 不要使用 Sass 变量、`@use`、`@forward`、mixin 或嵌套语法；嵌套选择器必须改写为扁平 CSS，例如 `.plugin-main .red {}`。
+- UI 构建保留 `rolldownOptions.external: ['vue']`，并使用 `translimeSdk()` 与 `createPluginCssIsolationPlugins(pluginId)`。
+- 使用 Tailwind 时，将样式放入插件专用 `@layer`，不要直接引入未分层的 `tailwindcss`。

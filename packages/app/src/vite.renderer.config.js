@@ -1,5 +1,6 @@
 /* eslint-env node */
 
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { builtinModules } from 'node:module';
 import { defineConfig, normalizePath } from 'vite';
@@ -10,13 +11,71 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 const RENDERER_ROOT = join(import.meta.dirname, 'renderer');
 const MODULES_ROOT = join(import.meta.dirname, '../node_modules');
-const isProd = process.env.MODE === 'production';
+const SHARED_VUE_SOURCE = normalizePath(resolve(MODULES_ROOT, './vue/dist/vue.esm-browser.js'));
+const SHARED_VUE_DEV_URL = '/libs/vue/vue.esm-browser.js';
+const DEFAULT_VITE_ORIGIN = 'http://localhost:5173/';
+const SHARED_VUE_IMPORT_PATH = './libs/vue/vue.esm-browser.js';
+
+const createSharedVueImportMapPlugin = (isDev) => {
+  let sharedVueDevUrl = new URL(SHARED_VUE_DEV_URL, DEFAULT_VITE_ORIGIN).href;
+
+  const updateSharedVueDevUrl = (server) => {
+    const resolvedUrl = server.resolvedUrls?.local?.[0];
+    const { host, port } = server.config.server;
+    const fallbackHost = host === true || host === '0.0.0.0' ? 'localhost' : host || 'localhost';
+    const baseUrl = resolvedUrl || `http://${fallbackHost}:${port || 5173}/`;
+    sharedVueDevUrl = new URL(SHARED_VUE_DEV_URL, baseUrl).href;
+  };
+
+  return {
+    name: 'translime-shared-vue-import-map',
+    enforce: 'pre',
+    resolveId(source) {
+      if (!isDev || source !== 'vue') {
+        return null;
+      }
+
+      return {
+        id: sharedVueDevUrl,
+        external: true,
+      };
+    },
+    configureServer(server) {
+      if (!isDev) {
+        return;
+      }
+
+      updateSharedVueDevUrl(server);
+      server.httpServer?.once('listening', () => {
+        updateSharedVueDevUrl(server);
+      });
+      server.middlewares.use((request, response, next) => {
+        const requestPath = request.url?.split('?')[0];
+        if (requestPath !== SHARED_VUE_DEV_URL) {
+          next();
+          return;
+        }
+
+        response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
+        response.end(readFileSync(SHARED_VUE_SOURCE));
+      });
+    },
+    transformIndexHtml(html) {
+      if (!isDev) {
+        return html;
+      }
+
+      return html.replace(SHARED_VUE_IMPORT_PATH, sharedVueDevUrl);
+    },
+  };
+};
 
 /**
  * @see https://vitejs.dev/config/
  */
 export default defineConfig(({ mode }) => {
   const isDev = mode === 'development';
+  const isProd = mode === 'production';
   return {
     mode,
     root: RENDERER_ROOT,
@@ -30,14 +89,10 @@ export default defineConfig(({ mode }) => {
           find: /^@\/(.*)/,
           replacement: `${join(RENDERER_ROOT)}/$1`,
         },
-        {
+        ...(isProd ? [{
           find: /^vue$/,
-          // 开发模式直接指向真实文件（vite 以 /@fs/ 在当前端口提供），避免写死端口；
-          // 生产构建从打包目录加载
-          replacement: isProd
-            ? 'app://./libs/vue/vue.esm-browser.js'
-            : resolve(MODULES_ROOT, './vue/dist/vue.esm-browser.js'),
-        },
+          replacement: 'app://./libs/vue/vue.esm-browser.js',
+        }] : []),
       ],
     },
     plugins: [
@@ -51,6 +106,7 @@ export default defineConfig(({ mode }) => {
           },
         ],
       }),
+      createSharedVueImportMapPlugin(isDev),
       vue({
         template: {
           compilerOptions: {
@@ -63,6 +119,7 @@ export default defineConfig(({ mode }) => {
     ],
     optimizeDeps: {
       exclude: [
+        'vue',
         'vuetify',
         'vue-router',
       ],

@@ -16,6 +16,30 @@ const dir = dirname(filename);
  */
 // eslint-disable-next-line no-multi-assign
 const mode = (process.env.MODE = process.env.MODE || 'development');
+const DEFAULT_CDP_PORT = 9222;
+
+const getCdpPort = () => {
+  const cdpArgument = process.argv.find((argument) => (
+    argument === '--cdp' || argument.startsWith('--cdp-port=')
+  ));
+
+  if (!cdpArgument) {
+    return null;
+  }
+
+  if (cdpArgument === '--cdp') {
+    return DEFAULT_CDP_PORT;
+  }
+
+  const port = Number(cdpArgument.substring('--cdp-port='.length));
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid CDP port: ${cdpArgument}`);
+  }
+
+  return port;
+};
+
+const CDP_PORT = getCdpPort();
 
 /** @type {import('vite').LogLevel} */
 const LOG_LEVEL = 'info';
@@ -53,7 +77,14 @@ const startElectronProcess = (logger) => {
     logger.warn('Electron app restarted', { timestamp: true });
   }
 
-  electronProcess = spawn(String(electronPath), ['--inspect=5858', '.']);
+  const electronArguments = ['--inspect=5858'];
+  if (CDP_PORT) {
+    electronArguments.push(`--remote-debugging-port=${CDP_PORT}`);
+    logger.info(`Electron CDP enabled at http://127.0.0.1:${CDP_PORT}`);
+  }
+  electronArguments.push('.');
+
+  electronProcess = spawn(String(electronPath), electronArguments);
 
   // 处理标准输出
   electronProcess.stdout.on('data', (data) => {

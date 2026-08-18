@@ -153,6 +153,20 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(js).toContain("mobileBreakpoint: 'md'");
       expect(js).toContain('xs: 0, sm: 600, md: 960, lg: 1280, xl: 1920, xxl: 2560');
     });
+
+    it('开发模式应让宿主和插件使用同一个 Vue URL', async () => {
+      const config = await read('src/vite.renderer.config.js');
+      const html = await read('src/renderer/index.html');
+
+      expect(config).toContain('createSharedVueImportMapPlugin');
+      expect(config).toContain('SHARED_VUE_DEV_URL');
+      expect(config).toContain('resolveId(source)');
+      expect(config).toContain('server.middlewares.use');
+      expect(config).toContain('server.resolvedUrls');
+      expect(config).toContain('external: true');
+      expect(config).toMatch(/exclude:\s*\[[\s\S]*'vue',[\s\S]*'vuetify'/);
+      expect(html).toContain('"vue": "./libs/vue/vue.esm-browser.js"');
+    });
   });
 
   describe('组件类迁移（Tailwind 为主）', () => {
@@ -249,6 +263,16 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       const contents = await Promise.all(vueFiles.map((file) => readFile(file, 'utf8')));
 
       expect(contents.every((code) => !code.includes('lang="scss"') && !code.includes('lang="sass"'))).toBe(true);
+    });
+
+    it('模板插件样式使用扁平 CSS，避免依赖 Sass 嵌套编译', async () => {
+      const template = await readFile(
+        resolve(appRoot, '../template-translime-plugin/ui.vue'),
+        'utf8',
+      );
+
+      expect(template).toContain('.plugin-main .red {');
+      expect(template).not.toMatch(/\.plugin-main\s*\{\s*\.red\s*\{/s);
     });
 
     it('app.css 通过 --v-font-body/--v-font-heading 覆盖字体栈', async () => {

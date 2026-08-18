@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "pnpm -C packages/app run dev",
     "dev:app": "pnpm -C packages/app run dev",
+    "dev:cdp": "pnpm -C packages/app run dev:cdp",
     "build:app": "pnpm -C packages/app run build",
     "publish:package": "node .github/scripts/publish-package.mjs",
     "test:publish-package": "node --test .github/scripts/publish-package.test.mjs",

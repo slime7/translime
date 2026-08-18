@@ -23,6 +23,14 @@ pnpm dev
 
 等价于 `pnpm -C packages/app run dev`，启动 Electron 宿主开发模式。
 
+如需通过 CDP 调试实际 Electron 页面，运行：
+
+```text
+pnpm dev:cdp
+```
+
+该模式在本机 `http://127.0.0.1:9222` 开启 CDP，仅用于本地调试。
+
 ## 构建、测试与检查
 
 - 构建宿主：`pnpm build:app`（产物在 `packages/app/dist`；electron-builder 打包输出在 `packages/app/dist_electron`）
