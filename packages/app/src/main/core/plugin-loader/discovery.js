@@ -14,7 +14,6 @@ import {
 } from './constants';
 import {
   createRuntimeState,
-  pathExists,
   readPluginSafe,
   refreshPluginStatus,
   uniqueStrings,
@@ -235,24 +234,16 @@ const resolvePlugins = (loader) => {
   const deps = Object.keys(json.dependencies || {});
   loader.plugins = [];
 
-  const filterFn = (isDev = false) => (name) => {
-    if (!isPluginPackageName(name)) {
-      return false;
-    }
-    const pluginPath = resolvePluginPath(name, isDev);
-    return pathExists(pluginPath);
-  };
-
   const devModules = showDevPlugin
     ? fs.readdirSync(PLUGIN_MODULES_PATH_DEV)
-      .filter(filterFn(true))
+      .filter((name) => isPluginPackageName(name))
       .map((pluginName) => readPluginSafe(resolvePluginPath(pluginName, true), {
         source: PLUGIN_SOURCE_DEV,
       }))
     : [];
 
   const modules = deps
-    .filter(filterFn())
+    .filter((name) => isPluginPackageName(name))
     .map((pluginName) => readPluginSafe(resolvePluginPath(pluginName), {
       source: PLUGIN_SOURCE_RELEASE,
       devPlugins: devModules,

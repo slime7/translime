@@ -520,6 +520,12 @@ const readPluginSafe = (pluginPath, options = {}) => {
   try {
     return readPlugin(pluginPath, options);
   } catch (error) {
+    if (
+      options.devPlugins
+      && options.devPlugins.some((item) => item.packageName === fallbackName)
+    ) {
+      return false;
+    }
     return createBrokenPlugin({
       packageName: fallbackName,
       pluginPath,

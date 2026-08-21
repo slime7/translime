@@ -172,7 +172,7 @@ const ensurePluginIpcReady = (loader, channelType) => {
  * @returns {Array<object>} 依赖该插件的插件列表。
  */
 const getDependents = (loader, packageName) => loader.plugins.filter(
-  (plugin) => plugin.dependencies.includes(packageName),
+  (plugin) => Array.isArray(plugin.dependencies) && plugin.dependencies.includes(packageName),
 );
 
 /**
@@ -410,14 +410,14 @@ const disablePlugin = (loader, packageName, options = {}) => {
 
   const cacheKeys = Object.keys(requireFresh.cache);
   const packagePattern = `${path.sep}${plugin.packageName}${path.sep}`.toLowerCase();
-  const normalizedPluginPath = plugin.pluginPath.toLowerCase();
+  const normalizedPluginPath = plugin.pluginPath ? plugin.pluginPath.toLowerCase() : '';
 
   let deletedCount = 0;
   cacheKeys.forEach((key) => {
     const lowerKey = key.toLowerCase();
     if (
       lowerKey.includes(packagePattern)
-      || lowerKey.startsWith(normalizedPluginPath)
+      || (normalizedPluginPath && lowerKey.startsWith(normalizedPluginPath))
     ) {
       delete requireFresh.cache[key];
       deletedCount += 1;
@@ -435,8 +435,10 @@ const disablePlugin = (loader, packageName, options = {}) => {
   }
 
   const isDev = plugin.dev;
-  const preservedBlockedBy = [...plugin.blockedBy];
-  const preservedMissingDependencies = [...plugin.missingDependencies];
+  const preservedBlockedBy = Array.isArray(plugin.blockedBy) ? [...plugin.blockedBy] : [];
+  const preservedMissingDependencies = Array.isArray(plugin.missingDependencies)
+    ? [...plugin.missingDependencies]
+    : [];
   if (keepDisabledRecord && !isUninstall) {
     const nextPlugin = readPluginSafe(plugin.pluginPath, {
       source: isDev ? PLUGIN_SOURCE_DEV : PLUGIN_SOURCE_RELEASE,

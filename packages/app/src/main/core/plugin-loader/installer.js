@@ -3,7 +3,7 @@ import path from 'node:path';
 import fsp from 'node:fs/promises';
 import mainStore from '../../utils/useMainStore';
 import logger from '../../utils/logger';
-import { PLUGIN_MODULES_PATH } from './constants';
+import { PLUGIN_MODULES_PATH, PLUGIN_MODULES_PATH_DEV } from './constants';
 import {
   downloadTarball,
   extractTarball,
@@ -139,9 +139,19 @@ const uninstallPlugin = async (loader, packageName) => {
   loader.disablePlugin(packageName, true);
 
   try {
-    const pluginDir = path.join(PLUGIN_MODULES_PATH, packageName);
-    await fsp.rm(pluginDir, { recursive: true, force: true });
+    const targetDirs = new Set();
+    const existingPlugin = loader.getPlugin(packageName);
+    if (existingPlugin?.pluginPath) {
+      targetDirs.add(existingPlugin.pluginPath);
+    }
+    targetDirs.add(path.join(PLUGIN_MODULES_PATH, packageName));
+    targetDirs.add(path.join(PLUGIN_MODULES_PATH_DEV, packageName));
+
+    await Promise.all(
+      Array.from(targetDirs).map((dirPath) => fsp.rm(dirPath, { recursive: true, force: true })),
+    );
     await updatePluginDependency(packageName, null, 'remove');
+    mainStore.config.delete(`plugin.${packageName}`);
     loader.resolvePlugins();
 
     loader.emit('plugin:uninstalled', { plugin: null, pluginId: packageName });

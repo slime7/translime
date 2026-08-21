@@ -86,6 +86,7 @@ vi.mock('@main/utils/useMainStore', () => ({
     config: {
       get: vi.fn((key, defaultVal) => defaultVal),
       set: vi.fn(),
+      delete: vi.fn(),
     },
     TEMP_DIR: '/mock/temp',
     ROOT: '/mock/root',
@@ -465,6 +466,84 @@ describe('pluginLoader', () => {
       expect(
         plugins.some((plugin) => plugin.packageName === 'translime-plugin-dev-refresh'),
       ).toBe(true);
+    });
+  });
+
+  describe('uninstallPlugin', () => {
+    it('应该能成功卸载丢失 package.json 的损坏插件并清理依赖与配置', async () => {
+      // 初始化存在一个损坏插件在列表中
+      const brokenPlugin = {
+        packageName: 'translime-plugin-broken',
+        pluginPath: '/mock/user/data/plugins/node_modules/translime-plugin-broken',
+        status: 'load-error',
+        statusText: '在 "/mock/user/data/plugins/node_modules/translime-plugin-broken" 中未找到有效的包信息文件',
+        enabled: false,
+      };
+      pluginLoader.plugins = [brokenPlugin];
+
+      // Mock package.json 初始包含该依赖
+      mockFsp.readFile.mockResolvedValueOnce(JSON.stringify({
+        dependencies: {
+          'translime-plugin-broken': '1.0.0',
+        },
+      }));
+      mockFsp.writeFile.mockResolvedValueOnce();
+      mockFsp.rm.mockResolvedValue();
+
+      // Mock 卸载后 resolvePlugins 读取的 package.json 为空
+      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
+        dependencies: {},
+      }));
+
+      await pluginLoader.uninstallPlugin('translime-plugin-broken');
+
+      // 验证删除了插件目录
+      expect(mockFsp.rm).toHaveBeenCalledWith(
+        expect.stringContaining('translime-plugin-broken'),
+        { recursive: true, force: true },
+      );
+      // 验证写回 package.json（移除了依赖）
+      expect(mockFsp.writeFile).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.not.stringContaining('translime-plugin-broken'),
+        'utf-8',
+      );
+      // 验证清除了该插件的配置
+      expect(mainStore.config.delete).toHaveBeenCalledWith('plugin.translime-plugin-broken');
+      // 验证重新扫描后列表中不再有该插件
+      expect(pluginLoader.plugins.find((p) => p.packageName === 'translime-plugin-broken')).toBeUndefined();
+    });
+
+    it('应该能成功卸载开发插件并删除 plugins_dev 目录下的文件', async () => {
+      const devPlugin = {
+        packageName: 'translime-plugin-dev-sample',
+        pluginPath: '/mock/user/data/plugins_dev/node_modules/translime-plugin-dev-sample',
+        dev: true,
+        source: 'dev',
+        enabled: false,
+      };
+      pluginLoader.plugins = [devPlugin];
+
+      mockFsp.readFile.mockResolvedValueOnce(JSON.stringify({
+        dependencies: {},
+      }));
+      mockFsp.writeFile.mockResolvedValueOnce();
+      mockFsp.rm.mockResolvedValue();
+
+      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
+        dependencies: {},
+      }));
+      mockFs.readdirSync.mockReturnValue([]);
+
+      await pluginLoader.uninstallPlugin('translime-plugin-dev-sample');
+
+      // 验证删除了 plugins_dev 下的目录
+      expect(mockFsp.rm).toHaveBeenCalledWith(
+        devPlugin.pluginPath,
+        { recursive: true, force: true },
+      );
+      expect(mainStore.config.delete).toHaveBeenCalledWith('plugin.translime-plugin-dev-sample');
+      expect(pluginLoader.plugins.find((p) => p.packageName === 'translime-plugin-dev-sample')).toBeUndefined();
     });
   });
 });
