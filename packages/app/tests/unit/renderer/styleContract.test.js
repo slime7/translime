@@ -156,6 +156,13 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(js).toContain('xs: 0, sm: 600, md: 960, lg: 1280, xl: 1920, xxl: 2560');
     });
 
+    it('vuetify.js 将 VBtn 与 VBtnGroup 默认圆角重置为 pill 药丸形态', async () => {
+      const js = await read('src/renderer/plugins/vuetify.js');
+
+      expect(js).toMatch(/VBtn:\s*\{[\s\S]*rounded:\s*'pill'/);
+      expect(js).toMatch(/VBtnGroup:\s*\{[\s\S]*rounded:\s*'pill'/);
+    });
+
     it('开发模式应让宿主和插件使用同一个 Vue URL', async () => {
       const config = await read('src/vite.renderer.config.js');
       const html = await read('src/renderer/index.html');
@@ -251,6 +258,13 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(vue).toContain('d-flex');
       expect(vue).toContain('text-medium-emphasis');
       expect(vue).toContain('text-body-small');
+    });
+
+    it('preview main.js 同步将 VBtn 与 VBtnGroup 默认圆角重置为 pill 药丸形态', async () => {
+      const js = await readSdk('src/preview/main.js');
+
+      expect(js).toMatch(/VBtn:\s*\{[\s\S]*rounded:\s*'pill'/);
+      expect(js).toMatch(/VBtnGroup:\s*\{[\s\S]*rounded:\s*'pill'/);
     });
   });
 

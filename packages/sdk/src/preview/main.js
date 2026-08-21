@@ -158,6 +158,10 @@ export async function startPreview(pluginComponent, options = {}) {
     defaults: {
       VBtn: {
         class: 'normal-case',
+        rounded: 'pill',
+      },
+      VBtnGroup: {
+        rounded: 'pill',
       },
       VSwitch: {
         color: 'primary',

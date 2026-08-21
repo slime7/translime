@@ -139,6 +139,10 @@ const vuetify = createVuetify({
   defaults: {
     VBtn: {
       class: 'normal-case',
+      rounded: 'pill',
+    },
+    VBtnGroup: {
+      rounded: 'pill',
     },
     VSwitch: {
       color: 'primary',
