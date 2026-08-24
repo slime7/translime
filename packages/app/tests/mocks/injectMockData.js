@@ -41,7 +41,6 @@ export const injectMockPlugins = (userDataDir) => {
     fs.mkdirSync(targetNodeModulesDir, { recursive: true });
   }
 
-  // 写入 plugins/package.json 声明已安装插件
   const pluginManifest = {
     name: 'translime-plugins-runtime',
     private: true,
@@ -55,7 +54,6 @@ export const injectMockPlugins = (userDataDir) => {
     'utf8',
   );
 
-  // 复制 mock 插件内容
   if (fs.existsSync(pluginsSourceDir)) {
     const pluginFolders = fs.readdirSync(pluginsSourceDir);
     pluginFolders.forEach((folder) => {

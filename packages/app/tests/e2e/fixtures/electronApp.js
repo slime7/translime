@@ -14,11 +14,9 @@ const appRootDir = path.resolve(dirname, '../../..');
 export const test = base.extend({
   // eslint-disable-next-line no-empty-pattern
   electronContext: async ({}, use) => {
-    // 1. 创建隔离的临时 userData 目录并注入全量 Mock 数据
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'translime-e2e-'));
     injectAllMocks(userDataDir);
 
-    // 2. 启动 Electron 进程
     const app = await electron.launch({
       args: ['.', `--user-data-dir=${userDataDir}`],
       cwd: appRootDir,
@@ -29,7 +27,6 @@ export const test = base.extend({
       },
     });
 
-    // 3. 定位主渲染窗口（排除 launch.html 启动屏）
     let mainWindow = app.windows().find((w) => w.url().includes('index.html'));
     if (!mainWindow) {
       mainWindow = await app.waitForEvent('window', {
@@ -41,7 +38,6 @@ export const test = base.extend({
     await mainWindow.waitForLoadState('domcontentloaded');
     await mainWindow.waitForSelector('#app', { state: 'attached', timeout: 15000 });
 
-    // 4. 辅助操作方法
     const helpers = {
       app,
       page: mainWindow,
@@ -81,10 +77,8 @@ export const test = base.extend({
       },
     };
 
-    // 5. 交付给测试执行
     await use(helpers);
 
-    // 6. 清理与关闭
     try {
       await app.close();
     } catch {
@@ -93,7 +87,7 @@ export const test = base.extend({
       try {
         fs.rmSync(userDataDir, { recursive: true, force: true });
       } catch {
-        // 临时文件回收在部分 Windows 进程锁定时可能延迟
+        // 忽略临时文件占用清理异常
       }
     }
   },
