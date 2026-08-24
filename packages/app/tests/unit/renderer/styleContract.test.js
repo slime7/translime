@@ -223,6 +223,18 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
     });
   });
 
+  describe('导航圆角动画契约', () => {
+    it('NaviLink.vue 与 Navigation.vue 的 v-avatar 使用 ease-animation 与动态圆角', async () => {
+      const naviLink = await read('src/renderer/views/Layout/components/NaviLink.vue');
+      const navigation = await read('src/renderer/views/Layout/components/Navigation.vue');
+
+      expect(naviLink).toContain('class="ease-animation"');
+      expect(naviLink).toContain(':class="[isHovering || isExactActive ? \'rounded-3xl\' : \'rounded-full\']"');
+      expect(navigation).toContain('class="ease-animation"');
+      expect(navigation).toContain(':class="[isHovering ? \'rounded-3xl\' : \'rounded-full\']"');
+    });
+  });
+
   describe('SDK preview 同步', () => {
     it('preview layers.css 使用官方 layer 顺序', async () => {
       const css = await readSdk('src/preview/layers.css');

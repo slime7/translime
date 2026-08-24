@@ -45,7 +45,7 @@
         >
 
           <v-avatar
-            class="transition-radius"
+            class="ease-animation"
             :class="[isHovering ? 'rounded-3xl' : 'rounded-full']"
             size="56"
             :color="isHovering ? 'primary-container' : 'secondary-container'"
@@ -124,10 +124,6 @@ export default {
 </style>
 
 <style scoped>
-.transition-radius {
-  transition-property: border-radius;
-}
-
 .navi-panel :deep(.navi-btn) {
   height: 56px;
 }

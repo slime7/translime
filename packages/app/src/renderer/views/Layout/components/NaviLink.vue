@@ -18,7 +18,7 @@
           color="error"
         >
           <v-avatar
-            class="transition-radius"
+            class="ease-animation"
             :class="[isHovering || isExactActive ? 'rounded-3xl' : 'rounded-full']"
             size="56"
             :color="isHovering || isExactActive ? 'primary-container' : 'secondary-container'"
@@ -57,7 +57,7 @@
         color="error"
       >
         <v-avatar
-          class="transition-radius"
+          class="ease-animation"
           :class="[isHovering ? 'rounded-3xl' : 'rounded-full']"
           size="56"
           :color="isHovering ? 'primary-container' : 'secondary-container'"
@@ -126,10 +126,6 @@ export default {
 </script>
 
 <style scoped>
-.transition-radius {
-  transition-property: border-radius;
-}
-
 .navi-btn {
   cursor: pointer;
 }
