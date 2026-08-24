@@ -42,13 +42,15 @@
 
 ```mermaid
 stateDiagram-v2
+  state "build-missing" as build_missing
+  state "load-error" as load_error
   [*] --> discovered
   discovered --> ready: 解析 manifest 构建依赖图
   discovered --> blocked: 依赖不满足
   ready --> activating: 激活事件触发
   activating --> active: pluginDidLoad 完成
-  ready --> build-missing: 产物缺失
-  activating --> load-error: 入口加载失败
+  ready --> build_missing: 产物缺失
+  activating --> load_error: 入口加载失败
   active --> [*]: 禁用或应用退出
 ```
 
