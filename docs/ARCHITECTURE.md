@@ -47,6 +47,7 @@ flowchart LR
 ### 宿主主进程（packages/app/src/main）
 
 - `index.js` / `launch.js` / `createElectronApp.js`：应用入口与启动编排。
+- `utils/linuxDesktopIntegration.js`：Linux 桌面环境（Wayland / X11）XDG 图标与 .desktop 启动项自动注册。
 - `core/pluginLoader.js`：插件系统门面，维护插件列表、命令注册表与激活索引，把具体实现委托给 `plugin-loader/` 子模块：
   - `plugin-loader/constants.js`：路径、状态与激活常量
   - `plugin-loader/discovery.js`：目录扫描、manifest 解析、依赖图与激活索引
@@ -117,10 +118,10 @@ flowchart TD
 
 ## 构建、部署与运行
 
-- 宿主构建：`pnpm build:app` 产出 `packages/app/dist`，electron-builder 打包到 `packages/app/dist_electron`（NSIS 安装包与 portable，Windows x64）。
+- 宿主构建：`pnpm build:app` 产出 `packages/app/dist`，electron-builder 打包到 `packages/app/dist_electron`（Windows 输出 NSIS 安装包与 portable；Linux 输出 AppImage 与 tar.gz）。
 - 自动更新：electron-updater 从 GitHub Releases（slime7/translime）拉取 `latest.yml` 与安装包。
 - CI（.github/workflows）：
-  - `build.yaml`：打 tag `v*.*.*` 或手动触发，在 windows-latest + Node 20 上安装依赖并构建宿主，产物上传为 draft release。
+  - `build.yaml`：打 tag `v*.*.*` 或手动触发，在 windows-latest 与 ubuntu-latest + Node 20 矩阵上安装依赖并构建宿主，产物（Windows exe/yml 与 Linux AppImage/tar.gz）上传为 draft release。
   - `publish-package.yaml`：`dev` 上 SDK 或插件的版本清单变化时，在固定的 Windows 2022 runner 上扫描本地版本；只构建、测试、打包并发布 npm 中尚不存在且高于最新版本的包，也可手动指定包名补发。发布使用 npm Trusted Publishing/OIDC，不依赖长期 npm token。
   - `github-page.yaml`：push 到 `dev` 分支时把 `github-page/` 部署到 GitHub Pages。
 - 深链：宿主注册 `translime://` 协议，`translime://open/...` 会转发到主窗口。

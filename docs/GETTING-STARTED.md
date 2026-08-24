@@ -4,7 +4,7 @@
 
 - Node.js ≥ 18.20（`packages/app` 的 engines 要求）。
 - pnpm 10（仓库为 pnpm workspace，锁文件为 `pnpm-lock.yaml`）。
-- 宿主当前以 Windows 为主要开发与发布平台（CI 仅运行 windows-latest，打包目标为 Windows x64）。
+- 宿主支持 Windows 与 Linux（包含 Wayland / X11 / SteamOS 等环境）作为运行与发布平台，CI 包含 windows-latest 与 ubuntu-latest 构建矩阵，打包目标涵盖 Windows（NSIS / Portable）与 Linux（AppImage / tar.gz）。
 - 插件 `translime-plugin-hdr-capture` 含 Rust 原生模块，构建它需要 Rust 工具链（cargo、napi）。
 - `packages/translime-plugin-bangumi-logs/docs/api` 是 git submodule，克隆或更新仓库后需要初始化。
 
@@ -33,7 +33,7 @@ pnpm dev:cdp
 
 ## 构建、测试与检查
 
-- 构建宿主：`pnpm build:app`（产物在 `packages/app/dist`；electron-builder 打包输出在 `packages/app/dist_electron`）
+- 构建宿主：`pnpm build:app`（产物在 `packages/app/dist`；electron-builder 打包输出在 `packages/app/dist_electron`）；Linux 构建：`pnpm build:app:linux`
 - 宿主测试：`pnpm -C packages/app run test`（vitest）
 - 宿主 lint：`pnpm -C packages/app run lint`
 - 构建 SDK：`pnpm -C packages/sdk run build`（产物在 `packages/sdk/dist`，含类型声明）

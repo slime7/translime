@@ -25,7 +25,7 @@ translime 是一个基于 Electron 的小功能加载器，用于快速加载以
 ## 非目标和边界
 
 - 不做大而全的应用平台，插件只承载"小功能"。
-- 当前发布产物仅面向 Windows x64（NSIS 安装包与 portable 版本），不承诺其他平台打包。
+- 当前发布产物主要面向 Windows x64（NSIS 安装包与 portable 版本）与 Linux x64（AppImage 与 tar.gz），并在 Linux Wayland / X11 合成器环境下完成兼容适配。
 - 不强制插件包含 UI：纯主进程逻辑的插件同样是合法形态。
 - 宿主不内置业务功能，业务能力全部由插件提供。
 
