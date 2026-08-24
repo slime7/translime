@@ -20,5 +20,9 @@ yarn-error.log*
 *.sln
 *.sw?
 
-#Electron-builder output
+# Electron-builder output
 /dist_electron
+
+# Playwright test outputs
+test-results/
+playwright-report/

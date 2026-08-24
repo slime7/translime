@@ -1,0 +1,3 @@
+{"level":"info","message":"App initialization complete","timestamp":"2026-03-24 10:00:00","event":"startup"}
+{"level":"info","message":"Plugin mock-test loaded successfully","timestamp":"2026-03-24 10:00:05","plugin_id":"translime-plugin-mock-test"}
+{"level":"warn","message":"Deprecated configuration detected","timestamp":"2026-03-24 10:05:00"}

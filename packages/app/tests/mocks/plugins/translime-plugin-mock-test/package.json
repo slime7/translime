@@ -1,0 +1,36 @@
+{
+  "name": "translime-plugin-mock-test",
+  "version": "1.0.0",
+  "description": "A mock plugin for translime E2E testing",
+  "license": "MIT",
+  "main": "./dist/index.cjs.js",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs.js"
+    }
+  },
+  "files": [
+    "dist",
+    "icon.png"
+  ],
+  "plugin": {
+    "title": "Mock Test Plugin",
+    "description": "Mock plugin for testing features and settings",
+    "icon": "./icon.png",
+    "activationEvents": [
+      "onView",
+      "onStartup"
+    ],
+    "dependencies": [],
+    "optionalDependencies": [],
+    "contributes": {
+      "commands": [
+        {
+          "id": "translime-plugin-mock-test.increment-counter",
+          "title": "Increase Counter"
+        }
+      ]
+    },
+    "ui": "dist/ui.esm.js"
+  }
+}

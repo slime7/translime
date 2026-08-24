@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { listLogDates, readLogRecords } from '../../src/main/utils/logViewer';
+import { listLogDates, readLogRecords } from '@main/utils/logViewer';
 
 const createTempAppData = async () => {
   const appDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'translime-log-viewer-'));
@@ -146,3 +146,4 @@ describe('logViewer utils', () => {
     ]);
   });
 });
+
