@@ -6,6 +6,7 @@
       <div class="mt-2">
         <v-text-field
           v-model="search"
+          data-test="plugin-search-input"
           label="插件名"
           placeholder="搜索插件或留空列出所有插件"
           variant="outlined"
@@ -17,6 +18,7 @@
         >
           <template #append>
             <v-btn
+              data-test="plugin-search-btn"
               color="primary"
               :disabled="loading.install || loading.search"
               :loading="loading.install || loading.search"
@@ -36,6 +38,7 @@
               class="ml-2"
               density="comfortable"
               icon="refresh"
+              data-test="plugin-refresh-btn"
               :loading="loading.refresh"
               :disabled="loading.refresh"
               @click="refreshDevPlugins"

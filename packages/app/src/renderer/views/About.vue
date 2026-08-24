@@ -30,6 +30,7 @@
                 <div>
                   <v-btn
                     size="small"
+                    data-test="about-download-update-btn"
                     :loading="downloading"
                     @click="startDownload"
                   >
@@ -43,7 +44,7 @@
 
               <div v-else-if="updateStatus === 'not-available'">
                 <div>
-                  <v-btn size="small" @click="checkForUpdate">
+                  <v-btn size="small" data-test="about-check-update-btn" @click="checkForUpdate">
                     检查更新
                   </v-btn>
                 </div>
@@ -71,6 +72,7 @@
                   <v-btn
                     size="small"
                     color="success"
+                    data-test="about-restart-update-btn"
                     @click="quitAndInstall"
                   >
                     立即重启
@@ -80,7 +82,7 @@
 
               <div v-else-if="updateStatus === 'error'">
                 <div>
-                  <v-btn size="small" @click="checkForUpdate">
+                  <v-btn size="small" data-test="about-check-update-btn" @click="checkForUpdate">
                     检查更新
                   </v-btn>
                 </div>
@@ -90,7 +92,7 @@
               </div>
 
               <div v-else>
-                <v-btn size="small" @click="checkForUpdate">
+                <v-btn size="small" data-test="about-check-update-btn" @click="checkForUpdate">
                   检查更新
                 </v-btn>
               </div>
@@ -149,7 +151,7 @@
                 </v-btn>
               </div>
               <div>
-                <v-btn color="primary" @click="openLogViewer">
+                <v-btn color="primary" data-test="about-open-log-btn" @click="openLogViewer">
                   查看日志
                 </v-btn>
               </div>

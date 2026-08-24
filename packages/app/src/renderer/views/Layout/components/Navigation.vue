@@ -10,12 +10,14 @@
         :to="{ name: 'Home' }"
         icon="home"
         tooltip="首页"
+        data-test="nav-home"
       />
 
       <navi-link
         :to="{ name: 'Plugins' }"
         tooltip="插件"
         icon="extension"
+        data-test="nav-plugins"
       >
         插件
       </navi-link>
@@ -24,6 +26,7 @@
         :to="{ name: 'Setting' }"
         tooltip="设置"
         icon="settings"
+        data-test="nav-setting"
       >
         设置
       </navi-link>
@@ -32,6 +35,7 @@
         :to="{ name: 'About' }"
         tooltip="关于"
         icon="support"
+        data-test="nav-about"
       >
         关于
       </navi-link>
@@ -40,6 +44,7 @@
         <a
           href="javascript:;"
           class="navi-btn no-underline block ease-animation"
+          data-test="nav-notification"
           v-bind="props"
           @click="showNotification"
         >
@@ -76,6 +81,7 @@
           :image="plugin.icon ? plugin.icon : null"
           :tooltip="plugin.title"
           :is-dev="plugin.dev"
+          :data-test="`nav-plugin-${plugin.packageName}`"
         >
           {{ plugin.title }}
         </navi-link>

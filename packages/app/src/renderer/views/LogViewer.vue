@@ -16,17 +16,27 @@
             <v-select
               v-model="selectedDate"
               class="log-viewer__toolbar-field"
+              data-test="log-date-select"
               :items="dateOptions"
               item-title="title"
               item-value="value"
               label="日期"
               hide-details
               :disabled="loading || !dateOptions.length"
-            />
+            >
+              <template #item="{ props: itemProps, item }">
+                <v-list-item
+                  v-bind="itemProps"
+                  :data-test="`log-date-option-${item.value}`"
+                  :data-test-date="item.value"
+                />
+              </template>
+            </v-select>
 
             <v-select
               v-model="selectedLevels"
               class="log-viewer__toolbar-field log-viewer__toolbar-field--level"
+              data-test="log-level-select"
               :items="levelOptions"
               item-title="title"
               item-value="value"
@@ -71,9 +81,13 @@
         </v-card-text>
       </v-card>
 
-      <div class="log-viewer__records">
+      <div
+        class="log-viewer__records"
+        data-test="log-records-container"
+      >
         <v-card
           v-for="record in filteredRecords"
+          data-test="log-record-card"
           :key="record.id"
           class="rounded-2xl"
           flat

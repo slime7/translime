@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures/electronApp.js';
+import { expect, test } from './fixtures/electronApp';
 
 test.describe('侧边栏与核心路由导航 (Navigation E2E)', () => {
   test('在首页、插件、设置、关于与日志查看器间平稳切换', async ({ electronContext }) => {
@@ -18,7 +18,7 @@ test.describe('侧边栏与核心路由导航 (Navigation E2E)', () => {
     await expect(page).toHaveURL(/.*#\/about/);
     await expect(page.locator('.about').first()).toBeVisible();
 
-    const logViewerBtn = page.locator('button:has-text("查看日志"), a[href*="#/logs"], button:has-text("日志")').first();
+    const logViewerBtn = page.locator('[data-test="about-open-log-btn"]').first();
     if (await logViewerBtn.isVisible()) {
       await logViewerBtn.click();
       await page.waitForTimeout(400);

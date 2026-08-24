@@ -6,12 +6,14 @@
 
     <mde-list class="mt-2">
       <mde-list-item
+        data-test="setting-theme-item"
         title="主题"
         item-type="select"
         :selected="currentThemeName"
         @click="themeDialogVisible = true"
       />
       <mde-list-item
+        data-test="setting-color-item"
         title="颜色"
         item-type="select"
         :selected="themeColorName"

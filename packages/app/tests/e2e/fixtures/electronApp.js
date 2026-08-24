@@ -3,14 +3,11 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { injectAllMocks } from '../../mocks/injectMockData.js';
+import { injectAllMocks } from '../../mocks/injectMockData';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRootDir = path.resolve(dirname, '../../..');
 
-/**
- * 扩展 Playwright test，注入隔离的 Electron 实例与页面辅助方法
- */
 export const test = base.extend({
   // eslint-disable-next-line no-empty-pattern
   electronContext: async ({}, use) => {
@@ -42,19 +39,15 @@ export const test = base.extend({
       app,
       page: mainWindow,
       userDataDir,
-      /**
-       * 通过侧边栏导航点击跳转
-       * @param {'Home' | 'Plugins' | 'Setting' | 'LogViewer' | 'About'} routeName
-       */
       async navigateTo(routeName) {
-        const iconSelectors = {
-          Home: '.navi-drawer .navi-panel .navi-btn:has(.v-icon:has-text("home"))',
-          Plugins: '.navi-drawer .navi-panel .navi-btn:has(.v-icon:has-text("extension"))',
-          Setting: '.navi-drawer .navi-panel .navi-btn:has(.v-icon:has-text("settings"))',
-          LogViewer: 'button:has-text("查看日志"), a[href*="#/logs"]',
-          About: '.navi-drawer .navi-panel .navi-btn:has(.v-icon:has-text("support"))',
+        const testIdSelectors = {
+          Home: '[data-test="nav-home"]',
+          Plugins: '[data-test="nav-plugins"]',
+          Setting: '[data-test="nav-setting"]',
+          LogViewer: '[data-test="about-open-log-btn"]',
+          About: '[data-test="nav-about"]',
         };
-        const selector = iconSelectors[routeName];
+        const selector = testIdSelectors[routeName];
         if (!selector) {
           throw new Error(`Unknown route name: ${routeName}`);
         }

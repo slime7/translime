@@ -4,6 +4,7 @@
     persistent
     scrollable
     max-width="560"
+    data-test="plugin-setting-dialog"
   >
     <v-card>
       <v-toolbar
@@ -13,6 +14,7 @@
         <v-btn
           icon
           dark
+          data-test="plugin-setting-close-btn"
           @click="internalValue = false"
         >
           <v-icon>close</v-icon>
@@ -23,6 +25,7 @@
           <v-btn
             dark
             variant="text"
+            data-test="plugin-setting-save-btn"
             @click="saveSettings"
           >
             保存

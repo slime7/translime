@@ -6,18 +6,21 @@
 
     <mde-list class="mt-2">
       <mde-list-item
+        data-test="setting-auto-start"
         title="开机自动启动"
         item-type="switch"
         :is-active="settings.openAtLogin"
         @click="onOpenAtLogin(!settings.openAtLogin)"
       />
       <mde-list-item
+        data-test="setting-minimize-tray"
         title="关闭时最小化到托盘"
         item-type="switch"
         :is-active="settings.minimizeToTrayOnClose"
         @click="onMinimizeToTrayOnClose(!settings.minimizeToTrayOnClose)"
       />
       <mde-list-item
+        data-test="setting-show-dev-plugin"
         title="显示开发中插件(重启后生效)"
         item-type="switch"
         :is-active="settings.showDevPlugin"

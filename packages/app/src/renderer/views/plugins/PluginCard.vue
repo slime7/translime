@@ -4,6 +4,8 @@
   >
     <v-card
       class="plugin-item-card ease-animation h-full overflow-hidden"
+      data-test="plugin-card"
+      :data-test-package="plugin.packageName"
       v-bind="props"
       :elevation="isHovering ? 5 : 2"
       :disabled="disabled"
@@ -65,6 +67,7 @@
                 height="40px"
                 width="40px"
                 title="启用"
+                data-test="plugin-enable-btn"
                 @click="enable"
               >
                 <v-icon>play_arrow</v-icon>
@@ -78,6 +81,7 @@
                 height="40px"
                 width="40px"
                 title="禁用"
+                data-test="plugin-disable-btn"
                 @click="disable"
               >
                 <v-icon>pause</v-icon>
@@ -90,6 +94,7 @@
                 height="40px"
                 width="40px"
                 title="卸载"
+                data-test="plugin-uninstall-btn"
                 @click="uninstall"
               >
                 <v-icon>delete</v-icon>

@@ -8,6 +8,7 @@
     >
       <div
         class="navi-btn no-underline block ease-animation"
+        :data-test="dataTest"
         v-navi="to"
         v-bind="props"
       >
@@ -47,6 +48,7 @@
     <div
       class="navi-btn no-underline block ease-animation"
       v-else-if="open"
+      :data-test="dataTest"
       v-bind="props"
       @click="openPluginWindow"
     >
@@ -92,8 +94,14 @@ export default {
   name: 'NaviLink',
 
   props: {
-    to: [Object, String, null, undefined],
-    open: [String, null, undefined],
+    to: {
+      type: [Object, String, null],
+      default: null,
+    },
+    open: {
+      type: [String, null],
+      default: null,
+    },
     icon: {
       default: false,
       type: [Boolean, String, null],
@@ -109,6 +117,10 @@ export default {
     isDev: {
       default: false,
       type: Boolean,
+    },
+    dataTest: {
+      default: '',
+      type: String,
     },
   },
 

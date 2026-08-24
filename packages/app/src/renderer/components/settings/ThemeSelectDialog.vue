@@ -3,6 +3,7 @@
     v-model="visible"
     persistent
     max-width="500px"
+    data-test="theme-select-dialog"
   >
     <v-card color="surface-container-high">
       <v-card-title>选择主题</v-card-title>
@@ -10,18 +11,21 @@
       <v-card-text>
         <mde-list>
           <mde-list-item
+            data-test="theme-option-light"
             item-type="radio"
             title="明亮"
             :is-active="selectedTheme === 'light'"
             @click="selectedTheme = 'light'"
           />
           <mde-list-item
+            data-test="theme-option-dark"
             item-type="radio"
             title="暗黑"
             :is-active="selectedTheme === 'dark'"
             @click="selectedTheme = 'dark'"
           />
           <mde-list-item
+            data-test="theme-option-system"
             item-type="radio"
             title="系统"
             :is-active="selectedTheme === 'system'"
@@ -34,6 +38,7 @@
         <v-spacer />
 
         <v-btn
+          data-test="theme-dialog-cancel-btn"
           color="primary"
           @click="onCancel"
         >
@@ -41,6 +46,7 @@
         </v-btn>
 
         <v-btn
+          data-test="theme-dialog-confirm-btn"
           color="primary"
           variant="elevated"
           @click="onConfirm"
