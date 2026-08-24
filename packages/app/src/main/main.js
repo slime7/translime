@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   ipcMain,
+  nativeImage,
   nativeTheme,
   screen,
   systemPreferences,
@@ -10,6 +11,7 @@ import Store from 'electron-store';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import icon from '@pkg/share/static/icon.png';
 import createProtocol from './utils/createProtocol';
 import mainStore from './utils/useMainStore';
 import appManager from './utils/useAppManager';
@@ -39,6 +41,7 @@ const isInDisplay = (winProps) => {
 };
 
 export default () => {
+  const isLinux = process.platform === 'linux';
   const { workArea } = screen.getPrimaryDisplay();
   const defaultWin = {
     x: workArea.width / 2 - 200,
@@ -72,16 +75,20 @@ export default () => {
     y = defaultWin.y;
   }
   // Create the browser window.
-  const win = new BrowserWindow({
-    x,
-    y,
+  const appIcon = nativeImage.createFromDataURL(icon);
+  const winOptions = {
     width,
     height,
     frame: true,
     show: false,
     minWidth: 700,
-    titleBarStyle: 'hidden',
-    titleBarOverlay,
+    icon: appIcon,
+    ...(isLinux ? {
+      titleBarStyle: 'default',
+    } : {
+      titleBarStyle: 'hidden',
+      titleBarOverlay,
+    }),
     webPreferences: {
       preload: join(dir, '../preload/index.cjs'),
       nodeIntegration: false,
@@ -89,7 +96,16 @@ export default () => {
       sandbox: true,
       webviewTag: true,
     },
-  });
+  };
+  if (!isLinux && isInDisplay({
+    x, y, width, height,
+  })) {
+    winOptions.x = x;
+    winOptions.y = y;
+  } else if (isLinux) {
+    winOptions.center = true;
+  }
+  const win = new BrowserWindow(winOptions);
   appManager.setWin(win);
   Store.initRenderer();
   const ipc = new Ipc(ipcMain, appManager.getWin().webContents);
@@ -109,9 +125,20 @@ export default () => {
 
   nativeTheme.on('updated', () => {
     if (appManager.getIpc()) {
+      let accentColor = '#20a6fc';
+      try {
+        if (process.platform === 'win32' || (systemPreferences && typeof systemPreferences.getAccentColor === 'function')) {
+          const color = systemPreferences.getAccentColor();
+          if (color) {
+            accentColor = `#${color.substring(0, 6)}`;
+          }
+        }
+      } catch (err) {
+        logger.warn('获取系统强调色失败，回退至默认颜色', err);
+      }
       const themeAndColor = {
         dark: nativeTheme.shouldUseDarkColors,
-        color: `#${systemPreferences.getAccentColor().substring(0, 6)}`,
+        color: accentColor,
       };
       appManager.getIpc().sendToAllWindows(ipcType.THEME_UPDATED, themeAndColor);
     }
@@ -132,15 +159,18 @@ export default () => {
 
   appManager.getWin().on('close', (event) => {
     const minimizeToTrayOnClose = mainStore.config.get('setting.minimizeToTrayOnClose', false);
-    if (minimizeToTrayOnClose && !appManager.state.isQuitting) {
+    if (minimizeToTrayOnClose && appManager.getTray() && !appManager.state.isQuitting) {
       event.preventDefault();
       appManager.getWin().hide();
     }
 
     if (!maximize) {
-      const pos = appManager.getWin().getPosition();
       const size = appManager.getWin().getSize();
-      [x, y, width, height] = [...pos, ...size];
+      [width, height] = size;
+      if (!isLinux) {
+        const pos = appManager.getWin().getPosition();
+        [x, y] = pos;
+      }
     }
     mainStore.config.set('window', {
       x,

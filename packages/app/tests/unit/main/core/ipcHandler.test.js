@@ -7,7 +7,7 @@ import appManager from '@main/utils/useAppManager';
 import mainStore from '@main/utils/useMainStore';
 
 const {
-  mockShell, mockApp, mockDialog, mockNativeTheme, NotificationMock,
+  mockShell, mockApp, mockDialog, mockNativeTheme, NotificationMock, mockSystemPreferences,
 } = vi.hoisted(() => ({
   mockShell: {
     openExternal: vi.fn(),
@@ -30,6 +30,9 @@ const {
     shouldUseDarkColors: false,
     themeSource: 'system',
   },
+  mockSystemPreferences: {
+    getAccentColor: vi.fn(),
+  },
   NotificationMock: class {
     constructor() {
       this.show = vi.fn();
@@ -48,6 +51,10 @@ vi.mock('electron', () => ({
   shell: mockShell,
   dialog: mockDialog,
   nativeTheme: mockNativeTheme,
+  systemPreferences: mockSystemPreferences,
+  nativeImage: {
+    createFromDataURL: vi.fn((url) => url),
+  },
   Notification: NotificationMock,
   Menu: {
     buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
@@ -268,6 +275,27 @@ describe('ipcHandler', () => {
 
       expect(loader.refreshDevPlugins).toHaveBeenCalled();
       expect(result).toBe(true);
+    });
+  });
+
+  describe('System Preferences & Colors', () => {
+    it('GET_SYSTEM_COLOR 在 Windows 下正常获取颜色并截取前 6 位十六进制', () => {
+      const origPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      mockSystemPreferences.getAccentColor.mockReturnValueOnce('123456ff');
+
+      const color = ipcHandler[ipcType.GET_SYSTEM_COLOR]();
+      expect(color).toBe('#123456');
+      Object.defineProperty(process, 'platform', { value: origPlatform });
+    });
+
+    it('GET_SYSTEM_COLOR 在异常或不支持时回退到默认强调色 #20a6fc', () => {
+      mockSystemPreferences.getAccentColor.mockImplementationOnce(() => {
+        throw new Error('Not supported');
+      });
+
+      const color = ipcHandler[ipcType.GET_SYSTEM_COLOR]();
+      expect(color).toBe('#20a6fc');
     });
   });
 });

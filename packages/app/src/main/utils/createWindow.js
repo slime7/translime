@@ -1,13 +1,16 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, nativeImage } from 'electron';
+import icon from '@pkg/share/static/icon.png';
 import createProtocol from './createProtocol';
 
 export default (fileUrl, browserWindowOptions, menu = false) => {
+  const appIcon = nativeImage.createFromDataURL(icon);
   let window = new BrowserWindow({
     width: 200,
     height: 200,
     frame: true,
     show: false,
     minWidth: 200,
+    icon: appIcon,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true, // 默认开启上下文隔离

@@ -3,6 +3,7 @@ import {
   clipboard,
   dialog,
   Menu,
+  nativeImage,
   nativeTheme,
   Notification,
   shell,
@@ -12,6 +13,7 @@ import fs from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import icon from '@pkg/share/static/icon.png';
 import createWindow from '../utils/createWindow';
 import mainStore from '../utils/useMainStore';
 import appManager from '../utils/useAppManager';
@@ -165,6 +167,7 @@ const ipcHandler = {
       }
       appManager.getChildWin(name).focus();
     } else {
+      const isLinux = process.platform === 'linux';
       const minWidth = options.minWidth || 540;
       const mainWinBound = appManager.getWin().getBounds();
       const winBound = mainStore.config.get(`plugin.${name.replace('plugin-window-', '')}.window`, {
@@ -185,17 +188,21 @@ const ipcHandler = {
       } else if ((options.titleBarStyle || 'hidden') === 'hidden') {
         titleBarOverlay = resolveTitleBarOverlay({ overlayMode, savedOverlay });
       }
-      const win = createWindow(indexPage, {
-        x: winBound.x,
-        y: winBound.y,
+      const appIcon = nativeImage.createFromDataURL(icon);
+      const winCreateOptions = {
         width: winBound.width,
         height: winBound.height,
         minWidth,
+        icon: appIcon,
         useContentSize:
           typeof options.useContentSize !== 'undefined' ? options.useContentSize : false,
         frame: typeof options.frame !== 'undefined' ? options.frame : true,
-        titleBarStyle: options.titleBarStyle || 'hidden',
-        titleBarOverlay,
+        ...(isLinux ? {
+          titleBarStyle: options.titleBarStyle || 'default',
+        } : {
+          titleBarStyle: options.titleBarStyle || 'hidden',
+          titleBarOverlay,
+        }),
         title: options.title || 'translime',
         resizable: typeof options.resizable !== 'undefined' ? options.resizable : true,
         transparent:
@@ -212,7 +219,14 @@ const ipcHandler = {
           sandbox: false,
           webviewTag: true,
         },
-      }, null);
+      };
+      if (!isLinux) {
+        winCreateOptions.x = winBound.x;
+        winCreateOptions.y = winBound.y;
+      } else {
+        winCreateOptions.center = true;
+      }
+      const win = createWindow(indexPage, winCreateOptions, null);
       appManager.setChildWin(name, win);
 
       appManager.getChildWin(name).on('maximize', () => {
@@ -234,9 +248,14 @@ const ipcHandler = {
       appManager.getChildWin(name).on('close', () => {
         const isPluginWindow = mainStore.config.has(`plugin.${name.replace('plugin-window-', '')}`);
         if (isPluginWindow && !appManager.getChildWin(name).isMaximized()) {
-          const pos = appManager.getChildWin(name).getPosition();
           const size = appManager.getChildWin(name).getSize();
-          const [x, y, width, height] = [...pos, ...size];
+          const [width, height] = size;
+          let { x } = winBound;
+          let { y } = winBound;
+          if (!isLinux) {
+            const pos = appManager.getChildWin(name).getPosition();
+            [x, y] = pos;
+          }
           const windowProps = {
             x,
             y,
@@ -493,15 +512,20 @@ const ipcHandler = {
   },
   [ipcType.GET_SYSTEM_COLOR]() {
     try {
-      const color = systemPreferences.getAccentColor();
-      // 如果是 Windows，返回的是 RRGGBBAA 格式，需要处理
-      if (process.platform === 'win32') {
-        return `#${color.substring(0, 6)}`;
+      if (process.platform === 'win32' || (systemPreferences && typeof systemPreferences.getAccentColor === 'function')) {
+        const color = systemPreferences.getAccentColor();
+        if (color) {
+          // 如果是 Windows，返回的是 RRGGBBAA 格式，需要处理
+          if (process.platform === 'win32') {
+            return `#${color.substring(0, 6)}`;
+          }
+          return color.startsWith('#') ? color : `#${color}`;
+        }
       }
-      return `#${color}`;
+      return '#20a6fc';
     } catch (e) {
-      logger.error('Failed to get system accent color', e);
-      return null;
+      logger.warn('Failed to get system accent color', e);
+      return '#20a6fc';
     }
   },
   [ipcType.GET_PRELOAD_PATH]() {

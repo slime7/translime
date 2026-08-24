@@ -6,6 +6,7 @@ import {
 } from 'vitest';
 import {
   getTitleBarHeight,
+  isNativeOverlayActive,
   TITLE_BAR_HEIGHT_FALLBACK,
 } from '@/hooks/useTitleBarHeight';
 
@@ -51,5 +52,32 @@ describe('getTitleBarHeight', () => {
 
     setWco({ getTitlebarAreaRect: () => ({ height: 40, width: 138 }) });
     expect(getTitleBarHeight()).toBe(40);
+  });
+});
+
+describe('isNativeOverlayActive', () => {
+  afterEach(() => {
+    setWco(undefined);
+  });
+
+  it('当无 windowControlsOverlay 时返回 false', () => {
+    expect(isNativeOverlayActive()).toBe(false);
+  });
+
+  it('当 visible 为 false 时返回 false', () => {
+    setWco({ visible: false, getTitlebarAreaRect: () => ({ width: 800, height: 32 }) });
+    expect(isNativeOverlayActive()).toBe(false);
+  });
+
+  it('当 overlay 宽度占满窗口（未留出原生控件区域）时返回 false', () => {
+    window.innerWidth = 1000;
+    setWco({ visible: true, getTitlebarAreaRect: () => ({ width: 1000, height: 32 }) });
+    expect(isNativeOverlayActive()).toBe(false);
+  });
+
+  it('当 overlay 宽度有效且小于窗口宽度（为原生控制留出空间）时返回 true', () => {
+    window.innerWidth = 1000;
+    setWco({ visible: true, getTitlebarAreaRect: () => ({ width: 860, height: 32 }) });
+    expect(isNativeOverlayActive()).toBe(true);
   });
 });

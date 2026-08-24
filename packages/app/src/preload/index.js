@@ -32,6 +32,7 @@ const detachCallbacks = (type) => {
  * @see https://github.com/electron/electron/issues/21437#issuecomment-573522360
  */
 const api = {
+  platform: process.platform,
   versions: process.versions,
   ipcRenderer: {
     send: (channel, data) => {

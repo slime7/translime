@@ -2,11 +2,14 @@
 
 import builder from 'electron-builder';
 import { build as viteBuild } from 'vite';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 // eslint-disable-next-line import-x/extensions
 import builderConfig from '../electron-builder.config.js';
 import pkg from '../package.json' with { type: 'json' };
+
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * @typedef {'production' | 'development' | 'test'} BuildMode
@@ -18,9 +21,9 @@ const buildArgs = process.argv.slice(2);
 
 // 配置文件的路径数组，提取为常量提高可读性
 const VITE_CONFIG_PATHS = [
-  'src/vite.main.config.js',
-  'src/vite.preload.config.js',
-  'src/vite.renderer.config.js',
+  resolve(appRoot, 'src/vite.main.config.js'),
+  resolve(appRoot, 'src/vite.preload.config.js'),
+  resolve(appRoot, 'src/vite.renderer.config.js'),
 ];
 
 /**
@@ -74,20 +77,32 @@ const preparePackageJson = () => {
  */
 const buildElectronApp = async () => {
   try {
+    process.chdir(appRoot);
     await buildVitePackages();
     preparePackageJson();
 
-    const outputDir = resolve(builderConfig.directories.app || 'dist');
+    const outputDir = resolve(appRoot, builderConfig.directories.app || 'dist');
     fs.writeFileSync(
       `${outputDir}/package.json`,
       JSON.stringify(pkg, null, 2),
     );
 
     const shouldUnpack = buildArgs.includes('--unpack');
+    let platform = builder.Platform.current();
+    if (buildArgs.includes('--linux')) {
+      platform = builder.Platform.LINUX;
+    } else if (buildArgs.includes('--win')) {
+      platform = builder.Platform.WINDOWS;
+    } else if (buildArgs.includes('--mac')) {
+      platform = builder.Platform.MAC;
+    }
+
+    const targets = platform.createTarget(shouldUnpack ? builder.DIR_TARGET : undefined);
+
     await builder.build({
       config: builderConfig,
-      dir: shouldUnpack,
       publish: 'never',
+      targets,
     });
   } catch (error) {
     console.error('Build failed:', error);

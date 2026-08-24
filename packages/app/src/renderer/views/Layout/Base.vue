@@ -1,8 +1,10 @@
 <template>
   <v-app>
     <v-system-bar
+      v-if="useCustomTitleBar"
       class="system-bar p-0"
       :height="titleBarHeight"
+      @dblclick="onToggleMaximize"
     >
       <div class="px-4">
         translime
@@ -10,8 +12,16 @@
 
       <v-spacer />
 
-      <!-- 预留原生 caption 按钮区域，避免内容被遮挡 -->
-      <div class="window-control-placeholder shrink-0" />
+      <!-- 原生 WCO 活跃时预留 caption 区域，否则使用自定义 WindowControls 降级 -->
+      <div
+        v-if="hasNativeOverlay"
+        class="window-control-placeholder shrink-0"
+      />
+      <window-controls
+        v-else
+        :is-maximize="isMaximize"
+        win="app"
+      />
     </v-system-bar>
 
     <navigation />
@@ -59,8 +69,11 @@
 
 <script setup>
 import {
+  computed,
   nextTick,
   onMounted,
+  onUnmounted,
+  ref,
 } from 'vue';
 import MainFooter from '@/components/MainFooter.vue';
 import Navigation from '@/views/Layout/components/Navigation.vue';
@@ -68,9 +81,25 @@ import Notification from '@/views/Layout/components/Notification.vue';
 import useGlobalStore from '@/store/globalStore';
 import EmbeddedPluginWebviews from '@/views/plugins/EmbeddedPluginWebviews.vue';
 import { useTitleBarHeight } from '@/hooks/useTitleBarHeight';
+import WindowControls from '@/components/WindowControls.vue';
+import { useIpc } from '@/hooks/electron';
 
 const store = useGlobalStore();
-const { height: titleBarHeight } = useTitleBarHeight();
+const ipc = useIpc();
+const isLinux = typeof window !== 'undefined' && (
+  window.electron?.platform === 'linux'
+  || window.electron?.versions?.platform === 'linux'
+  || (typeof navigator !== 'undefined' && /linux/i.test(navigator.userAgent))
+);
+const useCustomTitleBar = computed(() => !isLinux);
+const { height: titleBarHeight, hasNativeOverlay } = useTitleBarHeight();
+const isMaximize = ref(false);
+
+const onToggleMaximize = () => {
+  if (window.ts?.windowControl) {
+    window.ts.windowControl.maximize('app');
+  }
+};
 
 const onEnter = () => {
   nextTick(() => {
@@ -83,7 +112,18 @@ const onLeave = () => {
 };
 
 onMounted(() => {
-  document.body.className = 'custom-title-bar';
+  if (useCustomTitleBar.value) {
+    document.body.className = 'custom-title-bar';
+  } else {
+    document.body.className = '';
+  }
+  ipc.on('set-maximize-status', (maximize) => {
+    isMaximize.value = Boolean(maximize);
+  });
+});
+
+onUnmounted(() => {
+  ipc.detach('set-maximize-status');
 });
 </script>
 

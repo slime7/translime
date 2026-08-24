@@ -12,6 +12,7 @@ import createTray from './core/tray';
 import pluginLoader from './core/pluginLoader';
 import setupDeepLink, { linkHandler } from './core/deepLink';
 import * as autoUpdate from './core/autoUpdate';
+import { setupLinuxDesktopIntegration } from './utils/linuxDesktopIntegration';
 
 class CreateElectronApp extends EventEmitter {
   constructor() {
@@ -31,6 +32,19 @@ class CreateElectronApp extends EventEmitter {
 
   // eslint-disable-next-line class-methods-use-this
   base() {
+    app.name = 'translime';
+    if (process.platform === 'linux') {
+      setupLinuxDesktopIntegration();
+      const ozoneHint = process.env.TRANSLIME_OZONE_PLATFORM
+        || process.env.ELECTRON_OZONE_PLATFORM_HINT
+        || 'auto';
+      app.commandLine.appendSwitch('ozone-platform-hint', ozoneHint);
+      app.commandLine.appendSwitch('enable-wayland-ime');
+      if (typeof app.setDesktopName === 'function') {
+        app.setDesktopName('translime.desktop');
+      }
+    }
+
     appManager.state.mainProcessLock = app.requestSingleInstanceLock();
     if (!appManager.state.mainProcessLock) {
       app.quit();
@@ -43,6 +57,9 @@ class CreateElectronApp extends EventEmitter {
             appManager.getWin().restore();
           }
           appManager.getWin().focus();
+          if (typeof appManager.getWin().flashFrame === 'function') {
+            appManager.getWin().flashFrame(true);
+          }
           linkHandler(commandLine.pop());
         }
       });
@@ -109,6 +126,8 @@ class CreateElectronApp extends EventEmitter {
         createMainWindow();
         if (process.platform === 'win32') {
           app.setAppUserModelId(this.isDevelopment ? process.execPath : 'translime.app');
+        } else if (process.platform === 'linux' && typeof app.setDesktopName === 'function') {
+          app.setDesktopName('translime.desktop');
         }
       });
   }

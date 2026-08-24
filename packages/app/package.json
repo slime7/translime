@@ -19,6 +19,7 @@
     "dev:cdp": "node scripts/watch.js --cdp-port=9222",
     "serve": "node scripts/watch.js",
     "build": "rimraf dist && node scripts/build.js",
+    "build:linux": "rimraf dist && node scripts/build.js --linux",
     "build:unpack": "rimraf dist && node scripts/build.js --unpack",
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps",

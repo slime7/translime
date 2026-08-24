@@ -1,9 +1,10 @@
 <template>
   <v-app>
     <v-system-bar
-      v-if="!isEmbedded"
+      v-if="!isEmbedded && useCustomTitleBar"
       class="system-bar p-0"
       :height="titleBarHeight"
+      @dblclick="onToggleMaximize"
     >
       <div class="px-4">
         {{ plugin ? `${plugin.title} - translime` : 'translime' }}
@@ -11,8 +12,16 @@
 
       <v-spacer />
 
-      <!-- 预留原生 caption 按钮区域，避免内容被遮挡 -->
-      <div class="window-control-placeholder shrink-0" />
+      <!-- 原生 WCO 活跃时预留 caption 区域，否则使用自定义 WindowControls 降级 -->
+      <div
+        v-if="hasNativeOverlay"
+        class="window-control-placeholder shrink-0"
+      />
+      <window-controls
+        v-else
+        :is-maximize="isMaximize"
+        :win="`plugin-window-${packageName}`"
+      />
     </v-system-bar>
 
     <v-main class="h-screen">
@@ -41,13 +50,17 @@ import {
   nextTick,
   onMounted,
   onUnmounted,
+  ref,
 } from 'vue';
 import { useRoute } from 'vue-router';
 import * as components from 'vuetify/components';
 import * as labsComponents from 'vuetify/labs/components';
 import * as directives from 'vuetify/directives';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import globalStore from '@/store/globalStore';
 import { useTitleBarHeight } from '@/hooks/useTitleBarHeight';
+import WindowControls from '@/components/WindowControls.vue';
+import { useIpc } from '@/hooks/electron';
 
 if (!window.vuetify$) {
   window.vuetify$ = {
@@ -61,18 +74,35 @@ if (!window.vuetify$) {
 
 export default {
   name: 'LayoutPluginWindow',
+  components: {
+    WindowControls,
+  },
 
   setup() {
     const route = useRoute();
+    const ipc = useIpc();
     const store = globalStore();
 
     const packageName = computed(() => route.params.packageName);
     const plugin = computed(() => store.plugin(packageName.value));
     const isEmbedded = computed(() => route.query.embedded === 'true');
-    const { height: titleBarHeight } = useTitleBarHeight();
+    const isLinux = typeof window !== 'undefined' && (
+      window.electron?.platform === 'linux'
+      || window.electron?.versions?.platform === 'linux'
+      || (typeof navigator !== 'undefined' && /linux/i.test(navigator.userAgent))
+    );
+    const useCustomTitleBar = computed(() => !isLinux);
+    const { height: titleBarHeight, hasNativeOverlay } = useTitleBarHeight();
+    const isMaximize = ref(false);
+
+    const onToggleMaximize = () => {
+      if (window.ts?.windowControl) {
+        window.ts.windowControl.maximize(`plugin-window-${packageName.value}`);
+      }
+    };
 
     const applyCustomTitleBar = () => {
-      document.body.className = isEmbedded.value ? '' : 'custom-title-bar';
+      document.body.className = (!isEmbedded.value && useCustomTitleBar.value) ? 'custom-title-bar' : '';
     };
 
     const onEnter = () => {
@@ -87,18 +117,30 @@ export default {
     onMounted(() => {
       applyCustomTitleBar();
       store.pageTransitionActive = false;
+      ipc.on(`set-maximize-status:plugin-window-${packageName.value}`, (maximize) => {
+        isMaximize.value = Boolean(maximize);
+      });
+      ipc.invoke(ipcType.APP_IS_MAXIMIZE, `plugin-window-${packageName.value}`).then((res) => {
+        isMaximize.value = Boolean(res);
+      }).catch(() => {});
     });
 
     onUnmounted(() => {
+      ipc.detach(`set-maximize-status:plugin-window-${packageName.value}`);
       store.pageTransitionActive = false;
     });
 
     return {
       plugin,
+      packageName,
+      isMaximize,
       onEnter,
       onLeave,
       isEmbedded,
+      useCustomTitleBar,
       titleBarHeight,
+      hasNativeOverlay,
+      onToggleMaximize,
     };
   },
 };
