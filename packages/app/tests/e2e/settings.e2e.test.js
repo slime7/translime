@@ -1,8 +1,8 @@
-import { test, expect } from './fixtures/electronApp.js';
+import { expect, test } from './fixtures/electronApp.js';
 
 test.describe('系统与外观设置持久化 (Settings E2E)', () => {
   test('渲染通用与外观设置，并支持配置修改与持久化', async ({ electronContext }) => {
-    const { page, navigateTo } = electronContext;
+    const { navigateTo, page } = electronContext;
 
     await navigateTo('Setting');
     await expect(page.locator('.setting').first()).toBeVisible();

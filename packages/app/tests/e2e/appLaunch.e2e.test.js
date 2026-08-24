@@ -1,8 +1,8 @@
-import { test, expect } from './fixtures/electronApp.js';
+import { expect, test } from './fixtures/electronApp.js';
 
 test.describe('应用启动与主窗口渲染 (App Launch E2E)', () => {
   test('启动后成功呈现主窗口并加载根容器', async ({ electronContext }) => {
-    const { page, app } = electronContext;
+    const { app, page } = electronContext;
 
     expect(page).toBeDefined();
     const title = await page.title();

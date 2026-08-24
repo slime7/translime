@@ -1,8 +1,8 @@
-import { test, expect } from './fixtures/electronApp.js';
+import { expect, test } from './fixtures/electronApp.js';
 
 test.describe('插件生态与管理交互 (Plugins E2E)', () => {
   test('正常发现注入的测试插件，支持搜索过滤与启用/禁用状态切换', async ({ electronContext }) => {
-    const { page, navigateTo } = electronContext;
+    const { navigateTo, page } = electronContext;
 
     await navigateTo('Plugins');
     await expect(page.locator('.plugins').first()).toBeVisible();

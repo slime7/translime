@@ -15,7 +15,7 @@ const aliasResolverConfig = {
 export default [
   ...baseConfig,
   {
-    files: ['src/**/*.js', 'tests/**/*.js'],
+    files: ['src/**/*.js', 'src/**/*.vue', 'tests/**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -35,6 +35,13 @@ export default [
       'import-x/no-named-as-default': 'off',
       'import-x/no-named-as-default-member': 'off',
       'import-x/no-rename-default': 'off',
+    },
+  },
+  {
+    files: ['tests/**/*.js'],
+    rules: {
+      'no-console': 'off',
+      'import-x/extensions': 'off',
     },
   },
 ];

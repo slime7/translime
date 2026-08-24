@@ -1,8 +1,8 @@
-import { test, expect } from './fixtures/electronApp.js';
+import { expect, test } from './fixtures/electronApp.js';
 
 test.describe('侧边栏与核心路由导航 (Navigation E2E)', () => {
   test('在首页、插件、设置、关于与日志查看器间平稳切换', async ({ electronContext }) => {
-    const { page, navigateTo } = electronContext;
+    const { navigateTo, page } = electronContext;
 
     await expect(page.locator('.home').first()).toBeVisible();
 

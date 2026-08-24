@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/electronApp.js';
+import { expect, test } from './fixtures/electronApp.js';
 
 test.describe('日志查看与诊断检索 (LogViewer E2E)', () => {
   test('展示日志日期列表与日志记录，支持级别筛选与真实格式日志展示', async ({ electronContext }) => {

@@ -22,7 +22,7 @@
     "build:unpack": "rimraf dist && node scripts/build.js --unpack",
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps",
-    "lint": "eslint --ext js,jsx,ts,vue src/ --fix",
+    "lint": "eslint src/ tests/ --fix",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:e2e": "playwright test"

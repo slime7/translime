@@ -95,7 +95,7 @@ export default [
       'vuejs-accessibility/label-has-for': 'off',
       'no-param-reassign': ['error', {
         props: true,
-        ignorePropertyModificationsFor: ['state', 'acc', 'e'],
+        ignorePropertyModificationsFor: ['state', 'acc', 'e', 'element', 'el'],
       }],
       'import-x/no-cycle': 'warn',
     },
