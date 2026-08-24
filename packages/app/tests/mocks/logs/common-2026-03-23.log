@@ -1,1 +1,3 @@
-{"level":"info","message":"App opened on previous day","timestamp":"2026-03-23 09:30:00"}
+{"level":"info","message":"app 启动 | test","timestamp":"2026-03-23 09:30:00"}
+{"level":"info","message":"app current display: PrimaryDisplay (1920x1080)","timestamp":"2026-03-23 09:30:01"}
+{"context":"Main","level":"info","message":"插件已加载","plugin_id":"translime-plugin-mock-test","timestamp":"2026-03-23 09:30:04"}

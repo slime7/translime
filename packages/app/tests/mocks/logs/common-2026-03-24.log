@@ -1,3 +1,7 @@
-{"level":"info","message":"App initialization complete","timestamp":"2026-03-24 10:00:00","event":"startup"}
-{"level":"info","message":"Plugin mock-test loaded successfully","timestamp":"2026-03-24 10:00:05","plugin_id":"translime-plugin-mock-test"}
-{"level":"warn","message":"Deprecated configuration detected","timestamp":"2026-03-24 10:05:00"}
+{"level":"info","message":"app 启动 | test","timestamp":"2026-03-24 09:00:00"}
+{"level":"info","message":"app current display: PrimaryDisplay (1920x1080)","timestamp":"2026-03-24 09:00:01"}
+{"context":"Main","level":"info","message":"插件已加载","plugin_id":"translime-plugin-mock-test","timestamp":"2026-03-24 09:00:05"}
+{"context":"Main","data":{"appReady":true,"configuredShortcut":"Ctrl+Alt+S"},"level":"info","message":"[shortcut] 开始同步全局快捷键","plugin_id":"translime-plugin-mock-test","timestamp":"2026-03-24 09:00:05"}
+{"context":"Main","level":"info","message":"快捷键注册成功: Ctrl+Alt+S","plugin_id":"translime-plugin-mock-test","timestamp":"2026-03-24 09:00:06"}
+{"level":"info","message":"Skipping update check in test mode","timestamp":"2026-03-24 09:00:20"}
+{"context":"Main","data":{"fastResponse":true},"level":"info","message":"设置已保存","plugin_id":"translime-plugin-mock-test","timestamp":"2026-03-24 09:01:15"}
