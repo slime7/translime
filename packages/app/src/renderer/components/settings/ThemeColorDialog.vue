@@ -123,6 +123,11 @@ import useMdColor from '@/hooks/useMdColor';
 import useGlobalStore from '@/store/globalStore';
 import ColorPicker from '@/components/ColorPicker.vue';
 import ThemeColorPreviewCard from '@/components/ThemeColorPreviewCard.vue';
+import {
+  DEFAULT_THEME_COLOR_SOURCE,
+  DEFAULT_THEME_COLOR_VARIANT,
+  normalizeThemeColor,
+} from '@/utils/themeColorConfig';
 import { THEME_COLOR_VARIANTS } from './themeOptions';
 
 const props = defineProps({
@@ -148,21 +153,21 @@ const visible = computed({
 const dialogState = reactive({
   selected: '',
   customColor: '#000',
-  customColorVariant: 'SchemeTonalSpot',
+  customColorVariant: DEFAULT_THEME_COLOR_VARIANT,
   customThemeList: [],
   isSystemColorSupported: false,
   translimeThemeColors: {
     light: {
-      primary: '#00639b',
-      secondary: '#51606f',
-      tertiary: '#68587a',
-      error: '#ba1a1a',
+      primary: '#00649c',
+      secondary: '#7a546a',
+      tertiary: '#944271',
+      error: '#ac3434',
     },
     dark: {
-      primary: '#96cbff',
-      secondary: '#b9c8da',
-      tertiary: '#d3bfe6',
-      error: '#ffb4ab',
+      primary: '#b8dbff',
+      secondary: '#debece',
+      tertiary: '#ffafd7',
+      error: '#ff716c',
     },
   },
 });
@@ -194,9 +199,10 @@ const rebuildCustomThemeList = (color) => {
 };
 
 const initCustomThemeColor = () => {
-  dialogState.selected = settings.themeColor.name;
-  dialogState.customColor = settings.themeColor.source;
-  dialogState.customColorVariant = settings.themeColor.variant;
+  const themeColor = normalizeThemeColor(settings.themeColor);
+  dialogState.selected = themeColor.name;
+  dialogState.customColor = themeColor.source;
+  dialogState.customColorVariant = themeColor.variant;
   rebuildCustomThemeList(dialogState.customColor);
 };
 
@@ -232,11 +238,11 @@ const generateRandomColor = () => {
 };
 
 const setColorDialogConfirm = () => {
-  const themeColor = {
+  const themeColor = normalizeThemeColor({
     name: dialogState.selected,
     source: dialogState.customColor,
     variant: dialogState.customColorVariant,
-  };
+  });
   let themeColorItem;
 
   if (dialogState.selected === 'system' || dialogState.selected === 'custom') {
@@ -244,7 +250,7 @@ const setColorDialogConfirm = () => {
       (item) => item.variant === dialogState.customColorVariant,
     );
   } else if (dialogState.selected === 'translime') {
-    const themeResult = mdColor.getThemeColorFromColor('#20a6fc', 'SchemeRainbow');
+    const themeResult = mdColor.getThemeColorFromColor(DEFAULT_THEME_COLOR_SOURCE, DEFAULT_THEME_COLOR_VARIANT);
     themeColorItem = { schemes: themeResult.schemes };
   }
 

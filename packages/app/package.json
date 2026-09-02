@@ -29,7 +29,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@material/material-color-utilities": "^0.3.0",
+    "@material/material-color-utilities": "0.4.0",
     "@tailwindcss/vite": "^4.1.18",
     "axios": "~1.8.4",
     "dayjs": "^1.11.9",

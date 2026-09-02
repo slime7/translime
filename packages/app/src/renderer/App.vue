@@ -13,6 +13,10 @@ import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
 import globalStore from '@/store/globalStore';
 import { appConfigStore } from '@/utils';
+import {
+  getDefaultThemeColor,
+  normalizeThemeColor,
+} from '@/utils/themeColorConfig';
 
 const ipc = useIpc();
 const ipcRaw = useIpc(false);
@@ -56,11 +60,8 @@ const getTheme = async () => {
  * 如果配色名不是 'translime' (默认值)，则从 source 和 variant 生成 M3 配色并应用
  */
 const getThemeColors = async () => {
-  const themeColor = await appConfigStore.get('setting.themeColor', {
-    name: 'translime',
-    source: '#20a6fc',
-    variant: 'SchemeRainbow',
-  });
+  const storedThemeColor = await appConfigStore.get('setting.themeColor', getDefaultThemeColor());
+  const themeColor = normalizeThemeColor(storedThemeColor);
   // 如果不是默认配色，则应用自定义配色
   if (themeColor.name !== 'translime') {
     let { source } = themeColor;

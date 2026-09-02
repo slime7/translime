@@ -24,6 +24,7 @@
 | winston | 日志 |
 | vitest | 单元测试 |
 | electron-updater | 自动更新 |
+| @material/material-color-utilities 0.4.0 | 宿主渲染进程的 M3 2025 动态颜色与主题 token 生成 |
 | pnpm workspace | 多包管理 |
 
 宿主源码为 ESM（`"type": "module"`），构建时主进程产物为 CJS（`dist/main/index.cjs`），渲染进程产物为 ESM。
@@ -67,6 +68,7 @@ flowchart LR
 
 ### 渲染进程（packages/app/src/renderer）
 
+- 主题颜色使用 `@material/material-color-utilities` 0.4.0 生成 M3 2025 规范的 53 个系统颜色角色；内置方案限定为 `SchemeExpressive`、`SchemeTonalSpot`、`SchemeVibrant` 和 `SchemeNeutral`，默认使用 `SchemeExpressive`。
 - `views/plugins/`：插件列表、插件页与设置面板；`PluginRender.vue` 负责在 app renderer 中加载内嵌插件 UI，`EmbeddedPluginWebviews.vue` 负责在 `<webview>` 中加载插件 UI。
 - `utils/pluginStyleIsolation.js`：监听动态 `style`/`link` 节点，为内嵌插件样式保留插件 layer 并包裹 `@scope (.plugin-ui-loader[data-plugin-id="插件ID"])`；对 `:root`、`:host`、`html`、`body` 根级规则提供 `:scope` 兼容转换。
 - `PluginWindow.vue` 与 `views/Layout/PluginWindow.vue`：独立 BrowserWindow 形态的插件窗口。

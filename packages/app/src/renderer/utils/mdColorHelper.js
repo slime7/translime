@@ -1,16 +1,22 @@
 import * as m3utils from '@material/material-color-utilities';
+import {
+  DEFAULT_THEME_COLOR_VARIANT,
+  M3_SPEC_VERSION,
+  normalizeThemeColorVariant,
+} from './themeColorConfig';
 
 /**
- * All available color tokens
+ * M3 2025 规范下宿主对外提供的颜色 token。
+ * @type {ReadonlyArray<string>}
  */
 const tokens = [
-  'primary', 'onPrimary', 'primaryContainer', 'onPrimaryContainer', 'inversePrimary',
+  'primary', 'primaryDim', 'onPrimary', 'primaryContainer', 'onPrimaryContainer', 'inversePrimary',
   'primaryFixed', 'primaryFixedDim', 'onPrimaryFixed', 'onPrimaryFixedVariant',
-  'secondary', 'onSecondary', 'secondaryContainer', 'onSecondaryContainer',
+  'secondary', 'secondaryDim', 'onSecondary', 'secondaryContainer', 'onSecondaryContainer',
   'secondaryFixed', 'secondaryFixedDim', 'onSecondaryFixed', 'onSecondaryFixedVariant',
-  'tertiary', 'onTertiary', 'tertiaryContainer', 'onTertiaryContainer',
+  'tertiary', 'tertiaryDim', 'onTertiary', 'tertiaryContainer', 'onTertiaryContainer',
   'tertiaryFixed', 'tertiaryFixedDim', 'onTertiaryFixed', 'onTertiaryFixedVariant',
-  'error', 'onError', 'errorContainer', 'onErrorContainer',
+  'error', 'errorDim', 'onError', 'errorContainer', 'onErrorContainer',
   'surfaceDim', 'surface', 'surfaceBright',
   'surfaceContainerLowest', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest',
   'onSurface', 'onSurfaceVariant', 'outline', 'outlineVariant',
@@ -19,27 +25,50 @@ const tokens = [
   'background', 'onBackground',
   'shadow', 'scrim',
 ];
+
 /**
- * Generate custom color group from source and target color
+ * 使用 2025 Material 3 颜色规范创建动态配色方案。
+ * @param {object} hct - HCT 源颜色
+ * @param {boolean} isDark - 是否创建深色方案
+ * @param {string} variant - 请求的方案变体
+ * @param {number} contrastLevel - 对比度级别
+ * @returns {object} 动态配色方案
+ */
+const createScheme = (hct, isDark, variant, contrastLevel) => {
+  const normalizedVariant = normalizeThemeColorVariant(variant);
+  const Scheme = m3utils[normalizedVariant];
+
+  return new Scheme(hct, isDark, contrastLevel, M3_SPEC_VERSION);
+};
+
+/**
+ * 直接从生成的动态方案中读取颜色角色。
+ * @param {string} token - camelCase 格式的颜色角色名
+ * @param {object} scheme - 动态配色方案
+ * @returns {number} ARGB 颜色值
+ */
+const getDynamicColor = (token, scheme) => scheme[token];
+
+/**
+ * 根据源颜色和目标颜色生成自定义颜色组。
  *
- * @param source Source color
- * @param color Custom color
- * @param variant Scheme variant, equal to scheme class name (SchemeMonochrome, SchemeNeutral, SchemeTonalSpot,...)
- * @param contrastLevel Contrast level between -1.0 and 1.0
- * @return Custom color group
+ * @param {number} source - 源颜色
+ * @param {{value: number, blend?: boolean}} color - 自定义颜色
+ * @param {string} variant - 2025 规范支持的方案变体
+ * @param {number} contrastLevel - -1.0 到 1.0 的对比度级别
+ * @returns {object} 自定义颜色组
  *
  * @link https://m3.material.io/styles/color/the-color-system/color-roles
  */
-export function customColor(source, color, variant = 'SchemeTonalSpot', contrastLevel = 0.0) {
+export function customColor(source, color, variant = DEFAULT_THEME_COLOR_VARIANT, contrastLevel = 0.0) {
   let { value } = color;
   const from = value;
   if (color.blend) {
     value = m3utils.Blend.harmonize(from, source);
   }
   const hct = m3utils.Hct.fromInt(value);
-  const scheme = new m3utils[variant](hct, false, contrastLevel);
-  const darkScheme = new m3utils[variant](hct, true, contrastLevel);
-  const getDynamicColor = (token, s) => m3utils.MaterialDynamicColors[token].getArgb(s);
+  const scheme = createScheme(hct, false, variant, contrastLevel);
+  const darkScheme = createScheme(hct, true, variant, contrastLevel);
   return {
     color,
     value,
@@ -58,19 +87,20 @@ export function customColor(source, color, variant = 'SchemeTonalSpot', contrast
   };
 }
 /**
- * Generate a theme from a source color
+ * 根据源颜色生成主题。
  *
- * @param source Source color
- * @param customColors Array of custom colors
- * @param variant Scheme variant, equal to scheme class name (SchemeMonochrome, SchemeNeutral, SchemeTonalSpot,...)
- * @param contrastLevel Contrast level between -1.0 and 1.0
- * @return Theme object
+ * @param {number} source - 源颜色
+ * @param {string} variant - 2025 规范支持的方案变体
+ * @param {number} contrastLevel - -1.0 到 1.0 的对比度级别
+ * @param {Array<object>} customColors - 自定义颜色数组
+ * @returns {object} 主题对象
  */
-export function themeFromSourceColor(source, variant = 'SchemeTonalSpot', contrastLevel = 0.0, customColors = []) {
+export function themeFromSourceColor(source, variant = DEFAULT_THEME_COLOR_VARIANT, contrastLevel = 0.0, customColors = []) {
   const hct = m3utils.Hct.fromInt(source);
-  const scheme = new m3utils[variant](hct, false, contrastLevel);
-  const darkScheme = new m3utils[variant](hct, true, contrastLevel);
-  const getDynamicColors = (s) => Object.fromEntries(tokens.map((token) => [token, m3utils.MaterialDynamicColors[token].getArgb(s)]));
+  const normalizedVariant = normalizeThemeColorVariant(variant);
+  const scheme = createScheme(hct, false, normalizedVariant, contrastLevel);
+  const darkScheme = createScheme(hct, true, normalizedVariant, contrastLevel);
+  const getDynamicColors = (s) => Object.fromEntries(tokens.map((token) => [token, getDynamicColor(token, s)]));
   return {
     source,
     schemes: {
@@ -85,19 +115,19 @@ export function themeFromSourceColor(source, variant = 'SchemeTonalSpot', contra
       neutralVariant: scheme.neutralVariantPalette,
       error: scheme.errorPalette,
     },
-    customColors: customColors.map((c) => customColor(source, c, variant, contrastLevel)),
+    customColors: customColors.map((c) => customColor(source, c, normalizedVariant, contrastLevel)),
   };
 }
 /**
- * Generate a theme from an image source
+ * 根据图片源颜色生成主题。
  *
- * @param image Image element
- * @param variant Scheme variant, equal to scheme class name (SchemeMonochrome, SchemeNeutral, SchemeTonalSpot,...)
- * @param contrastLevel Contrast level between -1.0 and 1.0
- * @param customColors Array of custom colors
- * @return Theme object
+ * @param {HTMLImageElement} image - 图片元素
+ * @param {string} variant - 2025 规范支持的方案变体
+ * @param {number} contrastLevel - -1.0 到 1.0 的对比度级别
+ * @param {Array<object>} customColors - 自定义颜色数组
+ * @returns {Promise<object>} 主题对象
  */
-export async function themeFromImage(image, variant = 'SchemeTonalSpot', contrastLevel = 0.0, customColors = []) {
+export async function themeFromImage(image, variant = DEFAULT_THEME_COLOR_VARIANT, contrastLevel = 0.0, customColors = []) {
   const source = await m3utils.sourceColorFromImage(image);
   return themeFromSourceColor(source, variant, contrastLevel, customColors);
 }

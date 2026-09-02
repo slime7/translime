@@ -12,6 +12,11 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     include: ['tests/unit/**/*.test.js'],
+    server: {
+      deps: {
+        inline: ['@material/material-color-utilities'],
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

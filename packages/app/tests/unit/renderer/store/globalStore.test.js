@@ -5,6 +5,17 @@ import {
 import { createPinia, setActivePinia } from 'pinia';
 import useGlobalStore from '@/store/globalStore';
 
+const { appConfigStoreMock } = vi.hoisted(() => ({
+  appConfigStoreMock: {
+    get: vi.fn(),
+    set: vi.fn(),
+  },
+}));
+
+vi.mock('@/utils', () => ({
+  appConfigStore: appConfigStoreMock,
+}));
+
 // Mock electron hooks to avoid window.electron undefined error
 vi.mock('@/hooks/electron', () => ({
   useIpc: () => ({
@@ -20,6 +31,8 @@ vi.mock('@/hooks/electron', () => ({
 describe('globalStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    appConfigStoreMock.get.mockImplementation((key, fallback) => Promise.resolve(fallback));
+    appConfigStoreMock.set.mockResolvedValue(undefined);
   });
 
   describe('初始状态', () => {
@@ -32,6 +45,7 @@ describe('globalStore', () => {
       expect(store.appArgv).toEqual([]);
       expect(store.appSetting.openAtLogin).toBe(false);
       expect(store.appSetting.theme).toBe('system');
+      expect(store.appSetting.themeColor.variant).toBe('SchemeExpressive');
     });
   });
 
@@ -160,6 +174,33 @@ describe('globalStore', () => {
 
       store.setAppThemeColor(themeColor);
       expect(store.appSetting.themeColor).toEqual(themeColor);
+    });
+
+    it('读取旧主题方案时应该迁移并回写 Expressive', async () => {
+      appConfigStoreMock.get.mockImplementation((key, fallback) => {
+        if (key === 'setting.themeColor') {
+          return Promise.resolve({
+            name: 'custom',
+            source: '#123456',
+            variant: 'SchemeRainbow',
+          });
+        }
+        return Promise.resolve(fallback);
+      });
+      const store = useGlobalStore();
+
+      await store.initAppConfig();
+
+      expect(store.appSetting.themeColor).toEqual({
+        name: 'custom',
+        source: '#123456',
+        variant: 'SchemeExpressive',
+      });
+      expect(appConfigStoreMock.set).toHaveBeenCalledWith('setting.themeColor', {
+        name: 'custom',
+        source: '#123456',
+        variant: 'SchemeExpressive',
+      });
     });
   });
 });

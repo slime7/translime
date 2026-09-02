@@ -1,20 +1,34 @@
+import { SUPPORTED_THEME_COLOR_VARIANTS } from '@/utils/themeColorConfig';
+
+/**
+ * 主题模式名称映射。
+ * @type {{light: string, dark: string, system: string}}
+ */
 const THEME_MAP = {
   light: '明亮',
   dark: '暗黑',
   system: '系统',
 };
 
-const THEME_COLOR_VARIANTS = [
-  { title: '彩虹', value: 'SchemeRainbow' },
-  { title: '多彩活泼', value: 'SchemeFruitSalad' },
-  { title: '鲜艳', value: 'SchemeExpressive' },
-  { title: '平衡和谐', value: 'SchemeTonalSpot' },
-  { title: '高饱和度', value: 'SchemeVibrant' },
-  { title: '强调主色', value: 'SchemeContent' },
-  { title: '遵循源颜色', value: 'SchemeFidelity' },
-  { title: '灰度色彩', value: 'SchemeMonochrome' },
-  { title: '中性', value: 'SchemeNeutral' },
-];
+/**
+ * 2025 配色方案的显示名称。
+ * @type {Readonly<Record<string, string>>}
+ */
+const THEME_COLOR_VARIANT_TITLES = {
+  SchemeExpressive: '鲜艳',
+  SchemeTonalSpot: '平衡和谐',
+  SchemeVibrant: '高饱和度',
+  SchemeNeutral: '中性',
+};
+
+/**
+ * 主题颜色设置中展示的 2025 配色方案。
+ * @type {Array<{title: string, value: string}>}
+ */
+const THEME_COLOR_VARIANTS = SUPPORTED_THEME_COLOR_VARIANTS.map((value) => ({
+  title: THEME_COLOR_VARIANT_TITLES[value],
+  value,
+}));
 
 export {
   THEME_COLOR_VARIANTS,

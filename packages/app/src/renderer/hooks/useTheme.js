@@ -3,6 +3,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { appConfigStore } from '@/utils';
+import { normalizeThemeColor } from '@/utils/themeColorConfig';
 
 const DEFAULT_SYMBOL_COLORS = {
   dark: '#ffffff',
@@ -73,7 +74,7 @@ const useTheme = () => {
    * @param {object} [themeColor] - 可选，主题配色元数据，传入时会保存到 store 和配置
    * @param {string} themeColor.name - 配色名称 ('translime' | 'custom')
    * @param {string} themeColor.source - 源颜色 (十六进制格式)
-   * @param {string} themeColor.variant - 配色方案变体
+   * @param {string} themeColor.variant - 使用 M3 2025 规范的配色方案变体
    */
   const setCustomTheme = (colors, themeColor) => {
     if (colors.light) {
@@ -84,8 +85,9 @@ const useTheme = () => {
     }
     // 如果提供了 themeColor，则保存到 store 和配置
     if (themeColor) {
-      store.setAppThemeColor(themeColor);
-      appConfigStore.set('setting.themeColor', themeColor);
+      const normalizedThemeColor = normalizeThemeColor(themeColor);
+      store.setAppThemeColor(normalizedThemeColor);
+      appConfigStore.set('setting.themeColor', normalizedThemeColor);
       ipc.send(ipcType.THEME_COLOR_UPDATED);
     }
   };

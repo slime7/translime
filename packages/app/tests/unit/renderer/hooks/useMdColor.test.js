@@ -25,6 +25,17 @@ describe('useMdColor', () => {
       expect(theme).toHaveProperty('schemes');
       expect(theme.schemes).toHaveProperty('light');
       expect(theme.schemes).toHaveProperty('dark');
+      expect(theme.schemes.light).toHaveProperty('primaryDim');
+      expect(theme.schemes.dark).toHaveProperty('errorDim');
+    });
+
+    it('默认方案应该固定为 SchemeExpressive', () => {
+      const { getThemeColorFromColor } = useMdColor();
+
+      const defaultTheme = getThemeColorFromColor('#20a6fc');
+      const expressiveTheme = getThemeColorFromColor('#20a6fc', 'SchemeExpressive');
+
+      expect(defaultTheme.schemes).toEqual(expressiveTheme.schemes);
     });
 
     it('应该支持不同的 variant', () => {

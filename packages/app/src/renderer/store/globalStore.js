@@ -1,5 +1,9 @@
 import { acceptHMRUpdate, defineStore } from 'pinia';
 import { appConfigStore } from '@/utils';
+import {
+  getDefaultThemeColor,
+  normalizeThemeColor,
+} from '@/utils/themeColorConfig';
 
 const useGlobalStore = defineStore('globalStore', {
   state: () => ({
@@ -11,11 +15,7 @@ const useGlobalStore = defineStore('globalStore', {
       theme: 'system',
       showDevPlugin: false,
       pinnedPlugins: [],
-      themeColor: {
-        name: 'translime',
-        source: '#20a6fc',
-        variant: 'SchemeRainbow',
-      },
+      themeColor: getDefaultThemeColor(),
     },
     plugins: [],
     dark: false,
@@ -80,21 +80,27 @@ const useGlobalStore = defineStore('globalStore', {
       this.embeddedPluginInspectRequest = null;
     },
     async initAppConfig() {
-      this.$patch(async (state) => {
-        const openAtLogin = await appConfigStore.get('setting.openAtLogin', false);
-        const minimizeToTrayOnClose = await appConfigStore.get('setting.minimizeToTrayOnClose', false);
-        const registry = await appConfigStore.get('setting.registry', 'https://registry.npmmirror.com/');
+      const openAtLogin = await appConfigStore.get('setting.openAtLogin', false);
+      const minimizeToTrayOnClose = await appConfigStore.get('setting.minimizeToTrayOnClose', false);
+      const registry = await appConfigStore.get('setting.registry', 'https://registry.npmmirror.com/');
+      const theme = await appConfigStore.get('setting.theme', 'system');
+      const showDevPlugin = await appConfigStore.get('setting.showDevPlugin', false);
+      const storedThemeColor = await appConfigStore.get('setting.themeColor', getDefaultThemeColor());
+      const themeColor = normalizeThemeColor(storedThemeColor);
+      const pinnedPlugins = await appConfigStore.get('setting.pinnedPlugins', []);
+
+      if (storedThemeColor?.variant !== themeColor.variant) {
+        await appConfigStore.set('setting.themeColor', themeColor);
+      }
+
+      this.$patch((state) => {
         state.appSetting.openAtLogin = openAtLogin;
         state.appSetting.minimizeToTrayOnClose = minimizeToTrayOnClose;
         state.appSetting.registry = registry;
-        state.appSetting.theme = await appConfigStore.get('setting.theme', 'system');
-        state.appSetting.showDevPlugin = await appConfigStore.get('setting.showDevPlugin', false);
-        state.appSetting.themeColor = await appConfigStore.get('setting.themeColor', {
-          name: 'translime',
-          source: '#20a6fc',
-          variant: 'SchemeRainbow',
-        });
-        state.appSetting.pinnedPlugins = await appConfigStore.get('setting.pinnedPlugins', []);
+        state.appSetting.theme = theme;
+        state.appSetting.showDevPlugin = showDevPlugin;
+        state.appSetting.themeColor = themeColor;
+        state.appSetting.pinnedPlugins = pinnedPlugins;
       });
     },
     async togglePinPlugin(packageName) {
@@ -128,7 +134,10 @@ const useGlobalStore = defineStore('globalStore', {
       this.appArgv = argv;
     },
     setAppThemeColor(themeColor) {
-      this.appSetting.themeColor = Object.assign(this.appSetting.themeColor, themeColor);
+      this.appSetting.themeColor = normalizeThemeColor({
+        ...this.appSetting.themeColor,
+        ...themeColor,
+      });
     },
   },
 });

@@ -6,10 +6,11 @@ import {
   themeFromImage,
   themeFromSourceColor,
 } from '@/utils/mdColorHelper';
+import { DEFAULT_THEME_COLOR_VARIANT } from '@/utils/themeColorConfig';
 
 /**
  * Material Design 3 配色方案变体
- * @typedef {'SchemeContent' | 'SchemeExpressive' | 'SchemeFidelity' | 'SchemeFruitSalad' | 'SchemeMonochrome' | 'SchemeNeutral' | 'SchemeRainbow' | 'SchemeTonalSpot' | 'SchemeVibrant'} SchemeVariant
+ * @typedef {'SchemeExpressive' | 'SchemeTonalSpot' | 'SchemeVibrant' | 'SchemeNeutral'} SchemeVariant
  */
 
 /**
@@ -27,17 +28,12 @@ import {
  * 从十六进制颜色生成 Material Design 3 主题配色
  *
  * @param {string} color - 源颜色，十六进制格式 (如 '#6750A4')
- * @param {SchemeVariant} [variant='SchemeTonalSpot'] - 配色方案变体
+ * @param {SchemeVariant} [variant='SchemeExpressive'] - 配色方案变体，使用 M3 2025 规范
  *   可选值:
- *   - `SchemeContent`: 内容配色，强调主色
- *   - `SchemeExpressive`: 表达性配色，更鲜艳的色彩组合
- *   - `SchemeFidelity`: 忠实配色，严格遵循源颜色
- *   - `SchemeFruitSalad`: 水果沙拉配色，多彩活泼
- *   - `SchemeMonochrome`: 单色配色，灰度色彩
- *   - `SchemeNeutral`: 中性配色，低饱和度
- *   - `SchemeRainbow`: 彩虹配色，色相均匀分布
- *   - `SchemeTonalSpot`: (默认) 色调斑点配色，平衡且和谐
- *   - `SchemeVibrant`: 鲜艳配色，高饱和度
+ *   - `SchemeExpressive`: 鲜艳表达配色
+ *   - `SchemeTonalSpot`: 平衡和谐配色
+ *   - `SchemeVibrant`: 高饱和度配色
+ *   - `SchemeNeutral`: 中性配色
  * @param {number} [contrastLevel=0.0] - 对比度级别，范围 -1.0 到 1.0
  * @param {Array<object>} [customColors=[]] - 自定义颜色数组
  * @returns {M3Theme} M3 主题对象，包含 schemes, palettes 等
@@ -48,7 +44,7 @@ import {
  */
 const getThemeColorFromColor = (
   color,
-  variant = 'SchemeTonalSpot',
+  variant = DEFAULT_THEME_COLOR_VARIANT,
   contrastLevel = 0.0,
   customColors = [],
 ) => {
@@ -61,17 +57,12 @@ const getThemeColorFromColor = (
  * 从图片异步提取主色并生成 Material Design 3 主题配色
  *
  * @param {HTMLImageElement} image - 图片元素
- * @param {SchemeVariant} [variant='SchemeTonalSpot'] - 配色方案变体
+ * @param {SchemeVariant} [variant='SchemeExpressive'] - 配色方案变体，使用 M3 2025 规范
  *   可选值:
- *   - `SchemeContent`: 内容配色，强调主色
- *   - `SchemeExpressive`: 表达性配色，更鲜艳的色彩组合
- *   - `SchemeFidelity`: 忠实配色，严格遵循源颜色
- *   - `SchemeFruitSalad`: 水果沙拉配色，多彩活泼
- *   - `SchemeMonochrome`: 单色配色，灰度色彩
- *   - `SchemeNeutral`: 中性配色，低饱和度
- *   - `SchemeRainbow`: 彩虹配色，色相均匀分布
- *   - `SchemeTonalSpot`: (默认) 色调斑点配色，平衡且和谐
- *   - `SchemeVibrant`: 鲜艳配色，高饱和度
+ *   - `SchemeExpressive`: 鲜艳表达配色
+ *   - `SchemeTonalSpot`: 平衡和谐配色
+ *   - `SchemeVibrant`: 高饱和度配色
+ *   - `SchemeNeutral`: 中性配色
  * @param {number} [contrastLevel=0.0] - 对比度级别，范围 -1.0 到 1.0
  * @param {Array<object>} [customColors=[]] - 自定义颜色数组
  * @returns {Promise<M3Theme>} M3 主题对象
@@ -83,7 +74,7 @@ const getThemeColorFromColor = (
  */
 const getThemeColorFromImage = async (
   image,
-  variant = 'SchemeTonalSpot',
+  variant = DEFAULT_THEME_COLOR_VARIANT,
   contrastLevel = 0.0,
   customColors = [],
 ) => {

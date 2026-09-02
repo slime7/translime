@@ -1,6 +1,7 @@
 import {
   describe, expect, it,
 } from 'vitest';
+import * as m3utils from '@material/material-color-utilities';
 import {
   customColor,
   getReadableColors,
@@ -8,10 +9,30 @@ import {
   getVuetifyColors,
   themeFromSourceColor,
 } from '@/utils/mdColorHelper';
+import {
+  LEGACY_THEME_COLOR_VARIANTS,
+  M3_SPEC_VERSION,
+} from '@/utils/themeColorConfig';
 
 // Material Design 颜色工具测试
 // 使用 Translime 的主题色作为测试源颜色
 const TEST_SOURCE_COLOR = 0xFF20A6FC; // #20a6fc 的 ARGB 格式
+const EXPECTED_TOKENS = [
+  'primary', 'primaryDim', 'onPrimary', 'primaryContainer', 'onPrimaryContainer', 'inversePrimary',
+  'primaryFixed', 'primaryFixedDim', 'onPrimaryFixed', 'onPrimaryFixedVariant',
+  'secondary', 'secondaryDim', 'onSecondary', 'secondaryContainer', 'onSecondaryContainer',
+  'secondaryFixed', 'secondaryFixedDim', 'onSecondaryFixed', 'onSecondaryFixedVariant',
+  'tertiary', 'tertiaryDim', 'onTertiary', 'tertiaryContainer', 'onTertiaryContainer',
+  'tertiaryFixed', 'tertiaryFixedDim', 'onTertiaryFixed', 'onTertiaryFixedVariant',
+  'error', 'errorDim', 'onError', 'errorContainer', 'onErrorContainer',
+  'surfaceDim', 'surface', 'surfaceBright',
+  'surfaceContainerLowest', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest',
+  'onSurface', 'onSurfaceVariant', 'outline', 'outlineVariant',
+  'inverseSurface', 'inverseOnSurface',
+  'surfaceVariant', 'surfaceTint',
+  'background', 'onBackground',
+  'shadow', 'scrim',
+];
 
 describe('themeFromSourceColor', () => {
   it('应该从源颜色生成完整的主题对象', () => {
@@ -26,26 +47,43 @@ describe('themeFromSourceColor', () => {
 
   it('应该生成包含所有必需颜色 token 的配色方案', () => {
     const theme = themeFromSourceColor(TEST_SOURCE_COLOR);
-    const requiredTokens = [
-      'primary', 'onPrimary', 'primaryContainer', 'onPrimaryContainer',
-      'secondary', 'onSecondary', 'secondaryContainer', 'onSecondaryContainer',
-      'surface', 'onSurface', 'background', 'onBackground',
-      'error', 'onError',
-    ];
 
-    requiredTokens.forEach((token) => {
+    expect(Object.keys(theme.schemes.light)).toEqual(EXPECTED_TOKENS);
+    expect(Object.keys(theme.schemes.dark)).toEqual(EXPECTED_TOKENS);
+
+    EXPECTED_TOKENS.forEach((token) => {
       expect(theme.schemes.light).toHaveProperty(token);
       expect(theme.schemes.dark).toHaveProperty(token);
     });
   });
 
-  it('应该支持不同的 variant 参数', () => {
-    const variants = ['SchemeTonalSpot', 'SchemeMonochrome', 'SchemeNeutral'];
+  it('默认方案应该使用 SchemeExpressive 的 2025 结果', () => {
+    const defaultTheme = themeFromSourceColor(TEST_SOURCE_COLOR);
+    const expressiveTheme = themeFromSourceColor(TEST_SOURCE_COLOR, 'SchemeExpressive');
+
+    expect(defaultTheme.schemes).toEqual(expressiveTheme.schemes);
+  });
+
+  it('四种内置方案应该使用 2025 规范计算', () => {
+    const variants = ['SchemeExpressive', 'SchemeTonalSpot', 'SchemeVibrant', 'SchemeNeutral'];
+    const hct = m3utils.Hct.fromInt(TEST_SOURCE_COLOR);
 
     variants.forEach((variant) => {
       const theme = themeFromSourceColor(TEST_SOURCE_COLOR, variant);
-      expect(theme).toHaveProperty('schemes');
-      expect(theme.schemes.light).toHaveProperty('primary');
+      const expectedScheme = new m3utils[variant](hct, false, 0.0, M3_SPEC_VERSION);
+
+      expect(theme.schemes.light.primary).toBe(expectedScheme.primary);
+      expect(theme.schemes.light.primaryDim).toBe(expectedScheme.primaryDim);
+    });
+  });
+
+  it('旧方案应该迁移到 SchemeExpressive', () => {
+    const expressiveTheme = themeFromSourceColor(TEST_SOURCE_COLOR, 'SchemeExpressive');
+
+    LEGACY_THEME_COLOR_VARIANTS.forEach((variant) => {
+      const migratedTheme = themeFromSourceColor(TEST_SOURCE_COLOR, variant);
+
+      expect(migratedTheme.schemes).toEqual(expressiveTheme.schemes);
     });
   });
 
@@ -154,6 +192,8 @@ describe('getThemeStyles', () => {
 
     // primary 颜色在 light 和 dark 模式下应该不同
     expect(lightStyles['--md-color-primary']).not.toBe(darkStyles['--md-color-primary']);
+    expect(lightStyles['--md-color-primary-dim']).toMatch(/^#[0-9a-fA-F]{6}$/);
+    expect(darkStyles['--md-color-error-dim']).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 
   it('CSS 变量值应该是十六进制颜色字符串', () => {
@@ -178,6 +218,10 @@ describe('getVuetifyColors', () => {
     expect(vuetifyColors.light).toHaveProperty('on-primary');
     expect(vuetifyColors.light).toHaveProperty('primary-container');
     expect(vuetifyColors.light).toHaveProperty('on-primary-container');
+    expect(vuetifyColors.light).toHaveProperty('primary-dim');
+    expect(vuetifyColors.light).toHaveProperty('secondary-dim');
+    expect(vuetifyColors.light).toHaveProperty('tertiary-dim');
+    expect(vuetifyColors.light).toHaveProperty('error-dim');
   });
 
   it('应该同时包含 light 和 dark 配色方案', () => {
