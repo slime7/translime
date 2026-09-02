@@ -106,5 +106,6 @@ export const useTitleBarHeight = () => {
 
   return {
     height,
+    hasNativeOverlay,
   };
 };

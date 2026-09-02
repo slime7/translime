@@ -185,6 +185,32 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
     });
   });
 
+  describe('插件 CSS 运行时作用域契约', () => {
+    it('app 使用原生 @scope 包裹动态插件样式，并只转换根级选择器', async () => {
+      const isolation = await read('src/renderer/utils/pluginStyleIsolation.js');
+
+      expect(isolation).toContain('@scope (');
+      expect(isolation).toContain(':scope');
+      expect(isolation).toContain('data-plugin-style-id');
+      expect(isolation).toContain('normalizeRootSelectorList');
+      expect(isolation).not.toContain('CSSStyleSheet');
+      expect(isolation).not.toContain('serializeCssRule');
+      expect(isolation).not.toContain('scopeSelectorText');
+    });
+
+    it('SDK 只保留 CSS 注入封装，不再提供构建期选择器作用域插件', async () => {
+      const plugin = await readSdk('src/vite-plugin.js');
+      const types = await readSdk('src/vite-plugin.d.ts');
+
+      expect(plugin).toContain('createPluginCssIsolationPlugins');
+      expect(plugin).toContain('cssInjectedByJsPlugin(createPluginCssInjectionOptions(styleId))');
+      expect(plugin).not.toContain('createPluginCssScopePlugin');
+      expect(plugin).not.toContain('scopePluginCss');
+      expect(plugin).not.toContain('data-plugin-style-id');
+      expect(types).not.toContain('createPluginCssScopePlugin');
+    });
+  });
+
   describe('组件类迁移（Tailwind 为主）', () => {
     it('NaviLink.vue 使用 Tailwind 等价类', async () => {
       const vue = await read('src/renderer/views/Layout/components/NaviLink.vue');

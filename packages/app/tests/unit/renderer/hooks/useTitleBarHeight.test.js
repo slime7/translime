@@ -4,10 +4,13 @@ import {
   expect,
   it,
 } from 'vitest';
+import { defineComponent } from 'vue';
+import { mount } from '@vue/test-utils';
 import {
   getTitleBarHeight,
   isNativeOverlayActive,
   TITLE_BAR_HEIGHT_FALLBACK,
+  useTitleBarHeight,
 } from '@/hooks/useTitleBarHeight';
 
 const setWco = (value) => {
@@ -79,5 +82,30 @@ describe('isNativeOverlayActive', () => {
     window.innerWidth = 1000;
     setWco({ visible: true, getTitlebarAreaRect: () => ({ width: 860, height: 32 }) });
     expect(isNativeOverlayActive()).toBe(true);
+  });
+});
+
+describe('useTitleBarHeight', () => {
+  afterEach(() => {
+    setWco(undefined);
+  });
+
+  it('返回原生覆盖层状态，供布局选择系统控件或自绘降级控件', () => {
+    setWco({
+      visible: true,
+      getTitlebarAreaRect: () => ({ width: 860, height: 32 }),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+
+    const wrapper = mount(defineComponent({
+      setup() {
+        return useTitleBarHeight();
+      },
+      template: '<div />',
+    }));
+
+    expect(wrapper.vm.hasNativeOverlay).toBe(true);
+    wrapper.unmount();
   });
 });

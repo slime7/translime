@@ -82,13 +82,11 @@ defineProps({
 </template>
 
 <style scoped>
-@reference '@/assets/styles/tailwind.css';
-
 .mde-list-item {
   transition-property: all;
 }
 
 .mde-list-item + .mde-list-item {
-  margin-top: --spacing(.5);
+  margin-top: .125rem;
 }
 </style>

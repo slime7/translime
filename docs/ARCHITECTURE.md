@@ -2,7 +2,7 @@
 
 ## 当前状态摘要
 
-仓库是 pnpm workspace 单仓：`packages/app`（宿主应用，0.6.x）、`packages/sdk`（插件 SDK，1.0.x）与若干 `translime-plugin-*` 插件包。宿主基于 Electron，插件系统采用"描述符扫描 + 按触发激活"模型：启动时只解析 manifest 并构建依赖图，插件在其声明的激活事件（`onStartup`、`onView`、`onCommand`、`onIpc` 等）触发时才执行入口代码。插件 UI 运行在隔离的 `<webview>` 或独立 BrowserWindow 中，与宿主 DOM/CSS 完全隔离。
+仓库是 pnpm workspace 单仓：`packages/app`（宿主应用，0.6.x）、`packages/sdk`（插件 SDK，1.0.x）与若干 `translime-plugin-*` 插件包。宿主基于 Electron，插件系统采用"描述符扫描 + 按触发激活"模型：启动时只解析 manifest 并构建依赖图，插件在其声明的激活事件（`onStartup`、`onView`、`onCommand`、`onIpc` 等）触发时才执行入口代码。插件 UI 默认运行在隔离的 `<webview>` 或独立 BrowserWindow 中；内嵌渲染路径由宿主 app 使用 `@scope` 与 CSS layer 限制插件样式的选择器作用域。
 
 ## 架构原则
 
@@ -67,7 +67,8 @@ flowchart LR
 
 ### 渲染进程（packages/app/src/renderer）
 
-- `views/plugins/`：插件列表、插件页与设置面板；`PluginRender.vue` 与 `EmbeddedPluginWebviews.vue` 负责在 `<webview>` 中加载插件 UI。
+- `views/plugins/`：插件列表、插件页与设置面板；`PluginRender.vue` 负责在 app renderer 中加载内嵌插件 UI，`EmbeddedPluginWebviews.vue` 负责在 `<webview>` 中加载插件 UI。
+- `utils/pluginStyleIsolation.js`：监听动态 `style`/`link` 节点，为内嵌插件样式保留插件 layer 并包裹 `@scope (.plugin-ui-loader[data-plugin-id="插件ID"])`；对 `:root`、`:host`、`html`、`body` 根级规则提供 `:scope` 兼容转换。
 - `PluginWindow.vue` 与 `views/Layout/PluginWindow.vue`：独立 BrowserWindow 形态的插件窗口。
 - `store/`、`hooks/`、`components/`：宿主自身的状态与 UI 组件。
 
@@ -79,7 +80,7 @@ flowchart LR
 ### SDK（packages/sdk）
 
 - `src/index.js` 与 `src/index.d.ts`：运行时 API 与类型（主进程、渲染进程、通用三组）。
-- `src/vite-plugin.js`：`translimeSdk()` Vite 插件与 `createPluginCssIsolationPlugins()` 样式隔离封装。
+- `src/vite-plugin.js`：`translimeSdk()` Vite 插件与 `createPluginCssIsolationPlugins()` CSS 提取、注入和去重封装；插件选择器作用域由宿主 app 运行时完成。
 - `src/preview/` 与 `src/preview-mock.js`：浏览器 preview 模式 shell 与 mock 实现。
 - `src/electronNetAdapter.js`：基于 `window.ts.net` 的 axios adapter。
 - 发布产物：`dist/index.(js|cjs)`、`dist/vite-plugin.*`、`dist/preview.*`、`dist/preview-mock.*` 与类型声明。
@@ -93,7 +94,7 @@ flowchart LR
 1. 插件发现：启动时扫描 `userData/plugins`（发布插件）与 `userData/plugins_dev`（开发插件）下的 `node_modules`，读取各包 manifest，构建依赖图与激活索引，插件状态进入 `discovered` / `ready`。
 2. 插件激活：激活事件触发后，宿主加载插件主进程入口（CJS，配合原生模块加载补丁），执行 `pluginDidLoad`，注册命令与 IPC handler，状态进入 `active`。
 3. IPC 调用：插件 UI 通过 `ipc.invoke('事件名@插件ID', ...)` 调用；宿主按插件 ID 路由到对应 `ipcHandlers`，handler 可拿到 `sendToClient` 主动推送；若插件尚未激活且声明了 `onIpc`，宿主先激活再路由。
-4. 插件 UI 加载：渲染进程请求 `load-plugin-ui`，宿主按 manifest 的 `ui`（webview 内嵌）或 `windowUrl`（独立窗口）加载；webview 实例在路由切换时缓存复用。
+4. 插件 UI 加载：渲染进程请求 `load-plugin-ui`，`ui` 由 `PluginRender.vue` 在宿主 renderer 文档中动态加载（该路径可位于缓存的 webview 中），`windowUrl` 在独立窗口中加载；webview 实例在路由切换时缓存复用。
 5. 设置读写：`getPluginSetting` / `setPluginSetting` 读写配置中 `plugin.<插件ID>.settings.*`。
 6. 插件间通信：已激活插件通过 `pluginInterop.getExports()` / `waitForPlugin()` 访问其他插件导出的 API；依赖关系优先在 manifest 中声明。
 
@@ -126,9 +127,25 @@ flowchart TD
   - `github-page.yaml`：push 到 `dev` 分支时把 `github-page/` 部署到 GitHub Pages。
 - 深链：宿主注册 `translime://` 协议，`translime://open/...` 会转发到主窗口。
 
+## 内嵌插件样式隔离
+
+内嵌 UI 的插件根节点由 `PluginRender.vue` 提供 `.plugin-ui-loader[data-plugin-id="插件ID"]`。app renderer 监听插件动态插入的样式节点，并生成以下结构：
+
+```css
+@layer translime-plugin {
+  @scope (.plugin-ui-loader[data-plugin-id="插件ID"]) {
+    /* 插件原始 CSS */
+  }
+}
+```
+
+SDK 的 `createPluginCssIsolationPlugins(pluginId)` 只负责构建产物中的 CSS 提取、运行时注入、样式 ID 去重和插件专用 layer，不再在构建阶段改写普通选择器。宿主会将插件 CSS 中直接或前置使用的 `:root`、`:host`、`html`、`body` 规则映射到 `:scope`，以兼容主题变量和根级规则。
+
+`@scope` 限制选择器匹配范围；继承属性以及 `@keyframes`、`@font-face`、`@property` 等全局命名空间继续遵循浏览器原生语义。独立 `<webview>` 与 BrowserWindow 的文档隔离保持不变，旧版 SDK 已生成的带 `data-plugin-style-id` 标记样式由 app 保留兼容处理。
+
 ## 安全、可靠性与可观测性
 
-- 插件 UI 默认运行在 OOP `<webview>` 或独立 BrowserWindow 中，DOM 与 CSS 与宿主隔离；SDK 的 `createPluginCssIsolationPlugins` 与宿主运行时防御进一步限制样式泄漏。
+- 插件 UI 默认运行在 OOP `<webview>` 或独立 BrowserWindow 中，DOM 与 CSS 与宿主隔离；内嵌 UI 由宿主 `@scope` 与 CSS layer 进一步限制样式选择器的影响范围。
 - 原生模块通过 `nativeLoader` 补丁在临时目录加载，应用关闭时清理。
 - 插件加载失败不会阻断宿主启动，插件卡片展示 `build-missing`、`load-error`、`blocked` 等状态。
 - 日志集中到 winston 并提供 LogViewer；IPC 事件名集中在 `ipcConstant.js`，便于统一维护。

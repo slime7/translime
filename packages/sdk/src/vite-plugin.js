@@ -12,10 +12,6 @@ const currentDir = dirname(filename);
 
 const VIRTUAL_PREVIEW_ENTRY = 'virtual:translime-preview-entry';
 const RESOLVED_VIRTUAL_PREVIEW_ENTRY = `\0${VIRTUAL_PREVIEW_ENTRY}`;
-const HOST_ROOT_SELECTOR_RE = /^(?:\s)*(?::root|html|body)(?=[\s.#:[>+~]|$)/;
-const LEADING_COMBINATOR_RE = /^(?:\s)*(?:[>+~])(?:\s)*/;
-const AT_RULE_WITH_NESTED_RULES = new Set(['media', 'supports', 'layer', 'container', 'scope']);
-const AT_RULE_WITH_RAW_BLOCK = new Set(['font-face', 'keyframes', '-webkit-keyframes', '-moz-keyframes']);
 
 function cssInjectedByJsPlugin(options = {}) {
   const styleId = options.styleId || 'vite-plugin-css-injected-by-js';
@@ -90,223 +86,6 @@ function getInlineTemplate() {
 </html>`;
 }
 
-const escapeAttributeValue = (value) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
-const getPluginScopeSelector = (styleId) => `.plugin-ui-loader[data-plugin-id="${escapeAttributeValue(styleId)}"]`;
-
-const stripHostRootSelector = (selector) => {
-  let nextSelector = selector.trim();
-
-  while (HOST_ROOT_SELECTOR_RE.test(nextSelector)) {
-    nextSelector = nextSelector.replace(HOST_ROOT_SELECTOR_RE, '').trimStart();
-    nextSelector = nextSelector.replace(LEADING_COMBINATOR_RE, '').trimStart();
-  }
-
-  return nextSelector;
-};
-
-const scopeSelector = (selector, scopeSelectorText) => {
-  const trimmedSelector = selector.trim();
-  if (!trimmedSelector) {
-    return scopeSelectorText;
-  }
-
-  if (trimmedSelector.startsWith(scopeSelectorText)) {
-    return trimmedSelector;
-  }
-
-  const withoutHostRoot = stripHostRootSelector(trimmedSelector);
-  if (!withoutHostRoot) {
-    return scopeSelectorText;
-  }
-
-  if (withoutHostRoot.startsWith('@')) {
-    return withoutHostRoot;
-  }
-
-  if (withoutHostRoot.startsWith('::backdrop')) {
-    return withoutHostRoot;
-  }
-
-  return `${scopeSelectorText} ${withoutHostRoot}`;
-};
-
-const scopePluginCss = (cssCode, styleId) => {
-  const scopeSelectorText = getPluginScopeSelector(styleId);
-
-  const splitTopLevelSelectors = (selectorText) => {
-    const selectors = [];
-    let current = '';
-    let parenthesesDepth = 0;
-    let bracketsDepth = 0;
-    let quote = '';
-
-    for (let index = 0; index < selectorText.length; index += 1) {
-      const char = selectorText[index];
-      const prevChar = selectorText[index - 1];
-      current += char;
-
-      if (quote) {
-        if (char === quote && prevChar !== '\\') {
-          quote = '';
-        }
-      } else if (char === '"' || char === '\'') {
-        quote = char;
-      } else if (char === '(') {
-        parenthesesDepth += 1;
-      } else if (char === ')') {
-        parenthesesDepth -= 1;
-      } else if (char === '[') {
-        bracketsDepth += 1;
-      } else if (char === ']') {
-        bracketsDepth -= 1;
-      } else if (char === ',' && parenthesesDepth === 0 && bracketsDepth === 0) {
-        selectors.push(current.slice(0, -1));
-        current = '';
-      }
-    }
-
-    if (current.trim()) {
-      selectors.push(current);
-    }
-
-    return selectors;
-  };
-
-  const scopeSelectorList = (selectorText) => splitTopLevelSelectors(selectorText)
-    .map((selector) => scopeSelector(selector, scopeSelectorText))
-    .join(', ');
-
-  const findMatchingBrace = (source, openIndex) => {
-    let depth = 0;
-    let quote = '';
-    let inComment = false;
-
-    for (let index = openIndex; index < source.length; index += 1) {
-      const char = source[index];
-      const nextChar = source[index + 1];
-      const prevChar = source[index - 1];
-
-      if (inComment) {
-        if (char === '*' && nextChar === '/') {
-          inComment = false;
-          index += 1;
-        }
-      } else if (quote) {
-        if (char === quote && prevChar !== '\\') {
-          quote = '';
-        }
-      } else if (char === '/' && nextChar === '*') {
-        inComment = true;
-        index += 1;
-      } else if (char === '"' || char === '\'') {
-        quote = char;
-      } else if (char === '{') {
-        depth += 1;
-      } else if (char === '}') {
-        depth -= 1;
-        if (depth === 0) {
-          return index;
-        }
-      }
-    }
-
-    return -1;
-  };
-
-  const processCssBlock = (source) => {
-    let output = '';
-    let cursor = 0;
-    let quote = '';
-    let inComment = false;
-    let parenthesesDepth = 0;
-    let bracketsDepth = 0;
-
-    for (let index = 0; index < source.length; index += 1) {
-      const char = source[index];
-      const nextChar = source[index + 1];
-      const prevChar = source[index - 1];
-
-      if (inComment) {
-        if (char === '*' && nextChar === '/') {
-          inComment = false;
-          index += 1;
-        }
-      } else if (quote) {
-        if (char === quote && prevChar !== '\\') {
-          quote = '';
-        }
-      } else if (char === '/' && nextChar === '*') {
-        inComment = true;
-        index += 1;
-      } else if (char === '"' || char === '\'') {
-        quote = char;
-      } else if (char === '(') {
-        parenthesesDepth += 1;
-      } else if (char === ')') {
-        parenthesesDepth -= 1;
-      } else if (char === '[') {
-        bracketsDepth += 1;
-      } else if (char === ']') {
-        bracketsDepth -= 1;
-      } else if (parenthesesDepth === 0 && bracketsDepth === 0 && char === '{') {
-        const prelude = source.slice(cursor, index);
-        const trimmedPrelude = prelude.trim();
-        const closeIndex = findMatchingBrace(source, index);
-        if (closeIndex === -1) {
-          return output + source.slice(cursor);
-        }
-
-        const blockContent = source.slice(index + 1, closeIndex);
-        if (!trimmedPrelude) {
-          output += source.slice(cursor, closeIndex + 1);
-          cursor = closeIndex + 1;
-          index = closeIndex;
-        } else {
-          if (trimmedPrelude.startsWith('@')) {
-            const atRuleName = trimmedPrelude.slice(1).split(/\s|\(/, 1)[0].toLowerCase();
-            if (AT_RULE_WITH_NESTED_RULES.has(atRuleName)) {
-              output += `${prelude}{${processCssBlock(blockContent)}}`;
-            } else if (AT_RULE_WITH_RAW_BLOCK.has(atRuleName) || atRuleName.endsWith('keyframes')) {
-              output += `${prelude}{${blockContent}}`;
-            } else {
-              output += `${prelude}{${blockContent}}`;
-            }
-          } else {
-            output += `${scopeSelectorList(prelude)}{${blockContent}}`;
-          }
-          cursor = closeIndex + 1;
-          index = closeIndex;
-        }
-      }
-    }
-
-    return output + source.slice(cursor);
-  };
-
-  return processCssBlock(cssCode);
-};
-
-export function createPluginCssScopePlugin(styleId) {
-  return {
-    name: 'translime-plugin-css-scope',
-    apply: 'build',
-    enforce: 'post',
-    generateBundle(_, bundle) {
-      Object.values(bundle).forEach((chunk) => {
-        const isCssAsset = chunk.type === 'asset'
-          && typeof chunk.fileName === 'string'
-          && chunk.fileName.endsWith('.css')
-          && typeof chunk.source === 'string';
-        if (isCssAsset) {
-          const cssChunk = chunk;
-          cssChunk.source = scopePluginCss(cssChunk.source, styleId);
-        }
-      });
-    },
-  };
-}
-
 export function createPluginCssInjectionOptions(styleId) {
   return {
     styleId,
@@ -315,7 +94,6 @@ export function createPluginCssInjectionOptions(styleId) {
         if (typeof document !== 'undefined') {
           const elementStyle = document.createElement('style');
           elementStyle.id = options.styleId;
-          elementStyle.dataset.pluginStyleId = options.styleId;
 
           const existingElement = document.getElementById(options.styleId);
           if (existingElement) {
@@ -334,7 +112,6 @@ export function createPluginCssInjectionOptions(styleId) {
 
 export function createPluginCssIsolationPlugins(styleId) {
   return [
-    createPluginCssScopePlugin(styleId),
     cssInjectedByJsPlugin(createPluginCssInjectionOptions(styleId)),
   ];
 }

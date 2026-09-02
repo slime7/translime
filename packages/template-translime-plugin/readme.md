@@ -401,3 +401,17 @@ SDK 封装了常用的系统操作：
 - 不要使用 Sass 变量、`@use`、`@forward`、mixin 或嵌套语法；嵌套选择器必须改写为扁平 CSS，例如 `.plugin-main .red {}`。
 - UI 构建保留 `rolldownOptions.external: ['vue']`，并使用 `translimeSdk()` 与 `createPluginCssIsolationPlugins(pluginId)`。
 - 使用 Tailwind 时，将样式放入插件专用 `@layer`，不要直接引入未分层的 `tailwindcss`。
+
+## UI 样式隔离
+
+`createPluginCssIsolationPlugins(pluginId)` 负责 CSS 提取、运行时注入、样式 ID 去重和插件专用 `@layer`。构建阶段保留原始选择器，由宿主 app 在内嵌插件 UI 的运行时包裹为：
+
+```css
+@layer translime-plugin {
+  @scope (.plugin-ui-loader[data-plugin-id="插件ID"]) {
+    /* 插件原始 CSS */
+  }
+}
+```
+
+宿主会将插件样式中的 `:root`、`:host`、`html`、`body` 根级规则映射到作用域内的 `:scope`，以便主题变量继续生效。`@scope` 负责限制选择器匹配范围；继承属性以及 `@keyframes`、`@font-face`、`@property` 等全局命名空间仍遵循浏览器原生语义，相关名称应保持插件内唯一。

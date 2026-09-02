@@ -49,12 +49,21 @@ export default defineConfig(({ mode }) => {
 });
 ```
 
-这套封装会同时处理两件事：
+这套封装负责 CSS 提取、运行时注入、样式 ID 去重，并将注入内容包进插件专用的 `@layer 插件ID`。构建阶段会保留插件原始选择器，不再改写选择器文本。
 
-- 构建阶段把插件 CSS 选择器限制在 `.plugin-ui-loader[data-plugin-id="插件ID"]` 下
-- 运行时把插件注入样式包进 `@layer 插件ID`
+插件通过 app 的内嵌渲染路径加载时，宿主会将动态样式包进以下结构，并放入宿主预先声明的 `translime-plugin` layer：
 
-宿主和 Preview 会预声明 `translime-plugin` layer，并将 SDK 已隔离的样式直接放入该层，避免二次 CSSOM 序列化影响 Tailwind 的圆角、间距和其他 utility。旧式动态样式仍由宿主运行时继续作用域化。
+```css
+@layer translime-plugin {
+  @scope (.plugin-ui-loader[data-plugin-id="插件ID"]) {
+    /* 插件原始 CSS */
+  }
+}
+```
+
+宿主会将直接或前置出现的 `:root`、`:host`、`html`、`body` 规则映射到 `:scope`，以兼容插件主题变量和根级规则；其他选择器、声明值以及嵌套 at-rule 保持原始结构。独立 `<webview>` 与 BrowserWindow 继续使用浏览器文档隔离。
+
+`@scope` 限制选择器匹配范围，但继承属性以及 `@keyframes`、`@font-face`、`@property` 等全局命名空间仍遵循浏览器原生语义。插件应继续使用唯一的动画、字体和自定义属性名称，并通过插件专用 `@layer` 控制级联优先级。
 
 ## 代码示例
 
