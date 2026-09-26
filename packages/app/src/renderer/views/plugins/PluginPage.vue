@@ -1,5 +1,5 @@
 <template>
-  <div class="plugin-container">
+  <div class="plugin-container" :class="{ 'plugin-container--embedded': isEmbeddedRoute }">
     <plugin-title-bar :plugin="plugin" :visible="appBarVisible" v-if="plugin" @inspect="openWebviewDevTools" />
 
     <template v-if="showLocalWebview">
@@ -26,25 +26,12 @@ import {
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
-import * as components from 'vuetify/components';
-import * as labsComponents from 'vuetify/labs/components';
-import * as directives from 'vuetify/directives';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { openPluginWindow } from '@/utils';
 import PluginTitleBar from '@/views/Layout/components/PluginTitleBar.vue';
 
 const isDev = import.meta.env.DEV;
-
-if (!window.vuetify$) {
-  window.vuetify$ = {
-    components: {
-      ...components,
-      ...labsComponents,
-    },
-    directives,
-  };
-}
 
 export default {
   name: 'PluginPage',
@@ -192,6 +179,7 @@ export default {
     return {
       plugin,
       pluginId,
+      isEmbeddedRoute,
       pluginPath: computed(() => (plugin.value ? plugin.value.ui : undefined)),
       loaderVisible,
       showLocalWebview,
@@ -216,23 +204,30 @@ export default {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
 
-  .plugin-title-btn {
-    user-select: none;
-    cursor: pointer;
-  }
+/* 嵌入模式只占标题栏高度，webview 由 EmbeddedPluginWebviews 撑满剩余空间。
+   与 .plugin-container 同级书写：嵌套会产生隐式后代选择器，无法匹配同一元素 */
+.plugin-container--embedded {
+  flex: 0 0 auto;
+  height: auto;
+}
 
-  .webview {
-    display: flex;
-    width: 100%;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
+.plugin-container .plugin-title-btn {
+  user-select: none;
+  cursor: default;
+}
 
-  .dev-fab {
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-  }
+.plugin-container .webview {
+  display: flex;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.plugin-container .dev-fab {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
 }
 </style>

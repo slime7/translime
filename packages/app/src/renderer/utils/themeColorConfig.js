@@ -76,3 +76,21 @@ export const normalizeThemeColor = (themeColor) => {
     variant: normalizeThemeColorVariant(value.variant),
   };
 };
+
+/**
+ * mde-vue 主题控制器支持的配色方案变体命名。
+ * @type {Readonly<Record<string, string>>}
+ */
+const MAT_SCHEME_VARIANTS = Object.freeze({
+  SchemeExpressive: 'expressive',
+  SchemeTonalSpot: 'tonal-spot',
+  SchemeVibrant: 'vibrant',
+  SchemeNeutral: 'neutral',
+});
+
+/**
+ * 将宿主的配色方案变体转换为 mde-vue 主题控制器使用的命名。
+ * @param {string} variant - 宿主的方案变体（如 'SchemeExpressive'）
+ * @returns {string} mde-vue 的方案变体（如 'expressive'）
+ */
+export const toMatSchemeVariant = (variant) => MAT_SCHEME_VARIANTS[variant] || MAT_SCHEME_VARIANTS[DEFAULT_THEME_COLOR_VARIANT];

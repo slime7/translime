@@ -1,9 +1,15 @@
 import { useTheme as useVTheme } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
+import matUi from '@/plugins/matUi';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { appConfigStore } from '@/utils';
-import { normalizeThemeColor } from '@/utils/themeColorConfig';
+import {
+  DEFAULT_THEME_COLOR_SOURCE,
+  DEFAULT_THEME_COLOR_VARIANT,
+  normalizeThemeColor,
+  toMatSchemeVariant,
+} from '@/utils/themeColorConfig';
 
 const DEFAULT_SYMBOL_COLORS = {
   dark: '#ffffff',
@@ -30,6 +36,7 @@ const useTheme = () => {
   const ipc = useIpc();
   const store = useGlobalStore();
   const vTheme = useVTheme();
+  const matTheme = matUi.theme;
 
   const getNativeTheme = () => ipc.invoke(ipcType.GET_NATIVE_THEME);
 
@@ -51,6 +58,7 @@ const useTheme = () => {
   const setDark = (dark) => {
     store.dark = dark;
     vTheme.change(dark ? 'dark' : 'light');
+    matTheme.setMode(dark ? 'dark' : 'light');
   };
 
   const setTheme = (theme) => {
@@ -63,6 +71,21 @@ const useTheme = () => {
     });
     appConfigStore.set('setting.theme', theme);
     store.setAppTheme(theme);
+  };
+
+  /**
+   * 同步配色元数据到 mde-vue 主题控制器（宿主 UI 的 `--mat-sys-color-*` 令牌来源）。
+   * @param {object} themeColor - 归一化前的配色元数据 { name, source, variant }
+   */
+  const syncMatTheme = (themeColor) => {
+    const normalizedThemeColor = normalizeThemeColor(themeColor);
+    if (normalizedThemeColor.name === 'translime') {
+      matTheme.setSeedColor(DEFAULT_THEME_COLOR_SOURCE);
+      matTheme.setSchemeVariant(toMatSchemeVariant(DEFAULT_THEME_COLOR_VARIANT));
+      return;
+    }
+    matTheme.setSeedColor(normalizedThemeColor.source);
+    matTheme.setSchemeVariant(toMatSchemeVariant(normalizedThemeColor.variant));
   };
 
   /**
@@ -89,6 +112,7 @@ const useTheme = () => {
       store.setAppThemeColor(normalizedThemeColor);
       appConfigStore.set('setting.themeColor', normalizedThemeColor);
       ipc.send(ipcType.THEME_COLOR_UPDATED);
+      syncMatTheme(normalizedThemeColor);
     }
   };
 
@@ -97,6 +121,7 @@ const useTheme = () => {
     setTheme,
     setDark,
     setCustomTheme,
+    syncMatTheme,
     syncOverlayColor,
   };
 };

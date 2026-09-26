@@ -84,6 +84,50 @@ export function useVuetifyComponents(): Record<string, any>;
 export function useVuetifyDirectives(): Record<string, any>;
 
 /**
+ * mde-vue 主题控制器（Material 2025 动态主题）的宿主侧实例
+ */
+export interface MatThemeController {
+  readonly mode: 'light' | 'dark' | 'system';
+  readonly resolvedMode: 'light' | 'dark';
+  readonly seedColor: string;
+  readonly schemeVariant: 'tonal-spot' | 'neutral' | 'vibrant' | 'expressive';
+  setMode(value: 'light' | 'dark' | 'system'): void;
+  setSeedColor(value: string): void;
+  setSchemeVariant(value: 'tonal-spot' | 'neutral' | 'vibrant' | 'expressive'): void;
+  setContrastLevel(value: number): void;
+}
+
+/**
+ * 获取宿主提供的 mde-vue 运行时
+ * @description 仅在渲染进程环境可用，返回 { components, directives, theme }；
+ * 组件/指令也可直接使用全局注册的 mat-* 标签与 v-intersection / v-state-layer 指令
+ */
+export function useMat(): {
+  components: Record<string, any>;
+  directives: Record<string, any>;
+  theme?: MatThemeController;
+};
+
+/**
+ * useMat 的别名
+ */
+export function useMde(): {
+  components: Record<string, any>;
+  directives: Record<string, any>;
+  theme?: MatThemeController;
+};
+
+/**
+ * 获取所有宿主注册的 mde-vue 组件（mat-* / mde-*）
+ */
+export function useMatComponents(): Record<string, any>;
+
+/**
+ * 获取所有宿主注册的 mde-vue 指令（v-intersection / v-state-layer）
+ */
+export function useMatDirectives(): Record<string, any>;
+
+/**
  * 助手函数：获取 Electron 提供的对话框 API
  */
 export function useDialog(): any;

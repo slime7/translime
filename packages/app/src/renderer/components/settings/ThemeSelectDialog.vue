@@ -1,69 +1,89 @@
 <template>
-  <v-dialog
+  <mat-dialog
     v-model="visible"
-    persistent
-    max-width="500px"
+    width="500"
+    title="选择主题"
     data-test="theme-select-dialog"
   >
-    <v-card color="surface-container-high">
-      <v-card-title>选择主题</v-card-title>
-
-      <v-card-text>
-        <mde-list>
-          <mde-list-item
-            data-test="theme-option-light"
-            item-type="radio"
-            title="明亮"
-            :is-active="selectedTheme === 'light'"
-            @click="selectedTheme = 'light'"
+    <mat-list
+      variant="segmented"
+      interaction="single-action"
+      class="settings-list"
+    >
+      <mat-list-item
+        data-test="theme-option-light"
+        @click="selectedTheme = 'light'"
+      >
+        明亮
+        <template #trailing>
+          <mat-radio
+            :model-value="selectedTheme === 'light'"
+            :value="true"
+            class="pointer-events-none"
+            color="primary"
+            aria-hidden="true"
           />
-          <mde-list-item
-            data-test="theme-option-dark"
-            item-type="radio"
-            title="暗黑"
-            :is-active="selectedTheme === 'dark'"
-            @click="selectedTheme = 'dark'"
+        </template>
+      </mat-list-item>
+      <mat-list-item
+        data-test="theme-option-dark"
+        @click="selectedTheme = 'dark'"
+      >
+        暗黑
+        <template #trailing>
+          <mat-radio
+            :model-value="selectedTheme === 'dark'"
+            :value="true"
+            class="pointer-events-none"
+            color="primary"
+            aria-hidden="true"
           />
-          <mde-list-item
-            data-test="theme-option-system"
-            item-type="radio"
-            title="系统"
-            :is-active="selectedTheme === 'system'"
-            @click="selectedTheme = 'system'"
+        </template>
+      </mat-list-item>
+      <mat-list-item
+        data-test="theme-option-system"
+        @click="selectedTheme = 'system'"
+      >
+        系统
+        <template #trailing>
+          <mat-radio
+            :model-value="selectedTheme === 'system'"
+            :value="true"
+            class="pointer-events-none"
+            color="primary"
+            aria-hidden="true"
           />
-        </mde-list>
-      </v-card-text>
+        </template>
+      </mat-list-item>
+    </mat-list>
 
-      <v-card-actions>
-        <v-spacer />
+    <template #actions>
+      <div class="grow" />
 
-        <v-btn
-          data-test="theme-dialog-cancel-btn"
-          color="primary"
-          @click="onCancel"
-        >
-          取消
-        </v-btn>
+      <mat-btn
+        data-test="theme-dialog-cancel-btn"
+        color="primary"
+        @click="onCancel"
+      >
+        取消
+      </mat-btn>
 
-        <v-btn
-          data-test="theme-dialog-confirm-btn"
-          color="primary"
-          variant="elevated"
-          @click="onConfirm"
-        >
-          确定
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+      <mat-btn
+        data-test="theme-dialog-confirm-btn"
+        color="primary"
+        variant="filled"
+        @click="onConfirm"
+      >
+        确定
+      </mat-btn>
+    </template>
+  </mat-dialog>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue';
 import useTheme from '@/hooks/useTheme';
 import useGlobalStore from '@/store/globalStore';
-import MdeList from '@/components/MdeList.vue';
-import MdeListItem from '@/components/MdeListItem.vue';
 
 const props = defineProps({
   modelValue: {
@@ -99,3 +119,9 @@ const onConfirm = () => {
   theme.setTheme(selectedTheme.value);
 };
 </script>
+
+<style scoped>
+.settings-list {
+  border-radius: 16px;
+}
+</style>

@@ -9,20 +9,14 @@ import useDialogStore from '@/store/dialogStore';
 const globalStubs = {
   global: {
     stubs: {
-      'v-dialog': {
-        template: '<div class="v-dialog-stub"><slot /></div>',
-        props: ['modelValue'],
+      'mat-dialog': {
+        template: '<div class="mat-dialog-stub">{{ title }}<slot name="title" /><slot /><slot name="actions" /></div>',
+        props: ['modelValue', 'title', 'width'],
       },
-      'v-card': { template: '<div class="v-card-stub"><slot /></div>' },
-      'v-card-title': { template: '<div class="v-card-title-stub"><slot /></div>' },
-      'v-card-text': { template: '<div class="v-card-text-stub"><slot /></div>' },
-      'v-card-actions': { template: '<div class="v-card-actions-stub"><slot /></div>' },
-      'v-btn': {
-        template: '<button class="v-btn-stub" @click="$emit(\'click\')"><slot /></button>',
+      'mat-btn': {
+        template: '<button class="mat-btn-stub" @click="$emit(\'click\')"><slot /></button>',
       },
-      'v-spacer': true,
-      'v-progress-circular': true,
-      'v-sheet': { template: '<div class="v-sheet-stub"><slot /></div>' },
+      'mat-progress': true,
     },
   },
 };
@@ -38,8 +32,9 @@ describe('SimpleDialog.vue', () => {
 
     const wrapper = mount(SimpleDialog, globalStubs);
 
-    expect(wrapper.find('.simple-dialog').exists()).toBe(true);
+    expect(wrapper.find('.simple-dialog-frame').exists()).toBe(true);
     expect(wrapper.text()).toContain('Test Title');
+    expect(wrapper.text()).toContain('Test Content');
   });
 
   it('关闭按钮应该调用 pop', async () => {
@@ -48,7 +43,7 @@ describe('SimpleDialog.vue', () => {
     const spyPop = vi.spyOn(store, 'pop');
 
     const wrapper = mount(SimpleDialog, globalStubs);
-    const closeBtn = wrapper.find('.v-btn-stub');
+    const closeBtn = wrapper.find('.mat-btn-stub');
     await closeBtn.trigger('click');
 
     expect(spyPop).toHaveBeenCalled();
@@ -60,8 +55,7 @@ describe('SimpleDialog.vue', () => {
 
     const wrapper = mount(SimpleDialog, globalStubs);
 
-    const loaderDialog = wrapper.findAll('.v-dialog-stub').filter((w) => w.attributes('class')?.includes('loader'));
-    expect(loaderDialog.length).toBeGreaterThan(0);
+    expect(wrapper.find('.loader-wrapper').exists()).toBe(true);
   });
 
   it('应该渲染确认框', async () => {
@@ -80,7 +74,7 @@ describe('SimpleDialog.vue', () => {
 
     const wrapper = mount(SimpleDialog, globalStubs);
     // 0: Cancel, 1: Confirm based on template
-    const btns = wrapper.findAll('.v-btn-stub');
+    const btns = wrapper.findAll('.mat-btn-stub');
 
     await btns[1].trigger('click');
 

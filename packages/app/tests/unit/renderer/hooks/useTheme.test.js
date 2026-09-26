@@ -5,16 +5,28 @@ import { createPinia, setActivePinia } from 'pinia';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
 
-const { mockIpc } = vi.hoisted(() => ({
+const { mockIpc, matThemeMock } = vi.hoisted(() => ({
   mockIpc: {
     invoke: vi.fn().mockResolvedValue({ shouldUseDarkColors: false }),
     send: vi.fn(),
+  },
+  matThemeMock: {
+    setMode: vi.fn(),
+    setSeedColor: vi.fn(),
+    setSchemeVariant: vi.fn(),
   },
 }));
 
 // Mock electron hooks
 vi.mock('@/hooks/electron', () => ({
   useIpc: () => mockIpc,
+}));
+
+// Mock mde-vue 主题控制器（宿主 UI 主题）
+vi.mock('@/plugins/matUi', () => ({
+  default: {
+    theme: matThemeMock,
+  },
 }));
 
 // Mock Vuetify useTheme
@@ -55,6 +67,7 @@ describe('useTheme', () => {
     expect(theme).toHaveProperty('setTheme');
     expect(theme).toHaveProperty('setDark');
     expect(theme).toHaveProperty('setCustomTheme');
+    expect(theme).toHaveProperty('syncMatTheme');
     expect(theme).toHaveProperty('syncOverlayColor');
   });
 
@@ -82,6 +95,36 @@ describe('useTheme', () => {
       expect(() => theme.setDark(true)).not.toThrow();
       expect(() => theme.setDark(false)).not.toThrow();
     });
+
+    it('应该同步明暗模式到 mde-vue 主题控制器', () => {
+      const theme = useTheme();
+
+      theme.setDark(true);
+      expect(matThemeMock.setMode).toHaveBeenCalledWith('dark');
+
+      theme.setDark(false);
+      expect(matThemeMock.setMode).toHaveBeenCalledWith('light');
+    });
+  });
+
+  describe('syncMatTheme', () => {
+    it('默认配色应重置为 translime 种子色与 expressive 变体', () => {
+      const theme = useTheme();
+
+      theme.syncMatTheme({ name: 'translime', source: '#123456', variant: 'SchemeVibrant' });
+
+      expect(matThemeMock.setSeedColor).toHaveBeenCalledWith('#20a6fc');
+      expect(matThemeMock.setSchemeVariant).toHaveBeenCalledWith('expressive');
+    });
+
+    it('自定义配色应同步源色与变体到 mde-vue 命名', () => {
+      const theme = useTheme();
+
+      theme.syncMatTheme({ name: 'custom', source: '#346b4f', variant: 'SchemeTonalSpot' });
+
+      expect(matThemeMock.setSeedColor).toHaveBeenCalledWith('#346b4f');
+      expect(matThemeMock.setSchemeVariant).toHaveBeenCalledWith('tonal-spot');
+    });
   });
 
   describe('setCustomTheme', () => {
@@ -108,6 +151,8 @@ describe('useTheme', () => {
       };
 
       expect(() => theme.setCustomTheme(colors, themeColor)).not.toThrow();
+      expect(matThemeMock.setSeedColor).toHaveBeenCalledWith('#FF5722');
+      expect(matThemeMock.setSchemeVariant).toHaveBeenCalledWith('tonal-spot');
     });
   });
 

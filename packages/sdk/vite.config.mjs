@@ -37,6 +37,8 @@ const baseBuild = {
       'vuetify/blueprints',
       'vuetify/styles',
       'vuetify/locale',
+      'mde-vue',
+      'mde-vue/styles.css',
       'fs',
       'path',
       'url',

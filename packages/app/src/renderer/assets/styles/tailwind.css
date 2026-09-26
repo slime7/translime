@@ -1,14 +1,18 @@
 @import "tailwindcss/theme" layer(tailwind-theme);
+@import "tailwindcss/preflight" layer(tailwind-reset);
 @import "tailwindcss/utilities" layer(tailwind-utilities);
 
-/* 明暗模式：Vuetify 使用 .v-theme--dark/.v-theme--light 而非 .dark */
-@custom-variant light (&:where(.v-theme--light, .v-theme--light *));
-@custom-variant dark (&:where(.v-theme--dark, .v-theme--dark *));
+/* mde-vue 官方 Tailwind 映射（text-mat-* 排版等），按文档样式指南接入 */
+@import "mde-vue/tailwind.css";
+
+/* 明暗模式：mde-vue 主题运行时在根元素写入 data-mat-theme 属性 */
+@custom-variant light (&:where([data-mat-theme="light"], [data-mat-theme="light"] *));
+@custom-variant dark (&:where([data-mat-theme="dark"], [data-mat-theme="dark"] *));
 
 @theme {
   --breakpoint-*: initial; /* 重置 Tailwind 默认断点 */
 
-  /* 与 vuetify 运行时 display 阈值保持一致 */
+  /* 与宿主历史断点保持一致 */
   --breakpoint-xs:  0px;
   --breakpoint-sm:  600px;
   --breakpoint-md:  960px;
@@ -16,17 +20,48 @@
   --breakpoint-xl:  1920px;
   --breakpoint-xxl: 2560px;
 
-  /* 主题色：包装 Vuetify 的 RGB 通道变量，供 bg-/text-/border- 等工具类使用 */
-  --color-background:      rgb(var(--v-theme-background));
-  --color-surface:         rgb(var(--v-theme-surface));
-  --color-surface-variant: rgb(var(--v-theme-surface-variant));
-  --color-primary:         rgb(var(--v-theme-primary));
-  --color-success:         rgb(var(--v-theme-success));
-  --color-warning:         rgb(var(--v-theme-warning));
-  --color-error:           rgb(var(--v-theme-error));
-  --color-info:            rgb(var(--v-theme-info));
-  --color-on-primary-container:   rgb(var(--v-theme-on-primary-container));
-  --color-on-secondary-container: rgb(var(--v-theme-on-secondary-container));
+  /* 主题色：映射 mde-vue 运行时令牌，供 bg-/text-/border- 等工具类使用 */
+  --color-background:               var(--mat-sys-color-background);
+  --color-on-background:            var(--mat-sys-color-on-background);
+  --color-surface:                  var(--mat-sys-color-surface);
+  --color-surface-dim:              var(--mat-sys-color-surface-dim);
+  --color-surface-bright:           var(--mat-sys-color-surface-bright);
+  --color-surface-variant:          var(--mat-sys-color-surface-variant);
+  --color-surface-container-lowest: var(--mat-sys-color-surface-container-lowest);
+  --color-surface-container-low:    var(--mat-sys-color-surface-container-low);
+  --color-surface-container:        var(--mat-sys-color-surface-container);
+  --color-surface-container-high:   var(--mat-sys-color-surface-container-high);
+  --color-surface-container-highest: var(--mat-sys-color-surface-container-highest);
+  --color-on-surface:               var(--mat-sys-color-on-surface);
+  --color-on-surface-variant:       var(--mat-sys-color-on-surface-variant);
+  --color-primary:                  var(--mat-sys-color-primary);
+  --color-primary-dim:              var(--mat-sys-color-primary-dim);
+  --color-on-primary:               var(--mat-sys-color-on-primary);
+  --color-primary-container:        var(--mat-sys-color-primary-container);
+  --color-on-primary-container:     var(--mat-sys-color-on-primary-container);
+  --color-secondary:                var(--mat-sys-color-secondary);
+  --color-on-secondary:             var(--mat-sys-color-on-secondary);
+  --color-secondary-container:      var(--mat-sys-color-secondary-container);
+  --color-on-secondary-container:   var(--mat-sys-color-on-secondary-container);
+  --color-tertiary:                 var(--mat-sys-color-tertiary);
+  --color-on-tertiary:              var(--mat-sys-color-on-tertiary);
+  --color-tertiary-container:       var(--mat-sys-color-tertiary-container);
+  --color-on-tertiary-container:    var(--mat-sys-color-on-tertiary-container);
+  --color-error:                    var(--mat-sys-color-error);
+  --color-on-error:                 var(--mat-sys-color-on-error);
+  --color-error-container:          var(--mat-sys-color-error-container);
+  --color-on-error-container:       var(--mat-sys-color-on-error-container);
+  --color-outline:                  var(--mat-sys-color-outline);
+  --color-outline-variant:          var(--mat-sys-color-outline-variant);
+  --color-inverse-surface:          var(--mat-sys-color-inverse-surface);
+  --color-inverse-on-surface:       var(--mat-sys-color-inverse-on-surface);
+  --color-inverse-primary:          var(--mat-sys-color-inverse-primary);
+  --color-scrim:                    var(--mat-sys-color-scrim);
+
+  /* mde-vue 无 success/warning/info 角色，沿用 Material 基准色作为状态色 */
+  --color-success: #4caf50;
+  --color-warning: #fb8c00;
+  --color-info:    #2196f3;
 }
 
 /* 动态拼接类名的 safelist（如 color="..." prop 场景） */
@@ -38,7 +73,7 @@
 @source inline('text-error');
 
 /*
-  Vuetify 圆角工具类的 Tailwind 等价物（迁移期保留类名）
+  圆角工具类（迁移期保留类名）
 */
 @utility rounded-pill   { border-radius: 9999px }
 @utility rounded-circle { border-radius: 50%    }
@@ -47,111 +82,4 @@
 @source inline('rounded');
 @source inline('rounded-{none,sm,md,lg,xl,2xl,3xl,full,pill,circle,shaped}');
 
-/*
-  MD3 排版工具类（迁移期保留 Vuetify 类名）
-*/
-@utility text-display-large {
-  font-family: var(--font-heading, inherit);
-  font-size: 3.5625rem;
-  font-weight: 400;
-  line-height: 1.1228070175;
-  letter-spacing: -.0043859649em;
-}
-@utility text-display-medium {
-  font-family: var(--font-heading, inherit);
-  font-size: 2.8125rem;
-  font-weight: 400;
-  line-height: 1.1555555556;
-  letter-spacing: normal;
-}
-@utility text-display-small {
-  font-family: var(--font-heading, inherit);
-  font-size: 2.25rem;
-  font-weight: 400;
-  line-height: 1.2222222222;
-  letter-spacing: normal;
-}
-@utility text-headline-large {
-  font-family: var(--font-heading, inherit);
-  font-size: 2rem;
-  font-weight: 400;
-  line-height: 1.25;
-  letter-spacing: normal;
-}
-@utility text-headline-medium {
-  font-family: var(--font-heading, inherit);
-  font-size: 1.75rem;
-  font-weight: 400;
-  line-height: 1.2857142857;
-  letter-spacing: normal;
-}
-@utility text-headline-small {
-  font-family: var(--font-heading, inherit);
-  font-size: 1.5rem;
-  font-weight: 400;
-  line-height: 1.3333333333;
-  letter-spacing: normal;
-}
-@utility text-title-large {
-  font-family: var(--font-heading, inherit);
-  font-size: 1.375rem;
-  font-weight: 400;
-  line-height: 1.2727272727;
-  letter-spacing: normal;
-}
-@utility text-title-medium {
-  font-family: var(--font-body, inherit);
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.5;
-  letter-spacing: .009375em;
-}
-@utility text-title-small {
-  font-family: var(--font-body, inherit);
-  font-size: .875rem;
-  font-weight: 500;
-  line-height: 1.4285714286;
-  letter-spacing: .0071428571em;
-}
-@utility text-body-large {
-  font-family: var(--font-body, inherit);
-  font-size: 1rem;
-  font-weight: 400;
-  line-height: 1.5;
-  letter-spacing: .03125em;
-}
-@utility text-body-medium {
-  font-family: var(--font-body, inherit);
-  font-size: .875rem;
-  font-weight: 400;
-  line-height: 1.4285714286;
-  letter-spacing: .0178571429em;
-}
-@utility text-body-small {
-  font-family: var(--font-body, inherit);
-  font-size: .75rem;
-  font-weight: 400;
-  line-height: 1.3333333333;
-  letter-spacing: .0333333333em;
-}
-@utility text-label-large {
-  font-family: var(--font-body, inherit);
-  font-size: .875rem;
-  font-weight: 500;
-  line-height: 1.4285714286;
-  letter-spacing: .0071428571em;
-}
-@utility text-label-medium {
-  font-family: var(--font-body, inherit);
-  font-size: .75rem;
-  font-weight: 500;
-  line-height: 1.3333333333;
-  letter-spacing: .0416666667em;
-}
-@utility text-label-small {
-  font-family: var(--font-body, inherit);
-  font-size: .6875rem;
-  font-weight: 500;
-  line-height: 1.4545454545;
-  letter-spacing: .0454545455em;
-}
+/* MD3 排版工具类由 mde-vue/tailwind.css 提供（text-mat-*），不再本地维护 */

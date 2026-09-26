@@ -1,39 +1,43 @@
 <template>
-  <v-navigation-drawer
-    v-model="drawerVisible"
-    class="notify-drawer"
-    temporary
-    location="right"
-    width="560"
-  >
+  <transition name="notify-slide">
     <div
-      ref="containerRef"
-      class="notify-container p-4 h-full flex flex-col"
-      v-scroll.self="onAlertContainerScroll"
+      v-if="drawerVisible"
+      class="notify-drawer absolute inset-0 z-40"
+      role="dialog"
+      aria-label="通知栏"
     >
-      <v-spacer />
+      <div class="notify-scrim absolute inset-0 bg-scrim/40" @click="drawerVisible = false" />
 
-      <div v-if="!alertList.length">
-        <div class="flex justify-center">
-          无新通知
+      <div
+        ref="containerRef"
+        class="notify-container absolute inset-y-0 right-0 w-[560px] max-w-full p-4 flex flex-col overflow-y-auto bg-surface-container-lowest text-on-surface"
+        @scroll="onAlertContainerScroll"
+      >
+        <div class="grow" />
+
+        <div v-if="!alertList.length">
+          <div class="flex justify-center">
+            无新通知
+          </div>
         </div>
-      </div>
 
-      <div class="flex flex-col">
-        <v-alert
-          v-for="alertItem in alertList"
-          :key="alertItem.uuid"
-          :type="alertItem.type"
-          border="start"
-          class="my-2"
-        >
-          <div>{{ parseAlertTime(alertItem.time) }}</div>
-          <div>{{ alertItem.msg }}</div>
-        </v-alert>
+        <div class="flex flex-col">
+          <div
+            v-for="alertItem in alertList"
+            :key="alertItem.uuid"
+            class="my-2 px-4 py-3 rounded-lg border-l-4"
+            :class="alertItem.type === 'error'
+              ? 'bg-error-container text-on-error-container border-error'
+              : 'bg-secondary-container text-on-secondary-container border-secondary'"
+          >
+            <div>{{ parseAlertTime(alertItem.time) }}</div>
+            <div>{{ alertItem.msg }}</div>
+          </div>
+        </div>
+        <div id="notify-list-bottom" />
       </div>
-      <div id="notify-list-bottom" />
     </div>
-  </v-navigation-drawer>
+  </transition>
 </template>
 
 <script>
@@ -119,8 +123,31 @@ export default {
 </script>
 
 <style scoped>
+.notify-scrim {
+  backdrop-filter: blur(2px);
+}
+
 .notify-container {
-  height: 100%;
-  overflow-y: auto;
+  box-shadow: var(--mat-sys-elevation-level3);
+}
+
+.notify-slide-enter-active,
+.notify-slide-leave-active {
+  transition: opacity .2s cubic-bezier(.4, 0, .2, 1);
+}
+
+.notify-slide-enter-active .notify-container,
+.notify-slide-leave-active .notify-container {
+  transition: transform .25s cubic-bezier(0, 0, 0, 1);
+}
+
+.notify-slide-enter-from,
+.notify-slide-leave-to {
+  opacity: 0;
+}
+
+.notify-slide-enter-from .notify-container,
+.notify-slide-leave-to .notify-container {
+  transform: translateX(100%);
 }
 </style>

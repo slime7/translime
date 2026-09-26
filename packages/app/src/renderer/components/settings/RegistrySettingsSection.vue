@@ -1,61 +1,70 @@
 <template>
   <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
-    <div class="text-primary">
+    <div class="text-mat-label-large text-primary">
       插件域名
     </div>
 
-    <mde-list class="mt-2">
-      <mde-list-item
+    <mat-list
+      variant="segmented"
+      interaction="single-action"
+      class="settings-list mt-2"
+    >
+      <mat-list-item
         v-for="registry in registryList"
         :key="registry.id"
-        item-type="radio"
-        :lines="registry.link ? 'two' : 'one'"
-        :title="registry.name"
-        :subtitle="registry.link || null"
-        :is-active="settings.registry === registry.link"
         @click="onSelectRegistry(registry.link, registry.id)"
-      />
-    </mde-list>
-
-    <v-dialog
-      v-model="customRegistryPanelVisible"
-      persistent
-      max-width="500px"
-    >
-      <v-card color="surface-container-high">
-        <v-card-title>自定义 npm 域名</v-card-title>
-
-        <v-card-text>
-          <v-text-field
-            v-model="customRegistryItem.link"
-            label="域名"
-            placeholder="https://registry.npmjs.org"
+      >
+        {{ registry.name }}
+        <template v-if="registry.link" #supporting>
+          {{ registry.link }}
+        </template>
+        <template #trailing>
+          <mat-radio
+            :model-value="settings.registry === registry.link"
+            :value="true"
+            class="pointer-events-none"
             color="primary"
-            :rules="registryRules"
-            @click.right="showTextEditContextMenu"
+            aria-hidden="true"
           />
-        </v-card-text>
+        </template>
+      </mat-list-item>
+    </mat-list>
 
-        <v-card-actions>
-          <v-spacer />
+    <mat-dialog
+      v-model="customRegistryPanelVisible"
+      width="500"
+      title="自定义 npm 域名"
+    >
+      <mat-text-field
+        v-model="customRegistryItem.link"
+        label="域名"
+        placeholder="https://registry.npmjs.org"
+        color="primary"
+        :error="!!registryError"
+        :error-text="registryError"
+        class="w-full"
+        @contextmenu="showTextEditContextMenu"
+      />
 
-          <v-btn
-            color="primary"
-            @click="setCustomRegistryCancel"
-          >
-            取消
-          </v-btn>
+      <template #actions>
+        <div class="grow" />
 
-          <v-btn
-            color="primary"
-            variant="elevated"
-            @click="setCustomRegistryConfirm"
-          >
-            确定
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        <mat-btn
+          color="primary"
+          @click="setCustomRegistryCancel"
+        >
+          取消
+        </mat-btn>
+
+        <mat-btn
+          color="primary"
+          variant="filled"
+          @click="setCustomRegistryConfirm"
+        >
+          确定
+        </mat-btn>
+      </template>
+    </mat-dialog>
   </div>
 </template>
 
@@ -63,8 +72,6 @@
 import { computed, ref } from 'vue';
 import useGlobalStore from '@/store/globalStore';
 import { appConfigStore, showTextEditContextMenu } from '@/utils';
-import MdeList from '@/components/MdeList.vue';
-import MdeListItem from '@/components/MdeListItem.vue';
 
 const store = useGlobalStore();
 const settings = store.appSetting;
@@ -90,10 +97,7 @@ const registryList = [
 const customRegistryItem = computed(() => registryList.find((item) => item.id === 'custom'));
 const customRegistryPanelVisible = ref(false);
 const customRegistryPromoteResolve = ref(() => {});
-const registryRules = [
-  (value) => value.length > 0,
-  (value) => /^https?:\/\/.*$/.test(value),
-];
+const registryError = ref('');
 
 const onSelectRegistry = async (registry, setType) => {
   if (setType !== 'custom') {
@@ -121,6 +125,12 @@ const setCustomRegistryCancel = () => {
 };
 
 const setCustomRegistryConfirm = () => {
+  const link = customRegistryItem.value.link || '';
+  if (!/^https?:\/\/.*$/.test(link)) {
+    registryError.value = '请输入 http(s) 开头的域名';
+    return;
+  }
+  registryError.value = '';
   customRegistryPromoteResolve.value(true);
   customRegistryPanelVisible.value = false;
   customRegistryPromoteResolve.value = () => {};
@@ -130,3 +140,9 @@ if (!registryList.find((item) => item.link === settings.registry)) {
   customRegistryItem.value.link = settings.registry;
 }
 </script>
+
+<style scoped>
+.settings-list {
+  border-radius: 16px;
+}
+</style>

@@ -132,6 +132,41 @@ export function useVuetifyDirectives() {
 }
 
 /**
+ * 获取宿主提供的 mde-vue 运行时
+ * @description 仅在渲染进程环境可用，返回 { components, directives, theme }；
+ * 组件/指令也可直接使用全局注册的 mat-* 标签与 v-intersection / v-state-layer 指令
+ * @returns {Object} mde-vue 运行时对象
+ */
+export function useMat() {
+  if (typeof window !== 'undefined' && window.mde$) {
+    return window.mde$;
+  }
+  return {};
+}
+
+/**
+ * useMat 的别名
+ * @returns {Object} mde-vue 运行时对象
+ */
+export const useMde = useMat;
+
+/**
+ * 获取宿主注册的 mde-vue 组件
+ * @returns {Record<string, any>}
+ */
+export function useMatComponents() {
+  return useMat().components || {};
+}
+
+/**
+ * 获取宿主注册的 mde-vue 指令
+ * @returns {Record<string, any>}
+ */
+export function useMatDirectives() {
+  return useMat().directives || {};
+}
+
+/**
  * 获取 Dialog API
  * @description 类似于 Electron 的 dialog 模块 (showOpenDialog, showSaveDialog 等)
  * @returns {Object|null}

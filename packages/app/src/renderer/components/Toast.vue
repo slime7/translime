@@ -1,11 +1,10 @@
 <template>
-  <v-snackbar
+  <mat-snackbar
     :model-value="visible"
-    location="bottom"
-    timeout="-1"
-  >
-    {{ msg }}
-  </v-snackbar>
+    :text="msg"
+    :duration="0"
+    position="center"
+  />
 </template>
 
 <script>

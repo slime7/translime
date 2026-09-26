@@ -1,111 +1,90 @@
 <template>
-  <v-dialog
+  <mat-dialog
     v-model="visible"
-    persistent
-    scrollable
-    max-width="640px"
+    width="640"
+    title="选择颜色"
   >
-    <v-card color="surface-container-high">
-      <v-card-title>选择颜色</v-card-title>
+    <div class="mt-4">
+      <mat-btn-group
+        variant="connected"
+        selection="single"
+        :selected="dialogState.selected"
+        @select="onGroupSelect"
+      >
+        <mat-btn value="translime">
+          默认
+        </mat-btn>
 
-      <v-card-text>
-        <div class="mt-4 space-x-0.5">
-          <v-btn
-            rounded
-            class="rounded-s-4xl"
-            :class="[dialogState.selected === 'translime' ? 'rounded-e-4xl' : 'rounded-e-sm']"
-            :color="dialogState.selected === 'translime' ? 'primary' : 'surface-variant'"
-            @click="onSelectThemeColor('translime')"
-          >
-            默认
-          </v-btn>
+        <mat-btn value="system">
+          系统
+        </mat-btn>
 
-          <v-btn
-            rounded
-            :class="[dialogState.selected === 'system' ? 'rounded-4xl' : 'rounded-sm']"
-            :color="dialogState.selected === 'system' ? 'primary' : 'surface-variant'"
-            @click="onSelectThemeColor('system')"
-          >
-            系统
-          </v-btn>
+        <mat-btn value="custom">
+          自定义
+        </mat-btn>
+      </mat-btn-group>
+    </div>
 
-          <v-btn
-            rounded
-            class="rounded-e-4xl"
-            :class="[dialogState.selected === 'custom' ? 'rounded-s-4xl' : 'rounded-s-sm']"
-            :color="dialogState.selected === 'custom' ? 'primary' : 'surface-variant'"
-            @click="onSelectThemeColor('custom')"
-          >
-            自定义
-          </v-btn>
-        </div>
-
-        <v-card
-          v-if="dialogState.selected === 'custom'"
-          class="rounded-2xl mt-4"
-          variant="flat"
+    <div
+      v-if="dialogState.selected === 'custom'"
+      class="rounded-2xl mt-4 p-4 bg-surface-container flex items-center justify-between"
+    >
+      <div class="flex items-center gap-4">
+        <color-picker
+          v-model="dialogState.customColor"
           rounded
-          title="颜色来源"
-        >
-          <template #prepend>
-            <color-picker
-              v-model="dialogState.customColor"
-              rounded
-            />
-          </template>
-          <template #append>
-            <v-btn
-              icon="shuffle"
-              variant="plain"
-              @click="generateRandomColor"
-            />
-          </template>
-        </v-card>
+        />
+        <div>颜色来源</div>
+      </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-          <theme-color-preview-card
-            v-if="dialogState.selected === 'translime'"
-            title="默认"
-            :colors="translimePreviewColors"
-            :selected="dialogState.selected === 'translime'"
-            :color="dialogState.selected === 'translime' ? 'primary' : 'outline'"
-            @click="onSelectThemeColor('translime')"
-          />
+      <mat-btn
+        icon="shuffle"
+        label="随机颜色"
+        variant="text"
+        @click="generateRandomColor"
+      />
+    </div>
 
-          <template v-if="isGeneratedThemeSelected && dialogState.customThemeList?.length">
-            <theme-color-preview-card
-              v-for="customThemeItem in dialogState.customThemeList"
-              :key="customThemeItem.variant"
-              :title="customThemeItem.variantTitle"
-              :colors="getThemePreviewColors(customThemeItem.schemes)"
-              :selected="dialogState.customColorVariant === customThemeItem.variant"
-              :color="dialogState.customColorVariant === customThemeItem.variant ? 'primary' : 'outline'"
-              @click="onSelectThemeColor(dialogState.selected, customThemeItem.source, customThemeItem.variant)"
-            />
-          </template>
-        </div>
-      </v-card-text>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <theme-color-preview-card
+        v-if="dialogState.selected === 'translime'"
+        title="默认"
+        :colors="translimePreviewColors"
+        :selected="dialogState.selected === 'translime'"
+        @click="onSelectThemeColor('translime')"
+      />
 
-      <v-card-actions>
-        <v-spacer />
+      <template v-if="isGeneratedThemeSelected && dialogState.customThemeList?.length">
+        <theme-color-preview-card
+          v-for="customThemeItem in dialogState.customThemeList"
+          :key="customThemeItem.variant"
+          :title="customThemeItem.variantTitle"
+          :colors="getThemePreviewColors(customThemeItem.schemes)"
+          :selected="dialogState.customColorVariant === customThemeItem.variant"
+          @click="onSelectThemeColor(dialogState.selected, customThemeItem.source, customThemeItem.variant)"
+        />
+      </template>
+    </div>
 
-        <v-btn
-          color="primary"
-          @click="visible = false"
-        >
-          取消
-        </v-btn>
+    <template #actions>
+      <div class="grow" />
 
-        <v-btn
-          color="primary"
-          variant="elevated"
-          @click="setColorDialogConfirm"
-        >
-          确定
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+      <mat-btn
+        color="primary"
+        @click="visible = false"
+      >
+        取消
+      </mat-btn>
+
+      <mat-btn
+        color="primary"
+        variant="filled"
+        @click="setColorDialogConfirm"
+      >
+        确定
+      </mat-btn>
+    </template>
+  </mat-dialog>
 </template>
 
 <script setup>
@@ -152,7 +131,7 @@ const visible = computed({
 
 const dialogState = reactive({
   selected: '',
-  customColor: '#000',
+  customColor: '#000000',
   customColorVariant: DEFAULT_THEME_COLOR_VARIANT,
   customThemeList: [],
   isSystemColorSupported: false,
@@ -215,6 +194,13 @@ const initSystemColor = async () => {
       rebuildCustomThemeList(color);
     }
   }
+};
+
+const onGroupSelect = ({ nextSelected }) => {
+  if (!nextSelected) {
+    return;
+  }
+  onSelectThemeColor(nextSelected);
 };
 
 const onSelectThemeColor = async (name, source = null, variant = null) => {

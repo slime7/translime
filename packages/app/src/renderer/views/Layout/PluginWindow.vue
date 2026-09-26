@@ -1,16 +1,16 @@
 <template>
-  <v-app>
-    <v-system-bar
+  <div class="flex flex-col h-dvh">
+    <div
       v-if="!isEmbedded && useCustomTitleBar"
-      class="system-bar p-0"
-      :height="titleBarHeight"
+      class="system-bar flex-none flex items-center bg-surface-container"
+      :style="{ height: `${titleBarHeight}px` }"
       @dblclick="onToggleMaximize"
     >
       <div class="px-4">
         {{ plugin ? `${plugin.title} - translime` : 'translime' }}
       </div>
 
-      <v-spacer />
+      <div class="grow" />
 
       <!-- 原生 WCO 活跃时预留 caption 区域，否则使用自定义 WindowControls 降级 -->
       <div
@@ -22,26 +22,27 @@
         :is-maximize="isMaximize"
         :win="`plugin-window-${packageName}`"
       />
-    </v-system-bar>
+    </div>
 
-    <v-main class="h-screen">
+    <main class="flex-1 min-h-0 h-full">
       <div class="flex flex-col h-full" id="app-main-container">
         <div class="scroll-content scroll-content--plugin-window flex-auto">
           <router-view v-slot="{ Component, route }">
             <div class="route-stage route-stage--plugin-window">
-              <v-fade-transition
+              <transition
+                name="fade"
                 mode="out-in"
                 @after-enter="onEnter"
                 @before-leave="onLeave"
               >
                 <component :is="Component" :key="route.path" />
-              </v-fade-transition>
+              </transition>
             </div>
           </router-view>
         </div>
       </div>
-    </v-main>
-  </v-app>
+    </main>
+  </div>
 </template>
 
 <script>
@@ -53,24 +54,11 @@ import {
   ref,
 } from 'vue';
 import { useRoute } from 'vue-router';
-import * as components from 'vuetify/components';
-import * as labsComponents from 'vuetify/labs/components';
-import * as directives from 'vuetify/directives';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import globalStore from '@/store/globalStore';
 import { useTitleBarHeight } from '@/hooks/useTitleBarHeight';
 import WindowControls from '@/components/WindowControls.vue';
 import { useIpc } from '@/hooks/electron';
-
-if (!window.vuetify$) {
-  window.vuetify$ = {
-    components: {
-      ...components,
-      ...labsComponents,
-    },
-    directives,
-  };
-}
 
 export default {
   name: 'LayoutPluginWindow',

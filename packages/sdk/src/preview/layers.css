@@ -3,16 +3,23 @@
  * 必须在所有其他样式之前导入（main.js 中位于 vuetify/styles 之前）
  */
 
-/* 顶层 layer 顺序，与宿主保持一致，参考 Vuetify 官方文档 */
+/* 顶层 layer 顺序，与宿主保持一致 */
 @layer tailwind-theme;
 @layer tailwind-reset;
 
 @layer vuetify-core;
 @layer vuetify-components;
 @layer vuetify-overrides;
+
+@layer mde.tokens;
+@layer mde.components;
+@layer mde.utilities;
+
 @layer vuetify-utilities;
 
 @layer tailwind-utilities;
+
+@layer mde-final;
 
 @layer vuetify-final;
 

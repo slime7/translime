@@ -1,112 +1,88 @@
 <template>
-  <v-container fluid class="home h-full flex items-start p-6 md:p-8">
-    <div class="w-full max-w-7xl mx-auto mt-6">
+  <mat-container fluid class="home h-full flex items-start">
+    <div class="w-full max-w-7xl mx-auto">
       <div class="flex flex-col md:flex-row md:items-center justify-between mb-8">
         <div>
-          <h1 class="text-4xl font-bold mb-2">
+          <h1 class="text-mat-headline-large mb-2">
             应用中心
           </h1>
-          <p class="text-lg text-black/60 dark:text-white/60">
+          <p class="text-mat-body-large text-on-surface-variant">
             探索和管理所有已安装的 Translime 插件
           </p>
         </div>
 
         <div class="mt-4 md:mt-0 min-w-72">
-          <v-text-field
+          <mat-search
             v-model="searchQuery"
-            variant="solo-filled"
-            flat
-            density="comfortable"
-            prepend-inner-icon="search"
+            label="搜索插件"
             placeholder="搜索插件..."
-            hide-details
-            rounded
-            class="rounded-full shadow-none"
-            bg-color="surface-container-highest"
           />
         </div>
       </div>
 
       <div v-if="filteredPlugins.length > 0" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 xxl:grid-cols-4 gap-3 md:gap-4">
-        <div
+        <mat-card
           v-for="plugin in filteredPlugins"
           :key="plugin.packageName"
-          class="flex"
+          data-test="home-plugin-entry"
+          variant="filled"
+          color="surface-container-low"
+          class="home-card rounded-3xl overflow-hidden"
         >
-          <v-hover v-slot="{ isHovering, props }">
-            <v-card
-              v-bind="props"
-              :elevation="isHovering ? 2 : 0"
-              variant="flat"
-              color="surface-container-low"
-              rounded
-              class="plugin-entry ease-standard rounded-3xl w-full cursor-pointer"
-              @click="openPlugin(plugin)"
-            >
-              <div class="flex items-center gap-3 px-3 py-3">
-                <v-avatar
-                  :color="isHovering ? 'primary-container' : 'surface-container-high'"
-                  rounded
-                  class="plugin-entry__avatar ease-standard shrink-0 size-14 rounded-3xl"
-                >
-                  <v-img v-if="plugin.plugin?.icon || plugin.icon" :src="plugin.plugin?.icon || plugin.icon" />
-                  <v-icon
-                    v-else
-                    :color="isHovering ? 'primary' : 'on-surface-variant'"
-                    class="text-2xl"
-                  >
-                    extension
-                  </v-icon>
-                </v-avatar>
+          <mat-card-action-area
+            class="home-entry"
+            @click="openPlugin(plugin)"
+          >
+            <mat-avatar
+              v-if="plugin.plugin?.icon || plugin.icon"
+              :src="plugin.plugin?.icon || plugin.icon"
+              size="48"
+              class="home-entry__avatar shrink-0"
+            />
+            <mat-avatar
+              v-else
+              icon="extension"
+              size="48"
+              class="home-entry__avatar shrink-0"
+            />
 
-                <div class="min-w-0 grow">
-                  <div class="text-body-large font-medium truncate">
-                    {{ plugin.plugin?.title || plugin.title || plugin.packageName }}
-                  </div>
-                </div>
-
-                <v-btn
-                  :color="isPinned(plugin.packageName) ? 'primary' : 'on-surface-variant'"
-                  :variant="isPinned(plugin.packageName) ? 'tonal' : 'text'"
-                  size="small"
-                  icon
-                  rounded="pill"
-                  class="plugin-entry__pin ease-standard shrink-0"
-                  :aria-label="isPinned(plugin.packageName) ? '取消固定到侧栏' : '固定到侧栏'"
-                  @click.stop="togglePin(plugin.packageName)"
-                >
-                  <v-icon class="text-lg">
-                    push_pin
-                  </v-icon>
-
-                  <v-tooltip activator="parent" location="top">
-                    {{ isPinned(plugin.packageName) ? '取消固定到侧栏' : '固定到侧栏' }}
-                  </v-tooltip>
-                </v-btn>
+            <div class="min-w-0 text-left">
+              <div class="text-mat-title-medium truncate">
+                {{ plugin.plugin?.title || plugin.title || plugin.packageName }}
               </div>
-            </v-card>
-          </v-hover>
-        </div>
+            </div>
+          </mat-card-action-area>
+
+          <mat-btn
+            class="home-pin"
+            :variant="isPinned(plugin.packageName) ? 'filled-tonal' : 'text'"
+            :color="isPinned(plugin.packageName) ? 'primary' : 'on-surface-variant'"
+            icon="push_pin"
+            :label="isPinned(plugin.packageName) ? '取消固定到侧栏' : '固定到侧栏'"
+            :aria-label="isPinned(plugin.packageName) ? '取消固定到侧栏' : '固定到侧栏'"
+            @click="togglePin(plugin.packageName)"
+          />
+        </mat-card>
       </div>
 
       <div
         v-else
         class="flex flex-col items-center justify-center py-16 mt-8"
       >
-        <v-avatar color="surface-container-highest" class="mb-4 size-20 rounded-full" rounded>
-          <v-icon class="text-4xl" color="on-surface-variant">
+        <div class="mb-4 size-20 rounded-full bg-surface-container-highest flex items-center justify-center">
+          <mat-icon class="text-4xl text-on-surface-variant">
             search_off
-          </v-icon>
-        </v-avatar>
-        <h3 class="text-xl font-medium mb-2">
+          </mat-icon>
+        </div>
+        <h3 class="text-mat-title-large mb-2">
           未找到匹配的插件
         </h3>
-        <p class="text-base opacity-70">
+        <p class="text-mat-body-large text-on-surface-variant">
           请尝试使用其他关键词，或者在插件管理器中安装新插件
         </p>
       </div>
     </div>
-  </v-container>
+  </mat-container>
 </template>
 
 <script setup>
@@ -155,26 +131,39 @@ const openPlugin = (plugin) => {
 </script>
 
 <style scoped>
-.plugin-entry {
-  border: 1px solid rgb(var(--v-theme-outline-variant), .65);
-  transition-property: transform, box-shadow, border-color, background-color;
-
-  &:hover {
-    transform: translateY(-1px);
-    border-color: rgb(var(--v-theme-outline), .85);
-    background-color: rgb(var(--v-theme-surface-container));
-  }
+.home-card {
+  position: relative;
 }
 
-.plugin-entry__avatar {
-  transition-property: background-color, transform;
+/*
+ * action-area 渲染为 button 并铺满整卡，state layer 因此覆盖整卡；
+ * 内部的 __content span 会打断 flex 链，横向排版作用于该 span
+ */
+.home-entry {
+  padding: 12px 60px 12px 12px;
 }
 
-.plugin-entry__pin {
-  transition-property: background-color, color, transform;
+.home-entry :deep(.mat-card-action-area__content) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
 
-  &:hover {
-    transform: scale(1.04);
-  }
+.home-entry__avatar {
+  transition: transform .25s cubic-bezier(.4, 0, .2, 1);
+}
+
+.home-entry:active .home-entry__avatar {
+  transform: scale(.94);
+}
+
+/* 图钉与 action-area 同级，浮于其上，避免按钮嵌套按钮 */
+.home-pin {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  z-index: 2;
+  translate: 0 -50%;
 }
 </style>

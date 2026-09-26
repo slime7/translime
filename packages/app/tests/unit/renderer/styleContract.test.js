@@ -26,21 +26,25 @@ const listFiles = async (dir) => {
   ];
 };
 
-describe('宿主 Vuetify + Tailwind 样式契约', () => {
-  describe('CSS layer 顺序（官方文档结构）', () => {
+describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）', () => {
+  describe('CSS layer 顺序', () => {
     const officialOrder = [
       'tailwind-theme',
       'tailwind-reset',
       'vuetify-core',
       'vuetify-components',
       'vuetify-overrides',
+      'mde.tokens',
+      'mde.components',
+      'mde.utilities',
       'vuetify-utilities',
       'tailwind-utilities',
+      'mde-final',
       'vuetify-final',
       'translime-plugin',
     ];
 
-    it('layers.css 以官方顺序声明全部 layer', async () => {
+    it('layers.css 按官方顺序声明全部 layer', async () => {
       const css = await read('src/renderer/assets/styles/layers.css');
       const positions = officialOrder.map((name) => css.indexOf(`@layer ${name};`));
 
@@ -52,13 +56,13 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       });
     });
 
-    it('vuetify.js 在 vuetify/styles 之前导入 layers.css', async () => {
-      const js = await read('src/renderer/plugins/vuetify.js');
-      const layersImport = js.indexOf('assets/styles/layers.css');
-      const stylesImport = js.indexOf("import 'vuetify/styles'");
+    it('app.css 在 mde-vue/styles.css 之前导入 layers.css', async () => {
+      const css = await read('src/renderer/assets/styles/app.css');
+      const layersImport = css.indexOf('./layers.css');
+      const mdeStylesImport = css.indexOf('mde-vue/styles.css');
 
       expect(layersImport).toBeGreaterThan(-1);
-      expect(stylesImport).toBeGreaterThan(layersImport);
+      expect(mdeStylesImport).toBeGreaterThan(layersImport);
     });
 
     it('app.css 不再声明旧的 tailwind 中间层顺序', async () => {
@@ -68,21 +72,21 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
   });
 
   describe('tailwind.css 配置', () => {
-    it('按官方方式导入 theme 与 utilities 到对应 layer，且不引入 preflight', async () => {
+    it('按官方方式导入 theme、preflight 与 utilities 到对应 layer', async () => {
       const css = await read('src/renderer/assets/styles/tailwind.css');
 
       expect(css).toContain('@import "tailwindcss/theme" layer(tailwind-theme);');
+      expect(css).toContain('@import "tailwindcss/preflight" layer(tailwind-reset);');
       expect(css).toContain('@import "tailwindcss/utilities" layer(tailwind-utilities);');
       expect(css).not.toContain('tailwindcss/base');
-      expect(css).not.toContain('tailwindcss/preflight');
       expect(css).not.toMatch(/@import\s+["']tailwindcss["']/);
     });
 
-    it('dark/light 变体绑定 Vuetify 主题类', async () => {
+    it('dark/light 变体绑定 mde-vue 主题属性', async () => {
       const css = await read('src/renderer/assets/styles/tailwind.css');
 
-      expect(css).toContain('@custom-variant light (&:where(.v-theme--light, .v-theme--light *));');
-      expect(css).toContain('@custom-variant dark (&:where(.v-theme--dark, .v-theme--dark *));');
+      expect(css).toContain('@custom-variant light (&:where([data-mat-theme="light"], [data-mat-theme="light"] *));');
+      expect(css).toContain('@custom-variant dark (&:where([data-mat-theme="dark"], [data-mat-theme="dark"] *));');
     });
 
     it('断点与 Vuetify 阈值对齐（0/600/960/1280/1920/2560，xxl 命名）', async () => {
@@ -97,35 +101,37 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(css).toMatch(/--breakpoint-xxl:\s+2560px;/);
     });
 
-    it('映射 Vuetify 主题色为 Tailwind 颜色', async () => {
+    it('映射 mde-vue 主题令牌为 Tailwind 颜色', async () => {
       const css = await read('src/renderer/assets/styles/tailwind.css');
       const colors = [
         'background',
         'surface',
         'surface-variant',
+        'surface-container-high',
         'primary',
-        'success',
-        'warning',
+        'secondary-container',
         'error',
-        'info',
+        'on-error-container',
         'on-primary-container',
-        'on-secondary-container',
+        'on-surface-variant',
+        'outline',
+        'outline-variant',
       ];
 
       colors.forEach((name) => {
-        const pattern = new RegExp(`--color-${name}:\\s+rgb\\(var\\(--v-theme-${name}\\)\\);`);
+        const pattern = new RegExp(`--color-${name}:\\s+var\\(--mat-sys-color-${name}\\);`);
         expect(css, `缺少 --color-${name} 映射`).toMatch(pattern);
       });
     });
 
-    it('保留 Vuetify rounded 与 MD3 排版工具类的 Tailwind 等价物', async () => {
+    it('保留 Vuetify rounded 工具类等价物并按文档接入 mde-vue/tailwind.css', async () => {
       const css = await read('src/renderer/assets/styles/tailwind.css');
 
       expect(css).toContain('@utility rounded-pill');
       expect(css).toContain('@utility rounded-circle');
       expect(css).toContain('@utility rounded-shaped');
-      expect(css).toContain('@utility text-body-large');
-      expect(css).toContain('@utility text-body-small');
+      expect(css).toContain('@import "mde-vue/tailwind.css";');
+      expect(css).not.toContain('@utility text-body-large');
     });
   });
 
@@ -173,8 +179,26 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
       expect(config).toContain('server.middlewares.use');
       expect(config).toContain('server.resolvedUrls');
       expect(config).toContain('external: true');
-      expect(config).toMatch(/exclude:\s*\[[\s\S]*'vue',[\s\S]*'vuetify'/);
+      expect(config).toMatch(/exclude:\s*\[[\s\S]*'vue',[\s\S]*'vuetify',[\s\S]*'mde-vue'/);
       expect(html).toContain('"vue": "./libs/vue/vue.esm-browser.js"');
+    });
+
+    it('宿主入口同时安装 Vuetify（插件兼容）与 mde-vue（宿主 UI）', async () => {
+      const main = await read('src/renderer/index.js');
+
+      expect(main).toContain("@/plugins/vuetify'");
+      expect(main).toContain('@/plugins/vuetifyCompat');
+      expect(main).toContain("@/plugins/matUi'");
+      expect(main.indexOf('plugins/vuetify')).toBeLessThan(main.indexOf('plugins/matUi'));
+    });
+
+    it('vuetifyCompat 提供插件所需的 window.vuetify$', async () => {
+      const compat = await read('src/renderer/plugins/vuetifyCompat.js');
+
+      expect(compat).toContain("from 'vuetify/components'");
+      expect(compat).toContain("from 'vuetify/labs/components'");
+      expect(compat).toContain("from 'vuetify/directives'");
+      expect(compat).toContain('window.vuetify$');
     });
 
     it('插件 CSS layer 应位于宿主层级之后', async () => {
@@ -212,17 +236,17 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
   });
 
   describe('组件类迁移（Tailwind 为主）', () => {
-    it('NaviLink.vue 使用 Tailwind 等价类', async () => {
+    it('NaviLink.vue 使用 Tailwind 等价类，容器色经 CSS 令牌控制', async () => {
       const vue = await read('src/renderer/views/Layout/components/NaviLink.vue');
 
       expect(vue).not.toContain('d-block');
       expect(vue).not.toContain('text-decoration-none');
       expect(vue).not.toContain('text-no-wrap');
       expect(vue).not.toContain('text-truncate');
-      expect(vue).not.toContain('text-on-primary-container');
-      expect(vue).not.toContain('text-on-secondary-container');
-      expect(vue).toContain("'on-primary-container'");
-      expect(vue).toContain("'on-secondary-container'");
+      expect(vue).not.toContain('<v-');
+      expect(vue).toContain('text-nowrap truncate');
+      expect(vue).toContain('var(--mat-sys-color-secondary-container)');
+      expect(vue).toContain('var(--mat-sys-color-on-primary-container)');
     });
 
     it('Home.vue 使用 xxl 断点前缀', async () => {
@@ -239,25 +263,62 @@ describe('宿主 Vuetify + Tailwind 样式契约', () => {
     });
   });
 
+  describe('mde 排版契约', () => {
+    it('页面标题使用 mde 标题样式，游离文本不残留 Tailwind 原生字号类', async () => {
+      const home = await read('src/renderer/views/Home.vue');
+      const setting = await read('src/renderer/views/Setting.vue');
+      const plugins = await read('src/renderer/views/plugins/Plugins.vue');
+      const logViewer = await read('src/renderer/views/LogViewer.vue');
+
+      expect(home).toContain('text-mat-headline-large');
+      expect(home).not.toContain('font-bold');
+      expect(setting).toContain('text-mat-headline-large');
+      expect(setting).not.toContain('text-5xl');
+      expect(plugins).toContain('<h2 class="text-mat-headline-large">');
+      expect(logViewer).toContain('text-mat-headline-large');
+      expect(logViewer).toContain('text-mat-body-medium');
+    });
+  });
+
   describe('原生 CSS 嵌套契约', () => {
     it('Navigation.vue 的 :deep 保持顶层写法，不嵌在原生嵌套中', async () => {
       const vue = await read('src/renderer/views/Layout/components/Navigation.vue');
 
       expect(vue).toContain('.navi-panel :deep(.navi-btn) {');
-      expect(vue).toContain('.navi-panel :deep(.navi-btn) + .navi-btn {');
+      expect(vue).toContain('gap: 8px;');
       expect(vue).not.toMatch(/\{[^}]*:deep\(/s);
     });
   });
 
   describe('导航圆角动画契约', () => {
-    it('NaviLink.vue 与 Navigation.vue 的 v-avatar 使用 ease-animation 与动态圆角', async () => {
+    it('NaviLink.vue 与 Navigation.vue 的头像 hover/active 为纯 CSS 形变且使用有限值圆角', async () => {
       const naviLink = await read('src/renderer/views/Layout/components/NaviLink.vue');
       const navigation = await read('src/renderer/views/Layout/components/Navigation.vue');
 
-      expect(naviLink).toContain('class="ease-animation"');
-      expect(naviLink).toContain(':class="[isHovering || isExactActive ? \'rounded-3xl\' : \'rounded-full\']"');
-      expect(navigation).toContain('class="ease-animation"');
-      expect(navigation).toContain(':class="[isHovering ? \'rounded-3xl\' : \'rounded-full\']"');
+      // Tailwind v4 的 rounded-full 是 calc(infinity * 1px)，无法平滑插值到有限圆角；
+      // hover/active 圆角为 24px：28px（extra-large）在 56px 图标上恰为正圆会失去形变，
+      // 24 是仍可见形变的上限；hover 必须走 :hover 选择器而不是 mat-hover 响应式
+      expect(naviLink).toContain('navi-avatar flex items-center');
+      expect(naviLink).toContain("'navi-avatar--active' : 'navi-avatar--round'");
+      expect(naviLink).not.toContain('mat-hover');
+      expect(naviLink).toContain('var(--mat-sys-shape-corner-full)');
+      expect(naviLink).toContain('border-radius: 24px;');
+      expect(naviLink).toContain('.navi-btn:hover .navi-avatar--round');
+      expect(naviLink).toContain('transition:');
+      expect(naviLink).not.toContain('rounded-full');
+
+      expect(navigation).not.toContain('mat-hover');
+      expect(navigation).toContain('var(--mat-sys-shape-corner-full)');
+      expect(navigation).toContain('border-radius: 24px;');
+      expect(navigation).toContain('.navi-btn:hover .navi-avatar--round');
+    });
+
+    it('侧栏面板以 flex gap 提供图标间距', async () => {
+      const navigation = await read('src/renderer/views/Layout/components/Navigation.vue');
+
+      expect(navigation).toContain('display: flex;');
+      expect(navigation).toContain('flex-direction: column;');
+      expect(navigation).not.toContain('.navi-btn + .navi-btn');
     });
   });
 

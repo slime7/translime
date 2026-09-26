@@ -1,25 +1,30 @@
 <template>
-  <v-scroll-y-reverse-transition
-    group
+  <transition-group
+    name="alert-list"
     tag="div"
     class="alert-group"
   >
-    <v-alert
+    <div
       v-for="alertItem in activeList"
       :key="alertItem.uuid"
-      :type="alertItem.type"
-      border="left"
-      dismissible
+      class="alert-item flex items-start gap-1 px-4 py-3 rounded-lg"
+      :class="alertItem.type === 'error'
+        ? 'bg-error-container text-on-error-container'
+        : 'bg-secondary-container text-on-secondary-container'"
     >
-      {{ alertItem.msg }}
+      <div class="grow">
+        {{ alertItem.msg }}
+      </div>
 
-      <template #close>
-        <v-btn class="v-alert__dismissible" small icon @click="dismiss(alertItem.uuid)">
-          <v-icon>cancel</v-icon>
-        </v-btn>
-      </template>
-    </v-alert>
-  </v-scroll-y-reverse-transition>
+      <mat-btn
+        icon="cancel"
+        label="关闭"
+        variant="text"
+        class="shrink-0"
+        @click="dismiss(alertItem.uuid)"
+      />
+    </div>
+  </transition-group>
 </template>
 
 <script>
@@ -48,5 +53,21 @@ export default {
   bottom: 16px;
   width: 480px;
   max-width: 100%;
+  z-index: 30;
+}
+
+.alert-item + .alert-item {
+  margin-top: 8px;
+}
+
+.alert-list-enter-active,
+.alert-list-leave-active {
+  transition: all .25s cubic-bezier(0, 0, 0, 1);
+}
+
+.alert-list-enter-from,
+.alert-list-leave-to {
+  opacity: 0;
+  transform: translateY(16px);
 }
 </style>

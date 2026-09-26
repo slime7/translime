@@ -50,49 +50,38 @@ const basePlugin = {
 const globalMountOptions = {
   global: {
     stubs: {
-      'v-dialog': {
-        template: '<div class="v-dialog-stub"><slot /></div>',
-        props: ['modelValue'],
+      'mat-dialog': {
+        template: '<div class="mat-dialog-stub"><slot name="title" /><slot /><slot name="actions" /></div>',
+        props: ['modelValue', 'title', 'width'],
       },
-      'v-card': { template: '<div><slot /></div>' },
-      'v-toolbar': { template: '<div><slot /></div>' },
-      'v-btn': {
-        template: '<button @click="$emit(\'click\')"><slot /></button>',
+      'mat-btn': {
+        template: '<button class="mat-btn-stub" @click="$emit(\'click\')"><slot /></button>',
       },
-      'v-icon': { template: '<span><slot /></span>' },
-      'v-toolbar-title': { template: '<div><slot /></div>' },
-      'v-spacer': true,
-      'v-toolbar-items': { template: '<div><slot /></div>' },
-      'v-card-text': { template: '<div><slot /></div>' },
-      'v-form': {
-        template: '<form><slot /></form>',
-        methods: {
-          validate: () => true,
-        },
+      'mat-icon': true,
+      'mat-progress': true,
+      'mat-switch': true,
+      'mat-checkbox': true,
+      'mat-radio-group': true,
+      'mat-radio': true,
+      'mat-select': true,
+      'mat-tooltip': {
+        template: '<div class="tooltip"><slot /><slot name="activator" /></div>',
+        props: ['content'],
       },
-      'v-container': { template: '<div><slot /></div>' },
-      'v-tooltip': {
-        template: '<div class="tooltip" :data-text="text"><slot name="activator" :props="{}" /></div>',
-        props: ['text'],
-      },
-      'v-text-field': {
-        template: '<button class="text-field" :data-label="label" :data-value="modelValue || value || \'\'" @click="$emit(\'click:control\')">{{ modelValue || value || "" }}</button>',
+      'mat-text-field': {
+        template: '<button class="text-field" :data-label="label" :data-value="modelValue || \'\'">{{ modelValue || "" }}</button>',
         props: [
           'modelValue',
-          'value',
           'label',
           'placeholder',
-          'rules',
           'required',
           'readonly',
+          'error',
+          'errorText',
+          'color',
+          'type',
         ],
       },
-      'v-select': true,
-      'v-switch': true,
-      'v-checkbox': true,
-      'v-radio-group': true,
-      'v-radio': true,
-      'v-progress-circular': true,
     },
   },
 };
@@ -204,11 +193,31 @@ describe('PluginSettingPanel.vue', () => {
     expect(wrapper.find('.text-field').attributes('data-value')).toBe('C:\\Steam');
   });
 
-  it('validates required array values', async () => {
+  it('validates required values and reports errors', async () => {
     const wrapper = await mountPanel();
-    const validateRequired = wrapper.vm.requiredRule[0];
 
-    expect(validateRequired([])).toBe('此项必填');
-    expect(validateRequired(['C:\\tools\\ffmpeg.exe'])).toBe(true);
+    // 空数组视为未填写
+    expect(wrapper.vm.validateSettings()).toBe(false);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.validationErrors.filePath).toBe('此项必填');
+
+    wrapper.vm.settings.filePath = ['C:\\tools\\ffmpeg.exe'];
+    expect(wrapper.vm.validateSettings()).toBe(true);
+    expect(wrapper.vm.validationErrors.filePath).toBeUndefined();
+  });
+
+  it('skips validation for non-required items', async () => {
+    const plugin = {
+      ...basePlugin,
+      settingMenu: [
+        {
+          ...basePlugin.settingMenu[0],
+          required: false,
+        },
+      ],
+    };
+    const wrapper = await mountPanel({}, plugin);
+
+    expect(wrapper.vm.validateSettings()).toBe(true);
   });
 });

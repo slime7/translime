@@ -1,172 +1,145 @@
 <template>
-  <v-hover
+  <mat-hover
     v-slot="{ isHovering, props }"
   >
-    <v-card
-      class="plugin-item-card ease-animation h-full overflow-hidden"
+    <mat-card
+      class="plugin-item-card ease-animation h-full overflow-hidden rounded-3xl"
       data-test="plugin-card"
       :data-test-package="plugin.packageName"
-      v-bind="props"
-      :elevation="isHovering ? 5 : 2"
-      :disabled="disabled"
-      rounded="xl"
+      variant="elevated"
       color="tertiary-container"
+      :class="isHovering ? 'shadow-[var(--mat-sys-elevation-level3)]' : 'shadow-[var(--mat-sys-elevation-level1)]'"
+      v-bind="props"
     >
       <div class="relative h-full">
         <div class="min-w-0 relative z-10 flex flex-col h-full">
-          <v-tooltip :text="cardTitle" location="top">
-            <template #activator="{ props: titleProps }">
-              <v-card-title
-                class="text-2xl"
-                v-bind="titleProps"
-              >
-                <v-chip
+          <mat-tooltip :content="cardTitle" location="top">
+            <template #activator>
+              <div class="flex items-center px-4 pt-4 text-mat-title-large">
+                <mat-chip
                   v-if="plugin.dev"
-                  size="small"
-                  label
                   class="mr-2"
                 >
                   本地开发
-                </v-chip>
-                <v-chip
+                </mat-chip>
+                <mat-chip
                   v-if="statusMeta"
-                  size="small"
-                  label
                   class="mr-2"
                   :color="statusMeta.color"
                 >
                   {{ statusMeta.label }}
-                </v-chip>
+                </mat-chip>
                 <span>{{ cardTitle }}</span>
-              </v-card-title>
+              </div>
             </template>
-          </v-tooltip>
+          </mat-tooltip>
 
-          <v-card-subtitle>
+          <div class="px-4 pt-1 text-mat-body-medium opacity-80">
             <span v-if="!plugin.link">{{ cardSubTitle }}</span>
             <a v-else @click="authLink">{{ cardSubTitle }}</a>
-          </v-card-subtitle>
+          </div>
 
-          <v-card-text class="grow">
+          <mat-card-content class="grow">
             <div>{{ plugin.description }}</div>
             <div
               v-if="plugin.statusText"
-              class="mt-2 text-sm plugin-status"
+              class="mt-2 text-mat-body-medium plugin-status"
             >
               {{ plugin.statusText }}
             </div>
-          </v-card-text>
+          </mat-card-content>
 
-          <v-card-actions>
+          <mat-card-actions>
             <template v-if="!plugin.searchResultItem">
-              <v-btn
+              <mat-btn
                 v-if="!plugin.enabled"
                 class="ml-2"
-                fab
-                icon
-                height="40px"
-                width="40px"
-                title="启用"
+                icon="play_arrow"
+                label="启用"
                 data-test="plugin-enable-btn"
+                :disabled="disabled"
                 @click="enable"
-              >
-                <v-icon>play_arrow</v-icon>
-              </v-btn>
+              />
 
-              <v-btn
+              <mat-btn
                 v-else
                 class="ml-2"
-                fab
-                icon
-                height="40px"
-                width="40px"
-                title="禁用"
+                icon="pause"
+                label="禁用"
                 data-test="plugin-disable-btn"
+                :disabled="disabled"
                 @click="disable"
-              >
-                <v-icon>pause</v-icon>
-              </v-btn>
+              />
 
-              <v-btn
+              <mat-btn
                 class="ml-2"
-                fab
-                icon
-                height="40px"
-                width="40px"
-                title="卸载"
+                icon="delete"
+                label="卸载"
                 data-test="plugin-uninstall-btn"
+                :disabled="disabled"
                 @click="uninstall"
-              >
-                <v-icon>delete</v-icon>
-              </v-btn>
+              />
 
-              <v-btn
+              <mat-btn
                 v-if="hasNewVersion"
                 class="ml-2"
-                fab
-                icon
-                height="40px"
-                width="40px"
-                color="success"
-                title="升级"
+                icon="deployed_code_update"
+                label="升级"
+                :color="STATUS_SUCCESS"
+                :disabled="disabled"
                 @click="install(versionList[1]?.value)"
-              >
-                <v-icon>deployed_code_update</v-icon>
-              </v-btn>
+              />
 
-              <v-btn
+              <mat-btn
                 class="ml-2"
-                fab
-                icon
-                height="40px"
-                width="40px"
+                icon="settings"
+                label="设置"
+                :disabled="disabled"
                 @click="showContextMenu"
-              >
-                <v-icon>settings</v-icon>
-              </v-btn>
+              />
             </template>
             <template v-else>
-              <v-btn
+              <mat-btn
                 class="ml-2"
-                variant="elevated"
+                variant="filled"
                 color="primary"
+                :disabled="disabled"
                 @click="install(selectedVersion)"
                 v-if="!isInstalled"
               >
                 安装
-              </v-btn>
+              </mat-btn>
 
-              <v-btn
+              <mat-btn
                 class="ml-2"
-                variant="elevated"
-                color="success"
+                variant="filled"
+                :color="STATUS_SUCCESS"
+                :disabled="disabled"
                 @click="install(selectedVersion)"
                 v-if="canUpdated"
               >
                 升级
-              </v-btn>
+              </mat-btn>
 
-              <v-btn
+              <mat-btn
                 class="ml-2"
-                variant="elevated"
+                variant="filled"
+                :disabled="disabled"
                 @click="install(selectedVersion)"
                 v-if="isInstalled && !canUpdated"
               >
                 重新安装
-              </v-btn>
+              </mat-btn>
 
-              <v-select
+              <mat-select
                 v-model="selectedVersion"
                 class="version-selector ml-2"
                 :items="versionList"
                 label="版本"
-                variant="outlined"
-                hide-details
-                density="compact"
                 color="primary"
               />
             </template>
-          </v-card-actions>
+          </mat-card-actions>
         </div>
 
         <img
@@ -180,8 +153,8 @@
         v-model="settingPanelVisible"
         :plugin="plugin"
       />
-    </v-card>
-  </v-hover>
+    </mat-card>
+  </mat-hover>
 </template>
 
 <script>
@@ -196,6 +169,7 @@ import verCompare from 'semver-compare';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
+import { STATUS_INFO, STATUS_SUCCESS, STATUS_WARNING } from '@/utils/statusColors';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
 import usePluginActions from './hooks/usePluginActions';
@@ -267,13 +241,13 @@ export default {
       if (plugin.value.status === 'blocked') {
         return {
           label: '依赖阻塞',
-          color: 'warning',
+          color: STATUS_WARNING,
         };
       }
       if (plugin.value.status === 'build-missing') {
         return {
           label: '需要构建',
-          color: 'warning',
+          color: STATUS_WARNING,
         };
       }
       if (plugin.value.status === 'load-error') {
@@ -285,7 +259,7 @@ export default {
       if (plugin.value.dependents?.length) {
         return {
           label: '被依赖',
-          color: 'info',
+          color: STATUS_INFO,
         };
       }
       return null;
@@ -300,6 +274,7 @@ export default {
     });
 
     return {
+      STATUS_SUCCESS,
       settingPanelVisible,
       install,
       enable,
@@ -328,6 +303,19 @@ export default {
 .plugin-item-card {
   position: relative;
   transition: all .3s cubic-bezier(.4, 0, .2, 1);
+
+  /* 卡片底色是语义容器色，chip 默认的 surface 角色文字（on-surface-variant）在容器色上对比度不足，
+     改为跟随容器色角色；带显式 color 的状态 chip 填充其容器色，保证状态可辨识 */
+  :deep(.mat-chip) {
+    --mat-chip-label-color: var(--mat-on-accent-container-color);
+    --mat-chip-icon-color: var(--mat-on-accent-container-color);
+    --mat-chip-outline-color: color-mix(in srgb, var(--mat-on-accent-container-color) 40%, transparent);
+  }
+
+  :deep(.mat-chip--explicit-color) {
+    --mat-chip-container-color: var(--mat-accent-container-color);
+    --mat-chip-outline-color: transparent;
+  }
 
   .plugin-status {
     opacity: .78;

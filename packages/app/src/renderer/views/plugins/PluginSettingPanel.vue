@@ -1,162 +1,146 @@
 <template>
-  <v-dialog
+  <mat-dialog
     v-model="internalValue"
-    persistent
-    scrollable
-    max-width="560"
+    width="560"
+    title="配置"
     data-test="plugin-setting-dialog"
   >
-    <v-card>
-      <v-toolbar
-        dark
-        color="primary"
+    <div class="mt-4">
+      有些设置可能需要重启插件生效
+    </div>
+
+    <div v-if="!loading.getSettings" class="mt-4">
+      <div
+        v-for="(menuItem, index) in settingMenu"
+        :key="index"
+        class="flex items-center"
       >
-        <v-btn
-          icon
-          dark
-          data-test="plugin-setting-close-btn"
-          @click="internalValue = false"
+        <mat-text-field
+          v-if="menuItem.type === 'input' || menuItem.type === 'password'"
+          v-model="settings[menuItem.key]"
+          class="mt-2 w-full"
+          :label="menuItem.name"
+          :type="menuItem.type === 'password' ? 'password' : 'text'"
+          :placeholder="menuItem.placeholder"
+          :required="menuItem.required"
+          :error="!!validationErrors[menuItem.key]"
+          :error-text="validationErrors[menuItem.key]"
+          color="primary"
+          @contextmenu="showTextEditContextMenu"
+        />
+
+        <mat-tooltip
+          v-if="menuItem.type === 'file'"
+          :content="formatFilePaths(settings[menuItem.key]) || '未选择'"
+          location="bottom"
         >
-          <v-icon>close</v-icon>
-        </v-btn>
-        <v-toolbar-title>配置</v-toolbar-title>
-        <v-spacer />
-        <v-toolbar-items>
-          <v-btn
-            dark
-            variant="text"
-            data-test="plugin-setting-save-btn"
-            @click="saveSettings"
-          >
-            保存
-          </v-btn>
-        </v-toolbar-items>
-      </v-toolbar>
-
-      <v-card-text>
-        <div class="mt-4">
-          有些设置可能需要重启插件生效
-        </div>
-
-        <v-form v-if="!loading.getSettings" class="mt-4" ref="settingForm">
-          <v-container fluid>
+          <template #activator>
             <div
-              v-for="(menuItem, index) in settingMenu"
-              :key="index"
-              class="flex items-center -mx-4"
+              class="mt-2 w-full"
+              @click="selectFile.open(menuItem)"
             >
-              <v-text-field
-                v-if="menuItem.type === 'input' || menuItem.type === 'password'"
-                v-model="settings[menuItem.key]"
-                class="mt-2"
+              <mat-text-field
+                :model-value="formatFilePaths(settings[menuItem.key])"
+                class="w-full"
                 :label="menuItem.name"
-                :type="menuItem.type || 'input'"
                 :placeholder="menuItem.placeholder"
-                :rules="menuItem.required ? requiredRule : []"
                 :required="menuItem.required"
-                variant="outlined"
+                :error="!!validationErrors[menuItem.key]"
+                :error-text="validationErrors[menuItem.key]"
                 color="primary"
-                @click.right="showTextEditContextMenu"
+                readonly
               />
-
-              <v-tooltip
-                v-if="menuItem.type === 'file'"
-                :text="formatFilePaths(settings[menuItem.key]) || '未选择'"
-                location="bottom"
-              >
-                <template #activator="{ props }">
-                  <v-text-field
-                    v-bind="props"
-                    :model-value="formatFilePaths(settings[menuItem.key])"
-                    class="mt-2"
-                    :label="menuItem.name"
-                    :placeholder="menuItem.placeholder"
-                    :rules="menuItem.required ? requiredRule : []"
-                    :required="menuItem.required"
-                    variant="outlined"
-                    color="primary"
-                    readonly
-                    @click:control="selectFile.open(menuItem)"
-                  />
-                </template>
-              </v-tooltip>
-
-              <v-select
-                v-if="menuItem.type === 'list'"
-                v-model="settings[menuItem.key]"
-                class="mt-2"
-                :items="menuItem.choices"
-                :label="menuItem.name"
-                item-title="name"
-                :rules="menuItem.required ? requiredRule : []"
-                :required="menuItem.required"
-                variant="outlined"
-                color="primary"
-              />
-
-              <template
-                v-if="menuItem.type === 'switch'"
-              >
-                <label
-                  v-text="menuItem.name"
-                  class="grow"
-                  :for="`switch-${menuItem.key}`"
-                />
-
-                <v-switch
-                  v-model="settings[menuItem.key]"
-                  class="grow-0 shrink-0"
-                  :id="`switch-${menuItem.key}`"
-                  color="primary"
-                  hide-details
-                />
-              </template>
-
-              <template
-                v-if="menuItem.type === 'checkbox'"
-              >
-                <label class="mr-2" v-text="menuItem.name" />
-                <v-checkbox
-                  v-model="settings[menuItem.key]"
-                  v-for="(menuCheckboxItem, cIndex) in menuItem.choices"
-                  :key="cIndex"
-                  :label="menuCheckboxItem.name"
-                  :value="menuCheckboxItem.value"
-                  class="mr-2 grow-0"
-                  color="primary"
-                  hide-details
-                />
-              </template>
-
-              <template v-if="menuItem.type === 'radio'">
-                <label class="mr-2" v-text="menuItem.name" />
-
-                <v-radio-group
-                  v-if="menuItem.type === 'radio'"
-                  v-model="settings[menuItem.key]"
-                  mandatory
-                  inline
-                  hide-details
-                >
-                  <v-radio
-                    v-for="(menuRadioItem, rIndex) in menuItem.choices"
-                    :key="rIndex"
-                    :label="menuRadioItem.name"
-                    :value="menuRadioItem.value"
-                    color="primary"
-                  />
-                </v-radio-group>
-              </template>
             </div>
-          </v-container>
-        </v-form>
+          </template>
+        </mat-tooltip>
 
-        <div v-else class="flex justify-center">
-          <v-progress-circular indeterminate />
-        </div>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+        <mat-select
+          v-if="menuItem.type === 'list'"
+          v-model="settings[menuItem.key]"
+          class="mt-2 w-full"
+          :items="menuItem.choices"
+          :label="menuItem.name"
+          item-title="name"
+          item-value="value"
+          :required="menuItem.required"
+          :error="!!validationErrors[menuItem.key]"
+          :error-text="validationErrors[menuItem.key]"
+          color="primary"
+        />
+
+        <template v-if="menuItem.type === 'switch'">
+          <label
+            v-text="menuItem.name"
+            class="grow"
+            :for="`switch-${menuItem.key}`"
+          />
+
+          <mat-switch
+            v-model="settings[menuItem.key]"
+            class="grow-0 shrink-0"
+            :id="`switch-${menuItem.key}`"
+            color="primary"
+          />
+        </template>
+
+        <template v-if="menuItem.type === 'checkbox'">
+          <label class="mr-2" v-text="menuItem.name" />
+          <mat-checkbox
+            v-model="settings[menuItem.key]"
+            v-for="(menuCheckboxItem, cIndex) in menuItem.choices"
+            :key="cIndex"
+            :value="menuCheckboxItem.value"
+            class="mr-2 grow-0"
+            color="primary"
+          >
+            {{ menuCheckboxItem.name }}
+          </mat-checkbox>
+        </template>
+
+        <template v-if="menuItem.type === 'radio'">
+          <mat-radio-group
+            v-model="settings[menuItem.key]"
+            class="w-full"
+            :label="menuItem.name"
+            color="primary"
+          >
+            <mat-radio
+              v-for="(menuRadioItem, rIndex) in menuItem.choices"
+              :key="rIndex"
+              :value="menuRadioItem.value"
+            >
+              {{ menuRadioItem.name }}
+            </mat-radio>
+          </mat-radio-group>
+        </template>
+      </div>
+    </div>
+
+    <div v-else class="flex justify-center">
+      <mat-progress variant="circular" indeterminate />
+    </div>
+
+    <template #actions>
+      <div class="grow" />
+
+      <mat-btn
+        variant="text"
+        data-test="plugin-setting-close-btn"
+        @click="internalValue = false"
+      >
+        关闭
+      </mat-btn>
+
+      <mat-btn
+        variant="filled"
+        color="primary"
+        data-test="plugin-setting-save-btn"
+        @click="saveSettings"
+      >
+        保存
+      </mat-btn>
+    </template>
+  </mat-dialog>
 </template>
 
 <script>
@@ -218,16 +202,13 @@ export default {
       }
       return filePaths[0] || '';
     };
-    const requiredRule = [(v) => {
-      const hasValue = Array.isArray(v) ? v.length > 0 : !!v;
-      return hasValue || '此项必填';
-    }];
 
     const loading = reactive({
       getSettings: false,
       setSettings: false,
     });
     const settings = reactive({});
+    const validationErrors = reactive({});
     const initSettings = async () => {
       const { packageName } = props.plugin;
       loading.getSettings = true;
@@ -313,12 +294,29 @@ export default {
     };
     const settingMenu = computed(() => (props.plugin.settingMenu ? parseMenuItem(props.plugin.settingMenu) : []));
 
-    const settingForm = ref(null);
+    const validateSettings = () => {
+      let isValid = true;
+      settingMenu.value.forEach((menuItem) => {
+        if (!menuItem.required) {
+          delete validationErrors[menuItem.key];
+          return;
+        }
+        const value = settings[menuItem.key];
+        const hasValue = Array.isArray(value) ? value.length > 0 : value !== '' && value !== null && typeof value !== 'undefined';
+        if (hasValue) {
+          delete validationErrors[menuItem.key];
+        } else {
+          validationErrors[menuItem.key] = '此项必填';
+          isValid = false;
+        }
+      });
+      return isValid;
+    };
     const saveSettings = async () => {
       if (loading.setSettings) {
         return;
       }
-      const isValid = settingForm.value.validate();
+      const isValid = validateSettings();
       if (!isValid) {
         return;
       }
@@ -364,11 +362,11 @@ export default {
 
     return {
       internalValue,
-      requiredRule,
+      validationErrors,
       settingMenu,
-      settingForm,
       loading,
       settings,
+      validateSettings,
       saveSettings,
       formatFilePaths,
       showTextEditContextMenu,

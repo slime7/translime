@@ -1,162 +1,144 @@
 <template>
-  <v-container fluid class="plugins">
-    <h2>插件</h2>
+  <mat-container fluid class="plugins">
+    <h2 class="text-mat-headline-large">
+      插件
+    </h2>
 
     <div class="mt-4">
       <div class="mt-2">
-        <v-text-field
+        <mat-text-field
           v-model="search"
           data-test="plugin-search-input"
           label="插件名"
           placeholder="搜索插件或留空列出所有插件"
-          variant="outlined"
-          density="compact"
-          prefix="translime-plugin-"
+          prefix-text="translime-plugin-"
           color="primary"
+          class="w-full"
           @keyup.enter="searchAction"
-          @click.right="showTextEditContextMenu"
+          @contextmenu="showTextEditContextMenu"
         >
-          <template #append>
-            <v-btn
+          <template #trailing>
+            <mat-btn
               data-test="plugin-search-btn"
               color="primary"
-              :disabled="loading.install || loading.search"
               :loading="loading.install || loading.search"
               @click="searchAction"
             >
               {{ !search ? '查看插件' : '搜索插件' }}
-            </v-btn>
+            </mat-btn>
 
-            <v-btn
+            <mat-btn
               class="ml-2"
-              density="comfortable"
               icon="folder_zip"
+              label="安装本地插件"
               @click="installLocalPluginDialog.open()"
             />
 
-            <v-btn
+            <mat-btn
               class="ml-2"
-              density="comfortable"
               icon="refresh"
+              label="刷新开发中插件"
               data-test="plugin-refresh-btn"
-              :loading="loading.refresh"
               :disabled="loading.refresh"
               @click="refreshDevPlugins"
             />
           </template>
-        </v-text-field>
+        </mat-text-field>
       </div>
     </div>
 
     <template v-if="searchResult.list.length">
-      <h3>搜索结果</h3>
+      <h3 class="mt-8 text-mat-title-large">
+        搜索结果
+      </h3>
 
-      <div class="my-4">
-        <v-row class="plugin-list">
-          <v-col
-            sm="12"
-            md="6"
-            lg="4"
+      <div class="mt-3 mb-8">
+        <div class="plugin-list grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <plugin-card
             v-for="pluginItem in searchResult.list"
             :key="pluginItem.name"
+            :plugin="pluginItem"
+            :disabled="!!loading.install"
+            @install="installPlugins"
+          />
+
+          <div v-if="loading.search" class="w-full my-2 flex justify-center">
+            <mat-progress variant="circular" indeterminate color="primary" />
+          </div>
+        </div>
+
+        <div class="mt-5 flex justify-center gap-2">
+          <mat-btn
+            color="primary"
+            :disabled="loading.search"
+            @click="searchMore"
+            v-if="searchResult.total > (searchPage + 1) * 8"
           >
-            <plugin-card
-              :plugin="pluginItem"
-              :disabled="!!loading.install"
-              @install="installPlugins"
-            />
-          </v-col>
+            加载更多
+          </mat-btn>
 
-          <template v-if="loading.search">
-            <div class="w-100 my-2 flex justify-center">
-              <v-progress-circular color="primary" indeterminate />
-            </div>
-          </template>
-        </v-row>
-
-        <v-row class="justify-center">
-          <v-col sm="auto">
-            <v-btn
-              color="primary"
-              :disabled="loading.search"
-              @click="searchMore"
-              v-if="searchResult.total > (searchPage + 1) * 8"
-            >
-              加载更多
-            </v-btn>
-          </v-col>
-
-          <v-col sm="auto">
-            <v-btn
-              :disabled="loading.search"
-              @click="clearSearchResult"
-            >
-              清除搜索结果
-            </v-btn>
-          </v-col>
-        </v-row>
+          <mat-btn
+            :disabled="loading.search"
+            @click="clearSearchResult"
+          >
+            清除搜索结果
+          </mat-btn>
+        </div>
       </div>
     </template>
 
-    <h3>已安装</h3>
+    <h3 class="mt-8 text-mat-title-large">
+      已安装
+    </h3>
 
-    <div class="mt-4">
-      <v-row class="plugin-list">
-        <v-col
-          sm="12"
-          md="6"
-          lg="4"
+    <div class="mt-3">
+      <div class="plugin-list grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <plugin-card
           v-for="pluginItem in plugins"
           :key="pluginItem.packageName"
-        >
-          <plugin-card
-            :plugin="pluginItem"
-            :disabled="!!loading.uninstall || !!loading.install"
-            ref="pluginCardRefs"
-            @install="installPlugins"
-            @uninstall="uninstallPlugins"
-            @disable="disablePlugin"
-            @enable="enablePlugin"
-          />
-        </v-col>
-      </v-row>
+          :plugin="pluginItem"
+          :disabled="!!loading.uninstall || !!loading.install"
+          ref="pluginCardRefs"
+          @install="installPlugins"
+          @uninstall="uninstallPlugins"
+          @disable="disablePlugin"
+          @enable="enablePlugin"
+        />
+      </div>
     </div>
 
-    <v-dialog
+    <mat-dialog
       v-model="installLocalPluginDialog.visible"
-      max-width="600"
+      width="600"
+      title="安装本地插件"
     >
-      <v-card>
-        <v-card-text>
-          <v-tooltip
-            :text="installLocalPluginDialog.filepath || '未选择'"
-            location="bottom"
-          >
-            <template #activator="{ props }">
-              <v-text-field
-                v-bind="props"
-                :value="installLocalPluginDialog.filepath"
-                placeholder="选择本地的插件包文件"
-                :readonly="true"
-                @click:control="selectPluginFile()"
-              />
-            </template>
-          </v-tooltip>
-
-          <div class="mt-2 flex justify-center">
-            <v-btn
-              color="primary"
-              rounded
-              :disabled="!installLocalPluginDialog.filepath"
-              @click="installLocalPlugins"
-            >
-              安装这个插件
-            </v-btn>
+      <mat-tooltip
+        :content="installLocalPluginDialog.filepath || '未选择'"
+        location="bottom"
+      >
+        <template #activator>
+          <div @click="selectPluginFile()">
+            <mat-text-field
+              :model-value="installLocalPluginDialog.filepath"
+              placeholder="选择本地的插件包文件"
+              readonly
+              class="w-full"
+            />
           </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-  </v-container>
+        </template>
+      </mat-tooltip>
+
+      <div class="mt-2 flex justify-center">
+        <mat-btn
+          color="primary"
+          :disabled="!installLocalPluginDialog.filepath"
+          @click="installLocalPlugins"
+        >
+          安装这个插件
+        </mat-btn>
+      </div>
+    </mat-dialog>
+  </mat-container>
 </template>
 
 <script>

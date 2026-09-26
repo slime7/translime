@@ -1,43 +1,70 @@
 <template>
   <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
-    <div class="text-primary">
+    <div class="text-mat-label-large text-primary">
       通用
     </div>
 
-    <mde-list class="mt-2">
-      <mde-list-item
+    <mat-list
+      variant="segmented"
+      interaction="single-action"
+      class="settings-list mt-2"
+    >
+      <mat-list-item
         data-test="setting-auto-start"
-        title="开机自动启动"
-        item-type="switch"
-        :is-active="settings.openAtLogin"
         @click="onOpenAtLogin(!settings.openAtLogin)"
-      />
-      <mde-list-item
+      >
+        开机自动启动
+        <template #trailing>
+          <mat-switch
+            :model-value="settings.openAtLogin"
+            class="pointer-events-none"
+            color="primary"
+            aria-hidden="true"
+          />
+        </template>
+      </mat-list-item>
+      <mat-list-item
         data-test="setting-minimize-tray"
-        title="关闭时最小化到托盘"
-        item-type="switch"
-        :is-active="settings.minimizeToTrayOnClose"
         @click="onMinimizeToTrayOnClose(!settings.minimizeToTrayOnClose)"
-      />
-      <mde-list-item
+      >
+        关闭时最小化到托盘
+        <template #trailing>
+          <mat-switch
+            :model-value="settings.minimizeToTrayOnClose"
+            class="pointer-events-none"
+            color="primary"
+            aria-hidden="true"
+          />
+        </template>
+      </mat-list-item>
+      <mat-list-item
         data-test="setting-show-dev-plugin"
-        title="显示开发中插件(重启后生效)"
-        item-type="switch"
-        :is-active="settings.showDevPlugin"
         @click="onShowDevPlugin(!settings.showDevPlugin)"
-      />
-    </mde-list>
+      >
+        显示开发中插件(重启后生效)
+        <template #trailing>
+          <mat-switch
+            :model-value="settings.showDevPlugin"
+            class="pointer-events-none"
+            color="primary"
+            aria-hidden="true"
+          />
+        </template>
+      </mat-list-item>
+    </mat-list>
 
-    <mde-list class="mt-2">
-      <mde-list-item
-        title="打开 devtools(F12)"
-        @click="showDevtools"
-      />
-      <mde-list-item
-        title="重新启动"
-        @click="relaunch"
-      />
-    </mde-list>
+    <mat-list
+      variant="segmented"
+      interaction="single-action"
+      class="settings-list mt-2"
+    >
+      <mat-list-item @click="showDevtools">
+        打开 devtools(F12)
+      </mat-list-item>
+      <mat-list-item @click="relaunch">
+        重新启动
+      </mat-list-item>
+    </mat-list>
   </div>
 </template>
 
@@ -46,8 +73,6 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
 import { appConfigStore } from '@/utils';
-import MdeList from '@/components/MdeList.vue';
-import MdeListItem from '@/components/MdeListItem.vue';
 
 const ipc = useIpc();
 const store = useGlobalStore();
@@ -80,3 +105,9 @@ const relaunch = () => {
   ipc.send(ipcType.RELAUNCH);
 };
 </script>
+
+<style scoped>
+.settings-list {
+  border-radius: 16px;
+}
+</style>

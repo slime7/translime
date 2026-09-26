@@ -1,20 +1,30 @@
+@import './layers.css';
+@import 'mde-vue/styles.css';
+
 @import '../fonts/material icons/material_icons.css';
 @import '../fonts/robot/robot.css';
 @import '../fonts/noto sans sc/noto_sans_sc.css';
 @import '../fonts/source code pro/source_code_pro.css';
 
-/* Vuetify 4 预编译样式通过这两个变量读取字体栈（替代原 settings.scss 的 $body-font-family） */
+/* Vuetify 预编译样式通过这两个变量读取字体栈（插件运行时仍依赖） */
 :root {
   --v-font-body: 'Roboto', 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
   --v-font-heading: 'Roboto', 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
+
+  /* mde-vue 参考字体指向宿主加载的字体（本地 .material-icons 类实际加载 Material Symbols Outlined） */
+  --mat-ref-typeface-brand: 'Roboto', 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
+  --mat-ref-typeface-plain: 'Roboto', 'Noto Sans SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
+  --mat-ref-typeface-icon: 'Material Symbols Outlined';
 }
 
-html {
-  overflow-y: auto !important;
+/* html/body/#app 撑满视口；溢出由 mat-app-root 裁剪，滚动只发生在正文滚动容器内 */
+html,
+body,
+#app {
+  block-size: 100%;
 }
 
 #app {
-  height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -43,11 +53,11 @@ html {
   background-color: #606060cc;
 }
 
-.v-theme--light ::-webkit-scrollbar {
+[data-mat-theme='light'] ::-webkit-scrollbar {
   background-color: #fff;
 }
 
-.v-theme--dark ::-webkit-scrollbar {
+[data-mat-theme='dark'] ::-webkit-scrollbar {
   background-color: #1e1e1e;
 }
 
@@ -74,6 +84,18 @@ a {
   transition-duration: .2s;
 }
 
+/* 路由切换淡入淡出（替代 v-fade-transition） */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity .2s cubic-bezier(.4, 0, .2, 1);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 插件窗口自定义标题栏下，vuetify 覆盖层（插件 UI）需避开标题栏拖拽区 */
 .custom-title-bar .v-overlay-container .v-overlay {
   top: env(titlebar-area-height, 32px);
 
@@ -86,6 +108,7 @@ a {
   }
 }
 
+/* 以下为插件 UI（vuetify）在宿主文档中的外观兼容样式 */
 .v-radio .material-icons {
   --md-icons-fill: 'FILL' 0;
 }

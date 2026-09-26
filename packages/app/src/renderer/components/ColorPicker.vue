@@ -50,53 +50,63 @@ const setColorDialogConfirm = () => {
 <template>
   <div class="color-picker">
     <div
-      class="cursor-pointer border-2"
-      :class="[ sizeClass, { 'rounded-full': rounded }]"
-      :style="{ 'background-color': model, 'border-color': 'rgb(var(--v-theme-outline)' }"
+      class="border-2 border-outline"
+      :class="[sizeClass, { 'rounded-full': rounded }]"
+      :style="{ 'background-color': model }"
       @click="openDialog"
     />
 
-    <v-dialog
+    <mat-dialog
       v-model="dialogVisible"
-      scrollable
-      max-width="364px"
+      width="364"
+      title="颜色选择器"
     >
-      <v-card color="surface-container-high">
-        <v-card-title>颜色选择器</v-card-title>
+      <div class="flex justify-center">
+        <input
+          v-model="tempColor"
+          type="color"
+          class="color-picker__input"
+          aria-label="选择颜色"
+        >
+      </div>
 
-        <v-card-text>
-          <div>
-            <v-color-picker
-              v-model="tempColor"
-              bg-color="surface-container-high"
-              elevation="0"
-              mode="hex"
-              :modes="['hex', 'hsl', 'rgb', ...(alpha ? ['hexa', 'hsla', 'rgba'] : [])]"
-              hide-eye-dropper
-              tile
-            />
-          </div>
-        </v-card-text>
+      <template #actions>
+        <div class="grow" />
 
-        <v-card-actions>
-          <v-spacer />
+        <mat-btn
+          color="primary"
+          @click="setColorDialogCancel"
+        >
+          取消
+        </mat-btn>
 
-          <v-btn
-            color="primary"
-            @click="setColorDialogCancel"
-          >
-            取消
-          </v-btn>
-
-          <v-btn
-            color="primary"
-            variant="elevated"
-            @click="setColorDialogConfirm"
-          >
-            确认
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        <mat-btn
+          color="primary"
+          variant="filled"
+          @click="setColorDialogConfirm"
+        >
+          确认
+        </mat-btn>
+      </template>
+    </mat-dialog>
   </div>
 </template>
+
+<style scoped>
+.color-picker__input {
+  inline-size: 240px;
+  block-size: 180px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.color-picker__input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker__input::-webkit-color-swatch {
+  border: 1px solid var(--mat-sys-color-outline-variant);
+  border-radius: 12px;
+}
+</style>

@@ -24,34 +24,31 @@ const showContextMenu = () => {
 </script>
 
 <template>
-  <v-app-bar
-    :scroll-behavior="props.visible ? 'inverted' : 'hide inverted'"
-    density="compact"
-    color="surface-container"
+  <div
+    v-show="props.visible"
+    class="flex-none flex items-center h-12 bg-surface-container text-on-surface"
   >
-    <template #prepend>
-      <v-btn
-        append-icon="expand_more"
-        variant="text"
-        rounded="0"
-        height="100%"
-        @click="showContextMenu"
-      >
-        {{ plugin.title }}
-      </v-btn>
-    </template>
+    <mat-btn
+      variant="text"
+      shape="square"
+      class="h-full"
+      suffix="expand_more"
+      @click="showContextMenu"
+    >
+      {{ plugin.title }}
+    </mat-btn>
 
-    <template #append>
-      <v-btn
-        v-if="store.appSetting.showDevPlugin"
-        size="small"
-        color="primary"
-        variant="tonal"
-        @click="emit('inspect')"
-      >
-        <v-icon>bug_report</v-icon>
-        Inspect
-      </v-btn>
-    </template>
-  </v-app-bar>
+    <div class="grow" />
+
+    <mat-btn
+      v-if="store.appSetting.showDevPlugin"
+      variant="filled-tonal"
+      color="primary"
+      prefix="bug_report"
+      class="mr-2"
+      @click="emit('inspect')"
+    >
+      Inspect
+    </mat-btn>
+  </div>
 </template>

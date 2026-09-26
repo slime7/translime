@@ -93,7 +93,7 @@ stateDiagram-v2
 | API | 环境 |
 | --- | --- |
 | `getMainStore()`、`usePluginConfig()`、`usePluginInterop()` | 主进程 |
-| `useIpc()`、`useVuetify*()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
+| `useIpc()`、`useVuetify*()`、`useMat()` / `useMde()`、`useMatComponents()`、`useMatDirectives()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
 | `useLogger()`、`isPreviewMode()` | 通用 |
 
 跨环境调用（如在渲染进程访问主进程 Store）是禁止的。插件间通信通过 `usePluginInterop()` 的 `getExports()` / `waitForPlugin()` 完成，依赖关系应优先在 manifest 中声明。
@@ -102,6 +102,6 @@ stateDiagram-v2
 
 - 插件 ID 全局唯一且等于包名。
 - 激活时机必须声明，不把重初始化堆到启动阶段。
-- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 Vuetify 4，插件 UI 也要求基于 Vuetify 4。
+- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 mde-vue，插件 UI 继续基于 Vuetify 4——Vuetify 的组件/指令运行时（`window.vuetify$`）与 `--v-theme-*` 主题变量由宿主提供，插件不打包 Vuetify。
 - `main-renderer-ready` 只允许主窗口首屏完成后触发，插件渲染页不得重复触发。
 - 真实宿主是主要验证环境，preview 模式不替代宿主内验证。

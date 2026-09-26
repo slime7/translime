@@ -1,90 +1,71 @@
 <template>
   <div class="simple-dialog-frame">
-    <v-dialog
-      class="simple-dialog"
+    <mat-dialog
       v-for="(dialog, index) in dialogs"
       :key="`simple-dialog-${index}`"
-      v-bind="dialog.attr"
-      @input="close"
+      :model-value="true"
+      :title="dialog.title"
+      :width="dialog.attr?.['max-width'] || dialog.attr?.maxWidth || undefined"
+      @update:model-value="close"
     >
-      <v-card>
-        <v-card-title :class="titleClass">
-          {{ dialog.title }}
-        </v-card-title>
+      <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
+      <div v-html="dialog.content" />
 
-        <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
-        <v-card-text v-html="dialog.content" />
-        <v-card-text v-if="dialog.type === 'loading'">
-          <div class="flex items-center justify-center m-4">
-            <v-progress-circular
-              indeterminate
-              color="primary"
-              size="96"
-              width="12"
-            />
-          </div>
-        </v-card-text>
+      <template #actions>
+        <div class="grow" />
 
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="close">
-            关闭
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog
-      class="simple-dialog loader"
-      content-class="no-shadow"
-      :model-value="loader"
-      width="96"
-      persistent
-      no-click-animation
-      overlay-opacity="0"
-    >
-      <div>
-        <v-sheet
-          class="loader-wrapper m-4 flex items-center justify-center"
-          rounded="circle"
-          elevation="5"
+        <mat-btn
+          v-if="!dialog.hideClose"
+          @click="close"
         >
-          <v-progress-circular
-            indeterminate
-            color="primary"
-            size="32"
-            width="4"
-          />
-        </v-sheet>
-      </div>
-    </v-dialog>
+          关闭
+        </mat-btn>
+      </template>
+    </mat-dialog>
 
-    <v-dialog
-      class="simple-dialog confirm"
-      persistent
-      max-width="290"
-      v-model="confirm.visible"
+    <div
+      v-if="loader"
+      class="fixed inset-0 z-50 flex items-center justify-center"
+      role="status"
+      aria-label="加载中"
     >
-      <v-card
-        rounded="xl"
+      <div
+        class="loader-wrapper m-4 flex items-center justify-center rounded-full bg-surface-container-high shadow-[var(--mat-sys-elevation-level3)]"
       >
-        <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
-        <v-card-title v-text="confirm.title" />
+        <mat-progress
+          variant="circular"
+          indeterminate
+          color="primary"
+          :size="32"
+        />
+      </div>
+    </div>
 
-        <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
-        <v-card-text v-text="confirm.content" />
+    <mat-dialog
+      v-model="confirm.visible"
+      width="290"
+      :title="confirm.title || '提示'"
+    >
+      <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
+      <div v-text="confirm.content" />
 
-        <v-card-actions>
-          <v-spacer />
-          <v-btn text @click="confirm.reject">
-            取消
-          </v-btn>
-          <v-btn color="primary" @click="confirm.resolve">
-            确定
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <div class="grow" />
+
+        <mat-btn
+          variant="text"
+          @click="confirm.reject"
+        >
+          取消
+        </mat-btn>
+        <mat-btn
+          color="primary"
+          @click="confirm.resolve"
+        >
+          确定
+        </mat-btn>
+      </template>
+    </mat-dialog>
   </div>
 </template>
 
@@ -118,11 +99,7 @@ export default {
 };
 </script>
 
-<style>
-.v-dialog.no-shadow {
-  box-shadow: none;
-}
-
+<style scoped>
 .loader-wrapper {
   width: 64px;
   height: 64px;

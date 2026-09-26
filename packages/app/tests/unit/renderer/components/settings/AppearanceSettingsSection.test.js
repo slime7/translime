@@ -31,10 +31,9 @@ vi.mock('@/utils', () => ({
 const globalMountOptions = {
   global: {
     stubs: {
-      MdeList: { template: '<div><slot /></div>' },
-      MdeListItem: {
-        template: '<button class="setting-item" @click="$emit(\'click\')">{{ title }}|{{ selected || "" }}</button>',
-        props: ['title', 'selected', 'isActive', 'itemType'],
+      'mat-list': { template: '<div><slot /></div>' },
+      'mat-list-item': {
+        template: '<button class="setting-item" @click="$emit(\'click\')"><slot /><slot name="trailing" /></button>',
       },
       ThemeSelectDialog: {
         template: '<div class="theme-dialog">{{ modelValue }}</div>',
@@ -62,8 +61,10 @@ describe('AppearanceSettingsSection.vue', () => {
   it('应该显示当前主题和颜色名称', () => {
     const wrapper = mount(AppearanceSettingsSection, globalMountOptions);
 
-    expect(wrapper.text()).toContain('主题|系统');
-    expect(wrapper.text()).toContain('颜色|#123456 - 高饱和度');
+    expect(wrapper.text()).toContain('主题');
+    expect(wrapper.text()).toContain('系统');
+    expect(wrapper.text()).toContain('颜色');
+    expect(wrapper.text()).toContain('#123456 - 高饱和度');
   });
 
   it('点击列表项应该打开对应对话框', async () => {

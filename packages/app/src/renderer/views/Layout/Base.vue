@@ -1,16 +1,17 @@
 <template>
-  <v-app>
-    <v-system-bar
+  <!-- 标题栏置于 app-root 之外：模态层、帷幕与浮动组件的应用矩形不包含标题栏 -->
+  <div class="flex flex-col h-full">
+    <div
       v-if="useCustomTitleBar"
-      class="system-bar p-0"
-      :height="titleBarHeight"
+      class="system-bar flex-none flex items-center bg-surface-container"
+      :style="{ height: `${titleBarHeight}px` }"
       @dblclick="onToggleMaximize"
     >
       <div class="px-4">
         translime
       </div>
 
-      <v-spacer />
+      <div class="grow" />
 
       <!-- 原生 WCO 活跃时预留 caption 区域，否则使用自定义 WindowControls 降级 -->
       <div
@@ -22,49 +23,59 @@
         :is-maximize="isMaximize"
         win="app"
       />
-    </v-system-bar>
+    </div>
 
-    <navigation />
+    <!-- fillViewport=false 时块轴高度由父级 flex 布局提供（标题栏以外的剩余空间） -->
+    <mat-app-root
+      scrollable
+      :fill-viewport="false"
+      class="flex-1 min-h-0"
+    >
+      <div class="flex flex-col h-full">
+        <div class="flex flex-1 min-h-0">
+          <navigation />
 
-    <v-main class="h-screen">
-      <notification />
+          <main class="flex-1 min-w-0 h-full">
+            <notification />
 
-      <div id="app-main-container" class="flex flex-col h-full">
-        <router-view v-slot="{ Component, route }">
-          <div
-            :class="[
-              'scroll-content',
-              'flex-auto',
-              { 'scroll-content--plugin-shell': route.meta?.layoutMode === 'plugin-shell' },
-            ]"
-          >
-            <div
-              :class="[
-                'content-stage',
-                { 'content-stage--plugin-shell': route.meta?.layoutMode === 'plugin-shell' },
-              ]"
-            >
-              <div :class="['route-stage', { 'route-stage--plugin': route.meta?.layoutMode === 'plugin-shell' }]">
-                <v-fade-transition
-                  mode="out-in"
-                  @after-enter="onEnter"
-                  @before-leave="onLeave"
+            <div id="app-main-container" class="flex flex-col h-full">
+              <router-view v-slot="{ Component, route }">
+                <!-- 普通页面的正文滚动由 mat-scroll-area 承担，页面留白由其视口内边距统一提供；插件壳页面保持不滚动的 flex 容器 -->
+                <component
+                  :is="route.meta?.layoutMode === 'plugin-shell' ? 'div' : 'mat-scroll-area'"
+                  :class="route.meta?.layoutMode === 'plugin-shell' ? 'page-shell' : 'page-scroll'"
                 >
-                  <keep-alive>
-                    <component :is="Component" :key="route.path" />
-                  </keep-alive>
-                </v-fade-transition>
-              </div>
+                  <div
+                    :class="[
+                      'content-stage',
+                      { 'content-stage--plugin-shell': route.meta?.layoutMode === 'plugin-shell' },
+                    ]"
+                  >
+                    <div :class="['route-stage', { 'route-stage--plugin': route.meta?.layoutMode === 'plugin-shell' }]">
+                      <transition
+                        name="fade"
+                        mode="out-in"
+                        @after-enter="onEnter"
+                        @before-leave="onLeave"
+                      >
+                        <keep-alive>
+                          <component :is="Component" :key="route.path" />
+                        </keep-alive>
+                      </transition>
 
-              <embedded-plugin-webviews />
+                      <embedded-plugin-webviews />
+                    </div>
+                  </div>
+                </component>
+              </router-view>
             </div>
-          </div>
-        </router-view>
-      </div>
-    </v-main>
+          </main>
+        </div>
 
-    <main-footer />
-  </v-app>
+        <main-footer />
+      </div>
+    </mat-app-root>
+  </div>
 </template>
 
 <script setup>
@@ -137,24 +148,23 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.scroll-content {
+/* 普通页面的滚动由 mat-scroll-area 承担，这里只提供 flex 高度约束 */
+.page-scroll {
+  flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+}
 
-  &::-webkit-scrollbar {
-    background-color: transparent;
-  }
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .content-stage {
   width: 100%;
   min-height: 100%;
-}
-
-.scroll-content--plugin-shell {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .content-stage--plugin-shell {
@@ -172,6 +182,8 @@ onUnmounted(() => {
 }
 
 .route-stage--plugin {
-  flex: 0 0 auto;
+  /* 插件壳必须撑满 content-stage，标题栏固定、webview 占满剩余空间 */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 </style>

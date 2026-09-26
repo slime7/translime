@@ -75,6 +75,7 @@ const getThemeColors = async () => {
     const vuetifyColors = mdColor.getVuetifyColors(themeResult);
     theme.setCustomTheme(vuetifyColors);
   }
+  theme.syncMatTheme(themeColor);
   syncOverlayColor();
 };
 const themeUpdated = () => {

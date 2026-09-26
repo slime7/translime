@@ -121,6 +121,7 @@ export default defineConfig(({ mode }) => {
       exclude: [
         'vue',
         'vuetify',
+        'mde-vue',
         'vue-router',
       ],
     },

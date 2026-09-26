@@ -17,26 +17,6 @@ vi.mock('@pkg/share/utils', () => ({
   getUuiD: () => 'test-uuid',
 }));
 
-const globalStubs = {
-  global: {
-    directives: {
-      scroll: {
-        mounted() {},
-      },
-    },
-    stubs: {
-      'v-navigation-drawer': {
-        template: '<div class="drawer-stub"><slot /></div>',
-        props: ['modelValue'],
-      },
-      'v-alert': {
-        template: '<div class="alert-stub"><slot /></div>',
-      },
-      'v-spacer': true,
-    },
-  },
-};
-
 const setScrollMetrics = (element, {
   clientHeight = 200,
   scrollHeight = 600,
@@ -53,6 +33,13 @@ const setScrollMetrics = (element, {
   element.scrollTop = scrollTop;
 };
 
+const openDrawer = async (wrapper) => {
+  const store = useAlertStore();
+  store.setDrawerVisible(true);
+  await wrapper.vm.$nextTick();
+  await wrapper.vm.$nextTick();
+};
+
 describe('Notification.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -62,11 +49,14 @@ describe('Notification.vue', () => {
     const store = useAlertStore();
     store.pushContent({ uuid: '1', msg: '第一条消息' });
 
-    const wrapper = mount(Notification, globalStubs);
+    const wrapper = mount(Notification);
+    await openDrawer(wrapper);
+
     const container = wrapper.find('.notify-container').element;
     setScrollMetrics(container);
 
-    store.setDrawerVisible(true);
+    // 打开后再次有消息进入时，应立即跟随到底部
+    store.pushContent({ uuid: '2', msg: '第二条消息' });
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
 
@@ -77,13 +67,11 @@ describe('Notification.vue', () => {
     const store = useAlertStore();
     store.pushContent({ uuid: '1', msg: '第一条消息' });
 
-    const wrapper = mount(Notification, globalStubs);
+    const wrapper = mount(Notification);
+    await openDrawer(wrapper);
+
     const container = wrapper.find('.notify-container').element;
     setScrollMetrics(container);
-
-    store.setDrawerVisible(true);
-    await wrapper.vm.$nextTick();
-    await wrapper.vm.$nextTick();
 
     Object.defineProperty(container, 'scrollHeight', {
       configurable: true,
@@ -100,7 +88,9 @@ describe('Notification.vue', () => {
     const store = useAlertStore();
     store.pushContent({ uuid: '1', msg: '第一条消息' });
 
-    const wrapper = mount(Notification, globalStubs);
+    const wrapper = mount(Notification);
+    await openDrawer(wrapper);
+
     const container = wrapper.find('.notify-container').element;
     setScrollMetrics(container, {
       scrollTop: 50,
@@ -109,10 +99,6 @@ describe('Notification.vue', () => {
     wrapper.vm.onAlertContainerScroll({
       target: container,
     });
-    store.setDrawerVisible(true);
-    await wrapper.vm.$nextTick();
-    await wrapper.vm.$nextTick();
-
     Object.defineProperty(container, 'scrollHeight', {
       configurable: true,
       value: 860,

@@ -126,6 +126,9 @@ const doSomething = async () => {
 - `useVuetify()`: 获取 Vuetify 实例。
 - `useVuetifyComponents()`: 获取所有 Vuetify 组件。
 - `useVuetifyDirectives()`: 获取所有 Vuetify 指令。
+- `useMat()` / `useMde()`: 获取宿主提供的 mde-vue 运行时（`{ components, directives, theme }`）。
+- `useMatComponents()`: 获取所有宿主注册的 mde-vue 组件（mat-* / mde-*）。
+- `useMatDirectives()`: 获取 mde-vue 指令（`v-intersection` / `v-state-layer`）。
 - `useDialog()`: 获取 Electron 对话框 API。
 - `useShell()`: 获取 Shell API。
 - `getPluginSetting(...args)`: 获取插件设置。
@@ -135,6 +138,32 @@ const doSomething = async () => {
 - `openLink(...args)`: 在浏览器中打开链接。
 - `isPreviewMode()`: 检查当前是否为 preview 模式。
 - `electronNetAdapter(config)`: 基于 `window.ts.net` 的 axios adapter。
+
+### mde-vue 支持
+
+宿主 UI 基于 [mde-vue](https://github.com/slime7/mde-vue)（Material 3 Expressive），并通过 `window.mde$` 向插件 UI 提供 mde-vue 运行时。插件无需安装或打包 mde-vue：
+
+```vue
+<script setup>
+import { useMatComponents, useMat } from 'translime-sdk';
+
+const { MatBtn } = useMatComponents();
+// 或整体获取：const mde = useMat(); mde.theme 可读取/跟随宿主主题
+</script>
+
+<template>
+  <!-- 模板中直接使用 mat-* 标签：SDK 编译期自动注入组件，
+       宿主与 preview 环境也均已全局注册 -->
+  <MatBtn variant="outlined" @click="reload">刷新</MatBtn>
+</template>
+```
+
+说明：
+
+- SDK 的 Vite 插件会扫描插件源码中的 `mat-*` / `mde-*` 标签与 `Mat*` / `Mde*` 组件引用，并从 `window.mde$.components` 自动注入，行为与 Vuetify 支持完全一致。
+- 宿主与 preview Shell 都通过 `createMatUi` 全局注册了所有 `mat-*` / `Mat*` 组件及 `v-intersection`、`v-state-layer` 指令。
+- `window.mde$.theme` 是宿主的 mde-vue 主题控制器（Material 2025 动态主题），可用于读取或跟随宿主的种子色、明暗模式与配色变体。
+- 插件本地 preview 想启用 mde 时，在插件中安装 `mde-vue`（GitHub 仓库依赖）即可；未安装时 preview 自动跳过 mde 能力。
 
 ### 通用 (Common)
 
@@ -201,6 +230,7 @@ Preview 模式允许你在普通浏览器中预览和调试插件 UI，无需依
 
 - 零配置：SDK 会自动检测 preview 模式并注入 mock 实现。
 - 完整的 Vuetify 支持：Preview Shell 自动提供 Vuetify 组件和主题。
+- mde-vue 支持：插件安装 mde-vue 后，Preview Shell 自动全局注册 mat-* 组件并提供 `window.mde$`（未安装时自动跳过）。
 - API Mock：IPC、Dialog、Shell、插件设置等接口都有对应 mock。
 - 设置持久化：插件设置使用 `localStorage` 存储。
 

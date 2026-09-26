@@ -187,9 +187,9 @@ export function translimeSdk(options = {}) {
               external: [], // Preview 模式下需要打包所有依赖
             },
           },
-          // 优化依赖: 排除 vuetify (使用我们注入的 mock/core)
+          // 优化依赖: 排除 vuetify / mde-vue（使用运行时完整 ESM，避免二次打包 Vue 实例）
           optimizeDeps: {
-            exclude: ['vuetify'],
+            exclude: ['vuetify', 'mde-vue'],
           },
         };
       }
@@ -265,6 +265,7 @@ startPreview(PluginComponent);
       }
 
       const matches = new Set();
+      const matMatches = new Set();
 
       // 扫描 JS/TS 中的组件名（例如 VBtn、VCard）
       const componentRegex = /\b(V[A-Z][\w$]+)\b/g;
@@ -273,6 +274,14 @@ startPreview(PluginComponent);
       while (match !== null) {
         matches.add(match[1]);
         match = componentRegex.exec(code);
+      }
+
+      // 扫描 JS/TS 中的 mde-vue 组件名（例如 MatBtn、MdeDynamicText）
+      const matComponentRegex = /\b((?:Mat|Mde)[A-Z][\w$]+)\b/g;
+      match = matComponentRegex.exec(code);
+      while (match !== null) {
+        matMatches.add(match[1]);
+        match = matComponentRegex.exec(code);
       }
 
       // 扫描 Vue 模板中的 kebab-case 标签（例如 <v-btn>）
@@ -285,14 +294,24 @@ startPreview(PluginComponent);
           matches.add(name);
           match = templateTagRegex.exec(code);
         }
+
+        // 扫描 Vue 模板中的 mde-vue 标签（例如 <mat-btn>、<mde-dynamic-text>）
+        const matTagRegex = /<(mat|mde)-([a-z0-9-]+)\b/g;
+        match = matTagRegex.exec(code);
+        while (match !== null) {
+          const prefix = match[1] === 'mat' ? 'Mat' : 'Mde';
+          const name = `${prefix}${match[2].split('-').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join('')}`;
+          matMatches.add(name);
+          match = matTagRegex.exec(code);
+        }
       }
 
-      if (matches.size === 0) {
+      if (matches.size === 0 && matMatches.size === 0) {
         return null;
       }
 
       // 过滤掉已从其他地方导入或定义的变量
-      const used = Array.from(matches).filter((name) => {
+      const filterKnownNames = (names) => names.filter((name) => {
         // 检查 import 语句
         if (new RegExp(`import\\s+{[^}]*\\b${name}\\b[^}]*}\\s+from`, 'm').test(code)) {
           return false;
@@ -307,14 +326,23 @@ startPreview(PluginComponent);
         }
         return true;
       });
+      const used = filterKnownNames(Array.from(matches));
+      const matUsed = filterKnownNames(Array.from(matMatches));
 
-      if (used.length === 0) {
+      if (used.length === 0 && matUsed.length === 0) {
         return null;
       }
 
       // 注入代码
-      // 如果运行在渲染进程（有 window.vuetify$），则从中解构；否则为空对象
-      const injection = `\n/* 由 translime-sdk 自动注入 */\nconst { ${used.join(', ')} } = (typeof window !== 'undefined' && window.vuetify$?.components || {});\n`;
+      // 如果运行在渲染进程（有 window.vuetify$ / window.mde$），则从中解构；否则为空对象
+      const injections = [];
+      if (used.length > 0) {
+        injections.push(`const { ${used.join(', ')} } = (typeof window !== 'undefined' && window.vuetify$?.components || {});`);
+      }
+      if (matUsed.length > 0) {
+        injections.push(`const { ${matUsed.join(', ')} } = (typeof window !== 'undefined' && window.mde$?.components || {});`);
+      }
+      const injection = `\n/* 由 translime-sdk 自动注入 */\n${injections.join('\n')}\n`;
 
       let newCode = code;
       if (id.endsWith('.vue')) {

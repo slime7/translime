@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+﻿import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ export default defineConfig({
     include: ['tests/unit/**/*.test.js'],
     server: {
       deps: {
-        inline: ['@material/material-color-utilities'],
+        inline: ['@material/material-color-utilities', 'mde-vue'],
       },
     },
     coverage: {

@@ -1,24 +1,27 @@
 <template>
-  <v-container class="about">
+  <mat-container class="about">
     <div class="columns-1 lg:columns-2 gap-4 mx-auto max-w-204">
       <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
-        <v-card
-          class="rounded-2xl"
-          flat
-          rounded
-          title="版本"
+        <mat-card
+          class="rounded-3xl flow-root"
           color="surface-container"
         >
-          <v-card-text>
+          <template #headline>
+            版本
+          </template>
+
+          <mat-card-content>
             <div class="mb-2">
-              <h1>Translime</h1>
+              <h1 class="text-mat-headline-small">
+                Translime
+              </h1>
             </div>
 
             <div>
               <strong>version: </strong> {{ versions.app }}
             </div>
             <div>
-              <strong>github</strong>: <a href="javascript:;" @click="githubLink">https://github.com/slime7/translime <v-icon size="16">open_in_new</v-icon></a>
+              <strong>github</strong>: <a href="javascript:;" @click="githubLink">https://github.com/slime7/translime <mat-icon class="text-[16px]">open_in_new</mat-icon></a>
             </div>
 
             <div class="mt-4">
@@ -28,14 +31,13 @@
 
               <div v-else-if="updateStatus === 'available'">
                 <div>
-                  <v-btn
-                    size="small"
+                  <mat-btn
                     data-test="about-download-update-btn"
                     :loading="downloading"
                     @click="startDownload"
                   >
                     下载更新
-                  </v-btn>
+                  </mat-btn>
                 </div>
                 <div class="mt-2">
                   发现新版本: v{{ updateInfo.version }}
@@ -44,9 +46,9 @@
 
               <div v-else-if="updateStatus === 'not-available'">
                 <div>
-                  <v-btn size="small" data-test="about-check-update-btn" @click="checkForUpdate">
+                  <mat-btn data-test="about-check-update-btn" @click="checkForUpdate">
                     检查更新
-                  </v-btn>
+                  </mat-btn>
                 </div>
                 <div class="mt-2">
                   当前已是最新版本
@@ -55,11 +57,10 @@
 
               <div v-else-if="updateStatus === 'downloading'">
                 正在下载: {{ downloadProgress.percent.toFixed(1) }}%
-                <v-progress-linear
-                  v-model="downloadProgress.percent"
+                <mat-progress
+                  variant="linear"
+                  :value="downloadProgress.percent / 100"
                   color="primary"
-                  height="10"
-                  striped
                   class="mt-2"
                 />
               </div>
@@ -69,22 +70,21 @@
                   更新已下载，将在下次启动时自动生效
                 </div>
                 <div>
-                  <v-btn
-                    size="small"
-                    color="success"
+                  <mat-btn
+                    :color="STATUS_SUCCESS"
                     data-test="about-restart-update-btn"
                     @click="quitAndInstall"
                   >
                     立即重启
-                  </v-btn>
+                  </mat-btn>
                 </div>
               </div>
 
               <div v-else-if="updateStatus === 'error'">
                 <div>
-                  <v-btn size="small" data-test="about-check-update-btn" @click="checkForUpdate">
+                  <mat-btn data-test="about-check-update-btn" @click="checkForUpdate">
                     检查更新
-                  </v-btn>
+                  </mat-btn>
                 </div>
                 <div class="mt-2">
                   检查更新出错: {{ updateError }}
@@ -92,25 +92,26 @@
               </div>
 
               <div v-else>
-                <v-btn size="small" data-test="about-check-update-btn" @click="checkForUpdate">
+                <mat-btn data-test="about-check-update-btn" @click="checkForUpdate">
                   检查更新
-                </v-btn>
+                </mat-btn>
               </div>
             </div>
-          </v-card-text>
-        </v-card>
+          </mat-card-content>
+        </mat-card>
       </div>
 
       <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
-        <v-card
-          class="rounded-2xl"
-          flat
-          rounded
-          title="开发"
+        <mat-card
+          class="rounded-3xl flow-root"
           color="surface-container"
         >
-          <v-card-text>
-            <p class="break-all mb-4">
+          <template #headline>
+            开发
+          </template>
+
+          <mat-card-content>
+            <p class="break-all mb-4 text-mat-body-medium">
               启动命令：{{ appArgv.join(' ') }}
             </p>
 
@@ -127,47 +128,47 @@
               <div
                 v-if="isDev"
               >
-                <v-btn color="primary" @click="testAlert">
+                <mat-btn color="primary" @click="testAlert">
                   发送 alert
-                </v-btn>
+                </mat-btn>
               </div>
               <div
                 v-if="isDev"
               >
-                <v-btn color="primary" @click="testToast">
+                <mat-btn color="primary" @click="testToast">
                   发送 toast
-                </v-btn>
+                </mat-btn>
               </div>
               <div
                 v-if="isDev"
               >
-                <v-btn color="primary" @click="testConfirm">
+                <mat-btn color="primary" @click="testConfirm">
                   发送 confirm
-                </v-btn>
+                </mat-btn>
               </div>
               <div>
-                <v-btn color="primary" @click="appDir">
+                <mat-btn color="primary" @click="appDir">
                   打开 app 目录
-                </v-btn>
+                </mat-btn>
               </div>
               <div>
-                <v-btn color="primary" data-test="about-open-log-btn" @click="openLogViewer">
+                <mat-btn color="primary" data-test="about-open-log-btn" @click="openLogViewer">
                   查看日志
-                </v-btn>
+                </mat-btn>
               </div>
               <div
                 v-if="isDev"
               >
-                <v-btn color="primary" @click="reloadApp">
+                <mat-btn color="primary" @click="reloadApp">
                   重载
-                </v-btn>
+                </mat-btn>
               </div>
             </div>
-          </v-card-text>
-        </v-card>
+          </mat-card-content>
+        </mat-card>
       </div>
     </div>
-  </v-container>
+  </mat-container>
 </template>
 
 <script>
@@ -180,6 +181,7 @@ import globalStore from '@/store/globalStore';
 import useDialog from '@/hooks/useDialog';
 import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
+import { STATUS_SUCCESS } from '@/utils/statusColors';
 
 export default {
   name: 'AppAbout',
@@ -286,6 +288,7 @@ export default {
 
     return {
       isDev: process.env.NODE_ENV === 'development',
+      STATUS_SUCCESS,
       versions,
       testAlert,
       testToast,

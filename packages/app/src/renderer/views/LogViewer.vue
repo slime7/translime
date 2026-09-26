@@ -1,243 +1,205 @@
 <template>
-  <v-container class="log-viewer">
+  <mat-container class="log-viewer">
     <div class="log-viewer__container">
-      <div class="log-viewer__title">
+      <div class="log-viewer__title text-center text-mat-headline-large">
         日志
       </div>
 
-      <v-card
-        class="rounded-2xl mt-4"
-        flat
-        rounded
-        color="surface-container"
-      >
-        <v-card-text>
+      <mat-card class="rounded-3xl mt-4">
+        <mat-card-content>
           <div class="log-viewer__toolbar">
-            <v-select
+            <mat-select
               v-model="selectedDate"
-              class="log-viewer__toolbar-field"
-              data-test="log-date-select"
               :items="dateOptions"
-              item-title="title"
-              item-value="value"
               label="日期"
-              hide-details
+              variant="outlined"
+              class="log-viewer__date-select"
               :disabled="loading || !dateOptions.length"
-            >
-              <template #item="{ props: itemProps, item }">
-                <v-list-item
-                  v-bind="itemProps"
-                  :data-test="`log-date-option-${item.value}`"
-                  :data-test-date="item.value"
-                />
-              </template>
-            </v-select>
+            />
 
-            <v-select
+            <mat-select
               v-model="selectedLevels"
-              class="log-viewer__toolbar-field log-viewer__toolbar-field--level"
-              data-test="log-level-select"
               :items="levelOptions"
-              item-title="title"
-              item-value="value"
               label="级别"
+              variant="outlined"
               multiple
-              chips
-              hide-details
-              :disabled="loading"
+              class="log-viewer__level-select"
             />
 
             <div class="log-viewer__toolbar-actions">
-              <v-btn
+              <mat-btn
                 color="primary"
                 :loading="loading"
                 @click="refreshLogs"
               >
                 刷新
-              </v-btn>
+              </mat-btn>
 
-              <v-btn
-                variant="tonal"
+              <mat-btn
+                variant="filled-tonal"
                 :disabled="!hasLogDir"
                 @click="openLogDir"
               >
                 打开日志目录
-              </v-btn>
+              </mat-btn>
             </div>
           </div>
 
-          <div class="log-viewer__status text-medium-emphasis">
+          <div class="log-viewer__status text-mat-body-medium text-on-surface-variant">
             {{ statusText }}
           </div>
 
-          <v-alert
+          <div
             v-if="errorMessage"
-            class="mt-4"
-            type="error"
-            variant="tonal"
+            class="mt-4 px-4 py-3 rounded-lg bg-error-container text-on-error-container"
           >
             {{ errorMessage }}
-          </v-alert>
-        </v-card-text>
-      </v-card>
+          </div>
+        </mat-card-content>
+      </mat-card>
 
       <div
         class="log-viewer__records"
         data-test="log-records-container"
       >
-        <v-card
-          v-for="record in filteredRecords"
-          data-test="log-record-card"
-          :key="record.id"
-          class="rounded-2xl"
-          flat
-          rounded
-          color="surface-container"
+        <mat-virtual-scroll
+          ref="virtualScrollRef"
+          :items="filteredRecords"
+          item-key="id"
+          :estimated-item-height="150"
         >
-          <v-card-text>
-            <div class="log-viewer__record">
-              <div class="log-viewer__record-main">
-                <div class="log-viewer__record-meta">
-                  <v-chip
-                    size="small"
-                    :color="levelColorMap[record.level] || 'default'"
-                  >
-                    {{ record.level }}
-                  </v-chip>
+          <template #default="{ item, itemRef }">
+            <div
+              :ref="itemRef"
+              class="log-viewer__record-slot"
+            >
+              <mat-card
+                data-test="log-record-card"
+                class="rounded-3xl"
+              >
+                <mat-card-content>
+                  <div class="log-viewer__record">
+                    <div class="log-viewer__record-main">
+                      <div class="log-viewer__record-meta">
+                        <mat-chip :color="levelColorMap[item.level] || undefined">
+                          {{ item.level }}
+                        </mat-chip>
 
-                  <v-chip
-                    size="small"
-                    variant="outlined"
-                  >
-                    {{ sourceTitleMap[record.source] || record.source }}
-                  </v-chip>
+                        <mat-chip>
+                          {{ sourceTitleMap[item.source] || item.source }}
+                        </mat-chip>
 
-                  <span class="text-sm text-medium-emphasis">
-                    {{ record.timestamp || '无时间戳' }}
-                  </span>
-                </div>
+                        <span class="text-mat-body-medium text-on-surface-variant">
+                          {{ item.timestamp || '无时间戳' }}
+                        </span>
+                      </div>
 
-                <div
-                  v-if="record.pluginId"
-                  class="log-viewer__record-event text-sm text-medium-emphasis"
-                >
-                  {{ record.pluginId }}
-                </div>
+                      <div
+                        v-if="item.pluginId"
+                        class="log-viewer__record-event text-mat-body-medium text-on-surface-variant"
+                      >
+                        {{ item.pluginId }}
+                      </div>
 
-                <div class="log-viewer__record-message">
-                  {{ record.message }}
-                </div>
+                      <div class="log-viewer__record-message text-mat-body-large">
+                        {{ item.message }}
+                      </div>
 
-                <div
-                  v-if="record.stack"
-                  class="log-viewer__stack"
-                >
-                  {{ record.stack }}
-                </div>
-              </div>
+                      <div
+                        v-if="item.stack"
+                        class="log-viewer__stack text-mat-body-medium"
+                      >
+                        {{ item.stack }}
+                      </div>
+                    </div>
 
-              <div class="log-viewer__record-actions">
-                <v-btn
-                  variant="tonal"
-                  @click="openDetail(record)"
-                >
-                  查看详情
-                </v-btn>
-              </div>
+                    <div class="log-viewer__record-actions">
+                      <mat-btn
+                        variant="filled-tonal"
+                        @click="openDetail(item)"
+                      >
+                        查看详情
+                      </mat-btn>
+                    </div>
+                  </div>
+                </mat-card-content>
+              </mat-card>
             </div>
-          </v-card-text>
-        </v-card>
+          </template>
+        </mat-virtual-scroll>
       </div>
 
-      <v-card
+      <mat-card
         v-if="!loading && !filteredRecords.length"
-        class="rounded-2xl log-viewer__empty"
-        flat
-        rounded
+        class="rounded-3xl log-viewer__empty"
+      >
+        <mat-card-content class="text-on-surface-variant">
+          当前条件下没有可显示的日志。
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card
+        v-if="!loading && !filteredRecords.length"
+        class="rounded-3xl log-viewer__empty"
         color="surface-container"
       >
-        <v-card-text class="text-medium-emphasis">
+        <mat-card-content class="text-on-surface-variant">
           当前条件下没有可显示的日志。
-        </v-card-text>
-      </v-card>
+        </mat-card-content>
+      </mat-card>
     </div>
 
-    <v-dialog
+    <mat-dialog
       v-model="detailDialog.visible"
-      max-width="960"
-      scrollable
+      width="960"
+      title="日志详情"
     >
-      <v-card color="surface-container-high">
-        <v-card-title>
-          日志详情
-        </v-card-title>
+      <div class="text-mat-body-medium text-on-surface-variant">
+        {{ detailDialog.record?.timestamp || '无时间戳' }}
+      </div>
 
-        <v-card-text>
-          <div class="text-sm text-medium-emphasis">
-            {{ detailDialog.record?.timestamp || '无时间戳' }}
-          </div>
+      <div class="mt-2 text-mat-body-large log-viewer__detail-message">
+        {{ detailDialog.record?.message || '' }}
+      </div>
 
-          <div class="mt-2 text-base log-viewer__detail-message">
-            {{ detailDialog.record?.message || '' }}
-          </div>
+      <div class="log-viewer__tree">
+        <json-tree
+          :items="detailDialog.items"
+          :opened="detailDialog.opened"
+          :load-children="loadDetailChildren"
+          @update:opened="detailDialog.opened = $event"
+        />
+      </div>
 
-          <v-treeview
-            v-model:opened="detailDialog.opened"
-            :items="detailDialog.items"
-            :load-children="loadDetailChildren"
-            class="log-viewer__tree"
-            density="compact"
-            :indent="12"
-            item-title="title"
-            item-value="value"
-            :prepend-gap="4"
-            open-on-click
-            slim
-          >
-            <template #title="{ item }">
-              <div class="log-viewer__tree-node">
-                <span class="log-viewer__tree-label">{{ item.label }}</span>
-                <span class="log-viewer__tree-colon text-medium-emphasis">:</span>
-                <span
-                  v-if="item.valueText"
-                  class="log-viewer__tree-value text-medium-emphasis"
-                >
-                  {{ item.valueText }}
-                </span>
-              </div>
-            </template>
-          </v-treeview>
-        </v-card-text>
+      <template #actions>
+        <div class="grow" />
 
-        <v-card-actions>
-          <v-spacer />
+        <mat-btn
+          variant="filled-tonal"
+          :prefix="copyButtonIcon"
+          @mouseenter="onCopyButtonEnter"
+          @mouseleave="onCopyButtonLeave"
+          @click="copyDetail"
+        >
+          {{ copyButtonText }}
+        </mat-btn>
 
-          <v-btn
-            variant="tonal"
-            :prepend-icon="copyButtonIcon"
-            @mouseenter="onCopyButtonEnter"
-            @mouseleave="onCopyButtonLeave"
-            @click="copyDetail"
-          >
-            {{ copyButtonText }}
-          </v-btn>
-
-          <v-btn
-            color="primary"
-            @click="closeDetail"
-          >
-            关闭
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  </v-container>
+        <mat-btn
+          color="primary"
+          @click="closeDetail"
+        >
+          关闭
+        </mat-btn>
+      </template>
+    </mat-dialog>
+  </mat-container>
 </template>
 
 <script setup>
 import dayjs from 'dayjs';
 import {
   computed,
+  onActivated,
   onMounted,
   reactive,
   ref,
@@ -246,9 +208,13 @@ import {
 
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useClipboard, useIpc } from '@/hooks/electron';
+import { STATUS_INFO, STATUS_WARNING } from '@/utils/statusColors';
+import JsonTree from '@/components/JsonTree.vue';
 
 const ipc = useIpc();
 const clipboard = useClipboard();
+
+const virtualScrollRef = ref(null);
 
 const selectedDate = ref(dayjs().format('YYYY-MM-DD'));
 const availableDates = ref([]);
@@ -276,12 +242,12 @@ const copyState = reactive({
 
 const levelColorMap = {
   error: 'error',
-  warn: 'warning',
-  info: 'info',
+  warn: STATUS_WARNING,
+  info: STATUS_INFO,
   verbose: 'secondary',
   debug: 'primary',
-  silly: 'default',
-  log: 'default',
+  silly: undefined,
+  log: undefined,
 };
 
 const sourceTitleMap = {
@@ -576,27 +542,40 @@ watch(selectedDate, async (value, oldValue) => {
 onMounted(async () => {
   await refreshLogs();
 });
+
+// keep-alive 恢复后滚动位置被重置，虚拟区间需按视口顶部重新计算
+onActivated(() => {
+  virtualScrollRef.value?.refresh();
+});
 </script>
 
 <style scoped>
+/* 卡片背景走卡片专用变量；color prop 注入的 --mat-accent-color 会被后代 select 继承，
+   聚焦时 2px 外框会变成 surface-container 近白色而在浅色背景上不可见 */
+.log-viewer :deep(.mat-card) {
+  --mat-card-container-color: var(--mat-sys-color-surface-container);
+}
+
 .log-viewer__container {
   max-width: 60rem;
   margin: 0 auto;
 }
 
-.log-viewer__title {
-  text-align: center;
-  font-size: 3rem;
-  line-height: 1.1;
-}
-
+/* 日期与级别筛选同行：日期定宽，级别占满剩余空间并推动操作按钮靠右 */
 .log-viewer__toolbar {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
   gap: .75rem;
 }
 
-.log-viewer__toolbar-field {
+.log-viewer__date-select {
+  width: 11rem;
+  flex-shrink: 0;
+}
+
+.log-viewer__level-select {
+  flex: 1 1 12rem;
   min-width: 0;
 }
 
@@ -604,18 +583,20 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: .5rem;
+  flex-shrink: 0;
 }
 
 .log-viewer__status {
   margin-top: .75rem;
-  font-size: .875rem;
 }
 
+/* 虚拟滚动按 borderBox 测量项高，卡片间距放进包裹层 padding 而不是容器 gap */
 .log-viewer__records {
   margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: .75rem;
+}
+
+.log-viewer__record-slot {
+  padding-block-end: .75rem;
 }
 
 .log-viewer__record {
@@ -643,17 +624,15 @@ onMounted(async () => {
 .log-viewer__record-message {
   margin-top: .25rem;
   word-break: break-all;
-  font-size: 1rem;
 }
 
 .log-viewer__stack {
   margin-top: .75rem;
   padding: .75rem;
   border-radius: .75rem;
-  background: rgb(0 0 0 / 5%);
+  background: color-mix(in srgb, var(--mat-sys-color-on-surface) 5%, transparent);
   white-space: pre-wrap;
   word-break: break-all;
-  font-size: .875rem;
 }
 
 .log-viewer__record-actions {
@@ -668,7 +647,7 @@ onMounted(async () => {
   margin-top: 1rem;
   padding: .5rem;
   border-radius: .75rem;
-  background: rgb(0 0 0 / 3%);
+  background: color-mix(in srgb, var(--mat-sys-color-on-surface) 3%, transparent);
 }
 
 .log-viewer__detail-message {
@@ -676,44 +655,7 @@ onMounted(async () => {
   overflow-wrap: anywhere;
 }
 
-.log-viewer__tree-node {
-  display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr);
-  align-items: start;
-  column-gap: .375rem;
-  width: 100%;
-  min-height: 1.5rem;
-}
-
-.log-viewer__tree-label {
-  font-weight: 500;
-}
-
-.log-viewer__tree-colon {
-  margin-inline: -.125rem;
-}
-
-.log-viewer__tree-value {
-  min-width: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 @media (width >= 80rem) {
-  .log-viewer__toolbar {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .log-viewer__toolbar-field {
-    max-width: 14rem;
-  }
-
-  .log-viewer__toolbar-field--level {
-    flex: 1 1 auto;
-    max-width: none;
-  }
-
   .log-viewer__record {
     flex-direction: row;
     align-items: flex-start;

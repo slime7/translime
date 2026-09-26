@@ -1,25 +1,37 @@
 <template>
   <div class="mb-4 break-inside-avoid w-full max-w-100 mx-auto">
-    <div class="text-primary">
+    <div class="text-mat-label-large text-primary">
       外观
     </div>
 
-    <mde-list class="mt-2">
-      <mde-list-item
+    <mat-list
+      variant="segmented"
+      interaction="single-action"
+      class="settings-list mt-2"
+    >
+      <mat-list-item
         data-test="setting-theme-item"
-        title="主题"
-        item-type="select"
-        :selected="currentThemeName"
         @click="themeDialogVisible = true"
-      />
-      <mde-list-item
+      >
+        主题
+        <template #trailing>
+          <div class="text-on-surface-variant">
+            {{ currentThemeName }}
+          </div>
+        </template>
+      </mat-list-item>
+      <mat-list-item
         data-test="setting-color-item"
-        title="颜色"
-        item-type="select"
-        :selected="themeColorName"
         @click="colorDialogVisible = true"
-      />
-    </mde-list>
+      >
+        颜色
+        <template #trailing>
+          <div class="text-on-surface-variant">
+            {{ themeColorName }}
+          </div>
+        </template>
+      </mat-list-item>
+    </mat-list>
 
     <theme-select-dialog v-model="themeDialogVisible" />
     <theme-color-dialog v-model="colorDialogVisible" />
@@ -29,8 +41,6 @@
 <script setup>
 import { computed, ref } from 'vue';
 import useGlobalStore from '@/store/globalStore';
-import MdeList from '@/components/MdeList.vue';
-import MdeListItem from '@/components/MdeListItem.vue';
 import ThemeSelectDialog from './ThemeSelectDialog.vue';
 import ThemeColorDialog from './ThemeColorDialog.vue';
 import {
@@ -60,5 +70,10 @@ const themeColorName = computed(() => {
   }
   }
 });
-
 </script>
+
+<style scoped>
+.settings-list {
+  border-radius: 16px;
+}
+</style>

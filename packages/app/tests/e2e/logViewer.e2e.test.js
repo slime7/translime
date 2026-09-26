@@ -10,7 +10,8 @@ test.describe('日志查看与诊断检索 (LogViewer E2E)', () => {
     await page.waitForTimeout(500);
     await expect(page.locator('.log-viewer').first()).toBeVisible();
 
-    const dateSelect = page.locator('[data-test="log-date-select"]').first();
+    // mat-select 的 data-test 不透传到根元素，改用可见 combobox 的角色定位
+    const dateSelect = page.getByRole('combobox', { name: '日期' }).first();
     await expect(dateSelect).toBeVisible();
 
     const recordCards = page.locator('[data-test="log-records-container"] [data-test="log-record-card"]');
@@ -19,7 +20,7 @@ test.describe('日志查看与诊断检索 (LogViewer E2E)', () => {
     expect(recordsText).toContain('app 启动');
 
     await dateSelect.click();
-    const dateOption = page.locator('[data-test="log-date-option-2026-03-24"], [data-test-date="2026-03-24"]').first();
+    const dateOption = page.getByRole('menuitem').filter({ hasText: '2026-03-24' }).first();
     if (await dateOption.isVisible({ timeout: 3000 }).catch(() => false)) {
       await dateOption.click();
       await page.waitForTimeout(400);

@@ -1,8 +1,8 @@
 /**
  * Preview 模式入口
- * 初始化 Vue + Vuetify 并挂载 Preview Shell
+ * 初始化 Vue + Vuetify + mde-vue 并挂载 Preview Shell
  */
-// 必须在 vuetify/styles 之前导入，确保 CSS layer 顺序正确
+// 必须在 vuetify/styles 与 mde-vue/styles 之前导入，确保 CSS layer 顺序正确
 import './layers.css';
 
 import { createApp } from 'vue';
@@ -183,6 +183,37 @@ export async function startPreview(pluginComponent, options = {}) {
     directives,
   };
 
+  // 初始化 mde-vue（与宿主保持一致），并提供插件运行时。
+  // mde-vue 由宿主或插件按需安装，未安装时跳过，不影响其余预览能力。
+  let matUi = null;
+  try {
+    const [mdeVue] = await Promise.all([
+      import('mde-vue'),
+      import('mde-vue/styles.css'),
+    ]);
+    matUi = mdeVue.createMatUi({
+      iconClass: 'material-icons',
+    });
+    const mdeComponents = {};
+    const mdeDirectives = {};
+    Object.entries(mdeVue).forEach(([name, exported]) => {
+      if (name === 'Intersection' || name === 'StateLayer') {
+        mdeDirectives[name] = exported;
+        return;
+      }
+      if (/^(Mat|Mde)[A-Z]/.test(name)) {
+        mdeComponents[name] = exported;
+      }
+    });
+    window.mde$ = {
+      components: mdeComponents,
+      directives: mdeDirectives,
+      theme: matUi.theme,
+    };
+  } catch {
+    // mde-vue 未安装：忽略
+  }
+
   // 设置插件组件到全局变量
   // eslint-disable-next-line no-underscore-dangle
   window.__PREVIEW_PLUGIN_COMPONENT__ = pluginComponent;
@@ -190,6 +221,9 @@ export async function startPreview(pluginComponent, options = {}) {
   // 创建并挂载应用
   const app = createApp(PreviewApp);
   app.use(vuetify);
+  if (matUi) {
+    app.use(matUi);
+  }
 
   // 挂载前确保 DOM 元素存在
   let mountEl = document.getElementById(mountId);

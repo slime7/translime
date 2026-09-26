@@ -1,6 +1,6 @@
 <template>
-  <v-container class="setting">
-    <div class="text-center text-5xl">
+  <mat-container class="setting">
+    <div class="text-center text-mat-headline-large">
       设置
     </div>
 
@@ -9,7 +9,7 @@
       <registry-settings-section />
       <appearance-settings-section />
     </div>
-  </v-container>
+  </mat-container>
 </template>
 
 <script setup>
