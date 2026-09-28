@@ -1,9 +1,8 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import LayoutBase from '../views/Layout/Base.vue';
-import AppHome from '../views/Home.vue';
 import AppAbout from '../views/About.vue';
 import AppLogViewer from '../views/LogViewer.vue';
-import AppPlugins from '../views/plugins/Plugins.vue';
+import AppPluginCenter from '../views/plugins/PluginCenter.vue';
 import AppSetting from '../views/Setting.vue';
 import AppPluginPage from '../views/plugins/PluginPage.vue';
 import AppPluginRender from '../views/plugins/PluginRender.vue';
@@ -19,8 +18,8 @@ const routes = [
     children: [
       {
         path: '',
-        name: 'Home',
-        component: AppHome,
+        name: 'PluginCenter',
+        component: AppPluginCenter,
       },
       {
         path: '/about',
@@ -31,11 +30,6 @@ const routes = [
         path: '/logs',
         name: 'LogViewer',
         component: AppLogViewer,
-      },
-      {
-        path: '/plugins',
-        name: 'Plugins',
-        component: AppPlugins,
       },
       {
         path: '/setting',

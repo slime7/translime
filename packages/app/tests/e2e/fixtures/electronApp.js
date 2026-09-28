@@ -41,8 +41,7 @@ export const test = base.extend({
       userDataDir,
       async navigateTo(routeName) {
         const testIdSelectors = {
-          Home: '[data-test="nav-home"]',
-          Plugins: '[data-test="nav-plugins"]',
+          PluginCenter: '[data-test="nav-plugins"]',
           Setting: '[data-test="nav-setting"]',
           LogViewer: '[data-test="about-open-log-btn"]',
           About: '[data-test="nav-about"]',
@@ -56,8 +55,7 @@ export const test = base.extend({
           await navButton.click();
         } else {
           const routeMap = {
-            Home: '#/',
-            Plugins: '#/plugins',
+            PluginCenter: '#/',
             Setting: '#/setting',
             LogViewer: '#/logs',
             About: '#/about',

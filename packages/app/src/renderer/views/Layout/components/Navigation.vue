@@ -2,15 +2,8 @@
   <aside class="navi-drawer flex-none h-full flex flex-col overflow-y-auto bg-surface-container-low">
     <div class="navi-panel p-2">
       <navi-link
-        :to="{ name: 'Home' }"
-        icon="home"
-        tooltip="首页"
-        data-test="nav-home"
-      />
-
-      <navi-link
-        :to="{ name: 'Plugins' }"
-        tooltip="插件"
+        :to="{ name: 'PluginCenter' }"
+        tooltip="插件中心"
         icon="extension"
         data-test="nav-plugins"
       >

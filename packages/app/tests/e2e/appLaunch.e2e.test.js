@@ -11,9 +11,6 @@ test.describe('应用启动与主窗口渲染 (App Launch E2E)', () => {
     const appElement = page.locator('#app');
     await expect(appElement).toBeVisible();
 
-    const homeNav = page.locator('[data-test="nav-home"]').first();
-    await expect(homeNav).toBeVisible();
-
     const pluginsNav = page.locator('[data-test="nav-plugins"]').first();
     await expect(pluginsNav).toBeVisible();
 

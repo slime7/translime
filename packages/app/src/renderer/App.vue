@@ -101,7 +101,7 @@ const handleAppArgv = async () => {
 const onShowSettingPanel = () => {
   ipc.on(ipcType.OPEN_PLUGIN_SETTING_PANEL, ({ packageName }) => {
     router.replace({
-      name: 'Plugins',
+      name: 'PluginCenter',
       query: { setting: packageName, t: +(new Date()) },
     });
   });
@@ -122,7 +122,7 @@ const onDeepLink = () => {
     if (params.install?.startsWith('translime-plugin-')) {
       // 安装插件
       router.replace({
-        name: 'Plugins',
+        name: 'PluginCenter',
         query: { install: params.install, t: +(new Date()) },
       });
     }

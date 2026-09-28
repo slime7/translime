@@ -18,6 +18,7 @@
 <script>
 import {
   computed,
+  nextTick,
   onActivated,
   onDeactivated,
   onMounted,
@@ -99,6 +100,13 @@ export default {
       pluginActivated.value = true;
     };
 
+    // 兜底：路由过渡的 after-enter 偶发不触发会使 pageTransitionActive 停留在 true，标题栏一直隐藏
+    const ensureTitleBarVisible = () => {
+      nextTick(() => {
+        store.pageTransitionActive = false;
+      });
+    };
+
     const syncEmbeddedWebview = () => {
       if (!isEmbeddedRoute.value || !pluginId.value || !loaderVisible.value || !preloadPath.value) {
         return;
@@ -123,20 +131,20 @@ export default {
           if (route.name === 'PluginPage' && route.params.packageName === pluginId.value) {
             openPluginWindow(plugin.value);
             router.push({
-              name: 'Home',
+              name: 'PluginCenter',
             });
           }
         }
         if (prevV && !v && !prevV.windowMode) {
           // 插件被卸载，且当前页面处于打开状态（非单独窗口模式）
           router.push({
-            name: 'Home',
+            name: 'PluginCenter',
           });
         } else if (prevV?.enabled && !v?.enabled && !v?.windowMode) {
           // 插件被禁用，且当前处于嵌入模式
           if (route.name === 'PluginPage' && route.params.packageName === pluginId.value) {
             router.push({
-              name: 'Home',
+              name: 'PluginCenter',
             });
           }
         }
@@ -153,11 +161,13 @@ export default {
 
     onMounted(() => {
       ensurePluginActivated();
+      ensureTitleBarVisible();
     });
 
     onActivated(() => {
       ensurePluginActivated();
       syncEmbeddedWebview();
+      ensureTitleBarVisible();
     });
 
     onDeactivated(() => {

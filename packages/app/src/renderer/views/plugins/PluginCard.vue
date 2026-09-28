@@ -35,8 +35,7 @@
           </mat-tooltip>
 
           <div class="px-4 pt-1 text-mat-body-medium opacity-80">
-            <span v-if="!plugin.link">{{ cardSubTitle }}</span>
-            <a v-else @click="authLink">{{ cardSubTitle }}</a>
+            <span>{{ cardSubTitle }}</span>
           </div>
 
           <mat-card-content class="grow">
@@ -50,95 +49,73 @@
           </mat-card-content>
 
           <mat-card-actions>
-            <template v-if="!plugin.searchResultItem">
-              <mat-btn
-                v-if="!plugin.enabled"
-                class="ml-2"
-                icon="play_arrow"
-                label="启用"
-                data-test="plugin-enable-btn"
-                :disabled="disabled"
-                @click="enable"
-              />
+            <mat-btn
+              v-if="canOpen"
+              class="ml-2"
+              icon="open_in_new"
+              label="打开"
+              data-test="plugin-open-btn"
+              :disabled="disabled"
+              @click="openPlugin"
+            />
 
-              <mat-btn
-                v-else
-                class="ml-2"
-                icon="pause"
-                label="禁用"
-                data-test="plugin-disable-btn"
-                :disabled="disabled"
-                @click="disable"
-              />
+            <mat-btn
+              v-if="!plugin.enabled"
+              class="ml-2"
+              icon="play_arrow"
+              label="启用"
+              data-test="plugin-enable-btn"
+              :disabled="disabled"
+              @click="enable"
+            />
 
-              <mat-btn
-                class="ml-2"
-                icon="delete"
-                label="卸载"
-                data-test="plugin-uninstall-btn"
-                :disabled="disabled"
-                @click="uninstall"
-              />
+            <mat-btn
+              v-else
+              class="ml-2"
+              icon="pause"
+              label="禁用"
+              data-test="plugin-disable-btn"
+              :disabled="disabled"
+              @click="disable"
+            />
 
-              <mat-btn
-                v-if="hasNewVersion"
-                class="ml-2"
-                icon="deployed_code_update"
-                label="升级"
-                :color="STATUS_SUCCESS"
-                :disabled="disabled"
-                @click="install(versionList[1]?.value)"
-              />
+            <mat-btn
+              v-if="hasNewVersion"
+              class="ml-2"
+              icon="deployed_code_update"
+              label="升级"
+              :color="STATUS_SUCCESS"
+              :disabled="disabled"
+              @click="install(versionList[1]?.value)"
+            />
 
-              <mat-btn
-                class="ml-2"
-                icon="settings"
-                label="设置"
-                :disabled="disabled"
-                @click="showContextMenu"
-              />
-            </template>
-            <template v-else>
-              <mat-btn
-                class="ml-2"
-                variant="filled"
-                color="primary"
-                :disabled="disabled"
-                @click="install(selectedVersion)"
-                v-if="!isInstalled"
-              >
-                安装
-              </mat-btn>
+            <mat-btn
+              class="ml-2"
+              icon="settings"
+              label="设置"
+              :disabled="disabled"
+              @click="showContextMenu"
+            />
 
-              <mat-btn
-                class="ml-2"
-                variant="filled"
-                :color="STATUS_SUCCESS"
-                :disabled="disabled"
-                @click="install(selectedVersion)"
-                v-if="canUpdated"
-              >
-                升级
-              </mat-btn>
+            <mat-btn
+              class="ml-2 pin-btn"
+              :class="{ 'pin-btn--pinned': isPinned }"
+              :variant="isPinned ? 'filled-tonal' : 'filled'"
+              icon="push_pin"
+              :label="isPinned ? '取消固定到侧栏' : '固定到侧栏'"
+              :aria-label="isPinned ? '取消固定到侧栏' : '固定到侧栏'"
+              data-test="plugin-pin-btn"
+              @click="togglePin"
+            />
 
-              <mat-btn
-                class="ml-2"
-                variant="filled"
-                :disabled="disabled"
-                @click="install(selectedVersion)"
-                v-if="isInstalled && !canUpdated"
-              >
-                重新安装
-              </mat-btn>
-
-              <mat-select
-                v-model="selectedVersion"
-                class="version-selector ml-2"
-                :items="versionList"
-                label="版本"
-                color="primary"
-              />
-            </template>
+            <mat-btn
+              class="ml-2"
+              icon="delete"
+              label="卸载"
+              data-test="plugin-uninstall-btn"
+              :disabled="disabled"
+              @click="uninstall"
+            />
           </mat-card-actions>
         </div>
 
@@ -158,17 +135,14 @@
 </template>
 
 <script>
-import { storeToRefs } from 'pinia';
 import {
   computed,
-  ref,
   toRefs,
-  watch,
 } from 'vue';
+import { useRouter } from 'vue-router';
 import verCompare from 'semver-compare';
-import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { useIpc } from '@/hooks/electron';
 import useGlobalStore from '@/store/globalStore';
+import { openPluginWindow } from '@/utils';
 import { STATUS_INFO, STATUS_SUCCESS, STATUS_WARNING } from '@/utils/statusColors';
 import PluginSettingPanel from './PluginSettingPanel.vue';
 import usePluginSettingPanel from './hooks/usePluginSettingPanel';
@@ -197,23 +171,25 @@ export default {
   setup(props, { emit, expose }) {
     const { plugin } = toRefs(props);
     const pluginId = plugin.value.packageName;
-    const ipc = useIpc();
     const store = useGlobalStore();
+    const router = useRouter();
 
-    const { plugins } = storeToRefs(store);
-    const isInstalled = computed(() => plugins.value.some((p) => p.packageName === plugin.value.packageName));
-    const canUpdated = computed(() => {
-      if (!isInstalled.value) {
-        return false;
+    const canOpen = computed(() => plugin.value.enabled && !!(plugin.value.ui || plugin.value.windowUrl));
+    const openPlugin = () => {
+      if (plugin.value.windowMode) {
+        openPluginWindow(plugin.value);
+        return;
       }
-      const installedPlugin = plugins.value.find((p) => p.packageName === plugin.value.packageName);
-      return verCompare(plugin.value.version, installedPlugin.version) > 0;
-    });
+
+      router.push({ name: 'PluginPage', params: { packageName: plugin.value.packageName } });
+    };
+    const isPinned = computed(() => store.appSetting?.pinnedPlugins?.includes(pluginId));
+    const togglePin = async () => {
+      await store.togglePinPlugin(pluginId);
+    };
+
     const cardTitle = computed(() => plugin.value.title);
     const cardSubTitle = computed(() => `${plugin.value.author ? `${plugin.value.author} · ` : ''}${plugin.value.version}`);
-    const authLink = () => {
-      ipc.send(ipcType.OPEN_LINK, { url: String(plugin.value.link) });
-    };
 
     // 设置面板
     const { settingPanelVisible, showSettingPanel } = usePluginSettingPanel(pluginId);
@@ -228,7 +204,6 @@ export default {
     } = usePluginActions(plugin.value, emit);
 
     // 面板版本选择
-    const selectedVersion = ref('');
     const versionList = computed(() => [
       {
         value: '',
@@ -264,10 +239,6 @@ export default {
       }
       return null;
     });
-    watch([isInstalled, canUpdated], () => {
-      selectedVersion.value = '';
-    });
-
     expose({
       showSettingPanel,
       pluginId,
@@ -283,10 +254,10 @@ export default {
       showContextMenu,
       cardTitle,
       cardSubTitle,
-      authLink,
-      isInstalled,
-      canUpdated,
-      selectedVersion,
+      canOpen,
+      openPlugin,
+      isPinned,
+      togglePin,
       versionList,
       hasNewVersion,
       statusMeta,
@@ -296,8 +267,9 @@ export default {
 </script>
 
 <style scoped>
-.version-selector {
-  max-width: 135px;
+/* 固定时图钉图标切换 FILL 轴：轮廓（未固定）→ 实心（已固定） */
+.pin-btn--pinned :deep(.mat-btn__icon) {
+  font-variation-settings: 'FILL' 1;
 }
 
 .plugin-item-card {

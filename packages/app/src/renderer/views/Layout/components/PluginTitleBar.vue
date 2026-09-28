@@ -26,6 +26,7 @@ const showContextMenu = () => {
 <template>
   <div
     v-show="props.visible"
+    data-test="plugin-title-bar"
     class="flex-none flex items-center h-12 bg-surface-container text-on-surface"
   >
     <mat-btn

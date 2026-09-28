@@ -249,8 +249,8 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
       expect(vue).toContain('var(--mat-sys-color-on-primary-container)');
     });
 
-    it('Home.vue 使用 xxl 断点前缀', async () => {
-      const vue = await read('src/renderer/views/Home.vue');
+    it('PluginCenter.vue 使用 xxl 断点前缀', async () => {
+      const vue = await read('src/renderer/views/plugins/PluginCenter.vue');
 
       expect(vue).toContain('xxl:grid-cols-4');
       expect(vue).not.toContain('2xl:grid-cols-4');
@@ -265,16 +265,15 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
 
   describe('mde 排版契约', () => {
     it('页面标题使用 mde 标题样式，游离文本不残留 Tailwind 原生字号类', async () => {
-      const home = await read('src/renderer/views/Home.vue');
+      const pluginCenter = await read('src/renderer/views/plugins/PluginCenter.vue');
       const setting = await read('src/renderer/views/Setting.vue');
-      const plugins = await read('src/renderer/views/plugins/Plugins.vue');
       const logViewer = await read('src/renderer/views/LogViewer.vue');
 
-      expect(home).toContain('text-mat-headline-large');
-      expect(home).not.toContain('font-bold');
+      expect(pluginCenter).toContain('text-mat-headline-large');
+      expect(pluginCenter).not.toContain('font-bold');
       expect(setting).toContain('text-mat-headline-large');
       expect(setting).not.toContain('text-5xl');
-      expect(plugins).toContain('<h2 class="text-mat-headline-large">');
+      expect(pluginCenter).toContain('<h2 class="text-mat-headline-large">');
       expect(logViewer).toContain('text-mat-headline-large');
       expect(logViewer).toContain('text-mat-body-medium');
     });
