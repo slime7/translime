@@ -53,7 +53,7 @@
                   >
                     <div :class="['route-stage', { 'route-stage--plugin': route.meta?.layoutMode === 'plugin-shell' }]">
                       <transition
-                        name="fade"
+                        name="page-blur"
                         mode="out-in"
                         @after-enter="onEnter"
                         @before-leave="onLeave"

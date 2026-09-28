@@ -30,7 +30,7 @@
           <router-view v-slot="{ Component, route }">
             <div class="route-stage route-stage--plugin-window">
               <transition
-                name="fade"
+                name="page-blur"
                 mode="out-in"
                 @after-enter="onEnter"
                 @before-leave="onLeave"
