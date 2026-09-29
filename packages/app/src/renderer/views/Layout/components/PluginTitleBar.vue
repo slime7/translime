@@ -1,11 +1,10 @@
 <script setup>
-import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { useIpc } from '@/hooks/electron';
+import useMenuStore from '@/store/menuStore';
 import useGlobalStore from '@/store/globalStore';
 
 const emit = defineEmits(['inspect']);
 
-const ipc = useIpc();
+const menu = useMenuStore();
 const store = useGlobalStore();
 const props = defineProps({
   plugin: {
@@ -18,8 +17,8 @@ const props = defineProps({
   },
 });
 
-const showContextMenu = () => {
-  ipc.send(ipcType.OPEN_PLUGIN_CONTEXT_MENU, props.plugin.packageName);
+const showContextMenu = (event) => {
+  menu.openPluginMenu(props.plugin.packageName, event);
 };
 </script>
 
@@ -30,6 +29,7 @@ const showContextMenu = () => {
     class="flex-none flex items-center h-12 bg-surface-container text-on-surface"
   >
     <mat-btn
+      :id="`plugin-title-menu-${props.plugin.packageName}`"
       variant="text"
       shape="square"
       class="h-full"

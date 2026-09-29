@@ -1,9 +1,9 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { webContents } from 'electron';
 import ipcHandler from './ipcHandler';
 import appManager from '../utils/useAppManager';
+import ipcContext from './ipcContext';
 
-const asyncLocalStorage = new AsyncLocalStorage();
+const asyncLocalStorage = ipcContext;
 
 export default class Ipc {
   /**

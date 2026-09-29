@@ -90,11 +90,13 @@
             />
 
             <mat-btn
+              :id="`plugin-card-menu-${plugin.packageName}`"
               class="ml-2"
               icon="settings"
               label="设置"
+              data-test="plugin-menu-btn"
               :disabled="disabled"
-              @click="showContextMenu"
+              @click="showContextMenu($event)"
             />
 
             <mat-btn

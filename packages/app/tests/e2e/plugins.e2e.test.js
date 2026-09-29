@@ -75,4 +75,24 @@ test.describe('插件生态与管理交互 (Plugins E2E)', () => {
     await expect(titleBar).toBeVisible({ timeout: 10000 });
     await expect(titleBar).toContainText('Mock');
   });
+
+  test('插件搜索框右键应弹出文本编辑菜单', async ({ electronContext }) => {
+    const { page, navigateTo } = electronContext;
+
+    await navigateTo('PluginCenter');
+    const searchInput = page.locator('[data-test="plugin-search-input"]').first();
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+
+    // 防止的回归：搜索框从 mat-text-field 迁移到 mat-search 时丢失了
+    // @contextmenu 绑定，文本输入框右键不再有撤销/复制/粘贴菜单
+    await searchInput.click({ button: 'right' });
+
+    const menu = page.locator('[role="menu"]').first();
+    await expect(menu).toBeVisible();
+    await expect(menu).toContainText('撤销');
+    await expect(menu).toContainText('粘贴');
+
+    await menu.getByText('重做').click();
+    await expect(menu).not.toBeVisible();
+  });
 });

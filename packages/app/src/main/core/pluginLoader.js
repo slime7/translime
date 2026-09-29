@@ -33,7 +33,7 @@ import {
   refreshDevPlugins,
   uninstallPlugin,
 } from './plugin-loader/installer';
-import popPluginMenu from './plugin-loader/menu';
+import buildPluginMenu from './plugin-loader/menu';
 import {
   cleanTempNodeFiles,
   setupNodeLoaderHack,
@@ -312,14 +312,13 @@ class PluginLoader extends EventEmitter {
   }
 
   /**
-   * 弹出插件上下文菜单。
+   * 构建插件上下文菜单描述，交给发起请求窗口的渲染端 mat-menu 展示。
    *
    * @param {string} packageName - 插件包名。
-   * @param {object} ipcEv - IPC 事件包装对象。
-   * @returns {void}
+   * @returns {{menuId: string, items: Array<object>}} 渲染端菜单描述。
    */
-  popPluginMenu(packageName, ipcEv) {
-    popPluginMenu(this, packageName, ipcEv);
+  buildPluginMenu(packageName) {
+    return buildPluginMenu(this, packageName);
   }
 
   /**

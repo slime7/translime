@@ -1,10 +1,9 @@
-import * as ipcType from '@pkg/share/utils/ipcConstant';
-import { useIpc } from '@/hooks/electron';
 import useDialog from '@/hooks/useDialog';
+import useMenuStore from '@/store/menuStore';
 
 export default function usePluginActions(plugin, emit) {
-  const ipc = useIpc();
   const { showConfirm } = useDialog();
+  const menu = useMenuStore();
   const pluginId = plugin.packageName;
 
   const install = (version) => {
@@ -25,8 +24,8 @@ export default function usePluginActions(plugin, emit) {
       reallyUninstall();
     }
   };
-  const showContextMenu = () => {
-    ipc.send(ipcType.OPEN_PLUGIN_CONTEXT_MENU, pluginId);
+  const showContextMenu = (event) => {
+    menu.openPluginMenu(pluginId, event);
   };
 
   return {

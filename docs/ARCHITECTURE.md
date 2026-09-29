@@ -57,7 +57,10 @@ flowchart LR
   - `plugin-loader/metadata.js`：manifest 安全读取与状态刷新
   - `plugin-loader/runtime.js`：激活、启停、命令执行与 IPC 就绪
   - `plugin-loader/installer.js` 与 `plugin-loader/packageInstaller.js`：插件安装与卸载
-  - `plugin-loader/menu.js`：插件菜单
+  - `plugin-loader/menu.js`：插件菜单描述生成，把菜单项与点击处理函数登记到 `core/menuRegistry.js`，由渲染端 M3 菜单（`HostMenu`）展示并把点击动作回传执行
+  - `core/menuRegistry.js`：渲染端菜单的动作登记与分发（`menuId` + 菜单项 id 一次性消费）
+  - `core/textEditMenu.js`：文本编辑上下文菜单（撤销/重做/剪贴板）描述生成，动作作用于原 `WebContents`
+  - `core/ipcContext.js`：跨 `Ipc` 与 handler 侧共享的 `AsyncLocalStorage` 请求上下文
   - `plugin-loader/nativeLoader.js`：原生模块加载补丁
 - `core/ipcHandler.js`：注册宿主与插件的 IPC handler，提供插件激活入口。
 - `core/Ipc.js`：IPC 基础封装。

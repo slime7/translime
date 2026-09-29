@@ -84,7 +84,7 @@ stateDiagram-v2
 | `pluginWillUnload` | 禁用或退出前执行，适合清理 |
 | `pluginSettingSaved` | 设置保存后触发 |
 | `settingMenu` | 设置面板声明式配置项 |
-| `pluginMenu` | 附加菜单项（Electron MenuItem） |
+| `pluginMenu` | 附加菜单项，由宿主渲染端 M3 菜单渲染，支持 Electron MenuItem 子集（`id`/`label`/`click`/`type`/`checked`/`enabled`/`visible`） |
 | `ipcHandlers` | IPC handler 数组，handler 接收 `{ sendToClient }` |
 | `commands` | 运行期命令处理函数 |
 

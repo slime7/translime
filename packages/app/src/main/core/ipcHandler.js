@@ -2,7 +2,6 @@ import {
   app,
   clipboard,
   dialog,
-  Menu,
   nativeImage,
   nativeTheme,
   Notification,
@@ -26,6 +25,9 @@ import {
 } from '../utils/titleBarOverlay';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
+import buildTextEditMenu from './textEditMenu';
+import { dispatchMenuAction } from './menuRegistry';
+import { getIpcSender } from './ipcContext';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 
@@ -345,7 +347,10 @@ const ipcHandler = {
   },
   [ipcType.OPEN_PLUGIN_CONTEXT_MENU](packageName) {
     const loader = getPluginLoaderOrThrow();
-    loader.popPluginMenu(packageName, appManager.getIpc());
+    return loader.buildPluginMenu(packageName);
+  },
+  [ipcType.PLUGIN_CONTEXT_MENU_ACTION]({ menuId, itemId } = {}) {
+    return dispatchMenuAction(menuId, itemId);
   },
   [ipcType.DIALOG_SHOW_OPEN_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
@@ -416,46 +421,8 @@ const ipcHandler = {
   [ipcType.SHOW_DEV_PLUGIN]({ isShow }) {
     mainStore.config.set('setting.showDevPlugin', isShow);
   },
-  [ipcType.SHOW_TEXT_EDIT_CONTEXT]({ selectedText = '' }) {
-    const clipboardText = clipboard.readText();
-    const contextMenuItems = [
-      {
-        role: 'undo',
-        label: '撤销',
-        registerAccelerator: false,
-        accelerator: 'CommandOrControl+Z',
-      },
-      {
-        role: 'redo',
-        label: '重做',
-        registerAccelerator: false,
-        accelerator: 'CommandOrControl+Y',
-      },
-      { type: 'separator' },
-      {
-        role: 'cut',
-        label: '剪切',
-        registerAccelerator: false,
-        accelerator: 'CommandOrControl+X',
-        enabled: selectedText,
-      },
-      {
-        role: 'copy',
-        label: '复制',
-        registerAccelerator: false,
-        accelerator: 'CommandOrControl+C',
-        enabled: selectedText,
-      },
-      {
-        role: 'paste',
-        label: '粘贴',
-        registerAccelerator: false,
-        accelerator: 'CommandOrControl+V',
-        enabled: clipboardText,
-      },
-    ];
-    const menu = Menu.buildFromTemplate(contextMenuItems);
-    menu.popup();
+  [ipcType.SHOW_TEXT_EDIT_CONTEXT]({ selectedText = '' } = {}) {
+    return buildTextEditMenu(getIpcSender(), { selectedText });
   },
   [ipcType.GET_NATIVE_THEME]() {
     return {

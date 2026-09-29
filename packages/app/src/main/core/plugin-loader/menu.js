@@ -1,20 +1,58 @@
-import { clipboard, Menu } from 'electron';
+import { clipboard } from 'electron';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../../utils/useMainStore';
 import appManager from '../../utils/useAppManager';
+import { registerMenu } from '../menuRegistry';
 
 /**
- * 构建并弹出插件右键菜单。
+ * 把 Electron MenuItem 风格的菜单模板序列化为渲染端 mat-menu 描述。
  *
- * 菜单项会根据插件当前状态动态显隐，并把插件自定义菜单追加到末尾。
+ * 可见性过滤在此完成；只透传渲染端支持的子集（label、checkbox 选中态、
+ * enabled 与分隔线），插件自定义菜单中暂不支持的能力（子菜单、图标等）被忽略。
+ *
+ * @param {Array<object>} template - 菜单模板。
+ * @returns {{actions: Map<string, Function>, items: Array<object>}}
+ */
+const serializeMenu = (template) => {
+  const actions = new Map();
+  const items = [];
+  template.forEach((item, index) => {
+    if (item.visible === false) {
+      return;
+    }
+    if (item.type === 'separator') {
+      items.push({ type: 'separator' });
+      return;
+    }
+    const itemId = item.id || `item-${index}`;
+    if (actions.has(itemId)) {
+      // 同一份菜单内 id 重复时只保留首个，避免回传动作命中错误处理函数
+      return;
+    }
+    actions.set(itemId, item.click);
+    items.push({
+      id: itemId,
+      label: item.label,
+      ...(item.type === 'checkbox' ? { checked: Boolean(item.checked) } : {}),
+      ...(item.enabled === undefined ? {} : { enabled: Boolean(item.enabled) }),
+    });
+  });
+  return { actions, items };
+};
+
+/**
+ * 构建插件上下文菜单的可序列化描述，交给渲染端 mat-menu 展示。
+ *
+ * 菜单项会根据插件当前状态动态显隐，并把插件自定义菜单追加到末尾；
+ * 各项目的处理函数随描述一并登记，渲染端点击后回传 menuId 与菜单项 id 执行。
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} packageName - 插件包名。
- * @param {object} ipcEv - 当前 IPC 事件包装对象。
- * @returns {void}
+ * @returns {{menuId: string, items: Array<object>}} 渲染端菜单描述。
  */
-const popPluginMenu = (loader, packageName, ipcEv) => {
+const buildPluginMenu = (loader, packageName) => {
   const plugin = loader.getPlugin(packageName);
+  const ipcEv = appManager.getIpc();
 
   const contextMenuItems = [
     {
@@ -103,15 +141,12 @@ const popPluginMenu = (loader, packageName, ipcEv) => {
       },
     },
   ];
-  const menuDivider = {
-    type: 'separator',
-  };
   if (Array.isArray(plugin.pluginMenu) && plugin.pluginMenu.length) {
-    contextMenuItems.push(menuDivider, ...plugin.pluginMenu);
+    contextMenuItems.push({ type: 'separator' }, ...plugin.pluginMenu);
   }
 
-  const menu = Menu.buildFromTemplate(contextMenuItems);
-  menu.popup();
+  const { actions, items } = serializeMenu(contextMenuItems);
+  return { menuId: registerMenu(actions), items };
 };
 
-export default popPluginMenu;
+export default buildPluginMenu;

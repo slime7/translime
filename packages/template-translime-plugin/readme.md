@@ -230,8 +230,11 @@ export const ipcHandlers = [
 
 你可以在 Translime 的某些位置（依赖具体实现）添加自定义菜单（附加在插件下拉菜单）。
 
+宿主菜单由渲染端 Material 3 菜单组件渲染，只支持 Electron `MenuItem` 配置的子集：
+`id`、`label`、`click`、`type`（`'separator'` 或 `'checkbox'`）、`checked`、`enabled` 与
+`visible`。子菜单、图标等其余能力暂不支持。
+
 ```javascript
-// 符合 Electron MenuItem 配置
 export const pluginMenu = [
   {
     id: `plugin-custom-menu`,

@@ -1,5 +1,7 @@
 <template>
   <router-view />
+  <!-- 全局宿主菜单：插件上下文菜单与文本编辑菜单统一由主进程描述驱动 -->
+  <host-menu />
 </template>
 
 <script setup>
@@ -12,6 +14,7 @@ import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
 import globalStore from '@/store/globalStore';
+import HostMenu from '@/components/HostMenu.vue';
 import { appConfigStore } from '@/utils';
 import {
   getDefaultThemeColor,

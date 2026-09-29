@@ -1,13 +1,13 @@
 import { reactive, ref } from 'vue';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useDialog, useIpc } from '@/hooks/electron';
+import useMenuStore from '@/store/menuStore';
 
 const ipc = useIpc();
 const ipcRaw = useIpc(false);
 
-export const showTextEditContextMenu = () => {
-  const selectedText = window.getSelection().toString();
-  ipc.send(ipcType.SHOW_TEXT_EDIT_CONTEXT, { selectedText });
+export const showTextEditContextMenu = (event) => {
+  useMenuStore().openTextEditMenu(event);
 };
 
 export const useState = (initialValue) => {

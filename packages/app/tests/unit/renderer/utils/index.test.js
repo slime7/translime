@@ -133,59 +133,26 @@ describe('renderer/utils/index', () => {
 
   describe('showTextEditContextMenu', () => {
     let showTextEditContextMenu;
-    let mockIpc;
+    const openTextEditMenu = vi.fn();
 
     beforeEach(async () => {
       vi.resetModules();
 
-      // 重新 mock useIpc
-      mockIpc = {
-        send: vi.fn(),
-        invoke: vi.fn(),
-      };
-
-      vi.doMock('@/hooks/electron', () => ({
-        useDialog: vi.fn(() => ({
-          showOpenDialog: vi.fn(),
-        })),
-        useIpc: vi.fn(() => mockIpc),
+      // 菜单的打开与动作回传行为由 menuStore 的用例覆盖，这里只验证入口委托
+      vi.doMock('@/store/menuStore', () => ({
+        default: () => ({ openTextEditMenu }),
       }));
 
       const module = await import('@/utils/index');
       showTextEditContextMenu = module.showTextEditContextMenu;
     });
 
-    it('应该获取选中文本并发送 IPC 消息', () => {
-      // Mock window.getSelection
-      const originalGetSelection = window.getSelection;
-      window.getSelection = vi.fn(() => ({
-        toString: () => 'selected text',
-      }));
+    it('应该把右键事件委托给全局菜单 store', () => {
+      const event = { clientX: 10, clientY: 20 };
 
-      showTextEditContextMenu();
+      showTextEditContextMenu(event);
 
-      expect(mockIpc.send).toHaveBeenCalledWith(
-        'show-text-edit-context',
-        { selectedText: 'selected text' },
-      );
-
-      window.getSelection = originalGetSelection;
-    });
-
-    it('无选中文本时应发送空字符串', () => {
-      const originalGetSelection = window.getSelection;
-      window.getSelection = vi.fn(() => ({
-        toString: () => '',
-      }));
-
-      showTextEditContextMenu();
-
-      expect(mockIpc.send).toHaveBeenCalledWith(
-        'show-text-edit-context',
-        { selectedText: '' },
-      );
-
-      window.getSelection = originalGetSelection;
+      expect(openTextEditMenu).toHaveBeenCalledWith(event);
     });
   });
 

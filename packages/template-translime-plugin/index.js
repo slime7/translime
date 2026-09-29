@@ -154,8 +154,7 @@ const settingMenu = [
   },
 ];
 
-// 插件上下文菜单
-// https://www.electronjs.org/zh/docs/latest/api/menu-item
+// 插件上下文菜单（宿主以渲染端 M3 菜单渲染，仅支持 id/label/click/type/checked/enabled/visible）
 const pluginMenu = [
   {
     id: `${id}-custom-menu`,

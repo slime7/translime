@@ -13,6 +13,7 @@
         label="搜索插件"
         placeholder="搜索插件市场，回车确认；留空回车列出全部插件"
         @search="searchAction"
+        @contextmenu="showTextEditContextMenu"
       >
         <template #trailing>
           <mat-btn
@@ -307,7 +308,7 @@ import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useDialog from '@/hooks/useDialog';
 import useGlobalStore from '@/store/globalStore';
-import { selectFileDialog } from '@/utils';
+import { selectFileDialog, showTextEditContextMenu } from '@/utils';
 import { STATUS_SUCCESS } from '@/utils/statusColors';
 import PluginCard from './PluginCard.vue';
 import usePluginCenterSearch, { parseSearchResult, SEARCH_PAGE_SIZE } from './hooks/usePluginCenterSearch';
