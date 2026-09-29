@@ -9,7 +9,9 @@ import {
   systemPreferences,
 } from 'electron';
 import fs from 'node:fs';
-import { dirname, join, sep } from 'node:path';
+import {
+  dirname, isAbsolute, join, resolve as pathResolve, relative, sep,
+} from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import icon from '@pkg/share/static/icon.png';
@@ -23,6 +25,8 @@ import {
   resolveTitleBarOverlay,
   TITLE_BAR_OVERLAY_COLOR,
 } from '../utils/titleBarOverlay';
+import { PLUGIN_MODULES_PATH, PLUGIN_MODULES_PATH_DEV } from './plugin-loader/constants';
+import { attributeSender, resolveSenderPluginId } from './plugin-loader/pluginSenderRegistry';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
 import buildTextEditMenu from './textEditMenu';
@@ -54,6 +58,30 @@ const withPluginLoader = async (action, errorPrefix = '') => {
     }
 
     throw new Error(`${errorPrefix}: ${err.message}`);
+  }
+};
+
+const PLUGIN_ID_PATTERN = /^translime-plugin-[a-z0-9-]+$/;
+const OPEN_LINK_ALLOWED_PROTOCOLS = ['http:', 'https:'];
+const LOGGER_ALLOWED_LEVELS = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
+
+/**
+ * 校验插件设置访问权限与键名格式。
+ *
+ * 已归属插件的发送方只能读写自身插件的设置；
+ * 插件 ID 必须符合命名约定，避免 `plugin.<id>` 配置键被拼接注入。
+ *
+ * @param {string} packageName - 目标插件包名。
+ * @returns {void} 校验失败时抛出异常。
+ */
+const ensurePluginSettingAccess = (packageName) => {
+  const name = String(packageName || '');
+  if (!PLUGIN_ID_PATTERN.test(name)) {
+    throw new Error(`非法的插件设置键：${name}`);
+  }
+  const senderPluginId = resolveSenderPluginId(getIpcSender());
+  if (senderPluginId && senderPluginId !== name) {
+    throw new Error(`插件 "${senderPluginId}" 不允许读写 "${name}" 的设置`);
   }
 };
 
@@ -135,7 +163,17 @@ const ipcHandler = {
     };
   },
   [ipcType.OPEN_LINK]({ url }) {
-    shell.openExternal(url);
+    const rawUrl = String(url || '');
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch (err) {
+      throw new Error(`openLink 仅支持 http/https 链接，无法解析：${rawUrl}`);
+    }
+    if (!OPEN_LINK_ALLOWED_PROTOCOLS.includes(parsedUrl.protocol)) {
+      throw new Error(`openLink 仅支持 http/https 链接，已拦截 ${parsedUrl.protocol} 协议`);
+    }
+    shell.openExternal(rawUrl);
   },
   [ipcType.OPEN_DIR]({ dirPath }) {
     const sysDirPath = dirPath.replaceAll('/', sep);
@@ -230,6 +268,11 @@ const ipcHandler = {
       }
       const win = createWindow(indexPage, winCreateOptions, null);
       appManager.setChildWin(name, win);
+
+      // 独立插件窗口：登记归属，窗口内的 webview guest 可据此关联到插件
+      if (name.startsWith('plugin-window-')) {
+        attributeSender(win.webContents, name.replace('plugin-window-', ''));
+      }
 
       appManager.getChildWin(name).on('maximize', () => {
         appManager.getIpc().sendToClient(
@@ -330,10 +373,12 @@ const ipcHandler = {
     }, '开发插件刷新失败');
   },
   async [ipcType.GET_PLUGIN_SETTING](packageName) {
+    ensurePluginSettingAccess(packageName);
     const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
     return settings;
   },
   async [ipcType.SET_PLUGIN_SETTING](packageName, key, settings = null) {
+    ensurePluginSettingAccess(packageName);
     if (typeof key === 'object' && !settings) {
       mainStore.config.set(`plugin.${packageName}.settings`, key);
     } else {
@@ -452,6 +497,14 @@ const ipcHandler = {
     return clipboard.readText();
   },
   [ipcType.LOGGER](level, payload) {
+    // 白名单校验，避免把任意字符串注入 winston 导致日志方法报错
+    let logLevel = String(level || '');
+    if (logLevel === 'log') {
+      logLevel = 'info';
+    }
+    if (!LOGGER_ALLOWED_LEVELS.includes(logLevel)) {
+      logLevel = 'info';
+    }
     if (payload && typeof payload === 'object' && !Array.isArray(payload) && payload.args) {
       const { args, meta } = payload;
 
@@ -461,20 +514,37 @@ const ipcHandler = {
         const lastArg = args[args.length - 1];
         if (lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg)) {
           const combinedMeta = { ...meta, ...lastArg };
-          logger[level](...args.slice(0, -1), combinedMeta);
+          logger[logLevel](...args.slice(0, -1), combinedMeta);
         } else {
-          logger[level](...args, meta);
+          logger[logLevel](...args, meta);
         }
       } else {
-        logger[level](...args);
+        logger[logLevel](...args);
       }
     } else {
       // 兼容旧版调用
       const args = Array.isArray(payload) ? payload : [payload];
-      logger[level](...args);
+      logger[logLevel](...args);
     }
   },
   async [ipcType.LOAD_PLUGIN_UI](pluginPath) {
+    const normalizedPath = pathResolve(String(pluginPath || ''));
+    const allowedRoots = [PLUGIN_MODULES_PATH, PLUGIN_MODULES_PATH_DEV];
+    const insidePluginDirs = allowedRoots.some((root) => {
+      const rel = relative(root, normalizedPath);
+      return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel);
+    });
+    if (!insidePluginDirs) {
+      throw new Error('load-plugin-ui 仅允许读取插件目录内的 UI 产物');
+    }
+    // 归属登记：该请求由运行插件 UI 的 webview 文档发起，
+    // 据此把发送方 WebContents 关联到插件，供后续 IPC 收口校验使用
+    const plugin = appManager.getPluginLoader()?.getPlugins()
+      .find((item) => item.ui && relative(item.ui, normalizedPath) === '');
+    const sender = getIpcSender();
+    if (plugin && sender) {
+      attributeSender(sender, plugin.packageName);
+    }
     return fs.readFileSync(pluginPath, 'utf8');
   },
   [ipcType.GET_SYSTEM_COLOR]() {

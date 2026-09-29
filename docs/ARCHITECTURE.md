@@ -4,6 +4,8 @@
 
 仓库是 pnpm workspace 单仓：`packages/app`（宿主应用，0.6.x）、`packages/sdk`（插件 SDK，1.0.x）与若干 `translime-plugin-*` 插件包。宿主基于 Electron，插件系统采用"描述符扫描 + 按触发激活"模型：启动时只解析 manifest 并构建依赖图，插件在其声明的激活事件（`onStartup`、`onView`、`onCommand`、`onIpc` 等）触发时才执行入口代码。插件 UI 默认运行在隔离的 `<webview>` 或独立 BrowserWindow 中；内嵌渲染路径由宿主 app 使用 `@scope` 与 CSS layer 限制插件样式的选择器作用域。
 
+插件主进程代码默认与宿主同进程运行，可通过 `plugin.isolated: true` 声明进入隔离模式（utilityProcess）；manifest 可用 `engines.translime` 声明宿主版本兼容范围（缺省视为兼容）。IPC 通道带归属登记：插件不能抢占他人通道，跨插件调用仅对暴露 `libs` 的插件放行。
+
 ## 架构原则
 
 - 声明式激活：插件通过 `package.json.plugin.activationEvents` 声明激活时机，宿主按事件路由激活。
@@ -54,14 +56,17 @@ flowchart LR
 - `core/pluginLoader.js`：插件系统门面，维护插件列表、命令注册表与激活索引，把具体实现委托给 `plugin-loader/` 子模块：
   - `plugin-loader/constants.js`：路径、状态与激活常量
   - `plugin-loader/discovery.js`：目录扫描、manifest 解析、依赖图与激活索引
-  - `plugin-loader/metadata.js`：manifest 安全读取与状态刷新
-  - `plugin-loader/runtime.js`：激活、启停、命令执行与 IPC 就绪
+  - `plugin-loader/metadata.js`：manifest 安全读取、`engines.translime` 兼容校验、manifest 警告收集与状态刷新
+  - `plugin-loader/runtime.js`：激活、启停、命令执行与 IPC 就绪；生命周期回调（`pluginDidLoad`/`pluginWillUnload`/`pluginSettingSaved`）异常隔离，激活全程记录耗时
+  - `plugin-loader/isolatedRuntime.js`：隔离模式宿主侧，fork utilityProcess 并桥接 IPC/命令/日志，子进程崩溃转为 `load-error`
+  - `plugin-loader/pluginSenderRegistry.js`：插件渲染端（webview / 独立窗口）归属登记，供 IPC 收口校验
   - `plugin-loader/installer.js` 与 `plugin-loader/packageInstaller.js`：插件安装与卸载
   - `plugin-loader/menu.js`：插件菜单描述生成，把菜单项与点击处理函数登记到 `core/menuRegistry.js`，由渲染端 M3 菜单（`HostMenu`）展示并把点击动作回传执行
   - `core/menuRegistry.js`：渲染端菜单的动作登记与分发（`menuId` + 菜单项 id 一次性消费）
   - `core/textEditMenu.js`：文本编辑上下文菜单（撤销/重做/剪贴板）描述生成，动作作用于原 `WebContents`
   - `core/ipcContext.js`：跨 `Ipc` 与 handler 侧共享的 `AsyncLocalStorage` 请求上下文
   - `plugin-loader/nativeLoader.js`：原生模块加载补丁
+  - `main/isolated-child/`：隔离模式子进程引导脚本（`vite.isolated-child.config.js` 构建为 `dist/isolated-child/index.cjs`，零 Electron 依赖）
 - `core/ipcHandler.js`：注册宿主与插件的 IPC handler，提供插件激活入口。
 - `core/Ipc.js`：IPC 基础封装。
 - `core/pluginInterop.js`：已激活插件之间的 API 共享。
@@ -156,9 +161,14 @@ SDK 的 `createPluginCssIsolationPlugins(pluginId)` 只负责构建产物中的 
 ## 安全、可靠性与可观测性
 
 - 插件 UI 默认运行在 OOP `<webview>` 或独立 BrowserWindow 中，DOM 与 CSS 与宿主隔离；内嵌 UI 由宿主 `@scope` 与 CSS layer 进一步限制样式选择器的影响范围。
+- 宿主页面（主窗口、子窗口）带 CSP 基线：禁远程脚本与对象嵌入，`script-src 'self' 'unsafe-eval' blob:`（`blob:` 供内嵌插件 UI 动态加载，`unsafe-eval` 暂为共享 vue 全量构建保留）。
+- IPC 通道带归属登记与所有者保护：插件不能覆盖宿主内置通道或他人通道；已归属插件的渲染端跨插件调用 IPC 仅对暴露 `libs` 的插件放行；`get/setPluginSetting` 限定自身插件，`appConfigStore` 对插件归属发送方只读，`openLink` 仅放行 http/https，`load-plugin-ui` 仅允许插件目录内路径。
+- 插件主进程代码可选隔离运行（`plugin.isolated: true`）：fork 进 utilityProcess，`pluginDidLoad` 阻塞有超时，子进程崩溃转为 `load-error` 并保留错误码，不再影响宿主与其他插件。
+- 常规模式下生命周期回调（`pluginDidLoad`/`pluginWillUnload`/`pluginSettingSaved`）逐个异常隔离：失败转为 `load-error` 并清理已注册的 IPC/命令/interop，激活标记必定释放，插件可重试；激活耗时记录在 `loadDuration`，超过 3s 输出慢激活告警。
+- manifest 解析收集 `manifestWarnings`（未知激活事件、缺 id 命令、非法 engines 范围）并在插件卡片展示；入口未导出任何插件 API 时按 `load-error` 处理。
 - 原生模块通过 `nativeLoader` 补丁在临时目录加载，应用关闭时清理。
-- 插件加载失败不会阻断宿主启动，插件卡片展示 `build-missing`、`load-error`、`blocked` 等状态。
-- 日志集中到 winston 并提供 LogViewer；IPC 事件名集中在 `ipcConstant.js`，便于统一维护。
+- 插件加载失败不会阻断宿主启动，插件卡片展示 `build-missing`、`load-error`、`blocked`、`incompatible` 等状态。
+- 日志集中到 winston 并提供 LogViewer；渲染端日志级别按白名单收敛；IPC 事件名集中在 `ipcConstant.js`，便于统一维护。
 
 ## 相关文档与源码入口
 

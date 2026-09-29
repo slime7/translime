@@ -18,11 +18,14 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // eslint-disable-next-line no-multi-assign
 const mode = process.env.MODE = process.env.MODE || 'production';
 const buildArgs = process.argv.slice(2);
+// --vite-only：只产出 dist（e2e 测试足够），跳过缓慢的 electron-builder 打包
+const viteOnly = buildArgs.includes('--vite-only');
 
 // 配置文件的路径数组，提取为常量提高可读性
 const VITE_CONFIG_PATHS = [
   resolve(appRoot, 'src/vite.main.config.js'),
   resolve(appRoot, 'src/vite.preload.config.js'),
+  resolve(appRoot, 'src/vite.isolated-child.config.js'),
   resolve(appRoot, 'src/vite.renderer.config.js'),
 ];
 
@@ -79,6 +82,11 @@ const buildElectronApp = async () => {
   try {
     process.chdir(appRoot);
     await buildVitePackages();
+
+    if (viteOnly) {
+      return;
+    }
+
     preparePackageJson();
 
     const outputDir = resolve(appRoot, builderConfig.directories.app || 'dist');

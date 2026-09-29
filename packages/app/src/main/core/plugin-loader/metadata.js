@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import semver from 'semver';
 import mainStore from '../../utils/useMainStore';
 import readPackageManifest from '../../utils/readPackageManifest';
 import {
@@ -14,6 +15,7 @@ import {
   PLUGIN_STATUS_BLOCKED,
   PLUGIN_STATUS_BUILD_MISSING,
   PLUGIN_STATUS_DISCOVERED,
+  PLUGIN_STATUS_INCOMPATIBLE,
   PLUGIN_STATUS_LOAD_ERROR,
   PLUGIN_STATUS_READY,
 } from './constants';
@@ -66,19 +68,44 @@ const uniqueStrings = (value) => Array.from(new Set(
 ));
 
 /**
+ * 受支持的激活事件名。
+ *
+ * `onCommand:` / `onIpc:` 为前缀式事件，其余为完整匹配。
+ */
+const KNOWN_ACTIVATION_EVENTS = [
+  ACTIVATION_ON_STARTUP,
+  'onAppReady',
+  ACTIVATION_ON_VIEW,
+];
+
+const isKnownActivationEvent = (eventName) => KNOWN_ACTIVATION_EVENTS.includes(eventName)
+  || eventName.startsWith('onCommand:')
+  || eventName.startsWith('onIpc:');
+
+/**
  * 规范化插件激活事件配置。
  *
- * 当插件没有声明激活条件时，默认视为 `onStartup`。
+ * 当插件没有声明激活条件时，默认视为 `onStartup`；
+ * 无法识别的事件名会被剔除并记录到 warnings，避免静默失效。
  *
  * @param {any} activationEvents - 插件原始激活事件定义。
+ * @param {Array<string>} [warnings] - 收集 manifest 警告的数组。
  * @returns {Array<string>} 标准化后的激活事件列表。
  */
-const normalizeActivationEvents = (activationEvents) => {
+const normalizeActivationEvents = (activationEvents, warnings = null) => {
   const normalized = uniqueStrings(activationEvents);
   if (!normalized.length) {
     return [ACTIVATION_ON_STARTUP];
   }
-  return normalized;
+  const knownEvents = normalized.filter(isKnownActivationEvent);
+  const unknownEvents = normalized.filter((eventName) => !isKnownActivationEvent(eventName));
+  if (unknownEvents.length && warnings) {
+    warnings.push(`无法识别的激活事件：${unknownEvents.join('、')}（已忽略）`);
+  }
+  if (!knownEvents.length) {
+    return [ACTIVATION_ON_STARTUP];
+  }
+  return knownEvents;
 };
 
 /**
@@ -87,17 +114,61 @@ const normalizeActivationEvents = (activationEvents) => {
  * @param {any} commands - 插件声明的命令列表。
  * @returns {Array<{id: string, title: string}>} 清洗后的命令元数据。
  */
-const normalizeCommands = (commands) => toArray(commands)
-  .map((command) => {
-    if (!command || !command.id) {
-      return null;
+const normalizeCommands = (commands, warnings = null) => {
+  const normalized = toArray(commands);
+  const invalidCount = normalized.filter((command) => !command || !command.id).length;
+  if (invalidCount && warnings) {
+    warnings.push(`contributes.commands 中有 ${invalidCount} 项缺少 id，已忽略`);
+  }
+  return normalized
+    .map((command) => {
+      if (!command || !command.id) {
+        return null;
+      }
+      return {
+        id: String(command.id),
+        title: command.title ? String(command.title) : String(command.id),
+      };
+    })
+    .filter(Boolean);
+};
+
+/**
+ * 解析插件声明的宿主版本要求（package.json 的 `engines.translime`）。
+ *
+ * 兼容策略：未声明（或声明为 `*`）视为兼容，保证旧插件默认可用；
+ * 声明了范围时按 semver 校验当前宿主版本，非法范围视为不兼容并给出警告。
+ *
+ * @param {object} pluginPkg - package.json 内容。
+ * @param {string} hostVersion - 当前宿主版本。
+ * @param {Array<string>} [warnings] - 收集 manifest 警告的数组。
+ * @returns {{hostRequirement: string|null, hostVersion: string, hostCompatible: boolean}}
+ * 宿主版本兼容信息。
+ */
+const resolveHostCompat = (pluginPkg, hostVersion, warnings = null) => {
+  const rawRange = pluginPkg.engines?.translime;
+  const result = {
+    hostRequirement: null,
+    hostVersion,
+    hostCompatible: true,
+  };
+  if (rawRange === undefined || rawRange === null || String(rawRange).trim() === '*') {
+    return result;
+  }
+  const requirement = String(rawRange).trim();
+  result.hostRequirement = requirement;
+  if (!semver.validRange(requirement)) {
+    result.hostCompatible = false;
+    if (warnings) {
+      warnings.push(`engines.translime 不是合法的 semver 范围："${requirement}"`);
     }
-    return {
-      id: String(command.id),
-      title: command.title ? String(command.title) : String(command.id),
-    };
-  })
-  .filter(Boolean);
+    return result;
+  }
+  result.hostCompatible = semver.satisfies(hostVersion, requirement, {
+    includePrerelease: true,
+  });
+  return result;
+};
 
 /**
  * 从激活事件列表中解析 IPC 与命令懒激活索引。
@@ -147,6 +218,9 @@ const createRuntimeState = () => ({
 /**
  * 检查插件入口文件、UI 产物和窗口页面是否存在。
  *
+ * 清单未声明主进程入口是合法形态（纯 UI 插件），不视为入口问题，
+ * 但会记录 manifest 警告提示运行形态。
+ *
  * @param {object} plugin - 已初始化基础字段的插件对象。
  * @returns {Array<string>} 缺失构建产物的标签列表。
  */
@@ -155,7 +229,7 @@ const getEntryIssues = (plugin) => {
   if (plugin.exports) {
     const mainEntry = path.resolve(plugin.pluginPath, plugin.exports);
     if (!pathExists(mainEntry)) {
-      issues.push('main entry');
+      issues.push('主进程入口产物');
     }
   }
   if (plugin.ui && !pathExists(plugin.ui)) {
@@ -169,6 +243,14 @@ const getEntryIssues = (plugin) => {
   }
   return issues;
 };
+
+/**
+ * 生成入口问题的展示文案。
+ *
+ * @param {Array<string>} issues - 入口问题列表。
+ * @returns {string} 状态说明文本。
+ */
+const buildEntryIssueText = (issues) => `缺少${issues.join('、')}，请先构建插件后再在 Translime 中加载。`;
 
 /**
  * 按给定状态生成一个新的插件快照。
@@ -186,6 +268,7 @@ const applyPluginStatus = (plugin, status = PLUGIN_STATUS_READY, statusText = ''
   available: ![
     PLUGIN_STATUS_BLOCKED,
     PLUGIN_STATUS_BUILD_MISSING,
+    PLUGIN_STATUS_INCOMPATIBLE,
     PLUGIN_STATUS_LOAD_ERROR,
   ].includes(status),
 });
@@ -216,11 +299,12 @@ const getDependencyStatusText = (plugin) => {
  * 根据当前插件字段重新推导展示状态。
  *
  * 优先级依次为：
- * 1. 构建产物缺失
- * 2. 依赖阻塞
- * 3. 已激活
- * 4. 加载异常
- * 5. 就绪
+ * 1. 构建产物缺失 / 清单缺主进程入口
+ * 2. 宿主版本不兼容
+ * 3. 依赖阻塞
+ * 4. 已激活
+ * 5. 加载异常
+ * 6. 就绪
  *
  * @param {object} plugin - 待更新状态的插件对象。
  * @returns {object} 带最新状态字段的新对象。
@@ -230,7 +314,15 @@ const refreshPluginStatus = (plugin) => {
     return applyPluginStatus(
       plugin,
       PLUGIN_STATUS_BUILD_MISSING,
-      `缺少${plugin.entryIssues.join('、')}，请先构建插件后再在 Translime 中加载。`,
+      buildEntryIssueText(plugin.entryIssues),
+    );
+  }
+
+  if (plugin.hostRequirement && plugin.hostCompatible === false) {
+    return applyPluginStatus(
+      plugin,
+      PLUGIN_STATUS_INCOMPATIBLE,
+      `需要 Translime ${plugin.hostRequirement}，当前宿主版本 ${plugin.hostVersion} 不满足，插件已停用。`,
     );
   }
 
@@ -288,6 +380,11 @@ const createBrokenPlugin = ({
     contributes: {
       commands: [],
     },
+    manifestWarnings: [],
+    hostRequirement: null,
+    hostVersion: '',
+    hostCompatible: true,
+    isolated: false,
     ipcActivationTypes: [],
     commandActivationIds: [],
     missingDependencies: [],
@@ -299,6 +396,7 @@ const createBrokenPlugin = ({
     entryIssues: [],
     active: false,
     loadTime: 0,
+    loadDuration: 0,
     ...createRuntimeState(),
   };
 
@@ -409,21 +507,27 @@ const resolvePluginExports = (pluginPkg) => {
  * @returns {object} 初始化完成的插件对象。
  */
 const initializePluginState = (plugin, pluginPath, pluginPkg, source) => {
+  const manifestWarnings = [];
+  const hostCompat = resolveHostCompat(pluginPkg, mainStore.APP_VERSION, manifestWarnings);
   const initializedPlugin = {
     ...plugin,
-    activationEvents: normalizeActivationEvents(plugin.activationEvents),
+    activationEvents: normalizeActivationEvents(plugin.activationEvents, manifestWarnings),
     dependencies: uniqueStrings(plugin.dependencies),
     optionalDependencies: uniqueStrings(plugin.optionalDependencies),
     contributes: {
-      commands: normalizeCommands(plugin.contributes?.commands),
+      commands: normalizeCommands(plugin.contributes?.commands, manifestWarnings),
     },
     exports: resolvePluginExports(pluginPkg),
     pluginPath,
     version: pluginPkg.version,
     dev: source === PLUGIN_SOURCE_DEV,
     source,
+    isolated: plugin.isolated === true,
+    manifestWarnings,
+    ...hostCompat,
     active: false,
     loadTime: 0,
+    loadDuration: 0,
     missingDependencies: [],
     missingOptionalDependencies: [],
     blockedBy: [],
@@ -435,6 +539,12 @@ const initializePluginState = (plugin, pluginPath, pluginPkg, source) => {
 
   Object.assign(initializedPlugin, parseActivationMeta(initializedPlugin.activationEvents));
   initializedPlugin.entryIssues = getEntryIssues(initializedPlugin);
+  if (!initializedPlugin.exports) {
+    // 纯 UI 插件是合法形态，但激活后不会注册任何主进程能力，显式提示运行形态
+    initializedPlugin.manifestWarnings.push(
+      '未声明主进程入口（package.json main），插件将仅作为 UI 插件运行',
+    );
+  }
 
   return initializedPlugin;
 };
@@ -493,7 +603,14 @@ const readPlugin = (pluginPath, {
     plugin = applyPluginStatus(
       plugin,
       PLUGIN_STATUS_BUILD_MISSING,
-      `缺少${plugin.entryIssues.join('、')}，请先构建插件后再在 Translime 中加载。`,
+      buildEntryIssueText(plugin.entryIssues),
+    );
+    plugin.enabled = false;
+  } else if (plugin.hostRequirement && plugin.hostCompatible === false) {
+    plugin = applyPluginStatus(
+      plugin,
+      PLUGIN_STATUS_INCOMPATIBLE,
+      `需要 Translime ${plugin.hostRequirement}，当前宿主版本 ${plugin.hostVersion} 不满足，插件已停用。`,
     );
     plugin.enabled = false;
   } else {

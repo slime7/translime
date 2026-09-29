@@ -24,9 +24,17 @@
 | `activationEvents` | 激活时机数组，缺省等价于 `["onStartup"]` |
 | `dependencies` | 硬依赖插件列表，启用前必须满足 |
 | `optionalDependencies` | 可选依赖插件列表，仅用于能力发现 |
+| `isolated` | 隔离运行开关（可选）：`true` 时主进程代码运行在独立 utilityProcess 中，详见下方“隔离运行模式” |
 | `contributes.commands` | 静态命令声明：`{ id, title }` |
 
-主进程入口由包级 `main` 字段指向（如 `dist/index.cjs.js`）。插件 ID 即包名，必须全局唯一，且符合 `translime-plugin-[a-z0-9-]+`。
+宿主版本兼容在 package.json 顶层 `engines.translime` 声明（semver 范围，如 `">=0.6.0"`）。
+**缺省视为兼容**——旧插件无需声明即可继续运行；声明后由宿主在加载时校验，不满足时插件进入
+`incompatible` 状态并保持停用。解析阶段收集的 `manifestWarnings`（无法识别的激活事件、缺少 id
+的命令、非法 engines 范围等）会随插件对象返回，由插件卡片展示。
+
+主进程入口由包级 `main` 字段指向（如 `dist/index.cjs.js`）；未声明时插件作为纯 UI 插件运行
+（激活后不注册主进程能力），并记录 manifest 警告。入口已声明但产物缺失才视为 `build-missing`。
+插件 ID 即包名，必须全局唯一，且符合 `translime-plugin-[a-z0-9-]+`。
 
 ## 插件状态机
 
@@ -37,20 +45,23 @@
 | `activating` | 正在执行激活流程 |
 | `active` | 已加载主进程入口并注册运行期能力 |
 | `blocked` | 依赖未满足，被阻塞 |
-| `build-missing` | 缺少构建产物 |
-| `load-error` | 加载入口失败 |
+| `build-missing` | 缺少构建产物或清单未声明主进程入口 |
+| `incompatible` | `engines.translime` 范围不满足当前宿主版本，强制停用 |
+| `load-error` | 加载入口失败或 `pluginDidLoad` 执行失败（可重试） |
 
 ```mermaid
 stateDiagram-v2
   state "build-missing" as build_missing
   state "load-error" as load_error
+  state "incompatible" as incompatible
   [*] --> discovered
   discovered --> ready: 解析 manifest 构建依赖图
   discovered --> blocked: 依赖不满足
+  discovered --> incompatible: engines.translime 不满足
+  discovered --> build_missing: 产物缺失或缺 main 入口
   ready --> activating: 激活事件触发
   activating --> active: pluginDidLoad 完成
-  ready --> build_missing: 产物缺失
-  activating --> load_error: 入口加载失败
+  activating --> load_error: 入口加载或 pluginDidLoad 失败
   active --> [*]: 禁用或应用退出
 ```
 
@@ -92,16 +103,41 @@ stateDiagram-v2
 
 | API | 环境 |
 | --- | --- |
-| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()` | 主进程 |
+| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()` | 主进程（隔离模式下抛错） |
 | `useIpc()`、`useVuetify*()`、`useMat()` / `useMde()`、`useMatComponents()`、`useMatDirectives()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
-| `useLogger()`、`isPreviewMode()` | 通用 |
+| `useLogger()`、`isPreviewMode()`、`isIsolatedMode()` | 通用 |
 
-跨环境调用（如在渲染进程访问主进程 Store）是禁止的。插件间通信通过 `usePluginInterop()` 的 `getExports()` / `waitForPlugin()` 完成，依赖关系应优先在 manifest 中声明。
+跨环境调用（如在渲染进程访问主进程 Store）是禁止的。插件间通信通过 `usePluginInterop()` 的
+`getExports()` / `waitForPlugin()` 完成，依赖关系应优先在 manifest 中声明。
+
+## IPC 通道与安全边界
+
+- 插件 handler 统一注册为 `事件名@插件ID`；宿主内置通道不带后缀。通道登记带所有者信息，
+  插件不能抢占宿主内置通道，也不能注册/注销其他插件已登记的通道；相同所有者重复注册（插件重启）
+  允许原地替换。
+- 已归属插件的渲染端（插件 webview / 独立插件窗口）只能调用自身通道；**跨插件 IPC 仅对暴露了
+  `libs`（pluginInterop 已注册）的插件放行**，否则调用被拒绝并提示改用 interop。宿主窗口等未归属
+  发送方不受限制。
+- `getPluginSetting` / `setPluginSetting` 仅允许读写自身插件的 `plugin.<id>.settings`；
+  `appConfigStore` 对插件归属发送方只读，禁止 `delete` / `clear` 与 `plugin.*` 键写入。
+- `openLink` 仅放行 http/https；`load-plugin-ui` 仅允许读取插件目录内的 UI 产物；
+  渲染端日志级别按 winston 白名单收敛。
+
+## 隔离运行模式
+
+manifest 声明 `plugin.isolated: true` 时，插件主进程代码运行在独立 utilityProcess
+（`src/main/isolated-child` 引导，`isolatedRuntime.js` 桥接）：
+
+- 支持完整的 `pluginDidLoad` / `pluginWillUnload` / `pluginSettingSaved`、`ipcHandlers` 与
+  `commands`，子进程崩溃会转为 `load-error`（含退出码），不再影响宿主与其他插件。
+- 不支持 `libs` 导出与 `getMainStore` / `usePluginConfig` / `usePluginInterop`（SDK 抛出明确错误）；
+  `sendToClient` 仅支持主窗口与 `'all'` 两种目标。
 
 ## 不变量
 
 - 插件 ID 全局唯一且等于包名。
-- 激活时机必须声明，不把重初始化堆到启动阶段。
+- 激活时机必须声明，不把重初始化堆到启动阶段；`engines.translime` 缺省兼容，声明即校验。
 - 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 mde-vue，插件 UI 继续基于 Vuetify 4——Vuetify 的组件/指令运行时（`window.vuetify$`）与 `--v-theme-*` 主题变量由宿主提供，插件不打包 Vuetify。
+- 宿主页面带 CSP 基线（禁远程脚本，`script-src 'self' 'unsafe-eval' blob:`），后续目标是移除 `unsafe-eval`。
 - `main-renderer-ready` 只允许主窗口首屏完成后触发，插件渲染页不得重复触发。
 - 真实宿主是主要验证环境，preview 模式不替代宿主内验证。

@@ -76,6 +76,46 @@ test.describe('插件生态与管理交互 (Plugins E2E)', () => {
     await expect(titleBar).toContainText('Mock');
   });
 
+  test('搜索只作用于当前页签且不自动切换，市场页签留空列出全部插件', async ({ electronContext }) => {
+    const { page } = electronContext;
+
+    await page.locator('.plugin-center').first().waitFor({ state: 'visible', timeout: 10000 });
+    const pluginCard = page.locator('[data-test="plugin-card"][data-test-package="translime-plugin-mock-test"]').first();
+    await expect(pluginCard).toBeVisible({ timeout: 10000 });
+
+    const searchTab = page.locator('[data-test="plugin-tab-search"]').first();
+    const searchInput = page.locator('[data-test="plugin-search-input"]').first();
+    // 市场页签的空态占位：仅在尚未进入浏览模式时显示
+    const marketSplash = page.getByText('在上方输入关键词搜索插件市场').first();
+
+    // 已安装页签：输入无匹配关键词，回车后必须停留在当前页签
+    await searchInput.fill('zzz-no-match');
+    const noMatchHint = page.getByText('没有匹配的已安装插件').first();
+    await expect(noMatchHint).toBeVisible({ timeout: 5000 });
+    await searchInput.press('Enter');
+    // 防止的回归：回车搜索自动切到市场页签，把用户从正在过滤的列表拽走
+    await expect(noMatchHint).toBeVisible({ timeout: 3000 });
+
+    // 退格清空：已安装列表由本地即时过滤自然恢复
+    await searchInput.press('Control+a');
+    await searchInput.press('Backspace');
+    await expect(pluginCard).toBeVisible({ timeout: 5000 });
+
+    // 市场页签：进入即以空关键词进入浏览模式列出全部插件，空态占位被结果区替换
+    await searchTab.click();
+    await expect(marketSplash).not.toBeVisible({ timeout: 8000 });
+    await expect(pluginCard).not.toBeVisible();
+
+    // 市场页签内回车查询与清空文本都停留在市场页签，清空后回到浏览模式
+    await searchInput.fill('mock');
+    await searchInput.press('Enter');
+    await searchInput.press('Control+a');
+    await searchInput.press('Backspace');
+    // 防止的回归：清空搜索自动跳回已安装页签
+    await expect(pluginCard).not.toBeVisible({ timeout: 3000 });
+    await expect(marketSplash).not.toBeVisible();
+  });
+
   test('插件搜索框右键应弹出文本编辑菜单', async ({ electronContext }) => {
     const { page, navigateTo } = electronContext;
 

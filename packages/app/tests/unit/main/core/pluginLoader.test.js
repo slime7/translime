@@ -437,6 +437,89 @@ describe('pluginLoader', () => {
       expect(commandHandler).toHaveBeenCalledWith(1, 2);
       expect(pluginLoader.plugins[0].active).toBe(true);
     });
+
+    it('pluginDidLoad 抛错时应转为 load-error 且不卡死激活状态', () => {
+      const pluginDidLoad = vi.fn(() => {
+        throw new Error('did-load boom');
+      });
+      mockRequire.mockReturnValue({ pluginDidLoad });
+
+      pluginLoader.plugins = [{
+        packageName: 'translime-plugin-didload-crash',
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: true,
+        dependencies: [],
+      }];
+
+      const plugin = pluginLoader.enablePlugin('translime-plugin-didload-crash');
+
+      expect(plugin.status).toBe('load-error');
+      expect(plugin.statusText).toContain('did-load boom');
+      expect(plugin.enabled).toBe(false);
+      // 关键回归：激活标记必须被清理，否则插件永久无法再次激活
+      expect(pluginLoader.activatingPlugins.has('translime-plugin-didload-crash')).toBe(false);
+      // 再次启用允许重试（即便仍会失败）
+      expect(() => pluginLoader.enablePlugin('translime-plugin-didload-crash')).not.toThrow();
+    });
+
+    it('入口未导出任何插件 API 时应报 load-error', () => {
+      mockRequire.mockReturnValue({});
+
+      pluginLoader.plugins = [{
+        packageName: 'translime-plugin-empty-entry',
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: true,
+        dependencies: [],
+      }];
+
+      const plugin = pluginLoader.enablePlugin('translime-plugin-empty-entry');
+
+      expect(plugin.status).toBe('load-error');
+      expect(plugin.statusText).toContain('未导出任何插件 API');
+      expect(plugin.enabled).toBe(false);
+    });
+
+    it('pluginWillUnload 抛错时禁用流程应继续清理', () => {
+      const pluginWillUnload = vi.fn(() => {
+        throw new Error('will-unload boom');
+      });
+      mockRequire.mockReturnValue({ pluginWillUnload });
+
+      const packageName = 'translime-plugin-unload-crash';
+      pluginLoader.plugins = [{
+        packageName,
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: true,
+        dependencies: [],
+      }];
+
+      pluginLoader.enablePlugin(packageName);
+      const result = pluginLoader.disablePlugin(packageName);
+
+      expect(result).toBe(true);
+      expect(pluginInterop.unregister).toHaveBeenCalledWith(packageName);
+      expect(pluginLoader.plugins[0].enabled).toBe(false);
+    });
+
+    it('激活完成后应记录 loadDuration 耗时', () => {
+      mockRequire.mockReturnValue({ pluginDidLoad: vi.fn() });
+
+      pluginLoader.plugins = [{
+        packageName: 'translime-plugin-timing',
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: true,
+        dependencies: [],
+      }];
+
+      const plugin = pluginLoader.enablePlugin('translime-plugin-timing');
+
+      expect(typeof plugin.loadDuration).toBe('number');
+      expect(plugin.loadDuration).toBeGreaterThanOrEqual(0);
+    });
   });
 
   describe('reloadPlugin/refreshDevPlugins', () => {

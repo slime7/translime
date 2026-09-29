@@ -10,6 +10,9 @@
       "require": "./dist/index.cjs.js"
     }
   },
+  "engines": {
+    "translime": ">=0.6.0"
+  },
   "files": [
     "dist",
     "icon.png"

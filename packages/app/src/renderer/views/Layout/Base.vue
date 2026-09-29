@@ -62,12 +62,15 @@
                           <component :is="Component" :key="route.path" />
                         </keep-alive>
                       </transition>
-
-                      <embedded-plugin-webviews />
                     </div>
                   </div>
                 </component>
               </router-view>
+
+              <!-- 插件 webview 缓存必须挂在路由插槽之外：插槽的包裹组件会在
+                   div/mat-scroll-area 间切换身份，放进插槽会随路由切换整棵销毁，
+                   插件 UI 的输入内容等状态会随之丢失 -->
+              <embedded-plugin-webviews />
             </div>
           </main>
         </div>
@@ -157,7 +160,8 @@ onUnmounted(() => {
 .page-shell {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  /* 嵌入式插件壳只包住标题栏（webview 由插槽外的同级缓存容器撑满），不能抢占剩余空间 */
+  flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
 }

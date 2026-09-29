@@ -1,10 +1,15 @@
 import {
   beforeEach, describe, expect, it, vi,
 } from 'vitest';
+import nodePath from 'node:path';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import ipcHandler from '@main/core/ipcHandler';
 import appManager from '@main/utils/useAppManager';
 import mainStore from '@main/utils/useMainStore';
+import logger from '@main/utils/logger';
+import ipcContext from '@main/core/ipcContext';
+import { attributeSender } from '@main/core/plugin-loader/pluginSenderRegistry';
+import { PLUGIN_MODULES_PATH } from '@main/core/plugin-loader/constants';
 
 const {
   mockShell, mockApp, mockDialog, mockNativeTheme, NotificationMock, mockSystemPreferences,
@@ -14,7 +19,7 @@ const {
     openPath: vi.fn().mockResolvedValue(''),
   },
   mockApp: {
-    getPath: vi.fn(),
+    getPath: vi.fn(() => '/mock/user/data'),
     relaunch: vi.fn(),
     quit: vi.fn(),
     setLoginItemSettings: vi.fn(),
@@ -134,6 +139,29 @@ vi.mock('@main/core/netHandler', () => ({
   default: {},
 }));
 
+const { mockFsRead } = vi.hoisted(() => ({
+  mockFsRead: vi.fn(),
+}));
+
+vi.mock('node:fs', () => ({
+  default: {
+    readFileSync: mockFsRead,
+  },
+}));
+
+vi.mock('@main/utils/logger', () => ({
+  default: {
+    log: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    verbose: vi.fn(),
+    http: vi.fn(),
+    silly: vi.fn(),
+  },
+}));
+
 describe('ipcHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -245,10 +273,87 @@ describe('ipcHandler', () => {
       expect(mockShell.openExternal).toHaveBeenCalledWith('https://example.com');
     });
 
+    it('OPEN_LINK 应该拦截非 http/https 协议', () => {
+      expect(() => ipcHandler[ipcType.OPEN_LINK]({ url: 'file:///C:/Windows/system32' })).toThrow('openLink');
+      const scriptUrl = ['javascript', 'alert(1)'].join(':');
+      expect(() => ipcHandler[ipcType.OPEN_LINK]({ url: scriptUrl })).toThrow('openLink');
+      expect(mockShell.openExternal).not.toHaveBeenCalled();
+    });
+
     it('APP_VERSIONS 应该返回版本信息', () => {
       const versions = ipcHandler[ipcType.APP_VERSIONS]();
       expect(versions).toHaveProperty('app', '1.0.0');
       expect(versions).toHaveProperty('electron');
+    });
+  });
+
+  describe('Logger Channel', () => {
+    it('LOGGER 应该把白名单之外的日志级别回退为 info', () => {
+      ipcHandler[ipcType.LOGGER]('invalid-level', { args: ['hello'] });
+      expect(logger.info).toHaveBeenCalledWith('hello');
+    });
+
+    it('LOGGER 应该保留白名单内的日志级别', () => {
+      ipcHandler[ipcType.LOGGER]('warn', { args: ['careful'] });
+      expect(logger.warn).toHaveBeenCalledWith('careful');
+    });
+  });
+
+  describe('Plugin Settings Access', () => {
+    it('SET_PLUGIN_SETTING 应该拒绝归属插件 A 的发送方写插件 B 的设置', async () => {
+      const sender = { id: 9001, isDestroyed: vi.fn(() => false) };
+      attributeSender(sender, 'translime-plugin-a');
+
+      await expect(ipcContext.run(sender, () => (
+        ipcHandler[ipcType.SET_PLUGIN_SETTING]('translime-plugin-b', 'key', 'value')
+      ))).rejects.toThrow('不允许读写');
+    });
+
+    it('SET_PLUGIN_SETTING 应该拒绝非法插件 ID', async () => {
+      await expect(ipcHandler[ipcType.SET_PLUGIN_SETTING]('other.settings', 'key', 'value'))
+        .rejects.toThrow('非法的插件设置键');
+    });
+
+    it('未归属发送方可以写插件设置（宿主窗口场景）', async () => {
+      const result = await ipcHandler[ipcType.SET_PLUGIN_SETTING]('translime-plugin-a', 'key', 'value');
+      expect(result).toBe(true);
+      expect(mainStore.config.set).toHaveBeenCalledWith('plugin.translime-plugin-a.settings.key', 'value');
+    });
+  });
+
+  describe('Load Plugin UI', () => {
+    it('LOAD_PLUGIN_UI 应该拒绝插件目录之外的路径', async () => {
+      await expect(ipcHandler[ipcType.LOAD_PLUGIN_UI]('C:/Windows/system32/config'))
+        .rejects.toThrow('load-plugin-ui');
+      expect(mockFsRead).not.toHaveBeenCalled();
+    });
+
+    it('LOAD_PLUGIN_UI 应该允许插件目录内的产物并登记发送方归属', async () => {
+      const pluginUiPath = nodePath.join(
+        PLUGIN_MODULES_PATH,
+        'translime-plugin-a',
+        'dist',
+        'ui.esm.js',
+      );
+      mockFsRead.mockReturnValueOnce('export default {}');
+      const sender = { id: 9002, isDestroyed: vi.fn(() => false) };
+      const loader = {
+        getPlugins: vi.fn(() => [{
+          packageName: 'translime-plugin-a',
+          ui: pluginUiPath,
+        }]),
+        onPluginSettingSave: vi.fn(),
+      };
+      appManager.getPluginLoader.mockReturnValue(loader);
+
+      await ipcContext.run(sender, () => ipcHandler[ipcType.LOAD_PLUGIN_UI](pluginUiPath));
+
+      expect(mockFsRead).toHaveBeenCalledWith(pluginUiPath, 'utf8');
+      // 归属登记生效：随后该发送方写自己的设置应被放行
+      const result = await ipcContext.run(sender, () => (
+        ipcHandler[ipcType.SET_PLUGIN_SETTING]('translime-plugin-a', 'k', 'v')
+      ));
+      expect(result).toBe(true);
     });
   });
 

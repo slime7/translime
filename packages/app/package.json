@@ -26,7 +26,7 @@
     "lint": "eslint src/ tests/ --fix",
     "test": "vitest run",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "node scripts/build.js --vite-only && playwright test"
   },
   "dependencies": {
     "@material/material-color-utilities": "0.4.0",
@@ -39,6 +39,7 @@
     "json5": "^2.2.3",
     "mde-vue": "git+https://github.com/slime7/mde-vue.git#ecc12c131ae567a3de297800a7d99180b2ad3f72",
     "pinia": "^2.3.1",
+    "semver": "^7.8.5",
     "semver-compare": "^1.0.0",
     "tailwindcss": "^4.1.18",
     "tar": "^7.4.3",

@@ -16,6 +16,10 @@ export interface PluginManifest {
   activationEvents?: string[];
   dependencies?: string[];
   optionalDependencies?: string[];
+  /**
+   * 以隔离进程（utilityProcess）运行插件主进程代码
+   */
+  isolated?: boolean;
   contributes?: {
     commands?: PluginCommandContribution[];
   };
@@ -25,6 +29,12 @@ export interface PluginManifest {
  * 检查当前是否为 Preview 模式
  */
 export function isPreviewMode(): boolean;
+
+/**
+ * 当前是否运行在宿主的隔离插件子进程（plugin.isolated: true）中。
+ * 隔离模式下 getMainStore / usePluginConfig / usePluginInterop 会抛错。
+ */
+export function isIsolatedMode(): boolean;
 
 /**
  * 获取主程序 Store (仅在主进程环境可用)
@@ -182,6 +192,7 @@ export function useLogger(): {
   warn(...args: any[]): void;
   error(...args: any[]): void;
   debug(...args: any[]): void;
+  child(meta: Record<string, any>): ReturnType<typeof useLogger>;
 };
 
 /**

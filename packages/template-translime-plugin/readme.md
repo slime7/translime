@@ -56,6 +56,9 @@
   "name": "your-plugin-name",
   "version": "1.0.0",
   "main": "./dist/index.cjs.js", // 插件后端逻辑入口
+  "engines": {
+    "translime": ">=0.6.0" // 要求的宿主版本（semver 范围）；缺省视为兼容任意版本
+  },
   "plugin": {
     "title": "插件标题",
     "description": "插件的功能描述",
@@ -64,6 +67,7 @@
     "activationEvents": ["onView"], // 激活时机，缺省时默认 onStartup
     "dependencies": ["translime-plugin-foo"], // 硬依赖
     "optionalDependencies": ["translime-plugin-bar"], // 可选依赖
+    "isolated": false,           // (可选) true 时主进程代码运行在独立 utilityProcess 中
     "contributes": {
       "commands": [
         {
@@ -99,6 +103,22 @@
 - `dependencies` 是硬依赖，用于声明前置插件。
 - `optionalDependencies` 是可选依赖，只表示“有则使用”。
 - `pluginInterop` 仍然可用，但它负责的是已激活插件之间的通信，不替代 manifest 依赖声明。
+
+### 宿主版本兼容（engines.translime）
+
+- 在 `package.json` 的 `engines` 中声明 `translime` 字段（semver 范围），例如 `">=0.6.0"`。
+- 宿主加载插件时会校验该范围；不满足时插件标记为 `incompatible` 并保持停用，不会执行入口代码。
+- 未声明（或声明为 `*`）视为兼容任意宿主版本，旧插件无需改动即可继续运行。
+
+### 隔离模式（plugin.isolated）
+
+可选声明 `"isolated": true`，让插件主进程代码运行在独立的 utilityProcess 中：
+
+- 优势：插件崩溃或无界循环不会拖垮宿主与其他插件，适合易崩、重计算或加载不可靠原生模块的插件。
+- 限制：隔离模式下不支持 `libs` 导出与 `getMainStore` / `usePluginConfig` / `usePluginInterop`
+  （SDK 会抛出明确错误），跨插件协作请改用 IPC handler。
+- IPC handler、`commands`、`pluginDidLoad` / `pluginWillUnload` / `pluginSettingSaved`
+  与常规模式用法一致，由宿主自动桥接；`sendToClient` 仅支持主窗口与 `'all'` 两种目标。
 
 ---
 

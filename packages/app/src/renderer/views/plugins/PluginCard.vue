@@ -41,6 +41,17 @@
           <mat-card-content class="grow">
             <div>{{ plugin.description }}</div>
             <div
+              v-if="plugin.manifestWarnings?.length"
+              class="mt-1 text-mat-body-small opacity-70 plugin-warnings"
+            >
+              <div
+                v-for="warning in plugin.manifestWarnings"
+                :key="warning"
+              >
+                {{ warning }}
+              </div>
+            </div>
+            <div
               v-if="plugin.statusText"
               class="mt-2 text-mat-body-medium plugin-status"
             >
@@ -225,6 +236,12 @@ export default {
         return {
           label: '需要构建',
           color: STATUS_WARNING,
+        };
+      }
+      if (plugin.value.status === 'incompatible') {
+        return {
+          label: '版本不兼容',
+          color: 'error',
         };
       }
       if (plugin.value.status === 'load-error') {

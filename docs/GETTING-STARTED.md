@@ -35,6 +35,7 @@ pnpm dev:cdp
 
 - 构建宿主：`pnpm build:app`（产物在 `packages/app/dist`；electron-builder 打包输出在 `packages/app/dist_electron`）；Linux 构建：`pnpm build:app:linux`
 - 宿主测试：`pnpm -C packages/app run test`（vitest）
+- 宿主 e2e：`pnpm -C packages/app run test:e2e`（Playwright Electron；启动器会先以 `--vite-only` 模式重建 `packages/app/dist`，无需手动构建。e2e 依赖生产模式产物，若 dist 曾被 `pnpm dev` 覆盖为 dev 构建，直接运行 playwright 会因加载不到页面而失败）
 - 宿主 lint：`pnpm -C packages/app run lint`
 - 构建 SDK：`pnpm -C packages/sdk run build`（产物在 `packages/sdk/dist`，含类型声明）
 - SDK lint：`pnpm -C packages/sdk run lint` 与 `pnpm -C packages/sdk run lint:style`
@@ -117,7 +118,10 @@ node .agents/plugin-scaffold/create-plugin.mjs --name translime-plugin-your-name
 | 现象 | 处理 |
 | --- | --- |
 | 插件卡片显示 `build-missing` | 插件未构建或产物缺失，运行该插件的 build 脚本 |
+| 插件卡片显示 `incompatible` | 插件 `engines.translime` 声明的宿主版本范围与当前宿主不匹配，升级宿主或联系插件作者调整范围 |
 | 插件卡片显示 `blocked` | 插件声明的依赖插件未启用，先启用依赖 |
+| 隔离插件（`plugin.isolated: true`）显示 `load-error` 并提示超时 | 插件 `pluginDidLoad` 阻塞或入口加载失败，查看宿主日志中该插件的输出 |
+| SDK 报 "在隔离模式下不可用" | 隔离插件调用了 `getMainStore` / `usePluginConfig` / `usePluginInterop`，改用 IPC handler 或去掉 isolated 声明 |
 | `bangumi-logs/docs/api` 目录为空 | submodule 未初始化，执行 `git submodule update --init` |
 | `hdr-capture` 构建失败 | 缺少 Rust 工具链或 napi 依赖 |
 | 修改插件 UI 后宿主内无变化 | webview 实例被缓存，使用插件卡片重载入口刷新 |

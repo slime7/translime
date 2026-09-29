@@ -107,15 +107,31 @@ export default function usePluginCenterSearch() {
     return !!installedPlugin && verCompare(item.version, installedPlugin.version) > 0;
   };
 
+  // 与安装流程使用同一个 registry 配置（setting.registry），避免搜索与安装来源不一致
+  const getRegistryBase = () => {
+    const registry = String(store.appSetting?.registry || '').replace(/\/+$/, '');
+    return registry || 'https://registry.npmjs.org';
+  };
+
   const getPluginDetail = async (packageName) => {
+    const request = (registryBase) => useHttp(`${registryBase}/${packageName}`, {
+      params: {
+        x: Math.random(),
+      },
+    }).get();
     try {
-      return await useHttp(`https://registry.npmjs.org/${packageName}`, {
-        params: {
-          x: Math.random(),
-        },
-      }).get();
+      return await request(getRegistryBase());
     } catch (err) {
-      alert.show(err.message, 'error');
+      // 配置的镜像源查询失败时回退 npm 官方源重试一次
+      if (getRegistryBase() === 'https://registry.npmjs.org') {
+        alert.show(err.message, 'error');
+        return null;
+      }
+      try {
+        return await request('https://registry.npmjs.org');
+      } catch (fallbackErr) {
+        alert.show(fallbackErr.message, 'error');
+      }
     }
     return null;
   };
@@ -128,13 +144,29 @@ export default function usePluginCenterSearch() {
     try {
       const searchText = `text=${q ? `translime-plugin-${q}+` : ''}keywords:translime%20plugin`;
       // doc: https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md#get-v1search
-      const data = await useHttp(`https://registry.npmjs.com/-/v1/search?${searchText}`, {
-        params: {
-          size: SEARCH_PAGE_SIZE,
-          from: page * SEARCH_PAGE_SIZE,
-          x: Math.random(),
-        },
-      }).get();
+      const searchUrl = (registryBase) => `${registryBase}/-/v1/search?${searchText}`;
+      let data;
+      try {
+        data = await useHttp(searchUrl(getRegistryBase()), {
+          params: {
+            size: SEARCH_PAGE_SIZE,
+            from: page * SEARCH_PAGE_SIZE,
+            x: Math.random(),
+          },
+        }).get();
+      } catch (registryErr) {
+        if (getRegistryBase() === 'https://registry.npmjs.org') {
+          throw registryErr;
+        }
+        // 镜像源搜索失败时回退 npm 官方源
+        data = await useHttp(searchUrl('https://registry.npmjs.org'), {
+          params: {
+            size: SEARCH_PAGE_SIZE,
+            from: page * SEARCH_PAGE_SIZE,
+            x: Math.random(),
+          },
+        }).get();
+      }
       const filterData = data.objects.filter((item) => item.package.name.includes('translime-plugin'));
       const packages = await Promise.all(filterData.map((p) => getPluginDetail(p.package.name, p.package.version)));
       searchResult.list.push(...packages.map((item) => parseSearchResult(item)));
@@ -147,12 +179,38 @@ export default function usePluginCenterSearch() {
     }
   };
 
-  const searchAction = () => {
+  const clearSearchResult = () => {
+    search.value = '';
+    searchResult.list = [];
+    searchResult.total = 0;
+    searchPage.value = 0;
+    searched.value = false;
+  };
+
+  // 市场页签的浏览模式：空关键词列出市场全部插件（分页加载）
+  const loadMarketAll = () => {
     if (searchLoading.value) {
       return;
     }
     searched.value = true;
-    activeTab.value = 'search';
+    searchResult.list = [];
+    searchResult.total = 0;
+    searchPage.value = 0;
+    searchRequest('', 0);
+  };
+
+  // 回车提交：不切换页签，搜索只作用于当前页签——
+  // 已安装页签的过滤是实时的，回车无需任何动作；
+  // 市场页签按关键词查询，留空=列出市场全部插件
+  const searchAction = () => {
+    if (searchLoading.value || activeTab.value !== 'search') {
+      return;
+    }
+    if (!search.value.trim()) {
+      loadMarketAll();
+      return;
+    }
+    searched.value = true;
     searchResult.list = [];
     searchRequest(search.value, 0);
   };
@@ -164,17 +222,11 @@ export default function usePluginCenterSearch() {
     searchRequest(search.value, searchPage.value + 1);
   };
 
-  const clearSearchResult = () => {
-    search.value = '';
-    searchResult.list = [];
-    searchResult.total = 0;
-    searchPage.value = 0;
-    searched.value = false;
-  };
-
-  // 切换页签即离开当前搜索上下文：清空文本与结果，两个页签都从干净状态开始
+  // 切换页签即离开当前搜索上下文：清空文本与结果并回到默认页签，
+  // 调用方随后按需切换到目标页签
   const resetSearchState = () => {
     clearSearchResult();
+    activeTab.value = 'installed';
   };
 
   const switchToSearch = () => {
@@ -183,6 +235,8 @@ export default function usePluginCenterSearch() {
     }
     resetSearchState();
     activeTab.value = 'search';
+    // 进入市场页签即以浏览模式列出全部插件
+    loadMarketAll();
   };
 
   const switchToInstalled = () => {
@@ -192,6 +246,15 @@ export default function usePluginCenterSearch() {
     resetSearchState();
     activeTab.value = 'installed';
   };
+
+  // 市场页签下文本被清空（退格/剪切/✕）时重新列出全部插件；
+  // 已安装页签的清空由本地即时过滤自然恢复，无需处理。
+  // 不切换页签：resetSearchState 会先把页签设回 installed，此监听不会误触发
+  watch(search, (value) => {
+    if (!value.trim() && activeTab.value === 'search') {
+      loadMarketAll();
+    }
+  });
 
   // 路由切换（离开插件中心）同样完整重置：页面被 keep-alive 缓存（deactivated 钩子不可靠），
   // 用路由监听保证切走再切回后不残留旧关键词与旧结果

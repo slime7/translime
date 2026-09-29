@@ -24,6 +24,8 @@ const PLUGIN_STATUS_ACTIVE = 'active';
 const PLUGIN_STATUS_BLOCKED = 'blocked';
 const PLUGIN_STATUS_BUILD_MISSING = 'build-missing';
 const PLUGIN_STATUS_LOAD_ERROR = 'load-error';
+const PLUGIN_STATUS_INCOMPATIBLE = 'incompatible';
+const ACTIVATION_ON_APP_READY = 'onAppReady';
 const ACTIVATION_ON_STARTUP = 'onStartup';
 const ACTIVATION_ON_VIEW = 'onView';
 const ACTIVATION_ON_COMMAND_PREFIX = 'onCommand:';
@@ -53,6 +55,7 @@ const resolvePluginPath = (pluginName, isDevPlugin = false) => path.join(
 const isPluginPackageName = (name) => /^translime-plugin-/.test(name);
 
 export {
+  ACTIVATION_ON_APP_READY,
   ACTIVATION_ON_COMMAND_PREFIX,
   ACTIVATION_ON_IPC_PREFIX,
   ACTIVATION_ON_STARTUP,
@@ -70,6 +73,7 @@ export {
   PLUGIN_STATUS_BLOCKED,
   PLUGIN_STATUS_BUILD_MISSING,
   PLUGIN_STATUS_DISCOVERED,
+  PLUGIN_STATUS_INCOMPATIBLE,
   PLUGIN_STATUS_LOAD_ERROR,
   PLUGIN_STATUS_READY,
   TEMP_NODE_DIR,

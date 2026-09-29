@@ -17,6 +17,7 @@ import mainStore from './utils/useMainStore';
 import appManager from './utils/useAppManager';
 import logger from './utils/logger';
 import Ipc from './core/Ipc';
+import { resolveSenderPluginId } from './core/plugin-loader/pluginSenderRegistry';
 import {
   resolveOverlayMode,
   resolveTitleBarOverlay,
@@ -121,7 +122,20 @@ export default () => {
     ipc.sendToClient('set-maximize-status', false);
   });
 
-  ipcMain.handle('appConfigStore', (event, method, ...rest) => mainStore.config[method](...rest));
+  // appConfigStore 直通 electron-store：已归属插件的渲染端只允许读，
+  // 禁止 delete/clear 与写入其他插件的 plugin.* 配置，防止跨插件篡改
+  ipcMain.handle('appConfigStore', (event, method, ...rest) => {
+    const senderPluginId = resolveSenderPluginId(event.sender);
+    if (senderPluginId) {
+      const targetKey = typeof rest[0] === 'string' ? rest[0] : '';
+      const isDestructive = ['delete', 'clear', 'clearStore'].includes(method);
+      const isPluginKeyWrite = method === 'set' && targetKey.startsWith('plugin.');
+      if (isDestructive || isPluginKeyWrite) {
+        throw new Error(`插件 "${senderPluginId}" 不允许通过 appConfigStore 执行 ${method}("${targetKey}")`);
+      }
+    }
+    return mainStore.config[method](...rest);
+  });
 
   nativeTheme.on('updated', () => {
     if (appManager.getIpc()) {

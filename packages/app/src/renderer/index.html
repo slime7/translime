@@ -2,6 +2,12 @@
 <html lang="zh-Hans">
 <head>
   <meta charset="UTF-8">
+  <!-- CSP 基线：禁止远程脚本与插件注入的外部代码源。'unsafe-eval' 暂时保留，
+       宿主与插件共享的 vue.esm-browser 全量构建仍可能触发运行时模板编译；
+       blob: 供内嵌插件 UI（PluginRender 动态 import）使用。
+       script-src 的 sha256 对应下方内联 importmap（生产构建中 vue 依赖它解析），
+       修改 importmap 内容后需同步更新该 hash -->
+  <meta content="default-src 'self'; script-src 'self' 'unsafe-eval' blob: 'sha256-y4pHLv3cYiv8TFaOajF2qQOJBCSL9/ZCD24Bo4fvho0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src 'self' data: blob: http: https:; font-src 'self' data: http: https:; connect-src 'self' ws: wss: http: https:; object-src 'none'; base-uri 'none'" http-equiv="Content-Security-Policy">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>translime</title>
   <script type="importmap">

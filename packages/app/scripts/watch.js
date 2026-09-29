@@ -150,6 +150,17 @@ const setupPreloadWatcher = (viteDevServer) => build({
 });
 
 /**
+ * 设置隔离插件子进程引导脚本监听器。
+ *
+ * 引导脚本变更不需要重启 Electron，只重新构建产物即可。
+ * @returns {Promise<import('vite').RollupOutput | Array<import('vite').RollupOutput> | import('vite').RollupWatcher>}
+ */
+const setupIsolatedChildWatcher = () => build({
+  ...sharedConfig,
+  configFile: 'src/vite.isolated-child.config.js',
+});
+
+/**
  * 启动Vite开发服务器
  * @returns {Promise<import('vite').ViteDevServer>}
  */
@@ -186,6 +197,7 @@ const startDevEnvironment = async () => {
       timeout: 5000,
     });
 
+    await setupIsolatedChildWatcher();
     await setupMainProcessWatcher(viteDevServer);
   } catch (error) {
     console.error('Development server error:', error);

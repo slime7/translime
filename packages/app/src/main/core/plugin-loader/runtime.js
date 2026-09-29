@@ -19,6 +19,7 @@ import {
   refreshPluginStatus,
   uniqueStrings,
 } from './metadata';
+import { activateIsolatedPlugin, deactivateIsolatedPlugin, notifySettingSaved } from './isolatedRuntime';
 
 /**
  * 插件运行期启停、命令执行与跨插件访问逻辑。
@@ -26,6 +27,55 @@ import {
  * 这一层会真正触发插件入口代码执行，并维护运行期注册表。
  */
 const requireFresh = createRequire(path.join(process.cwd(), 'package.json'));
+
+/**
+ * 激活耗时超过该值（毫秒）时输出慢激活告警。
+ */
+const SLOW_ACTIVATION_THRESHOLD = 3000;
+
+/**
+ * 插件入口真正携带了可供宿主使用的运行期导出。
+ *
+ * 入口存在但什么都没导出通常意味着构建配置错误，
+ * 这类插件激活后不会注册任何能力，应当显式报错而不是假装成功。
+ *
+ * @param {object} pluginMain - 从入口提取的运行期导出集合。
+ * @returns {boolean} 是否包含至少一个有效导出。
+ */
+const hasRuntimeExports = (pluginMain) => Boolean(
+  typeof pluginMain.pluginDidLoad === 'function'
+  || typeof pluginMain.pluginWillUnload === 'function'
+  || typeof pluginMain.pluginSettingSaved === 'function'
+  || (Array.isArray(pluginMain.settingMenu) && pluginMain.settingMenu.length)
+  || (Array.isArray(pluginMain.pluginMenu) && pluginMain.pluginMenu.length)
+  || (Array.isArray(pluginMain.ipcHandlers) && pluginMain.ipcHandlers.length)
+  || pluginMain.libs
+  || (Array.isArray(pluginMain.commands) && pluginMain.commands.length),
+);
+
+/**
+ * 清理插件在宿主侧登记的运行期注册（IPC handler、命令、interop）。
+ *
+ * 供禁用与激活失败两条路径复用，保证失败激活不会留下半套注册表。
+ *
+ * @param {object} loader - `PluginLoader` 实例。
+ * @param {object} plugin - 插件对象。
+ * @returns {void}
+ */
+const cleanupRuntimeRegistrations = (loader, plugin) => {
+  const ipc = appManager.getIpc();
+  if (plugin.ipcHandlers?.length && ipc) {
+    plugin.ipcHandlers.forEach((handler) => {
+      ipc.removeHandler(`${handler.type}@${plugin.packageName}`, plugin.packageName);
+    });
+  }
+  pluginInterop.unregister(plugin.packageName);
+  if (plugin.commands?.length) {
+    plugin.commands.forEach((command) => {
+      loader.runtimeCommandHandlers.delete(command.id);
+    });
+  }
+};
 
 /**
  * 规范化插件运行期导出的命令定义。
@@ -206,6 +256,17 @@ const enablePlugin = (loader, packageName, init = false) => {
     }
   }
 
+  // readPluginSafe 在开发插件覆盖同名正式插件等场景会返回 false，
+  // 此时若列表中能找到该插件则复用，否则直接中止，避免对 false 做 Object.assign
+  if (!plugin) {
+    const fallbackPlugin = loader.getPlugin(packageName);
+    if (!fallbackPlugin) {
+      logger.warn(`[plugin] enable aborted, plugin not readable: ${packageName}`);
+      return undefined;
+    }
+    plugin = fallbackPlugin;
+  }
+
   Object.assign(plugin, {
     dependencies: plugin.dependencies || [],
     optionalDependencies: plugin.optionalDependencies || [],
@@ -257,99 +318,158 @@ const enablePlugin = (loader, packageName, init = false) => {
 
   loader.activatingPlugins.add(packageName);
   Object.assign(plugin, applyPluginStatus(plugin, PLUGIN_STATUS_ACTIVATING));
-  plugin.dependencies.forEach((dependencyId) => {
-    loader.enablePlugin(dependencyId, true);
-  });
+  // 无论激活以何种方式退出（成功、异常、隔离进程超时），
+  // 都必须清理“激活中”标记，否则插件会被永久卡在无法再次激活的状态
+  try {
+    plugin.dependencies.forEach((dependencyId) => {
+      loader.enablePlugin(dependencyId, true);
+    });
 
-  let pluginMain = {};
-  if (plugin.exports) {
-    try {
-      const pluginExports = path.join(plugin.pluginPath, plugin.exports);
-      const pluginImport = requireFresh(`${pluginExports}`);
-      pluginMain = {
-        pluginDidLoad: pluginImport.pluginDidLoad,
-        pluginWillUnload: pluginImport.pluginWillUnload,
-        pluginSettingSaved: pluginImport.pluginSettingSaved,
-        settingMenu: pluginImport.settingMenu,
-        pluginMenu: pluginImport.pluginMenu,
-        ipcHandlers: pluginImport.ipcHandlers,
-        libs: pluginImport.libs,
-        windowOptions: pluginImport.windowOptions,
-        commands: normalizeRuntimeCommands(pluginImport.commands),
-      };
-    } catch (err) {
-      logger.error('[plugin] enable error: ', err);
+    if (plugin.isolated) {
+      return activateIsolatedPlugin(loader, plugin, {
+        init,
+        cleanup: (target) => cleanupRuntimeRegistrations(loader, target),
+      });
+    }
+
+    const activatedAt = Date.now();
+    let pluginMain = {};
+    if (plugin.exports) {
+      try {
+        const pluginExports = path.join(plugin.pluginPath, plugin.exports);
+        const pluginImport = requireFresh(`${pluginExports}`);
+        pluginMain = {
+          pluginDidLoad: pluginImport.pluginDidLoad,
+          pluginWillUnload: pluginImport.pluginWillUnload,
+          pluginSettingSaved: pluginImport.pluginSettingSaved,
+          settingMenu: pluginImport.settingMenu,
+          pluginMenu: pluginImport.pluginMenu,
+          ipcHandlers: pluginImport.ipcHandlers,
+          libs: pluginImport.libs,
+          windowOptions: pluginImport.windowOptions,
+          commands: normalizeRuntimeCommands(pluginImport.commands),
+        };
+      } catch (err) {
+        logger.error('[plugin] enable error: ', err);
+        Object.assign(
+          plugin,
+          applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, err.message),
+          { enabled: false },
+        );
+        loader.emit('plugin:error', {
+          plugin: plugin || null,
+          pluginId: packageName,
+          error: err,
+          operation: 'enable',
+        });
+        return plugin;
+      }
+    }
+
+    if (plugin.exports && !hasRuntimeExports(pluginMain)) {
+      const message = '插件入口未导出任何插件 API（pluginDidLoad / ipcHandlers / commands 等），请检查入口构建产物';
+      logger.error(`[plugin] ${packageName}: ${message}`);
       Object.assign(
         plugin,
-        applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, err.message),
+        applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, message),
         { enabled: false },
       );
-      loader.activatingPlugins.delete(packageName);
       loader.emit('plugin:error', {
-        plugin: plugin || null,
+        plugin,
         pluginId: packageName,
-        error: err,
+        error: new Error(message),
         operation: 'enable',
       });
       return plugin;
     }
-  }
 
-  Object.assign(plugin, createRuntimeState(), refreshPluginStatus(plugin));
-  pluginMain.enabled = true;
-  pluginMain.active = true;
-  pluginMain.loadTime = Date.now();
-  mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
+    Object.assign(plugin, createRuntimeState(), refreshPluginStatus(plugin));
+    pluginMain.enabled = true;
+    pluginMain.active = true;
+    pluginMain.loadTime = Date.now();
+    pluginMain.loadDuration = pluginMain.loadTime - activatedAt;
+    mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
 
-  const mergedPlugin = Object.assign(plugin, pluginMain || {});
+    const mergedPlugin = Object.assign(plugin, pluginMain || {});
 
-  if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
-    mergedPlugin.ipcHandlers.forEach((handler) => {
-      const ipc = appManager.getIpc();
-      if (ipc) {
-        ipc.appendHandler(
-          `${handler.type}@${mergedPlugin.packageName}`,
-          handler.handler,
-        );
-      }
-    });
-  }
-
-  if (mergedPlugin.commands?.length) {
-    mergedPlugin.commands.forEach((command) => {
-      loader.runtimeCommandHandlers.set(command.id, {
-        pluginId: mergedPlugin.packageName,
-        handler: command.handler,
+    if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
+      mergedPlugin.ipcHandlers.forEach((handler) => {
+        const ipc = appManager.getIpc();
+        if (ipc) {
+          ipc.appendHandler(
+            `${handler.type}@${mergedPlugin.packageName}`,
+            handler.handler,
+            { owner: mergedPlugin.packageName },
+          );
+        }
       });
+    }
+
+    if (mergedPlugin.commands?.length) {
+      mergedPlugin.commands.forEach((command) => {
+        loader.runtimeCommandHandlers.set(command.id, {
+          pluginId: mergedPlugin.packageName,
+          handler: command.handler,
+        });
+      });
+    }
+
+    if (mergedPlugin.libs) {
+      pluginInterop.register(mergedPlugin.packageName, mergedPlugin.libs);
+    }
+
+    mergedPlugin.windowOptions = {};
+    if (mergedPlugin.windowUrl) {
+      mergedPlugin.windowMode = true;
+      mergedPlugin.windowOptions = pluginMain.windowOptions || {};
+    } else if (typeof mergedPlugin.windowMode === 'undefined') {
+      mergedPlugin.windowMode = mainStore.config.get(
+        `plugin.${plugin.packageName}.windowMode`,
+        false,
+      );
+    }
+
+    // pluginDidLoad 的异常不允许向上传播：宿主需要保持状态机一致，
+    // 并清掉刚才注册的 IPC / 命令 / interop，让插件停留在可重试的 load-error 状态
+    try {
+      processPlugin(mergedPlugin);
+    } catch (err) {
+      logger.error(`[plugin] pluginDidLoad 执行失败: ${mergedPlugin.packageName}`, err);
+      cleanupRuntimeRegistrations(loader, mergedPlugin);
+      Object.assign(
+        mergedPlugin,
+        applyPluginStatus(
+          mergedPlugin,
+          PLUGIN_STATUS_LOAD_ERROR,
+          `pluginDidLoad 执行失败：${err.message}`,
+        ),
+        { enabled: false, active: false },
+      );
+      mainStore.config.set(`plugin.${mergedPlugin.packageName}.enabled`, false);
+      loader.emit('plugin:error', {
+        plugin: mergedPlugin,
+        pluginId: packageName,
+        error: err,
+        operation: 'didLoad',
+      });
+      return mergedPlugin;
+    }
+
+    if (mergedPlugin.loadDuration > SLOW_ACTIVATION_THRESHOLD) {
+      logger.warn(`[plugin] 插件 "${mergedPlugin.packageName}" 激活耗时 ${mergedPlugin.loadDuration}ms，建议改用 onAppReady/onView 等延迟激活事件`);
+    }
+
+    Object.assign(mergedPlugin, refreshPluginStatus(mergedPlugin));
+    loader.emit('plugin:enabled', {
+      plugin: mergedPlugin,
+      pluginId: mergedPlugin.packageName,
+      isInit: init,
     });
+
+    return mergedPlugin;
+  } finally {
+    loader.activatingPlugins.delete(packageName);
   }
-
-  if (mergedPlugin.libs) {
-    pluginInterop.register(mergedPlugin.packageName, mergedPlugin.libs);
-  }
-
-  mergedPlugin.windowOptions = {};
-  if (mergedPlugin.windowUrl) {
-    mergedPlugin.windowMode = true;
-    mergedPlugin.windowOptions = pluginMain.windowOptions || {};
-  } else if (typeof mergedPlugin.windowMode === 'undefined') {
-    mergedPlugin.windowMode = mainStore.config.get(
-      `plugin.${plugin.packageName}.windowMode`,
-      false,
-    );
-  }
-
-  processPlugin(mergedPlugin);
-  Object.assign(mergedPlugin, refreshPluginStatus(mergedPlugin));
-  loader.activatingPlugins.delete(packageName);
-
-  loader.emit('plugin:enabled', {
-    plugin: mergedPlugin,
-    pluginId: mergedPlugin.packageName,
-    isInit: init,
-  });
-
-  return mergedPlugin;
 };
 
 /**
@@ -388,7 +508,7 @@ const disablePlugin = (loader, packageName, options = {}) => {
     plugin.ipcHandlers.forEach((handler) => {
       const ipc = appManager.getIpc();
       if (ipc) {
-        ipc.removeHandler(`${handler.type}@${plugin.packageName}`);
+        ipc.removeHandler(`${handler.type}@${plugin.packageName}`, plugin.packageName);
       }
     });
   }
@@ -400,8 +520,16 @@ const disablePlugin = (loader, packageName, options = {}) => {
     });
   }
 
-  if (typeof plugin.pluginWillUnload === 'function') {
-    plugin.pluginWillUnload();
+  if (plugin.isolated) {
+    // 隔离插件的清理在子进程侧完成：通知卸载、等待退出并杀掉进程。
+    // pluginWillUnload 的异常不允许中断后续清理
+    deactivateIsolatedPlugin(loader, plugin);
+  } else if (typeof plugin.pluginWillUnload === 'function') {
+    try {
+      plugin.pluginWillUnload();
+    } catch (err) {
+      logger.error(`[plugin] pluginWillUnload 执行失败: ${plugin.packageName}`, err);
+    }
   }
 
   if (appManager.getChildWin(`plugin-window-${packageName}`)) {
@@ -535,8 +663,16 @@ const access = (loader, pluginId) => {
  */
 const onPluginSettingSave = (loader, pluginId) => {
   const plugin = loader.getPlugin(pluginId);
-  if (plugin && plugin.active && typeof plugin.pluginSettingSaved === 'function') {
-    plugin.pluginSettingSaved();
+  if (plugin && plugin.active) {
+    try {
+      if (plugin.isolated) {
+        notifySettingSaved(plugin);
+      } else if (typeof plugin.pluginSettingSaved === 'function') {
+        plugin.pluginSettingSaved();
+      }
+    } catch (err) {
+      logger.error(`[plugin] pluginSettingSaved 执行失败: ${pluginId}`, err);
+    }
   }
   loader.emit('plugin:setting-changed', { plugin: plugin || null, pluginId });
 };

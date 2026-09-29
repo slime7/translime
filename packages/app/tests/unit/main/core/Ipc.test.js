@@ -2,6 +2,8 @@ import {
   beforeEach, describe, expect, it, vi,
 } from 'vitest';
 import Ipc from '@main/core/Ipc';
+import pluginInterop from '@main/core/pluginInterop';
+import { attributeSender } from '@main/core/plugin-loader/pluginSenderRegistry';
 
 // Mock ipcHandler
 vi.mock('@main/core/ipcHandler', () => ({
@@ -11,6 +13,22 @@ vi.mock('@main/core/ipcHandler', () => ({
     errorHandler: vi.fn(() => {
       throw new Error('handler error');
     }),
+  },
+}));
+
+vi.mock('electron', () => ({
+  webContents: {
+    getAllWebContents: vi.fn(() => []),
+  },
+}));
+
+vi.mock('@main/utils/logger', () => ({
+  default: {
+    log: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
@@ -90,11 +108,65 @@ describe('Ipc', () => {
       expect(result).toEqual({ data: null, err: 'IPC handler [nonExistentHandler] not found' });
     });
 
+    it('插件通道的 handler 错误应附带插件归属前缀', async () => {
+      ipc.appendHandler('boom@translime-plugin-a', () => () => {
+        throw new Error('boom');
+      }, { owner: 'translime-plugin-a' });
+
+      const result = await handleCallback({}, { type: 'boom@translime-plugin-a', args: [] });
+
+      expect(result).toEqual({ data: null, err: '[translime-plugin-a] boom' });
+    });
+
     it('args 为空时应使用空数组', async () => {
       const { default: ipcHandler } = await import('@main/core/ipcHandler');
       await handleCallback({}, { type: 'testHandler' });
 
       expect(ipcHandler.testHandler).toHaveBeenCalledWith();
+    });
+  });
+
+  describe('跨插件调用校验', () => {
+    const makeSender = (id) => ({ id, isDestroyed: vi.fn(() => false) });
+
+    it('已归属插件不能调用其他未暴露 libs 插件的通道', async () => {
+      const sender = makeSender(101);
+      attributeSender(sender, 'translime-plugin-a');
+      ipc.appendHandler('data@translime-plugin-b', () => () => 'b-data', { owner: 'translime-plugin-b' });
+
+      const result = await handleCallback({ sender }, { type: 'data@translime-plugin-b', args: [] });
+
+      expect(result.err).toContain('不允许跨插件调用');
+    });
+
+    it('已归属插件可以访问暴露了 libs 的插件通道', async () => {
+      const sender = makeSender(102);
+      attributeSender(sender, 'translime-plugin-a');
+      ipc.appendHandler('query@translime-plugin-lib', () => () => 'lib-data', { owner: 'translime-plugin-lib' });
+      vi.spyOn(pluginInterop, 'getRegisteredPlugins').mockReturnValue(['translime-plugin-lib']);
+
+      const result = await handleCallback({ sender }, { type: 'query@translime-plugin-lib', args: [] });
+
+      expect(result).toEqual({ data: 'lib-data', err: null });
+      pluginInterop.getRegisteredPlugins.mockRestore();
+    });
+
+    it('插件可以调用自身通道', async () => {
+      const sender = makeSender(103);
+      attributeSender(sender, 'translime-plugin-a');
+      ipc.appendHandler('self@translime-plugin-a', () => () => 'self-data', { owner: 'translime-plugin-a' });
+
+      const result = await handleCallback({ sender }, { type: 'self@translime-plugin-a', args: [] });
+
+      expect(result).toEqual({ data: 'self-data', err: null });
+    });
+
+    it('未归属发送方（宿主窗口）不受跨插件限制', async () => {
+      ipc.appendHandler('data@translime-plugin-b', () => () => 'b-data', { owner: 'translime-plugin-b' });
+
+      const result = await handleCallback({ sender: makeSender(104) }, { type: 'data@translime-plugin-b', args: [] });
+
+      expect(result).toEqual({ data: 'b-data', err: null });
     });
   });
 
@@ -177,6 +249,42 @@ describe('Ipc', () => {
       const result = await handleCallback({}, { type: 'dynamicHandler', args: ['test'] });
 
       expect(result).toEqual({ data: 'dynamic: test', err: null });
+    });
+
+    it('相同所有者重复注册应该原地替换', () => {
+      const first = vi.fn(() => () => 'first');
+      const second = vi.fn(() => () => 'second');
+
+      expect(ipc.appendHandler('owned@translime-plugin-a', first, { owner: 'translime-plugin-a' })).toBe(true);
+      expect(ipc.appendHandler('owned@translime-plugin-a', second, { owner: 'translime-plugin-a' })).toBe(true);
+      expect(ipc.handlerList['owned@translime-plugin-a']()).toBe('second');
+    });
+
+    it('插件不能抢占宿主内置通道', () => {
+      const originalHandler = ipc.handlerList.testHandler;
+      const result = ipc.appendHandler('testHandler', () => () => 'hijacked', { owner: 'translime-plugin-a' });
+
+      expect(result).toBe(false);
+      expect(ipc.handlerList.testHandler).toBe(originalHandler);
+    });
+
+    it('插件不能注册其他插件已登记的通道', () => {
+      ipc.appendHandler('taken@translime-plugin-a', () => () => 'a', { owner: 'translime-plugin-a' });
+
+      const result = ipc.appendHandler('taken@translime-plugin-a', () => () => 'b', { owner: 'translime-plugin-b' });
+
+      expect(result).toBe(false);
+      expect(ipc.handlerList['taken@translime-plugin-a']()).toBe('a');
+    });
+
+    it('removeHandler 传入非所有者时应该拒绝移除', () => {
+      ipc.appendHandler('keep@translime-plugin-a', () => () => 'a', { owner: 'translime-plugin-a' });
+
+      expect(ipc.removeHandler('keep@translime-plugin-a', 'translime-plugin-b')).toBe(false);
+      expect(ipc.handlerList['keep@translime-plugin-a']).toBeDefined();
+
+      expect(ipc.removeHandler('keep@translime-plugin-a', 'translime-plugin-a')).toBe(true);
+      expect(ipc.handlerList['keep@translime-plugin-a']).toBeUndefined();
     });
   });
 

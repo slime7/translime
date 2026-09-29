@@ -26,6 +26,28 @@ if (typeof window !== 'undefined' && checkPreviewMode()) {
 }
 
 // ----------------------------------------------------------------------
+// Isolated Mode Detection (utilityProcess Child)
+// ----------------------------------------------------------------------
+
+/**
+ * 当前是否运行在宿主的隔离插件子进程（plugin.isolated: true）中。
+ * @returns {boolean}
+ */
+export function isIsolatedMode() {
+  return typeof process !== 'undefined'
+    && process.env
+    && process.env.TRANSLIME_ISOLATED_PLUGIN;
+}
+
+const isolatedUnsupported = (apiName) => {
+  throw new Error(
+    `SDK API "${apiName}" 在隔离模式（plugin.isolated: true）下不可用：`
+    + '隔离插件的宿主侧桥接暂不包含全局 Store / 插件间 interop，'
+    + '请改用 IPC handler 与宿主通信，或去掉 manifest 中的 isolated 声明。',
+  );
+};
+
+// ----------------------------------------------------------------------
 // Core / Store APIs (Main Process Only)
 // ----------------------------------------------------------------------
 
@@ -47,10 +69,13 @@ export function isPreviewMode() {
 
 /**
  * 获取主程序 Store
- * @description 仅在 **主进程 (Main Process)** 环境可用
+ * @description 仅在 **主进程 (Main Process)** 环境可用；隔离模式（plugin.isolated）下抛错
  * @returns {MainStore|null} 若在非主进程环境调用，返回 null
  */
 export function getMainStore() {
+  if (isIsolatedMode()) {
+    isolatedUnsupported('getMainStore');
+  }
   if (typeof global !== 'undefined' && global.mainStore) {
     return global.mainStore;
   }
@@ -59,11 +84,14 @@ export function getMainStore() {
 
 /**
  * 使用插件配置代理
- * @description 获取针对特定插件的配置读写对象
+ * @description 获取针对特定插件的配置读写对象；隔离模式（plugin.isolated）下抛错
  * @param {string} pluginId 插件 ID (通常与 package.json 中的 name 一致)
  * @returns {{ get: function(string, *): *, set: function(string, *): void }}
  */
 export function usePluginConfig(pluginId) {
+  if (isIsolatedMode()) {
+    isolatedUnsupported('usePluginConfig');
+  }
   const store = getMainStore();
   return {
     get(key, defaultValue) {
@@ -77,10 +105,13 @@ export function usePluginConfig(pluginId) {
 
 /**
  * 获取插件间通信工具
- * @description 仅在 **主进程 (Main Process)** 环境可用
+ * @description 仅在 **主进程 (Main Process)** 环境可用；隔离模式（plugin.isolated）下抛错
  * @returns {import('./index.d').PluginInterop|null}
  */
 export function usePluginInterop() {
+  if (isIsolatedMode()) {
+    isolatedUnsupported('usePluginInterop');
+  }
   if (typeof global !== 'undefined' && global.pluginInterop) {
     return global.pluginInterop;
   }

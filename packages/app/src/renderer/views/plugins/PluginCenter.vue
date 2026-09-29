@@ -11,7 +11,7 @@
         data-test="plugin-search-input"
         class="center-search"
         label="搜索插件"
-        placeholder="搜索插件市场，回车确认；留空回车列出全部插件"
+        placeholder="过滤当前页签；市场页签回车查询，留空列出全部插件"
         @search="searchAction"
         @contextmenu="showTextEditContextMenu"
       >
