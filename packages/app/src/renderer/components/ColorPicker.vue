@@ -75,6 +75,7 @@ const setColorDialogConfirm = () => {
 
         <mat-btn
           color="primary"
+          variant="text"
           @click="setColorDialogCancel"
         >
           取消

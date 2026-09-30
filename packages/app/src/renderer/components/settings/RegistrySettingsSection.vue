@@ -51,6 +51,7 @@
 
         <mat-btn
           color="primary"
+          variant="text"
           @click="setCustomRegistryCancel"
         >
           取消

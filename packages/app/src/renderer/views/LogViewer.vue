@@ -186,6 +186,7 @@
 
         <mat-btn
           color="primary"
+          variant="text"
           @click="closeDetail"
         >
           关闭

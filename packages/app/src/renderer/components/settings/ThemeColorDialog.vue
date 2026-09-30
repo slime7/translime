@@ -71,6 +71,7 @@
 
       <mat-btn
         color="primary"
+        variant="text"
         @click="visible = false"
       >
         取消

@@ -94,6 +94,7 @@
 
     <div class="mt-5 flex justify-end gap-2">
       <mat-btn
+        variant="text"
         data-test="dev-wizard-cancel-btn"
         @click="close"
       >

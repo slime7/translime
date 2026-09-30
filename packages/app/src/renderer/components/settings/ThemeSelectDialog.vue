@@ -63,6 +63,7 @@
       <mat-btn
         data-test="theme-dialog-cancel-btn"
         color="primary"
+        variant="text"
         @click="onCancel"
       >
         取消

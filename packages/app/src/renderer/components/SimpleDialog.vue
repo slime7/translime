@@ -16,6 +16,7 @@
 
         <mat-btn
           v-if="!dialog.hideClose"
+          variant="text"
           @click="close"
         >
           关闭
