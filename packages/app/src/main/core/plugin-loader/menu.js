@@ -1,4 +1,4 @@
-import { clipboard } from 'electron';
+import { clipboard, shell } from 'electron';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../../utils/useMainStore';
 import appManager from '../../utils/useAppManager';
@@ -80,6 +80,15 @@ const buildPluginMenu = (loader, packageName) => {
       click() {
         loader.restartPlugin(packageName);
         ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
+      },
+    },
+    {
+      id: 'open-plugin-dir',
+      label: '打开插件目录',
+      // 仅对明确标记为开发插件的条目展示，非 dev 插件（含 dev 字段缺失）一律隐藏
+      visible: plugin.dev === true,
+      click() {
+        shell.openPath(plugin.pluginPath);
       },
     },
     {

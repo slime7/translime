@@ -18,7 +18,7 @@
     "icon.png"
   ],
   "scripts": {
-    "dev": "vite build -c ui.vite.config.mjs --watch",
+    "dev": "node dev.mjs",
     "preview:ui": "vite -c ui.vite.config.mjs --mode preview",
     "build:plugin": "vite build",
     "build:ui": "vite build -c ui.vite.config.mjs",

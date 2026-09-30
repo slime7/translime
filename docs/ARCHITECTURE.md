@@ -61,6 +61,8 @@ flowchart LR
   - `plugin-loader/isolatedRuntime.js`：隔离模式宿主侧，fork utilityProcess 并桥接 IPC/命令/日志，子进程崩溃转为 `load-error`
   - `plugin-loader/pluginSenderRegistry.js`：插件渲染端（webview / 独立窗口）归属登记，供 IPC 收口校验
   - `plugin-loader/installer.js` 与 `plugin-loader/packageInstaller.js`：插件安装与卸载
+  - `plugin-loader/devPluginWizard.js`：宿主内「创建/引入开发插件」向导的纯文件操作（模板复制、占位符替换、junction 链接），模板随宿主打包（electron-builder `extraResources`，开发模式直接读 monorepo 模板包）
+  - `plugin-loader/devPluginWatcher.js`：监听已启用开发插件的 `dist` 目录，构建产物变化后防抖自动重启该插件，仅作用于 `showDevPlugin` 开启时的 dev 插件
   - `plugin-loader/menu.js`：插件菜单描述生成，把菜单项与点击处理函数登记到 `core/menuRegistry.js`，由渲染端 M3 菜单（`HostMenu`）展示并把点击动作回传执行
   - `core/menuRegistry.js`：渲染端菜单的动作登记与分发（`menuId` + 菜单项 id 一次性消费）
   - `core/textEditMenu.js`：文本编辑上下文菜单（撤销/重做/剪贴板）描述生成，动作作用于原 `WebContents`

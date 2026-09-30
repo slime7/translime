@@ -6,18 +6,22 @@ import { clipboard } from 'electron';
 import { dispatchMenuAction } from '@main/core/menuRegistry';
 import buildPluginMenu from '@main/core/plugin-loader/menu';
 
-const { mockConfigSet, mockSendToMain, mockIpcEv } = vi.hoisted(() => {
+const { mockConfigSet, mockSendToMain, mockIpcEv, mockShellOpenPath } = vi.hoisted(() => {
   const sendToMain = vi.fn();
   return {
     mockConfigSet: vi.fn(),
     mockSendToMain: sendToMain,
     mockIpcEv: { sendToMain },
+    mockShellOpenPath: vi.fn(),
   };
 });
 
 vi.mock('electron', () => ({
   clipboard: {
     writeText: vi.fn(),
+  },
+  shell: {
+    openPath: mockShellOpenPath,
   },
 }));
 
@@ -81,6 +85,26 @@ describe('plugin-loader/menu', () => {
     const { items } = buildPluginMenu(loader, 'translime-plugin-demo');
 
     expect(itemIds(items)).toEqual(['enable-plugin', 'uninstall-plugin', 'copy-plugin-link']);
+  });
+
+  it('仅开发插件展示“打开插件目录”，与启用状态无关', () => {
+    const devEnabled = createLoader({ dev: true });
+    expect(itemIds(buildPluginMenu(devEnabled.loader, 'p').items)).toContain('open-plugin-dir');
+
+    const devDisabled = createLoader({ dev: true, enabled: false, ui: false });
+    expect(itemIds(buildPluginMenu(devDisabled.loader, 'p').items)).toContain('open-plugin-dir');
+
+    const releasePlugin = createLoader({ dev: false });
+    expect(itemIds(buildPluginMenu(releasePlugin.loader, 'p').items)).not.toContain('open-plugin-dir');
+  });
+
+  it('回传动作应执行对应处理：打开插件目录', () => {
+    const { loader, plugin } = createLoader({ dev: true, pluginPath: 'C:/mock/translime-plugin-demo' });
+    const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
+
+    dispatchMenuAction(menuId, 'open-plugin-dir');
+
+    expect(mockShellOpenPath).toHaveBeenCalledWith('C:/mock/translime-plugin-demo');
   });
 
   it('有设置项的启用插件才展示“设置”', () => {

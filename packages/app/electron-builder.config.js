@@ -20,6 +20,19 @@ const config = {
     '--ignore-scripts',
   ],
   npmRebuild: false,
+  // 内置插件模板：供宿主内「创建开发插件」向导使用，
+  // 打包后位于资源目录 template-plugin，与脚手架共用同一份模板来源
+  extraResources: [
+    {
+      from: '../template-translime-plugin',
+      to: 'template-plugin',
+      filter: [
+        '**',
+        '!**/node_modules/**',
+        '!**/dist/**',
+      ],
+    },
+  ],
   files: [
     '**',
   ],

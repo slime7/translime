@@ -38,6 +38,10 @@ import {
   cleanTempNodeFiles,
   setupNodeLoaderHack,
 } from './plugin-loader/nativeLoader';
+import {
+  closeDevPluginWatchers,
+  syncDevPluginWatchers,
+} from './plugin-loader/devPluginWatcher';
 
 /**
  * 插件系统的主入口。
@@ -152,7 +156,9 @@ class PluginLoader extends EventEmitter {
    * @returns {Array<object>} 扫描后的插件列表。
    */
   resolvePlugins() {
-    return resolvePlugins(this);
+    const plugins = resolvePlugins(this);
+    syncDevPluginWatchers(this);
+    return plugins;
   }
 
   /**
@@ -235,7 +241,9 @@ class PluginLoader extends EventEmitter {
    * @returns {object} 启用后的插件对象。
    */
   enablePlugin(packageName, init = false) {
-    return enablePlugin(this, packageName, init);
+    const result = enablePlugin(this, packageName, init);
+    syncDevPluginWatchers(this);
+    return result;
   }
 
   /**
@@ -246,7 +254,9 @@ class PluginLoader extends EventEmitter {
    * @returns {boolean} 是否成功禁用。
    */
   disablePlugin(packageName, options = {}) {
-    return disablePlugin(this, packageName, options);
+    const result = disablePlugin(this, packageName, options);
+    syncDevPluginWatchers(this);
+    return result;
   }
 
   /**
@@ -327,6 +337,7 @@ class PluginLoader extends EventEmitter {
    * @returns {void}
    */
   appClose() {
+    closeDevPluginWatchers();
     appClose(this);
   }
 

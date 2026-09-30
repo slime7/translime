@@ -25,7 +25,12 @@ import {
   resolveTitleBarOverlay,
   TITLE_BAR_OVERLAY_COLOR,
 } from '../utils/titleBarOverlay';
-import { PLUGIN_MODULES_PATH, PLUGIN_MODULES_PATH_DEV } from './plugin-loader/constants';
+import { PLUGIN_DIR_DEV, PLUGIN_MODULES_PATH, PLUGIN_MODULES_PATH_DEV } from './plugin-loader/constants';
+import {
+  createDevPlugin,
+  linkDevPlugin,
+  readLinkablePluginManifest,
+} from './plugin-loader/devPluginWizard';
 import { attributeSender, resolveSenderPluginId } from './plugin-loader/pluginSenderRegistry';
 import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
@@ -64,6 +69,31 @@ const withPluginLoader = async (action, errorPrefix = '') => {
 const PLUGIN_ID_PATTERN = /^translime-plugin-[a-z0-9-]+$/;
 const OPEN_LINK_ALLOWED_PROTOCOLS = ['http:', 'https:'];
 const LOGGER_ALLOWED_LEVELS = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
+
+/**
+ * 解析内置插件模板目录。
+ *
+ * 打包后由 electron-builder extraResources 放到资源目录；
+ * 开发模式下直接使用 monorepo 中的模板包源码。
+ *
+ * @returns {string} 模板目录绝对路径。
+ */
+const resolveTemplatePluginDir = () => (app.isPackaged
+  ? join(process.resourcesPath, 'template-plugin')
+  : pathResolve(app.getAppPath(), '..', 'template-translime-plugin'));
+
+/**
+ * 向导创建/引入开发插件后的公共收尾：确保开发插件可见并触发重新扫描。
+ *
+ * @param {object} loader - `PluginLoader` 实例。
+ * @returns {void}
+ */
+const finishDevPluginSetup = (loader) => {
+  if (!mainStore.config.get('setting.showDevPlugin', false)) {
+    mainStore.config.set('setting.showDevPlugin', true);
+  }
+  loader.resolvePlugins();
+};
 
 /**
  * 校验插件设置访问权限与键名格式。
@@ -334,6 +364,42 @@ const ipcHandler = {
   },
   async [ipcType.INSTALL_LOCAL_PLUGIN](packagePath) {
     return withPluginLoader((loader) => loader.installLocalPlugin(packagePath), '插件安装出错');
+  },
+  async [ipcType.CREATE_DEV_PLUGIN]({
+    name, title, description, targetRoot,
+  } = {}) {
+    return withPluginLoader((loader) => {
+      const packageName = String(name || '');
+      if (loader.getPlugins().some((plugin) => plugin.packageName === packageName)) {
+        throw new Error(`插件 "${packageName}" 已存在`);
+      }
+      const result = createDevPlugin({
+        templateDir: resolveTemplatePluginDir(),
+        targetDir: join(targetRoot || PLUGIN_DIR_DEV, packageName),
+        devModulesPath: PLUGIN_MODULES_PATH_DEV,
+        name: packageName,
+        title,
+        description,
+      });
+      finishDevPluginSetup(loader);
+      return result;
+    }, '创建开发插件失败');
+  },
+  async [ipcType.LINK_DEV_PLUGIN]({ sourceDir } = {}) {
+    return withPluginLoader((loader) => {
+      const resolvedSourceDir = pathResolve(String(sourceDir || ''));
+      // 先校验清单再动文件系统，避免重名时留下半成品链接
+      const { name: packageName } = readLinkablePluginManifest(resolvedSourceDir);
+      if (loader.getPlugins().some((plugin) => plugin.packageName === packageName)) {
+        throw new Error(`插件 "${packageName}" 已存在`);
+      }
+      const result = linkDevPlugin({
+        sourceDir: resolvedSourceDir,
+        devModulesPath: PLUGIN_MODULES_PATH_DEV,
+      });
+      finishDevPluginSetup(loader);
+      return result;
+    }, '引入开发插件失败');
   },
   async [ipcType.UNINSTALL_PLUGIN](packageName) {
     return withPluginLoader((loader) => loader.uninstallPlugin(packageName), '插件卸载出错');

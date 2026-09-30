@@ -29,6 +29,13 @@
       </mat-search>
 
       <mat-btn
+        icon="add_circle"
+        label="创建开发插件"
+        data-test="plugin-create-dev-btn"
+        @click="devPluginWizardRef?.open('create')"
+      />
+
+      <mat-btn
         icon="folder_zip"
         label="安装本地插件"
         data-test="plugin-install-local-btn"
@@ -260,6 +267,11 @@
       </div>
     </section>
 
+    <dev-plugin-wizard
+      ref="devPluginWizardRef"
+      @success="getPlugins"
+    />
+
     <mat-dialog
       v-model="installLocalPluginDialog.visible"
       width="600"
@@ -311,6 +323,7 @@ import useGlobalStore from '@/store/globalStore';
 import { selectFileDialog, showTextEditContextMenu } from '@/utils';
 import { STATUS_SUCCESS } from '@/utils/statusColors';
 import PluginCard from './PluginCard.vue';
+import DevPluginWizard from './DevPluginWizard.vue';
 import usePluginCenterSearch, { parseSearchResult, SEARCH_PAGE_SIZE } from './hooks/usePluginCenterSearch';
 
 const ipc = useIpc();
@@ -504,6 +517,7 @@ const refreshDevPlugins = async () => {
 };
 
 const pluginCardRefs = ref([]);
+const devPluginWizardRef = ref(null);
 
 const openPluginSettingPanel = () => {
   const query = { ...route.query };

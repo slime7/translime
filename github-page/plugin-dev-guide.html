@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>translime 插件开发指南</title>
+  <style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-size: 16px;
+  }
+
+  *, *:before, *:after {
+    box-sizing: border-box;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: #fafafa;
+  }
+
+  .guide {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+    color: #333;
+    line-height: 1.7;
+  }
+
+  .guide .logo {
+    display: block;
+    margin: 0 auto 1rem;
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+  }
+
+  .guide h1 {
+    font-size: 1.6rem;
+    text-align: center;
+    color: #222;
+  }
+
+  .guide .lead {
+    text-align: center;
+    color: #9e9e9e;
+    margin-bottom: 2.5rem;
+  }
+
+  .guide h2 {
+    font-size: 1.2rem;
+    margin-top: 2.5rem;
+    padding-left: .6rem;
+    border-left: 4px solid #039be5;
+    color: #222;
+  }
+
+  .guide code {
+    padding: .1rem .35rem;
+    border-radius: 4px;
+    background-color: #eee;
+    font-size: .9em;
+  }
+
+  .guide pre {
+    padding: .9rem 1rem;
+    border-radius: 8px;
+    background-color: #f0f0f0;
+    overflow: auto;
+  }
+
+  .guide pre code {
+    padding: 0;
+    background: none;
+  }
+
+  .guide table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+  }
+
+  .guide th, .guide td {
+    border: 1px solid #e0e0e0;
+    padding: .45rem .7rem;
+    text-align: left;
+    font-size: .95rem;
+  }
+
+  .guide .tip {
+    padding: .8rem 1rem;
+    border-radius: 8px;
+    background-color: #e3f2fd;
+    font-size: .95rem;
+  }
+
+  .guide .actions {
+    margin-top: 3rem;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .guide .actions .btn {
+    all: unset;
+    padding: .5rem 1.2rem;
+    border-radius: 999px;
+    color: #fff;
+    background-color: #039be5;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .guide .actions .btn:hover {
+    text-decoration: underline .25rem #ffffffaa;
+  }
+  </style>
+</head>
+<body>
+  <article class="guide">
+    <img class="logo" src="../icon.png" alt="translime" />
+    <h1>translime 插件开发指南</h1>
+    <p class="lead">面向在仓库之外开发 translime 插件的开发者：从安装宿主到发布插件。</p>
+
+    <h2>一、准备</h2>
+    <ul>
+      <li>安装 <a href="https://github.com/slime7/translime/releases" target="_blank">translime 宿主</a>（Windows / Linux）。宿主是插件唯一的真实运行与调试环境。</li>
+      <li>Node.js ≥ 18.20 与 pnpm 10，用于构建插件包。</li>
+      <li>在宿主 <b>设置</b> 中开启 <b>显示开发中插件</b>，插件中心会出现开发插件相关入口。</li>
+    </ul>
+
+    <h2>二、创建或引入插件</h2>
+    <p>打开 <b>插件中心 → 创建开发插件</b>，两种方式：</p>
+    <ul>
+      <li><b>从模板创建</b>：填写包名（<code>translime-plugin-</code> 前缀自动带上）、标题与描述，选择存放目录（留空默认放在宿主 <code>plugins_dev</code> 目录）。宿主会基于内置模板生成完整插件项目，并自动链接进开发插件列表。</li>
+      <li><b>引入已有目录</b>：选择一个已存在的插件项目目录（<code>package.json</code> 需含 <code>plugin</code> 字段）。宿主只建立链接，项目保留在原位置。</li>
+    </ul>
+    <p>创建完成后插件出现在插件中心列表中，右键插件卡片可 <b>启用</b>、<b>重启</b>、<b>打开插件目录</b>。开发插件不发布 npm，仅在本机宿主中可见。</p>
+
+    <h2>三、开发与调试</h2>
+    <p>用编辑器打开插件目录（可在卡片右键选择「打开插件目录」）：</p>
+    <ul>
+      <li><code>index.js</code> 是主进程入口（声明生命周期钩子、IPC handler、命令），构建为 <code>dist/index.cjs.js</code>。</li>
+      <li><code>ui.vue</code> 是内嵌 UI 入口，构建为 <code>dist/ui.esm.js</code>。</li>
+      <li>运行 <code>pnpm install && pnpm dev</code> 同时监听两套构建；构建产物变化后，宿主会 <b>自动重启该插件</b>（需开启「显示开发中插件」），无需手动操作。</li>
+      <li>手动刷新可用插件中心的 <b>刷新开发中插件</b> 按钮或卡片右键 <b>重启插件</b>。</li>
+      <li>调试 UI：卡片右键可打开插件 webview 的 DevTools；调试主进程逻辑：宿主内置 <b>日志查看器</b>。</li>
+      <li>独立窗口插件可在 manifest 中声明 <code>windowUrl.dev</code> 指向本地 dev server，获得热更新。</li>
+    </ul>
+    <div class="tip">
+      推荐先用 <code>preview:ui</code> 在浏览器中快速调整界面，但布局、主题与宿主集成行为一律以宿主内实际效果为准。
+    </div>
+
+    <h2>四、SDK 与 manifest</h2>
+    <p>插件通过 <a href="https://www.npmjs.com/package/translime-sdk" target="_blank">translime-sdk</a> 访问宿主能力，API 与环境边界见 <a href="https://github.com/slime7/translime/blob/dev/packages/sdk/README.md" target="_blank">SDK 文档</a>。常用约定：</p>
+    <table>
+      <tr><th>约定</th><th>说明</th></tr>
+      <tr><td>包名</td><td>必须以 <code>translime-plugin-</code> 开头，小写字母、数字、连字符</td></tr>
+      <tr><td>激活时机</td><td><code>plugin.activationEvents</code>：带 UI 的工具插件建议 <code>onView</code>，后台插件才用 <code>onStartup</code> / <code>onAppReady</code></td></tr>
+      <tr><td>宿主兼容</td><td><code>engines.translime</code>（semver），缺省视为兼容</td></tr>
+      <tr><td>IPC 命名</td><td><code>事件名@插件ID</code>，例如 <code>ipc.invoke('get-data@translime-plugin-demo')</code></td></tr>
+      <tr><td>样式隔离</td><td>使用 SDK 的 <code>createPluginCssIsolationPlugins(pluginId)</code>，宿主运行时自动加 <code>@scope</code> 与 layer</td></tr>
+      <tr><td>图标</td><td>Material Design Icons（md）风格，禁止 <code>mdi-</code> 前缀</td></tr>
+    </table>
+
+    <h2>五、发布</h2>
+    <ul>
+      <li>确认 <code>package.json</code>：去掉 <code>private</code>、<code>files</code> 包含 <code>dist</code> 与图标、<code>main</code> 指向 <code>dist/index.cjs.js</code>、版本号递增。</li>
+      <li><code>pnpm build</code> 后建议先在宿主中完整验证一轮。</li>
+      <li><code>npm publish</code> 发布到 npm；宿主通过 npm registry 检索与安装插件包。</li>
+      <li>发布后可用分享链接 <code>https://slime7.github.io/translime/open/?install=你的插件包名</code> 让用户一键跳转安装。</li>
+    </ul>
+
+    <div class="actions">
+      <a class="btn" href="https://github.com/slime7/translime" target="_blank">GitHub 仓库</a>
+      <a class="btn" href="https://github.com/slime7/translime/blob/dev/packages/template-translime-plugin/readme.md" target="_blank">模板插件文档</a>
+    </div>
+  </article>
+</body>
+</html>

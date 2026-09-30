@@ -102,7 +102,18 @@ node .agents/plugin-scaffold/create-plugin.mjs --name translime-plugin-your-name
 
 可选参数：`--title`、`--description`、`--template`、`--repo`、`--force`。默认模板为 `packages/template-translime-plugin`，首个可用版本默认 `1.0.0`。
 
+安装版宿主内置了同一份模板：插件中心的「创建开发插件」向导可以不依赖本仓库直接生成插件并自动链接进 `plugins_dev`，面向仓库外的插件开发者；本仓库内的开发继续使用脚手架命令。
+
 ### 在宿主中联调插件
+
+优先使用宿主内置向导（无需手动链接）：
+
+1. 在插件中心点击「创建开发插件」，选择「从模板创建」或「引入已有目录」。
+2. 向导会自动把插件链接进 `<userData>/plugins_dev/node_modules`、开启"显示开发中插件"并刷新插件列表。
+3. 在插件页面启用插件；插件卡片右键可「打开插件目录」。
+4. 开启「显示开发中插件」后，宿主会监听各已启用开发插件的 `dist` 目录，构建产物变化时自动重启该插件；也可以用「刷新开发中插件」按钮或卡片右键「重启插件」手动刷新。
+
+手动 link 的方式仍然可用：
 
 1. 在插件包内构建插件（`pnpm --filter <插件包名> run build`）。
 2. 把插件链接到宿主的开发插件目录 `<userData>/plugins_dev/node_modules`：在插件根目录执行 `pnpm link --global`，再在 `plugins_dev/node_modules` 目录执行 `pnpm link --global <包名>`；或在 `plugins_dev/node_modules` 目录直接执行 `pnpm link <插件包绝对路径>`。

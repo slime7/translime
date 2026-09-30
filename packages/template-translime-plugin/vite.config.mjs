@@ -11,7 +11,8 @@ const config = ({ mode }) => ({
     sourcemap: mode === 'development' ? 'inline' : false,
     target: 'node20',
     outDir: './dist',
-    emptyOutDir: true,
+    // watch 模式下 UI 构建会并行写入同一个 dist，清空会删掉对方产物
+    emptyOutDir: mode !== 'watch',
     lib: {
       entry: 'index.js',
       name: 'plugin',
