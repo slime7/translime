@@ -7,7 +7,7 @@
 - **插件名称**: `translime-plugin-hdr-capture`
 - **功能描述**: 轻松获取 HDR 截图。
 - **技术栈**: 
-    - **Frontend**: Vue 3, Vuetify 4, Vite
+    - **Frontend**: Vue 3, mde-vue (Material 3), TailwindCSS, Vite
     - **Backend**: Electron (Node.js)
     - **Native**: Rust (NAPI-RS)
 
@@ -47,7 +47,7 @@ translime-plugin-hdr-capture/
 
 *   **渲染进程 (Renderer Process)**
     *   **入口文件**: `src/ui/ui.vue`, `src/ui/overlay/App.vue`
-    *   **可用 API**: `useIpc()`, `useVuetifyComponents()`, `getPluginSetting()`, `setPluginSetting()`, `useWindowControl()`
+    *   **可用 API**: `useIpc()`, `useMatComponents()`, `getPluginSetting()`, `setPluginSetting()`, `useWindowControl()`
     *   **禁用 API**: `getMainStore()` 等直接访问 Node 层的函数
 
 ### IPC 通信 (IPC Communication)
@@ -87,8 +87,8 @@ if (hdrApi) {
 ### UI 开发 (UI Development)
 
 *   **设置界面 (`src/ui/ui.vue`)**:
-    *   **框架**: Vue 3 + Vuetify 4。
-    *   **图标**: 使用 Material Design Icons (md) 风格 (例如 `<v-icon>home</v-icon>`)。
+    *   **框架**: Vue 3 + mde-vue (宿主通过 `window.mde$` 提供运行时，插件不打包；`engines.translime >= 0.7.0`)。
+    *   **图标**: 使用 Material Design Icons (md) 风格 (例如 `<mat-icon icon="home" />`)。
     *   **样式注入**: 使用 `vite-plugin-css-injected-by-js`，配置 `styleId: 'translime-plugin-hdr-capture'`。
 
 *   **全屏覆盖层 (`src/ui/overlay/`)**:

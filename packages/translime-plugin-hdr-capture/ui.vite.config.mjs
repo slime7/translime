@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
-import vuetify from 'vite-plugin-vuetify';
 import * as translimeVite from 'translime-sdk/vite';
 
 const {
@@ -22,11 +21,6 @@ export default defineConfig(({ mode }) => {
     tailwindcss(),
     translimeSdk(),
   ];
-
-  // preview 模式下添加 vuetify 插件来正确处理样式
-  if (isPreview) {
-    plugins.push(vuetify());
-  }
 
   // 非 preview 模式下添加 CSS 注入插件
   if (!isPreview) {

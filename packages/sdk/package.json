@@ -95,7 +95,7 @@
     "eslint-config-airbnb-extended": "^3.0.1",
     "eslint-plugin-vue": "^10.0.0",
     "globals": "^16.0.0",
-    "mde-vue": "git+https://github.com/slime7/mde-vue.git#ecc12c131ae567a3de297800a7d99180b2ad3f72",
+    "mde-vue": "git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda",
     "postcss-html": "^1.5.0",
     "stylelint": "^16.0.0",
     "stylelint-config-recommended-vue": "^1.5.0",

@@ -1,192 +1,192 @@
 <template>
-  <v-container class="plugin-main hdr-capture-settings">
-    <v-card
-      class="rounded-3xl"
-      rounded
+  <div class="plugin-main hdr-capture-settings">
+    <mat-card
+      class="settings-card"
+      variant="elevated"
     >
-      <v-card-title class="text-title-large">
-        <v-icon start>
-          camera
-        </v-icon>
-        HDR 截图工具设置
-      </v-card-title>
+      <template #headline>
+        <div class="flex items-center gap-2">
+          <mat-icon
+            icon="camera"
+            aria-hidden="true"
+          />
+          <span>HDR 截图工具设置</span>
+        </div>
+      </template>
 
-      <v-card-text>
+      <mat-card-content>
         <!-- 快捷键设置 -->
         <div class="setting-section">
-          <v-text-field
+          <mat-text-field
             v-model="tempShortcut"
+            class="w-full"
             label="截图快捷键"
             placeholder="例如: Ctrl+Alt+A（留空则通过按钮触发）"
             variant="outlined"
             color="primary"
-            density="comfortable"
-            hint="设置全局快捷键，在任意应用中触发截图"
-            persistent-hint
-            clearable
+            supporting-text="设置全局快捷键，在任意应用中触发截图"
             @keydown="onShortcutKeyDown"
             @blur="onShortcutBlur"
-            @click:clear="onShortcutClear"
-          />
+          >
+            <template #trailing>
+              <mat-btn
+                v-if="tempShortcut"
+                icon="close"
+                variant="standard"
+                size="small"
+                aria-label="清除快捷键"
+                @click.stop="onShortcutClear"
+              />
+            </template>
+          </mat-text-field>
         </div>
 
         <!-- 保存路径 -->
         <div class="setting-section">
-          <v-text-field
+          <mat-text-field
             v-model="settings.savePath"
+            class="w-full"
             label="保存路径"
             placeholder="默认为系统图片文件夹"
             variant="outlined"
             color="primary"
-            density="comfortable"
             readonly
             @click="selectSavePath"
           >
-            <template #append>
-              <v-btn
+            <template #trailing>
+              <mat-btn
                 icon="folder_open"
-                variant="text"
+                variant="standard"
+                size="small"
+                aria-label="选择保存路径"
                 @click.stop="selectSavePath"
               />
             </template>
-          </v-text-field>
+          </mat-text-field>
         </div>
 
         <!-- 保存文件名 -->
         <div class="setting-section">
-          <v-text-field
+          <mat-text-field
             v-model="settings.saveFilenameTemplate"
+            class="w-full"
             label="保存文件名"
             placeholder="例如: [DD]_YYYY-MM-DD_HH-mm-ss"
             variant="outlined"
             color="primary"
-            density="comfortable"
-            :hint="`预览：${previewFilenameResult}`"
-            persistent-hint
-            clearable
+            :supporting-text="`预览：${previewFilenameResult}`"
           >
-            <template #append-inner>
-              <v-tooltip
+            <template #trailing>
+              <mat-tooltip
+                rich
                 location="bottom"
-                open-on-click
               >
-                <template #activator="{ props }">
-                  <v-icon
-                    v-bind="props"
-                    icon="help_outline"
-                    size="small"
+                <template #activator>
+                  <mat-icon
+                    icon="help"
                     class="mr-2 cursor-pointer"
+                    aria-label="日期变量说明"
                   />
                 </template>
-                <div class="text-body-small">
-                  <div class="mb-2">
-                    日期变量说明：
-                  </div>
-                  <div>使用 dayjs 日期格式</div>
-                  <div>YYYY - 年份 (e.g. 2024)</div>
-                  <div>MM - 月份 (01-12)</div>
-                  <div>DD - 日期 (01-31)</div>
-                  <div>HH - 小时 (00-23)</div>
-                  <div>mm - 分钟 (00-59)</div>
-                  <div>ss - 秒 (00-59)</div>
-                  <div class="mt-2">
-                    留空则使用默认时间戳格式
-                  </div>
+                <template #subhead>
+                  日期变量说明
+                </template>
+                <div>使用 dayjs 日期格式</div>
+                <div>YYYY - 年份 (e.g. 2024)</div>
+                <div>MM - 月份 (01-12)</div>
+                <div>DD - 日期 (01-31)</div>
+                <div>HH - 小时 (00-23)</div>
+                <div>mm - 分钟 (00-59)</div>
+                <div>ss - 秒 (00-59)</div>
+                <div class="mt-1">
+                  留空则使用默认时间戳格式
                 </div>
-              </v-tooltip>
+              </mat-tooltip>
             </template>
-          </v-text-field>
+          </mat-text-field>
         </div>
 
         <!-- 保存格式 -->
         <div class="setting-section">
-          <v-select
+          <mat-select
             v-model="settings.saveFormat"
+            class="w-full"
             :items="formatOptions"
             label="保存格式"
             variant="outlined"
             color="primary"
-            density="comfortable"
           />
         </div>
 
         <!-- 响应速度设置 -->
         <div class="setting-section">
-          <v-switch
-            v-model="settings.fastResponse"
-            label="快速响应模式"
-            color="primary"
-          >
-            <template #append>
-              <v-tooltip
-                location="bottom"
-                text="开启后常驻后台，极大缩短截图响应时间 (推荐)"
-              >
-                <template #activator="{ props }">
-                  <v-icon
-                    v-bind="props"
-                    icon="help_outline"
-                    size="small"
-                    class="ml-2"
-                  />
-                </template>
-              </v-tooltip>
-            </template>
-          </v-switch>
+          <div class="flex items-center">
+            <mat-switch
+              v-model="settings.fastResponse"
+              color="primary"
+            >
+              快速响应模式
+            </mat-switch>
+            <mat-tooltip content="开启后常驻后台，极大缩短截图响应时间 (推荐)">
+              <template #activator>
+                <mat-icon
+                  icon="help"
+                  class="ml-2 cursor-pointer"
+                  aria-label="快速响应模式说明"
+                />
+              </template>
+            </mat-tooltip>
+          </div>
         </div>
 
         <!-- 捕获鼠标 -->
         <div class="setting-section">
-          <v-switch
+          <mat-switch
             v-model="settings.captureCursor"
-            label="捕获鼠标"
             color="primary"
-          />
+          >
+            捕获鼠标
+          </mat-switch>
         </div>
 
         <!-- HDR 映射设置组 -->
         <div class="setting-section">
-          <v-switch
-            v-model="settings.enableHdrMapping"
-            label="启用 HDR 映射"
-            color="primary"
-          >
-            <template #append>
-              <v-tooltip
-                location="bottom"
-                text="对 HDR 屏幕应用自定义的色调映射参数"
-              >
-                <template #activator="{ props }">
-                  <v-icon
-                    v-bind="props"
-                    icon="help_outline"
-                    size="small"
-                    class="ml-2"
-                  />
-                </template>
-              </v-tooltip>
-            </template>
-          </v-switch>
+          <div class="flex items-center">
+            <mat-switch
+              v-model="settings.enableHdrMapping"
+              color="primary"
+            >
+              启用 HDR 映射
+            </mat-switch>
+            <mat-tooltip content="对 HDR 屏幕应用自定义的色调映射参数">
+              <template #activator>
+                <mat-icon
+                  icon="help"
+                  class="ml-2 cursor-pointer"
+                  aria-label="启用 HDR 映射说明"
+                />
+              </template>
+            </mat-tooltip>
+          </div>
 
           <!-- HDR 映射子设置，仅在启用时显示 -->
-          <v-expand-transition>
+          <mat-expand-transition>
             <div
               v-show="settings.enableHdrMapping"
-              class="hdr-mapping-options mt-4 ml-4"
+              class="hdr-mapping-options ml-4"
             >
               <!-- SDR 输出最大值 -->
               <div class="slider-setting mb-4">
                 <div class="slider-header">
                   <span class="slider-label">SDR 输出最大值</span>
-                  <div class="d-flex align-center ga-2">
-                    <v-chip
-                      size="small"
+                  <div class="flex items-center gap-2">
+                    <mat-chip
+                      variant="assist"
                       color="primary"
-                      variant="tonal"
                     >
                       {{ sliderState.sdrWhiteNits }} nits
-                    </v-chip>
-                    <v-btn
+                    </mat-chip>
+                    <mat-btn
                       size="small"
                       variant="text"
                       color="primary"
@@ -194,18 +194,18 @@
                       @click="applySystemSdrWhiteNits"
                     >
                       使用系统值
-                    </v-btn>
+                    </mat-btn>
                   </div>
                 </div>
-                <v-slider
+                <mat-slider
                   v-model="sliderState.sdrWhiteNits"
+                  aria-label="SDR 输出最大值"
                   :min="80"
                   :max="400"
                   :step="1"
                   color="primary"
-                  thumb-label
-                  hide-details
-                  @end="settings.sdrWhiteNits = sliderState.sdrWhiteNits"
+                  show-value-indicator
+                  @change="settings.sdrWhiteNits = sliderState.sdrWhiteNits"
                 >
                   <template #prepend>
                     <span class="slider-range-label">80</span>
@@ -213,8 +213,8 @@
                   <template #append>
                     <span class="slider-range-label">400</span>
                   </template>
-                </v-slider>
-                <div class="slider-hint text-body-small text-grey">
+                </mat-slider>
+                <div class="slider-hint">
                   {{ systemSdrWhiteHint }}
                 </div>
               </div>
@@ -223,23 +223,22 @@
               <div class="slider-setting mb-4">
                 <div class="slider-header">
                   <span class="slider-label">HDR 输入最大值</span>
-                  <v-chip
-                    size="small"
+                  <mat-chip
+                    variant="assist"
                     color="primary"
-                    variant="tonal"
                   >
                     {{ sliderState.hdrMaxNits }} nits
-                  </v-chip>
+                  </mat-chip>
                 </div>
-                <v-slider
+                <mat-slider
                   v-model="sliderState.hdrMaxNits"
+                  aria-label="HDR 输入最大值"
                   :min="400"
                   :max="2000"
                   :step="10"
                   color="primary"
-                  thumb-label
-                  hide-details
-                  @end="settings.hdrMaxNits = sliderState.hdrMaxNits"
+                  show-value-indicator
+                  @change="settings.hdrMaxNits = sliderState.hdrMaxNits"
                 >
                   <template #prepend>
                     <span class="slider-range-label">400</span>
@@ -247,51 +246,51 @@
                   <template #append>
                     <span class="slider-range-label">2000</span>
                   </template>
-                </v-slider>
-                <div class="slider-hint text-body-small text-grey">
+                </mat-slider>
+                <div class="slider-hint">
                   HDR 内容的最大输入亮度，通常为你的显示器标称值
                 </div>
               </div>
 
               <!-- 保存 HDR 原始文件 -->
-              <v-switch
+              <mat-switch
                 v-model="settings.preserveHdr"
-                label="保存 HDR 原始文件"
                 color="primary"
-                density="compact"
-              />
+              >
+                保存 HDR 原始文件
+              </mat-switch>
             </div>
-          </v-expand-transition>
+          </mat-expand-transition>
         </div>
 
-        <v-divider class="my-4" />
+        <mat-divider class="my-4" />
         <!-- 操作按钮 -->
         <div class="action-buttons mt-6 flex gap-x-2">
-          <v-btn
+          <mat-btn
             class="grow"
+            variant="filled"
             color="primary"
             size="large"
+            prefix="camera"
             @click="startCapture()"
           >
-            <v-icon start>
-              camera
-            </v-icon>
             开始截图
-          </v-btn>
+          </mat-btn>
 
-          <v-btn
+          <mat-btn
             v-if="showDebugUi"
-            class="shrink-none"
+            class="shrink-0"
+            variant="filled"
             color="primary"
             size="large"
             @click="startCapture(true)"
           >
             overlay debug
-          </v-btn>
+          </mat-btn>
         </div>
-      </v-card-text>
-    </v-card>
-  </v-container>
+      </mat-card-content>
+    </mat-card>
+  </div>
 </template>
 
 <script setup>
@@ -512,13 +511,19 @@ const startCapture = async (isDebug = false) => {
   padding: 16px;
 }
 
+.settings-card {
+  padding: 4px;
+}
+
 .setting-section {
   margin-bottom: 16px;
 }
 
 /* HDR 映射设置样式 */
+/* 折叠内容根元素用内边距承载纵向间距，避免折叠首尾跳变 */
 .hdr-mapping-options {
   padding-left: 16px;
+  padding-top: 16px;
 }
 
 .slider-setting {
@@ -539,13 +544,15 @@ const startCapture = async (isDebug = false) => {
 
 .slider-range-label {
   font-size: .75rem;
-  color: rgb(var(--v-theme-on-surface) / 60%);
+  color: var(--mat-sys-color-on-surface-variant);
   min-width: 32px;
   text-align: center;
 }
 
 .slider-hint {
   margin-top: 4px;
-  opacity: .7;
+  font-size: .75rem;
+  color: var(--mat-sys-color-on-surface-variant);
+  opacity: .8;
 }
 </style>

@@ -87,8 +87,8 @@ importers:
         specifier: ^2.2.3
         version: 2.2.3
       mde-vue:
-        specifier: git+https://github.com/slime7/mde-vue.git#ecc12c131ae567a3de297800a7d99180b2ad3f72
-        version: https://codeload.github.com/slime7/mde-vue/tar.gz/ecc12c131ae567a3de297800a7d99180b2ad3f72(tailwindcss@4.1.18)(vue@3.5.40(typescript@5.9.3))
+        specifier: git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda
+        version: https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda(tailwindcss@4.1.18)(vue@3.5.40(typescript@5.9.3))
       pinia:
         specifier: ^2.3.1
         version: 2.3.1(typescript@5.9.3)(vue@3.5.40(typescript@5.9.3))
@@ -236,8 +236,8 @@ importers:
         specifier: ^16.0.0
         version: 16.5.0
       mde-vue:
-        specifier: git+https://github.com/slime7/mde-vue.git#ecc12c131ae567a3de297800a7d99180b2ad3f72
-        version: https://codeload.github.com/slime7/mde-vue/tar.gz/ecc12c131ae567a3de297800a7d99180b2ad3f72(tailwindcss@4.2.2)(vue@3.5.13(typescript@5.9.3))
+        specifier: git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda
+        version: https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda(tailwindcss@4.2.2)(vue@3.5.13(typescript@5.9.3))
       postcss-html:
         specifier: ^1.5.0
         version: 1.8.0
@@ -427,6 +427,9 @@ importers:
       eslint-plugin-vue:
         specifier: ^10.0.0
         version: 10.6.2(@stylistic/eslint-plugin@5.10.0(eslint@9.24.0(jiti@2.6.1)))(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.6.1))(typescript@5.9.3))(eslint@9.24.0(jiti@2.6.1))(vue-eslint-parser@10.4.0(eslint@9.24.0(jiti@2.6.1)))
+      mde-vue:
+        specifier: git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda
+        version: https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda(tailwindcss@4.1.18)(vue@3.5.40(typescript@5.9.3))
       rimraf:
         specifier: ^4.4.1
         version: 4.4.1
@@ -439,18 +442,12 @@ importers:
       vite-plugin-css-injected-by-js:
         specifier: ^3.4.0
         version: 3.4.0(vite@8.2.0(@types/node@22.14.1)(esbuild@0.27.2)(jiti@2.6.1)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))
-      vite-plugin-vuetify:
-        specifier: ^2.1.3
-        version: 2.1.3(vite@8.2.0(@types/node@22.14.1)(esbuild@0.27.2)(jiti@2.6.1)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))(vue@3.5.40(typescript@5.9.3))(vuetify@4.1.7)
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.14.1)(jsdom@27.4.0)(vite@8.2.0(@types/node@22.14.1)(esbuild@0.27.2)(jiti@2.6.1)(sass-embedded@1.97.1)(sass@1.97.1)(terser@5.39.0))
       vue:
         specifier: ^3.5.40
         version: 3.5.40(typescript@5.9.3)
-      vuetify:
-        specifier: ^4.1.7
-        version: 4.1.7(typescript@5.9.3)(vite-plugin-vuetify@2.1.3)(vue@3.5.40(typescript@5.9.3))
 
   packages/translime-plugin-mahjong-2-emoji:
     dependencies:
@@ -4937,8 +4934,8 @@ packages:
   mathml-tag-names@2.1.3:
     resolution: {integrity: sha512-APMBEanjybaPzUrfqU0IMU5I0AswKMH7k8OTLs0vvV4KZpExkTkY87nR/zpbuTPj+gARop7aGUbl11pnDfW6xg==}
 
-  mde-vue@https://codeload.github.com/slime7/mde-vue/tar.gz/ecc12c131ae567a3de297800a7d99180b2ad3f72:
-    resolution: {tarball: https://codeload.github.com/slime7/mde-vue/tar.gz/ecc12c131ae567a3de297800a7d99180b2ad3f72}
+  mde-vue@https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda:
+    resolution: {tarball: https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda}
     version: 0.1.0
     engines: {node: '>=24 <25', pnpm: '>=10.28.0'}
     peerDependencies:
@@ -12004,14 +12001,14 @@ snapshots:
 
   mathml-tag-names@2.1.3: {}
 
-  mde-vue@https://codeload.github.com/slime7/mde-vue/tar.gz/ecc12c131ae567a3de297800a7d99180b2ad3f72(tailwindcss@4.1.18)(vue@3.5.40(typescript@5.9.3)):
+  mde-vue@https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda(tailwindcss@4.1.18)(vue@3.5.40(typescript@5.9.3)):
     dependencies:
       '@material/material-color-utilities': 0.4.0
       vue: 3.5.40(typescript@5.9.3)
     optionalDependencies:
       tailwindcss: 4.1.18
 
-  mde-vue@https://codeload.github.com/slime7/mde-vue/tar.gz/ecc12c131ae567a3de297800a7d99180b2ad3f72(tailwindcss@4.2.2)(vue@3.5.13(typescript@5.9.3)):
+  mde-vue@https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda(tailwindcss@4.2.2)(vue@3.5.13(typescript@5.9.3)):
     dependencies:
       '@material/material-color-utilities': 0.4.0
       vue: 3.5.13(typescript@5.9.3)

@@ -148,7 +148,7 @@ manifest 声明 `plugin.isolated: true` 时，插件主进程代码运行在独�
 
 - 插件 ID 全局唯一且等于包名。
 - 激活时机必须声明，不把重初始化堆到启动阶段；`engines.translime` 缺省兼容，声明即校验。
-- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 mde-vue，插件 UI 继续基于 Vuetify 4——Vuetify 的组件/指令运行时（`window.vuetify$`）与 `--v-theme-*` 主题变量由宿主提供，插件不打包 Vuetify。
+- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 mde-vue。插件 UI 可基于 Vuetify 4（兼容存量，宿主提供 `window.vuetify$` 运行时与 `--v-theme-*` 主题变量），也可基于 mde-vue（宿主提供 `window.mde$` 运行时，需 `engines.translime >= 0.7.0`）；两组运行时均由宿主提供，插件不打包组件库。
 - 宿主页面带 CSP 基线（禁远程脚本，`script-src 'self' 'unsafe-eval' blob:`），后续目标是移除 `unsafe-eval`。
 - `main-renderer-ready` 只允许主窗口首屏完成后触发，插件渲染页不得重复触发。
 - 真实宿主是主要验证环境，preview 模式不替代宿主内验证。
