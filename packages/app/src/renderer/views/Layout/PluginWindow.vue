@@ -147,10 +147,6 @@ export default {
 .scroll-content {
   min-height: 0;
   overflow-y: auto;
-
-  &::-webkit-scrollbar {
-    background-color: transparent;
-  }
 }
 
 .scroll-content--plugin-window {
