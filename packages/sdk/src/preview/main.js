@@ -202,9 +202,15 @@ export async function startPreview(pluginComponent, options = {}) {
     });
     const mdeComponents = {};
     const mdeDirectives = {};
+    const mdeFunctions = {};
+    const matFunctionNames = new Set(['snackbar', 'toast', 'dialog', 'alert', 'confirm', 'prompt']);
     Object.entries(mdeVue).forEach(([name, exported]) => {
       if (name === 'Intersection' || name === 'StateLayer') {
         mdeDirectives[name] = exported;
+        return;
+      }
+      if (matFunctionNames.has(name) && typeof exported === 'function') {
+        mdeFunctions[name] = exported;
         return;
       }
       if (/^(Mat|Mde)[A-Z]/.test(name)) {
@@ -214,6 +220,7 @@ export async function startPreview(pluginComponent, options = {}) {
     window.mde$ = {
       components: mdeComponents,
       directives: mdeDirectives,
+      functions: mdeFunctions,
       theme: matUi.theme,
     };
   } catch {

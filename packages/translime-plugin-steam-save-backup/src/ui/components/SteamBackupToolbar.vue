@@ -1,42 +1,87 @@
 <template>
-  <v-toolbar
-    density="compact"
-    color="transparent"
-    class="mb-4"
-  >
-    <v-toolbar-title class="text-2xl font-bold text-primary">
-      Steam 存档备份
-    </v-toolbar-title>
+  <div class="flex items-center gap-2">
+    <template v-if="collapsed">
+      <mat-tooltip
+        content="打开备份目录"
+        location="bottom"
+      >
+        <template #activator>
+          <mat-btn
+            icon="folder_open"
+            variant="filled-tonal"
+            :loading="openDirLoading"
+            aria-label="打开备份目录"
+            @click="$emit('open-backup-dir')"
+          />
+        </template>
+      </mat-tooltip>
 
-    <v-spacer />
+      <mat-tooltip
+        content="手动添加存档目录"
+        location="bottom"
+      >
+        <template #activator>
+          <mat-btn
+            icon="create_new_folder"
+            variant="filled-tonal"
+            aria-label="手动添加存档目录"
+            @click="$emit('add-custom-dir')"
+          />
+        </template>
+      </mat-tooltip>
 
-    <v-btn
-      prepend-icon="folder_open"
-      variant="tonal"
-      color="secondary"
-      class="mr-2"
-      :loading="openDirLoading"
-      @click="$emit('open-backup-dir')"
-    >
-      打开备份目录
-    </v-btn>
+      <mat-tooltip
+        content="刷新列表"
+        location="bottom"
+      >
+        <template #activator>
+          <mat-btn
+            icon="refresh"
+            variant="filled-tonal"
+            :loading="scanLoading"
+            aria-label="刷新列表"
+            @click="$emit('scan-games')"
+          />
+        </template>
+      </mat-tooltip>
+    </template>
 
-    <v-btn
-      prepend-icon="refresh"
-      variant="tonal"
-      color="primary"
-      :loading="scanLoading"
-      @click="$emit('scan-games')"
-    >
-      刷新列表
-    </v-btn>
-  </v-toolbar>
+    <template v-else>
+      <mat-btn
+        variant="filled-tonal"
+        prefix="folder_open"
+        :loading="openDirLoading"
+        @click="$emit('open-backup-dir')"
+      >
+        打开备份目录
+      </mat-btn>
+
+      <mat-btn
+        variant="filled-tonal"
+        prefix="create_new_folder"
+        @click="$emit('add-custom-dir')"
+      >
+        手动添加
+      </mat-btn>
+
+      <mat-btn
+        variant="filled-tonal"
+        prefix="refresh"
+        :loading="scanLoading"
+        @click="$emit('scan-games')"
+      >
+        刷新列表
+      </mat-btn>
+    </template>
+  </div>
 </template>
 
 <script setup>
-import { useVuetifyComponents } from 'translime-sdk';
-
 defineProps({
+  collapsed: {
+    type: Boolean,
+    default: false,
+  },
   openDirLoading: {
     type: Boolean,
     default: false,
@@ -47,11 +92,5 @@ defineProps({
   },
 });
 
-defineEmits(['open-backup-dir', 'scan-games']);
-
-const vuetifyComponents = useVuetifyComponents();
-const VBtn = vuetifyComponents.VBtn;
-const VSpacer = vuetifyComponents.VSpacer;
-const VToolbar = vuetifyComponents.VToolbar;
-const VToolbarTitle = vuetifyComponents.VToolbarTitle;
+defineEmits(['open-backup-dir', 'add-custom-dir', 'scan-games']);
 </script>

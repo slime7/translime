@@ -166,9 +166,10 @@ ipc.on('data-changed', (data) => { ... }); // 接收主进程 sendToClient 推�
 - `useVuetify()`: 获取 Vuetify 实例。
 - `useVuetifyComponents()`: 获取所有 Vuetify 组件。
 - `useVuetifyDirectives()`: 获取所有 Vuetify 指令。
-- `useMat()` / `useMde()`: 获取宿主提供的 mde-vue 运行时（`{ components, directives, theme }`）。
+- `useMat()` / `useMde()`: 获取宿主提供的 mde-vue 运行时（`{ components, directives, functions, theme }`）。
 - `useMatComponents()`: 获取所有宿主注册的 mde-vue 组件（mat-* / mde-*）。
 - `useMatDirectives()`: 获取 mde-vue 指令（`v-intersection` / `v-state-layer`）。
+- `useMatFunctions()`: 获取 mde-vue 命令式函数（`snackbar` / `toast` / `dialog` / `alert` / `confirm` / `prompt`）。
 - `useDialog()`: 获取 Electron 对话框 API。
 - `useShell()`: 获取 Shell API。
 - `getPluginSetting(...args)`: 获取插件设置。
@@ -203,6 +204,18 @@ const { MatBtn } = useMatComponents();
 - SDK 的 Vite 插件会扫描插件源码中的 `mat-*` / `mde-*` 标签与 `Mat*` / `Mde*` 组件引用，并从 `window.mde$.components` 自动注入，行为与 Vuetify 支持完全一致。
 - 宿主与 preview Shell 都通过 `createMatUi` 全局注册了所有 `mat-*` / `Mat*` 组件及 `v-intersection`、`v-state-layer` 指令。
 - `window.mde$.theme` 是宿主的 mde-vue 主题控制器（Material 2025 动态主题），可用于读取或跟随宿主的种子色、明暗模式与配色变体。
+- `window.mde$.functions` 暴露 mde-vue 的命令式函数，推荐通过 `useMatFunctions()` 获取；不可用时返回空对象，调用前应判空：
+
+```javascript
+import { useMatFunctions } from 'translime-sdk';
+
+const mat = useMatFunctions();
+const ok = mat.confirm ? await mat.confirm({ title: '删除备份', content: '此操作不可撤销' }) : false;
+if (ok) {
+  // 执行删除
+}
+```
+
 - 插件本地 preview 想启用 mde 时，在插件中安装 `mde-vue`（GitHub 仓库依赖）即可；未安装时 preview 自动跳过 mde 能力。
 
 ### 通用 (Common)

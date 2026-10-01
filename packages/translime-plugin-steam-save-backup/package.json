@@ -1,6 +1,7 @@
 {
+  "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
   "name": "translime-plugin-steam-save-backup",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Steam 游戏存档备份与还原插件",
   "license": "MIT",
   "repository": {
@@ -16,6 +17,9 @@
     "translime-plugin"
   ],
   "main": "./dist/index.cjs.js",
+  "engines": {
+    "translime": ">=0.7.0"
+  },
   "exports": {
     ".": {
       "require": "./dist/index.cjs.js"
@@ -32,27 +36,33 @@
     "build": "npm run build:plugin && npm run build:ui",
     "preview:plugin": "vite build --mode preview",
     "preview:ui": "vite build -c ui.vite.config.mjs --mode preview",
-    "preview": "npm run preview:plugin && npm run preview:ui"
+    "preview": "npm run preview:plugin && npm run preview:ui",
+    "test": "pnpm exec vitest run -c vitest.config.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",
     "electron": "~39.2.4",
+    "mde-vue": "git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda",
     "translime-sdk": "workspace:*",
     "vite": "^8.2.0",
     "vite-plugin-css-injected-by-js": "^3.4.0",
-    "vue": "^3.5.40",
-    "vuetify": "^4.1.7"
+    "vitest": "4.1.10",
+    "vue": "^3.5.40"
   },
   "plugin": {
     "title": "Steam Save Backup",
     "description": "备份和还原 Steam 游戏存档",
     "icon": "src/icon.svg",
+    "activationEvents": [
+      "onView"
+    ],
+    "dependencies": [],
+    "optionalDependencies": [],
     "ui": "dist/ui.esm.js"
   },
   "peerDependencies": {
     "electron": "~39.2.4",
-    "vue": "^3.5.40",
-    "vuetify": "^4.1.7"
+    "vue": "^3.5.40"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",

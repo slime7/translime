@@ -1,36 +1,50 @@
 <template>
-  <v-container
-    fluid
-    class="h-full p-4"
+  <mat-layout
+    ref="layoutRef"
+    class="save-backup-page"
+    :class="{ 'preview-mode': previewMode }"
   >
-    <SteamBackupToolbar
-      :open-dir-loading="loading.openDir"
-      :scan-loading="loading.scan"
-      @open-backup-dir="openBackupDir"
-      @scan-games="scanGames"
-    />
+    <mat-app-bar
+      variant="small"
+      :scroll-target="layoutRef"
+    >
+      <span class="page-bar-title">Steam 存档备份</span>
 
-    <LoadingState v-if="loading.scan && games.length === 0" />
+      <template #trailing>
+        <SteamBackupToolbar
+          :collapsed="collapsed"
+          :open-dir-loading="loading.openDir"
+          :scan-loading="loading.scan"
+          @open-backup-dir="openBackupDir"
+          @add-custom-dir="customDirOpen = true"
+          @scan-games="scanGames"
+        />
+      </template>
+    </mat-app-bar>
 
-    <GameGrid
-      v-if="visibleGames.length > 0"
-      :games="visibleGames"
-      :exclude-loading="loading.exclude"
-      @open-game="openGameDetails"
-      @exclude-game="excludeGame"
-    />
+    <main class="save-backup-content">
+      <LoadingState v-if="loading.scan && games.length === 0" />
 
-    <HiddenGamesPanel
-      v-if="hiddenGames.length > 0"
-      :games="hiddenGames"
-      :exclude-loading="loading.exclude"
-      @include-game="includeGame"
-    />
+      <GameGrid
+        v-if="visibleGames.length > 0"
+        :games="visibleGames"
+        :exclude-loading="loading.exclude"
+        @open-game="openGameDetails"
+        @exclude-game="excludeGame"
+      />
 
-    <EmptyGamesState
-      v-if="!loading.scan && visibleGames.length === 0 && hiddenGames.length === 0"
-      @scan="scanGames"
-    />
+      <HiddenGamesPanel
+        v-if="hiddenGames.length > 0"
+        :games="hiddenGames"
+        :exclude-loading="loading.exclude"
+        @include-game="includeGame"
+      />
+
+      <EmptyGamesState
+        v-if="!loading.scan && visibleGames.length === 0 && hiddenGames.length === 0"
+        @scan="scanGames"
+      />
+    </main>
 
     <GameDetailsDialog
       v-model="dialog.show"
@@ -45,24 +59,21 @@
       @edit-note="openNoteDialog"
     />
 
-    <v-snackbar
-      v-model="snackbar.show"
-      :color="snackbar.color"
-      timeout="3000"
-      location="top"
-    >
-      {{ snackbar.text }}
+    <CustomSaveDirsDialog
+      v-model="customDirOpen"
+      @changed="scanGames"
+    />
 
-      <template #actions>
-        <v-btn
-          color="white"
-          variant="text"
-          @click="snackbar.show = false"
-        >
-          关闭
-        </v-btn>
-      </template>
-    </v-snackbar>
+    <mat-snackbar
+      v-model="snackbar.show"
+      :duration="3000"
+      closable
+    >
+      <!-- snackbar 同样被 Teleport 到 @scope 隔离范围之外，样式必须内联 -->
+      <span :style="snackbar.color === 'error' ? 'color: var(--mat-sys-color-inverse-primary)' : undefined">
+        {{ snackbar.text }}
+      </span>
+    </mat-snackbar>
 
     <NoteDialog
       v-model="noteDialog.show"
@@ -76,12 +87,18 @@
       :dialog="confirmDialog"
       @confirm="handleConfirm"
     />
-  </v-container>
+  </mat-layout>
 </template>
 
 <script setup>
-import { useVuetifyComponents } from 'translime-sdk';
+import {
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from 'vue';
+import { isPreviewMode } from 'translime-sdk';
 import ConfirmDialog from './components/ConfirmDialog.vue';
+import CustomSaveDirsDialog from './components/CustomSaveDirsDialog.vue';
 import EmptyGamesState from './components/EmptyGamesState.vue';
 import GameDetailsDialog from './components/GameDetailsDialog.vue';
 import GameGrid from './components/GameGrid.vue';
@@ -91,10 +108,28 @@ import NoteDialog from './components/NoteDialog.vue';
 import SteamBackupToolbar from './components/SteamBackupToolbar.vue';
 import useSteamSaveBackup from './composables/useSteamSaveBackup';
 
-const vuetifyComponents = useVuetifyComponents();
-const VBtn = vuetifyComponents.VBtn;
-const VContainer = vuetifyComponents.VContainer;
-const VSnackbar = vuetifyComponents.VSnackbar;
+defineOptions({
+  name: 'SteamSaveBackupUi',
+});
+
+const layoutRef = ref(null);
+const collapsed = ref(false);
+const customDirOpen = ref(false);
+const previewMode = isPreviewMode();
+
+let resizeObserver;
+
+onMounted(() => {
+  // 按插件页面实际宽度收缩工具栏为图标按钮，兼容内嵌 webview 与独立窗口两种宿主形态
+  resizeObserver = new ResizeObserver((entries) => {
+    collapsed.value = entries[0].contentRect.width < 640;
+  });
+  resizeObserver.observe(layoutRef.value?.$el ?? layoutRef.value);
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+});
 
 const {
   loading,
@@ -132,16 +167,31 @@ const {
 </style>
 
 <style scoped>
-.overflow-y-auto::-webkit-scrollbar {
-  width: 8px;
+.save-backup-page {
+  /* 插件文档即整个视口（内嵌 webview / 独立窗口）：高度锚定 dvh，
+     不依赖宿主 #app 高度链，任何一环失效都不会退化成文档+内层双层滚动。
+     首行 100% 作为不支持 dvh 引擎的回退 */
+  height: 100%;
+  height: 100dvh;
+  box-sizing: border-box;
+  /* 滚动容器是 layout 根本身：滚动条贴边，避免出现在内容 padding 内 */
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
-.overflow-y-auto::-webkit-scrollbar-thumb {
-  background-color: rgb(0 0 0 / 20%);
-  border-radius: 4px;
+/* preview shell 中插件位于 v-main 内容区，不是全视口，回退为跟随容器 */
+.save-backup-page.preview-mode {
+  height: 100%;
 }
 
-.text-break-all {
-  word-break: break-all;
+.page-bar-title {
+  color: var(--mat-sys-color-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.save-backup-content {
+  padding: 16px;
 }
 </style>

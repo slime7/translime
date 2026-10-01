@@ -1,92 +1,59 @@
 <template>
-  <v-dialog
+  <!-- mat-dialog 内容被 Teleport 到宿主 @scope 隔离范围之外，样式必须内联 -->
+  <mat-dialog
     v-model="visible"
-    max-width="800px"
-    scrollable
-    transition="dialog-bottom-transition"
+    width="800px"
+    close-on-back
+    :title="dialogTitle"
   >
-    <v-card
-      v-if="selectedGame"
-      class="rounded-2xl"
-      rounded
-      height="80vh"
+    <save-paths-panel :game="selectedGame" />
+
+    <div
+      v-if="!canBackup"
+      role="status"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-tertiary-container); color: var(--mat-sys-color-on-tertiary-container)"
     >
-      <v-toolbar
-        color="primary"
-        density="compact"
-        class="grow-0"
+      <mat-icon icon="warning" />
+      <span>
+        无法自动定位该游戏的存档路径，暂不支持备份。可在主页面工具栏“手动添加”中为该游戏指定存档目录。
+      </span>
+    </div>
+
+    <backup-list
+      :backups="backups"
+      :loading="loading"
+      :format-time="formatTime"
+      @restore="$emit('restore', $event)"
+      @edit-note="$emit('edit-note', $event)"
+      @delete="$emit('delete', $event)"
+    />
+
+    <template #actions>
+      <mat-spacer />
+
+      <mat-btn
+        variant="text"
+        @click="visible = false"
       >
-        <v-toolbar-title>
-          ({{ selectedGame.appid }}){{ selectedGame.name }} - 备份管理
-        </v-toolbar-title>
+        关闭
+      </mat-btn>
 
-        <template #append>
-          <div class="flex gap-1">
-            <v-btn
-              icon
-              @click="visible = false"
-            >
-              <v-icon>close</v-icon>
-            </v-btn>
-          </div>
-        </template>
-      </v-toolbar>
-
-      <v-card-text class="p-0 grow-1 overflow-y-auto">
-        <save-paths-panel :game="selectedGame" />
-
-        <v-alert
-          v-if="!canBackup"
-          color="tertiary-container"
-          variant="tonal"
-          class="m-4"
-          icon="warning"
-        >
-          <span class="text-[rgb(var(--v-theme-on-tertiary-container))]">
-            无法自动定位该游戏的存档路径，暂不支持备份。
-          </span>
-        </v-alert>
-
-        <backup-list
-          :backups="backups"
-          :loading="loading"
-          :format-time="formatTime"
-          @restore="$emit('restore', $event)"
-          @edit-note="$emit('edit-note', $event)"
-          @delete="$emit('delete', $event)"
-        />
-      </v-card-text>
-
-      <v-divider />
-
-      <v-card-actions class="pa-4">
-        <v-spacer />
-
-        <v-btn
-          variant="text"
-          @click="visible = false"
-        >
-          关闭
-        </v-btn>
-
-        <v-btn
-          color="primary"
-          prepend-icon="cloud_upload"
-          variant="elevated"
-          :loading="loading.backup"
-          :disabled="!canBackup"
-          @click="$emit('backup')"
-        >
-          立即备份
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+      <mat-btn
+        variant="filled"
+        color="primary"
+        prefix="cloud_upload"
+        :loading="loading.backup"
+        :disabled="!canBackup"
+        @click="$emit('backup')"
+      >
+        立即备份
+      </mat-btn>
+    </template>
+  </mat-dialog>
 </template>
 
 <script setup>
 import { computed } from 'vue';
-import { useVuetifyComponents } from 'translime-sdk';
 import BackupList from './BackupList.vue';
 import SavePathsPanel from './SavePathsPanel.vue';
 
@@ -130,16 +97,12 @@ const visible = computed({
   set: (value) => emit('update:modelValue', value),
 });
 
-const vuetifyComponents = useVuetifyComponents();
-const VAlert = vuetifyComponents.VAlert;
-const VBtn = vuetifyComponents.VBtn;
-const VCard = vuetifyComponents.VCard;
-const VCardActions = vuetifyComponents.VCardActions;
-const VCardText = vuetifyComponents.VCardText;
-const VDialog = vuetifyComponents.VDialog;
-const VDivider = vuetifyComponents.VDivider;
-const VIcon = vuetifyComponents.VIcon;
-const VSpacer = vuetifyComponents.VSpacer;
-const VToolbar = vuetifyComponents.VToolbar;
-const VToolbarTitle = vuetifyComponents.VToolbarTitle;
+const dialogTitle = computed(() => {
+  if (!props.selectedGame) {
+    return '备份管理';
+  }
+  return props.selectedGame.isCustom
+    ? `${props.selectedGame.name} - 备份管理`
+    : `(${props.selectedGame.appid}) ${props.selectedGame.name} - 备份管理`;
+});
 </script>

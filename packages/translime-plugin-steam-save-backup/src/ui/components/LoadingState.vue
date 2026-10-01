@@ -1,27 +1,28 @@
 <template>
-  <v-row>
-    <v-col
-      cols="12"
-      class="text-center mt-10"
-    >
-      <v-progress-circular
-        indeterminate
-        color="primary"
-        size="64"
-      />
+  <div class="text-center mt-10">
+    <mat-progress
+      variant="circular"
+      indeterminate
+      :size="64"
+      class="loading-spinner"
+      aria-label="正在扫描 Steam 游戏"
+    />
 
-      <div class="mt-4 text-[rgb(var(--v-theme-on-surface-variant))]">
-        正在扫描 Steam 游戏...
-      </div>
-    </v-col>
-  </v-row>
+    <div class="loading-text mt-4">
+      正在扫描 Steam 游戏...
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { useVuetifyComponents } from 'translime-sdk';
-
-const vuetifyComponents = useVuetifyComponents();
-const VCol = vuetifyComponents.VCol;
-const VProgressCircular = vuetifyComponents.VProgressCircular;
-const VRow = vuetifyComponents.VRow;
 </script>
+
+<style scoped>
+.loading-spinner {
+  display: inline-block;
+}
+
+.loading-text {
+  color: var(--mat-sys-color-on-surface-variant);
+}
+</style>

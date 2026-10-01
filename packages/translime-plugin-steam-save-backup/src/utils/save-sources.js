@@ -58,10 +58,11 @@ export const createSteamCloudSource = (savePath, index = 0) => normalizeSaveSour
 export const createCustomDirectorySource = (source = {}, index = 0) => normalizeSaveSource({
   ...source,
   type: SAVE_SOURCE_TYPES.CUSTOM_DIRECTORY,
-  label: source.label || 'Custom Directory',
+  label: source.label || '自定义目录',
+  enabled: source.enabled !== false && Boolean(source.absolutePath),
   metadata: {
     ...(source.metadata || {}),
-    reserved: true,
+    custom: true,
   },
 }, index);
 
@@ -75,7 +76,7 @@ export const steamSavePathsToSaveSources = (savePaths = []) => {
 
 export const saveSourcesToSavePaths = (
   saveSources = [],
-  supportedTypes = [SAVE_SOURCE_TYPES.STEAM_CLOUD],
+  supportedTypes = [SAVE_SOURCE_TYPES.STEAM_CLOUD, SAVE_SOURCE_TYPES.CUSTOM_DIRECTORY],
 ) => {
   if (!Array.isArray(saveSources)) {
     return [];

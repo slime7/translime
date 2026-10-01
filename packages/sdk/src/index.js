@@ -220,7 +220,7 @@ export function useVuetifyDirectives() {
 
 /**
  * 获取宿主提供的 mde-vue 运行时
- * @description 仅在渲染进程环境可用，返回 { components, directives, theme }；
+ * @description 仅在渲染进程环境可用，返回 { components, directives, functions, theme }；
  * 组件/指令也可直接使用全局注册的 mat-* 标签与 v-intersection / v-state-layer 指令
  * @returns {Object} mde-vue 运行时对象
  */
@@ -251,6 +251,16 @@ export function useMatComponents() {
  */
 export function useMatDirectives() {
   return useMat().directives || {};
+}
+
+/**
+ * 获取 mde-vue 命令式函数（snackbar/toast/dialog/alert/confirm/prompt）
+ * @description 依赖宿主通过 window.mde$.functions 暴露；需要宿主支持且为渲染进程环境，
+ * 不可用时返回空对象，调用方应做空值兜底
+ * @returns {Record<string, Function>}
+ */
+export function useMatFunctions() {
+  return useMat().functions || {};
 }
 
 /**

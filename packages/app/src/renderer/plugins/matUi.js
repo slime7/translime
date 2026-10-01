@@ -27,9 +27,16 @@ const matUi = createMatUi({
 
 const components = {};
 const directives = {};
+// mde-vue 根入口的命令式函数（snackbar/toast/dialog/alert/confirm/prompt）
+const MAT_FUNCTION_NAMES = new Set(['snackbar', 'toast', 'dialog', 'alert', 'confirm', 'prompt']);
+const functions = {};
 Object.entries(mdeVue).forEach(([name, exported]) => {
   if (name === 'Intersection' || name === 'StateLayer') {
     directives[name] = exported;
+    return;
+  }
+  if (MAT_FUNCTION_NAMES.has(name) && typeof exported === 'function') {
+    functions[name] = exported;
     return;
   }
   if (/^(Mat|Mde)[A-Z]/.test(name)) {
@@ -40,12 +47,13 @@ Object.entries(mdeVue).forEach(([name, exported]) => {
 /**
  * 插件 UI 的 mde-vue 运行时（与 window.vuetify$ 对称）。
  * 插件构建时由 SDK 注入 window.mde$ 的解构（不打包 mde-vue），
- * 同时暴露主题控制器供插件读取或跟随宿主主题。
+ * 同时暴露命令式函数与主题控制器供插件使用或跟随宿主主题。
  */
 if (!window.mde$) {
   window.mde$ = {
     components,
     directives,
+    functions,
     theme: matUi.theme,
   };
 }

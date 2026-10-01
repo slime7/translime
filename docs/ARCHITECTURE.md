@@ -82,7 +82,7 @@ flowchart LR
 
 - 宿主 UI 基于 mde-vue（`plugins/matUi.js` 安装 `createMatUi`）：主题由 `useMatTheme` 主题控制器驱动，向 `document.documentElement` 写入 53 个 `--mat-sys-color-*` 令牌与 `data-mat-theme` 属性；明暗模式、种子色与配色变体（Expressive/TonalSpot/Vibrant/Neutral，M3 2025 规范）由 `hooks/useTheme.js` 双向同步。
 - 插件兼容层（`plugins/vuetify.js` + `plugins/vuetifyCompat.js`）：Vuetify 4 仍随宿主初始化，并向所有加载宿主页面的文档（主窗口、插件窗口、内嵌 webview）提供 `window.vuetify$`（components/labs/directives）；`hooks/useTheme.js` 通过 `mdColorHelper`（@material/material-color-utilities）把配色写入 Vuetify theme，保证插件 UI 与宿主配色一致。
-- `plugins/matUi.js` 同时向插件提供 mde-vue 运行时 `window.mde$`（components/directives/theme，与 `window.vuetify$` 对称），SDK 会把插件源码中的 `mat-*` / `mde-*` 组件引用注入为对该对象的解构；宿主与 SDK preview 均通过 `createMatUi` 全局注册 `mat-*` 组件与 `v-intersection`、`v-state-layer` 指令。
+- `plugins/matUi.js` 同时向插件提供 mde-vue 运行时 `window.mde$`（components/directives/functions/theme，functions 为 `snackbar()`/`dialog()`/`confirm()` 等命令式函数，与 `window.vuetify$` 对称），SDK 会把插件源码中的 `mat-*` / `mde-*` 组件引用注入为对该对象的解构；宿主与 SDK preview 均通过 `createMatUi` 全局注册 `mat-*` 组件与 `v-intersection`、`v-state-layer` 指令。
 - `views/plugins/`：插件列表、插件页与设置面板；`PluginRender.vue` 负责在 app renderer 中加载内嵌插件 UI，`EmbeddedPluginWebviews.vue` 负责在 `<webview>` 中加载插件 UI。
 - `utils/pluginStyleIsolation.js`：监听动态 `style`/`link` 节点，为内嵌插件样式保留插件 layer 并包裹 `@scope (.plugin-ui-loader[data-plugin-id="插件ID"])`；对 `:root`、`:host`、`html`、`body` 根级规则提供 `:scope` 兼容转换。
 - `components/JsonTree.vue`：日志详情的懒加载 JSON 树（替代 Vuetify labs 的 v-treeview）。

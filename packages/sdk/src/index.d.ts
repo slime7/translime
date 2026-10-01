@@ -284,11 +284,26 @@ export interface MatThemeController {
 }
 
 /**
+ * mde-vue 命令式函数（window.mde$.functions）
+ */
+export interface MatFunctions {
+  /** 底部消息提示（toast 为其别名） */
+  snackbar(options: Record<string, any>): Promise<void>;
+  toast(options: Record<string, any>): Promise<void>;
+  /** 命令式对话框，动作返回对应 value，取消返回 undefined */
+  dialog<T = unknown>(options?: Record<string, any>): Promise<T | undefined>;
+  alert(options?: Record<string, any>): Promise<void>;
+  confirm(options?: Record<string, any>): Promise<boolean>;
+  prompt(options?: Record<string, any>): Promise<string | null>;
+}
+
+/**
  * mde-vue 运行时（window.mde$）
  */
 export interface MatRuntime {
   components: Record<string, any>;
   directives: Record<string, any>;
+  functions?: MatFunctions;
   theme?: MatThemeController;
 }
 
@@ -312,6 +327,12 @@ export function useMatComponents(): Record<string, any>;
  * 获取所有宿主注册的 mde-vue 指令（v-intersection / v-state-layer）
  */
 export function useMatDirectives(): Record<string, any>;
+
+/**
+ * 获取 mde-vue 命令式函数（snackbar/toast/dialog/alert/confirm/prompt，渲染进程）。
+ * 依赖宿主通过 window.mde$.functions 暴露，不可用时返回空对象，调用方应做空值兜底
+ */
+export function useMatFunctions(): Partial<MatFunctions>;
 
 /**
  * 获取 Electron 对话框 API（渲染进程）

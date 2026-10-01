@@ -1,5 +1,5 @@
 import { shell } from 'electron';
-import { ensureDir } from './utils/fs-wrapper';
+import { ensureDir, pathExists, stat } from './utils/fs-wrapper';
 import {
   findSavePaths,
   getSteamPath,
@@ -16,9 +16,16 @@ import {
   updateBackupNote,
 } from './utils/backup';
 import {
+  createCustomDirectorySource,
   saveSourcesToSavePaths,
   steamSavePathsToSaveSources,
 } from './utils/save-sources';
+import {
+  hashGameKey,
+  listDirFiles,
+  normalizeCustomDir,
+  normalizeGameNameKey,
+} from './utils/custom-dirs';
 
 const pluginId = 'translime-plugin-steam-save-backup';
 const { mainStore } = global;
@@ -58,6 +65,66 @@ const saveExcludeList = (list) => {
   }
   // 保持为数组存储，但在设置界面可能显示为逗号分隔字符串（取决于 Translime 实现）
   config.set(`plugin.${pluginId}.settings.excludeList`, list);
+};
+
+// 读取手动添加的自定义存档目录列表 [{ gameName, dir }]
+const getCustomSaveDirs = () => {
+  if (!config) {
+    return [];
+  }
+  const val = config.get(`plugin.${pluginId}.settings.customSaveDirs`, []);
+  if (!Array.isArray(val)) {
+    return [];
+  }
+  return val
+    .filter((entry) => entry && typeof entry.dir === 'string' && entry.dir
+      && typeof entry.gameName === 'string' && entry.gameName.trim())
+    .map((entry) => ({
+      gameName: entry.gameName.trim(),
+      dir: entry.dir,
+    }));
+};
+
+const saveCustomSaveDirs = (list) => {
+  if (!config) {
+    return;
+  }
+  config.set(`plugin.${pluginId}.settings.customSaveDirs`, list);
+};
+
+// 为游戏构造自定义目录存档源（枚举目录内文件，目录缺失或为空时返回空数组）
+const buildCustomDirSources = async (entries) => {
+  const sources = await Promise.all(entries.map(async (entry) => {
+    if (!(await pathExists(entry.dir))) {
+      return null;
+    }
+    const { files } = await listDirFiles(entry.dir);
+    if (files.length === 0) {
+      return null;
+    }
+    return createCustomDirectorySource({
+      id: `custom-directory:${normalizeCustomDir(entry.dir)}`,
+      absolutePath: entry.dir,
+      relativePath: '.',
+      files,
+      enabled: true,
+      label: '自定义目录',
+      metadata: {
+        gameName: entry.gameName,
+      },
+    });
+  }));
+  return sources.filter(Boolean);
+};
+
+// 按游戏名取出手动目录条目，并记录哪些名字命中了扫描列表
+const takeMatchedCustomDirs = (gameName, customDirs, matchedKeys) => {
+  const key = normalizeGameNameKey(gameName);
+  const entries = customDirs.filter((entry) => normalizeGameNameKey(entry.gameName) === key);
+  if (entries.length > 0) {
+    matchedKeys.add(key);
+  }
+  return entries;
 };
 
 // 插件设置菜单
@@ -132,18 +199,52 @@ export const ipcHandlers = [
           g.excluded = excludeList.includes(String(g.appid));
         });
 
-        // 为每个游戏查找可能的存档路径
+        const customDirs = getCustomSaveDirs();
+        const matchedCustomKeys = new Set();
+
+        // 为每个游戏查找可能的存档路径，并按游戏名合并手动添加的自定义目录
         await Promise.all(games.map(async (game) => {
           const savePaths = await findSavePaths(currentSteamPath, game.appid);
           const saveSources = steamSavePathsToSaveSources(savePaths);
+          const customEntries = takeMatchedCustomDirs(game.name, customDirs, matchedCustomKeys);
+          const customSources = await buildCustomDirSources(customEntries);
           const backupCount = await getBackupCount(game.appid, backupRoot);
           // eslint-disable-next-line no-param-reassign
           game.savePaths = savePaths;
           // eslint-disable-next-line no-param-reassign
-          game.saveSources = saveSources;
+          game.saveSources = [...saveSources, ...customSources];
           // eslint-disable-next-line no-param-reassign
           game.backupCount = backupCount;
         }));
+
+        // 未命中任何扫描游戏的手动条目 → 生成自定义游戏（支持非 Steam 游戏）
+        const unmatchedGroups = new Map();
+        customDirs.forEach((entry) => {
+          const key = normalizeGameNameKey(entry.gameName);
+          if (matchedCustomKeys.has(key)) {
+            return;
+          }
+          if (!unmatchedGroups.has(key)) {
+            unmatchedGroups.set(key, { gameName: entry.gameName, entries: [] });
+          }
+          unmatchedGroups.get(key).entries.push(entry);
+        });
+
+        const customGames = await Promise.all([...unmatchedGroups.values()].map(async (group) => {
+          const appid = hashGameKey(group.gameName);
+          return {
+            appid,
+            name: group.gameName,
+            isCustom: true,
+            installDir: null,
+            libraryPath: null,
+            savePaths: [],
+            saveSources: await buildCustomDirSources(group.entries),
+            backupCount: await getBackupCount(appid, backupRoot),
+            excluded: excludeList.includes(appid),
+          };
+        }));
+        games.push(...customGames);
 
         const userIds = await getSteamUserIds(currentSteamPath);
         return {
@@ -256,6 +357,82 @@ export const ipcHandlers = [
       try {
         const result = await updateBackupNote(backupPath, note);
         return { success: true, ...result };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'add-custom-save-dir',
+    handler: () => async ({ gameName, dir }) => {
+      try {
+        const normalizedGameName = typeof gameName === 'string' ? gameName.trim() : '';
+        const normalizedDir = typeof dir === 'string' ? dir.trim() : '';
+
+        if (!normalizedGameName) {
+          return { success: false, message: '请填写游戏名称' };
+        }
+        if (!normalizedDir) {
+          return { success: false, message: '请选择存档目录' };
+        }
+
+        let stats = null;
+        try {
+          stats = await stat(normalizedDir);
+        } catch {
+          stats = null;
+        }
+        if (!stats || !stats.isDirectory()) {
+          return { success: false, message: '目录不存在或不可访问' };
+        }
+
+        const { files } = await listDirFiles(normalizedDir);
+        if (files.length === 0) {
+          return { success: false, message: '该目录下没有文件，无法作为存档目录' };
+        }
+
+        const list = getCustomSaveDirs();
+        const nameKey = normalizeGameNameKey(normalizedGameName);
+        const dirKey = normalizeCustomDir(normalizedDir);
+        if (list.some((entry) => normalizeGameNameKey(entry.gameName) === nameKey
+          && normalizeCustomDir(entry.dir) === dirKey)) {
+          return { success: false, message: '该游戏的此目录已添加过' };
+        }
+
+        list.push({
+          gameName: normalizedGameName,
+          dir: normalizedDir,
+        });
+        saveCustomSaveDirs(list);
+
+        return { success: true, customDirs: list };
+      } catch (e) {
+        console.error('添加自定义存档目录失败：', e);
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'remove-custom-save-dir',
+    handler: () => async ({ gameName, dir }) => {
+      try {
+        const nameKey = normalizeGameNameKey(typeof gameName === 'string' ? gameName : '');
+        const dirKey = normalizeCustomDir(typeof dir === 'string' ? dir : '');
+        if (!nameKey || !dirKey) {
+          return { success: false, message: '参数不完整' };
+        }
+
+        const list = getCustomSaveDirs();
+        const next = list.filter(
+          (entry) => !(normalizeGameNameKey(entry.gameName) === nameKey
+            && normalizeCustomDir(entry.dir) === dirKey),
+        );
+        if (next.length === list.length) {
+          return { success: false, message: '未找到该自定义目录' };
+        }
+        saveCustomSaveDirs(next);
+
+        return { success: true, customDirs: next };
       } catch (e) {
         return { success: false, message: e.message };
       }

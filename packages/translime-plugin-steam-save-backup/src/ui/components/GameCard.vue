@@ -1,87 +1,84 @@
 <template>
-  <v-card
-    class="rounded-2xl"
-    rounded
-    hover
+  <mat-card
+    class="game-card"
+    variant="elevated"
     @click="$emit('open', game)"
   >
-    <div class="mx-auto h-full flex flex-col">
-      <div class="flex flex-row items-center p-4">
-        <v-avatar
-          color="primary"
-          size="56"
-        >
-          <span class="text-2xl font-bold text-[rgb(var(--v-theme-on-primary))]">
-            {{ game.name.charAt(0).toUpperCase() }}
-          </span>
-        </v-avatar>
+    <div class="flex flex-row items-center p-4">
+      <mat-avatar
+        :size="56"
+        color="primary"
+      >
+        <span class="text-2xl font-bold">{{ game.name.charAt(0).toUpperCase() }}</span>
+      </mat-avatar>
 
-        <div class="ml-4 truncate grow-1">
-          <v-tooltip
-            :text="game.name"
-            location="top"
-          >
-            <template #activator="{ props }">
-              <div
-                v-bind="props"
-                class="text-xl truncate font-medium"
-              >
-                {{ game.name }}
-              </div>
-            </template>
-          </v-tooltip>
-
-          <div class="text-[rgb(var(--v-theme-on-surface-variant))]">
-            APP ID: {{ game.appid }}
-          </div>
-        </div>
-
-        <v-tooltip
-          text="隐藏此游戏"
+      <div class="ml-4 truncate grow">
+        <mat-tooltip
+          :content="game.name"
           location="top"
         >
-          <template #activator="{ props }">
-            <v-btn
-              v-bind="props"
-              icon="visibility_off"
-              variant="text"
-              size="small"
-              color="on-surface-variant"
-              :loading="excludeLoading === game.appid"
-              @click.stop="$emit('exclude', game)"
-            />
+          <template #activator>
+            <div class="game-title truncate text-xl font-medium">
+              {{ game.name }}
+            </div>
           </template>
-        </v-tooltip>
+        </mat-tooltip>
+
+        <div
+          v-if="game.isCustom"
+          class="game-subtitle"
+        >
+          自定义游戏
+        </div>
+        <div
+          v-else
+          class="game-subtitle"
+        >
+          APP ID: {{ game.appid }}
+        </div>
       </div>
 
-      <v-divider />
+      <mat-tooltip
+        content="隐藏此游戏"
+        location="top"
+      >
+        <template #activator>
+          <mat-btn
+            icon="visibility_off"
+            variant="standard"
+            size="small"
+            :loading="excludeLoading === game.appid"
+            :aria-label="`隐藏游戏 ${game.name}`"
+            @click.stop="$emit('exclude', game)"
+          />
+        </template>
+      </mat-tooltip>
     </div>
 
-    <v-card-text>
+    <mat-divider />
+
+    <mat-card-content>
       <div class="py-2">
         <div class="flex justify-between items-center">
-          <v-chip
-            size="small"
-            :color="game.backupCount > 0 ? 'tertiary' : 'surface-container-highest'"
-            variant="flat"
+          <mat-chip
+            variant="assist"
+            :color="game.backupCount > 0 ? 'tertiary' : undefined"
             class="font-medium"
           >
             {{ game.backupCount || 0 }} 个备份
-          </v-chip>
+          </mat-chip>
 
-          <v-icon
-            color="outline"
+          <mat-icon
             icon="chevron_right"
+            class="card-chevron"
           />
         </div>
       </div>
-    </v-card-text>
-  </v-card>
+    </mat-card-content>
+  </mat-card>
 </template>
 
 <script setup>
-import { useVuetifyComponents } from 'translime-sdk';
-
 defineProps({
   game: {
     type: Object,
@@ -94,14 +91,27 @@ defineProps({
 });
 
 defineEmits(['open', 'exclude']);
-
-const vuetifyComponents = useVuetifyComponents();
-const VAvatar = vuetifyComponents.VAvatar;
-const VBtn = vuetifyComponents.VBtn;
-const VCard = vuetifyComponents.VCard;
-const VCardText = vuetifyComponents.VCardText;
-const VChip = vuetifyComponents.VChip;
-const VDivider = vuetifyComponents.VDivider;
-const VIcon = vuetifyComponents.VIcon;
-const VTooltip = vuetifyComponents.VTooltip;
 </script>
+
+<style scoped>
+.game-card {
+  cursor: pointer;
+  transition: box-shadow .2s ease;
+}
+
+.game-card:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+}
+
+.game-title {
+  color: var(--mat-sys-color-on-surface);
+}
+
+.game-subtitle {
+  color: var(--mat-sys-color-on-surface-variant);
+}
+
+.card-chevron {
+  color: var(--mat-sys-color-outline);
+}
+</style>

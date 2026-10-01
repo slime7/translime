@@ -1,69 +1,46 @@
 <template>
-  <v-dialog
+  <!-- mat-dialog 内容被 Teleport 到宿主 @scope 隔离范围之外，样式必须内联 -->
+  <mat-dialog
     v-model="visible"
-    max-width="400px"
+    width="400px"
+    close-on-back
+    title="编辑备注"
   >
-    <v-card
-      class="rounded-2xl"
-      rounded
-    >
-      <v-toolbar
-        color="primary"
-        density="compact"
+    <mat-text-field
+      v-model="noteValue"
+      style="width: 100%"
+      label="备份说明"
+      placeholder="例如：打 BOSS 前、某个结局等"
+      variant="outlined"
+      color="primary"
+      :max-length="80"
+      @keyup.enter="$emit('save')"
+    />
+
+    <template #actions>
+      <mat-spacer />
+
+      <mat-btn
+        variant="text"
+        @click="visible = false"
       >
-        <v-toolbar-title>编辑备注</v-toolbar-title>
+        取消
+      </mat-btn>
 
-        <v-spacer />
-
-        <v-btn
-          icon
-          @click="visible = false"
-        >
-          <v-icon>close</v-icon>
-        </v-btn>
-      </v-toolbar>
-
-      <v-card-text class="p-4">
-        <v-text-field
-          v-model="noteValue"
-          label="备份说明"
-          placeholder="例如：打 BOSS 前、某个结局等"
-          counter="80"
-          maxlength="80"
-          variant="outlined"
-          density="comfortable"
-          hide-details="auto"
-          autofocus
-          @keyup.enter="$emit('save')"
-        />
-      </v-card-text>
-
-      <v-card-actions class="p-4 pt-0">
-        <v-spacer />
-
-        <v-btn
-          variant="text"
-          @click="visible = false"
-        >
-          取消
-        </v-btn>
-
-        <v-btn
-          color="primary"
-          variant="elevated"
-          :loading="loading"
-          @click="$emit('save')"
-        >
-          保存
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+      <mat-btn
+        variant="filled"
+        color="primary"
+        :loading="loading"
+        @click="$emit('save')"
+      >
+        保存
+      </mat-btn>
+    </template>
+  </mat-dialog>
 </template>
 
 <script setup>
 import { computed } from 'vue';
-import { useVuetifyComponents } from 'translime-sdk';
 
 const props = defineProps({
   modelValue: {
@@ -91,16 +68,4 @@ const noteValue = computed({
   get: () => props.note,
   set: (value) => emit('update:note', value),
 });
-
-const vuetifyComponents = useVuetifyComponents();
-const VBtn = vuetifyComponents.VBtn;
-const VCard = vuetifyComponents.VCard;
-const VCardActions = vuetifyComponents.VCardActions;
-const VCardText = vuetifyComponents.VCardText;
-const VDialog = vuetifyComponents.VDialog;
-const VIcon = vuetifyComponents.VIcon;
-const VSpacer = vuetifyComponents.VSpacer;
-const VTextField = vuetifyComponents.VTextField;
-const VToolbar = vuetifyComponents.VToolbar;
-const VToolbarTitle = vuetifyComponents.VToolbarTitle;
 </script>

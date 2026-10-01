@@ -1,70 +1,48 @@
 <template>
-  <v-dialog
+  <!-- mat-dialog 内容被 Teleport 到宿主 @scope 隔离范围之外，样式必须内联 -->
+  <mat-dialog
     v-model="visible"
-    max-width="400px"
-    persistent
+    width="400px"
+    :title="dialog.title"
+    :icon="dialog.icon || undefined"
+    :color="matColor"
   >
-    <v-card
-      class="rounded-2xl pa-2"
-      rounded
+    <div style="color: var(--mat-sys-color-on-surface)">
+      {{ dialog.message }}
+    </div>
+
+    <div
+      v-if="dialog.detail"
+      style="margin-top: 4px; font-style: italic; font-weight: 500; color: var(--mat-sys-color-on-surface-variant)"
     >
-      <v-card-text class="text-center pt-6">
-        <v-avatar
-          :color="dialog.color"
-          size="64"
-          class="mb-4"
-          variant="tonal"
-        >
-          <v-icon
-            :icon="dialog.icon"
-            size="32"
-          />
-        </v-avatar>
+      {{ dialog.detail }}
+    </div>
 
-        <div class="text-xl font-bold mb-2">
-          {{ dialog.title }}
-        </div>
+    <template #actions>
+      <mat-spacer />
 
-        <div class="text-body-medium text-[rgb(var(--v-theme-on-surface-variant))] mb-4">
-          {{ dialog.message }}
+      <mat-btn
+        variant="text"
+        :disabled="dialog.loading"
+        @click="visible = false"
+      >
+        取消
+      </mat-btn>
 
-          <div
-            v-if="dialog.detail"
-            class="mt-1 italic font-medium"
-          >
-            {{ dialog.detail }}
-          </div>
-        </div>
-      </v-card-text>
-
-      <v-card-actions class="p-4 pt-0">
-        <v-spacer />
-
-        <v-btn
-          variant="text"
-          color="grey"
-          :disabled="dialog.loading"
-          @click="visible = false"
-        >
-          取消
-        </v-btn>
-
-        <v-btn
-          :color="dialog.color"
-          variant="elevated"
-          :loading="dialog.loading"
-          @click="$emit('confirm')"
-        >
-          {{ dialog.confirmText }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+      <mat-btn
+        variant="filled"
+        :color="matColor"
+        :loading="dialog.loading"
+        @click="$emit('confirm')"
+      >
+        {{ dialog.confirmText }}
+      </mat-btn>
+    </template>
+  </mat-dialog>
 </template>
 
 <script setup>
 import { computed } from 'vue';
-import { useVuetifyComponents } from 'translime-sdk';
 
 const props = defineProps({
   modelValue: {
@@ -84,13 +62,14 @@ const visible = computed({
   set: (value) => emit('update:modelValue', value),
 });
 
-const vuetifyComponents = useVuetifyComponents();
-const VAvatar = vuetifyComponents.VAvatar;
-const VBtn = vuetifyComponents.VBtn;
-const VCard = vuetifyComponents.VCard;
-const VCardActions = vuetifyComponents.VCardActions;
-const VCardText = vuetifyComponents.VCardText;
-const VDialog = vuetifyComponents.VDialog;
-const VIcon = vuetifyComponents.VIcon;
-const VSpacer = vuetifyComponents.VSpacer;
+// mde-vue 语义色没有 warning，把 warning 映射为 tertiary
+const matColor = computed(() => {
+  if (props.dialog.color === 'error') {
+    return 'error';
+  }
+  if (props.dialog.color === 'warning') {
+    return 'tertiary';
+  }
+  return 'primary';
+});
 </script>

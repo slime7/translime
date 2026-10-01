@@ -1,26 +1,17 @@
 <template>
-  <v-row>
-    <v-col
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+    <GameCard
       v-for="game in games"
       :key="game.appid"
-      cols="12"
-      sm="6"
-      md="4"
-      lg="3"
-      xl="2"
-    >
-      <game-card
-        :game="game"
-        :exclude-loading="excludeLoading"
-        @open="$emit('open-game', $event)"
-        @exclude="$emit('exclude-game', $event)"
-      />
-    </v-col>
-  </v-row>
+      :game="game"
+      :exclude-loading="excludeLoading"
+      @open="$emit('open-game', $event)"
+      @exclude="$emit('exclude-game', $event)"
+    />
+  </div>
 </template>
 
 <script setup>
-import { useVuetifyComponents } from 'translime-sdk';
 import GameCard from './GameCard.vue';
 
 defineProps({
@@ -35,8 +26,4 @@ defineProps({
 });
 
 defineEmits(['open-game', 'exclude-game']);
-
-const vuetifyComponents = useVuetifyComponents();
-const VCol = vuetifyComponents.VCol;
-const VRow = vuetifyComponents.VRow;
 </script>
