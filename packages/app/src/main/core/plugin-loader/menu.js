@@ -3,6 +3,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../../utils/useMainStore';
 import appManager from '../../utils/useAppManager';
 import { registerMenu } from '../menuRegistry';
+import { ensurePluginMetadata } from './runtime';
 
 /**
  * 把 Electron MenuItem 风格的菜单模板序列化为渲染端 mat-menu 描述。
@@ -51,6 +52,9 @@ const serializeMenu = (template) => {
  * @returns {{menuId: string, items: Array<object>}} 渲染端菜单描述。
  */
 const buildPluginMenu = (loader, packageName) => {
+  // 设置项属于声明式元数据：打开菜单时按需加载入口的静态导出（不触发激活），
+  // 使未激活/未启用的插件同样能随时打开配置面板
+  ensurePluginMetadata(loader, packageName);
   const plugin = loader.getPlugin(packageName);
   const ipcEv = appManager.getIpc();
 
@@ -103,8 +107,10 @@ const buildPluginMenu = (loader, packageName) => {
     {
       id: 'open-plugin-setting-panel',
       label: '设置',
+      // settingMenu 是声明式元数据（菜单打开时已延迟加载），
+      // 配置读写走 config store，不依赖插件激活或启用状态
       visible:
-        plugin.enabled && !!plugin.settingMenu && !!plugin.settingMenu.length,
+        !!plugin.settingMenu && !!plugin.settingMenu.length,
       click() {
         const mainWin = appManager.getWin();
         if (mainWin) {

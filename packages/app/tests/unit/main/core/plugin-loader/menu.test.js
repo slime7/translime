@@ -1,12 +1,17 @@
 import {
-  beforeEach, describe, expect, it, vi,
+  afterAll, beforeAll, beforeEach, describe, expect, it, vi,
 } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { clipboard } from 'electron';
 
 import { dispatchMenuAction } from '@main/core/menuRegistry';
 import buildPluginMenu from '@main/core/plugin-loader/menu';
 
-const { mockConfigSet, mockSendToMain, mockIpcEv, mockShellOpenPath } = vi.hoisted(() => {
+const {
+  mockConfigSet, mockSendToMain, mockIpcEv, mockShellOpenPath,
+} = vi.hoisted(() => {
   const sendToMain = vi.fn();
   return {
     mockConfigSet: vi.fn(),
@@ -17,6 +22,9 @@ const { mockConfigSet, mockSendToMain, mockIpcEv, mockShellOpenPath } = vi.hoist
 });
 
 vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn(() => 'C:/mock-userdata'),
+  },
   clipboard: {
     writeText: vi.fn(),
   },
@@ -31,6 +39,21 @@ vi.mock('@main/utils/useMainStore', () => ({
       set: mockConfigSet,
     },
   },
+}));
+
+vi.mock('@main/utils/logger', () => ({
+  default: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock('@main/core/plugin-loader/isolatedRuntime', () => ({
+  activateIsolatedPlugin: vi.fn(),
+  deactivateIsolatedPlugin: vi.fn(),
+  notifySettingSaved: vi.fn(),
 }));
 
 vi.mock('@main/utils/useAppManager', () => ({
@@ -66,6 +89,23 @@ const createLoader = (pluginOverrides = {}) => {
 const itemIds = (items) => items.map((item) => item.id ?? item.type);
 
 describe('plugin-loader/menu', () => {
+  let tempPluginDir;
+
+  beforeAll(() => {
+    // 真实入口产物：供元数据延迟加载（ensurePluginMetadata）用 require 读取
+    tempPluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'translime-menu-meta-'));
+    fs.mkdirSync(path.join(tempPluginDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tempPluginDir, 'dist', 'index.cjs.js'),
+      'module.exports = { settingMenu: [{ type: "input", name: "演示设置" }] };',
+      'utf8',
+    );
+  });
+
+  afterAll(() => {
+    fs.rmSync(tempPluginDir, { recursive: true, force: true });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -99,7 +139,7 @@ describe('plugin-loader/menu', () => {
   });
 
   it('回传动作应执行对应处理：打开插件目录', () => {
-    const { loader, plugin } = createLoader({ dev: true, pluginPath: 'C:/mock/translime-plugin-demo' });
+    const { loader } = createLoader({ dev: true, pluginPath: 'C:/mock/translime-plugin-demo' });
     const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
 
     dispatchMenuAction(menuId, 'open-plugin-dir');
@@ -107,9 +147,18 @@ describe('plugin-loader/menu', () => {
     expect(mockShellOpenPath).toHaveBeenCalledWith('C:/mock/translime-plugin-demo');
   });
 
-  it('有设置项的启用插件才展示“设置”', () => {
-    const withSettings = createLoader({ settingMenu: [{ label: 'general' }] });
-    expect(itemIds(buildPluginMenu(withSettings.loader, 'p').items)).toContain(
+  it('有设置项的插件展示“设置”，与启用状态无关', () => {
+    const enabledWithSettings = createLoader({ settingMenu: [{ label: 'general' }] });
+    expect(itemIds(buildPluginMenu(enabledWithSettings.loader, 'p').items)).toContain(
+      'open-plugin-setting-panel',
+    );
+
+    // 设置面板是声明式元数据，未启用的插件同样可以打开并预配置
+    const disabledWithSettings = createLoader({
+      enabled: false,
+      settingMenu: [{ label: 'general' }],
+    });
+    expect(itemIds(buildPluginMenu(disabledWithSettings.loader, 'p').items)).toContain(
       'open-plugin-setting-panel',
     );
 
@@ -117,6 +166,51 @@ describe('plugin-loader/menu', () => {
     expect(itemIds(buildPluginMenu(withoutSettings.loader, 'p').items)).not.toContain(
       'open-plugin-setting-panel',
     );
+  });
+
+  it('打开菜单应延迟加载入口的 settingMenu，不触发激活', () => {
+    // 防止的回归：settingMenu 在插件激活时才合并进主进程插件对象，
+    // 若菜单不按需加载静态元数据，未激活插件的配置面板入口会消失
+    const { loader, plugin } = createLoader({
+      enabled: false,
+      exports: 'dist/index.cjs.js',
+      pluginPath: tempPluginDir,
+    });
+
+    const { items } = buildPluginMenu(loader, 'translime-plugin-demo');
+
+    expect(plugin.metadataLoaded).toBe(true);
+    expect(plugin.settingMenu).toEqual([{ type: 'input', name: '演示设置' }]);
+    expect(itemIds(items)).toContain('open-plugin-setting-panel');
+    // 元数据加载不等于激活：运行期启用入口不应被调用
+    expect(loader.enablePlugin).not.toHaveBeenCalled();
+  });
+
+  it('入口产物缺失时菜单不展示设置且不抛错', () => {
+    const { loader, plugin } = createLoader({
+      enabled: false,
+      exports: 'dist/index.cjs.js',
+      pluginPath: path.join(tempPluginDir, 'not-exist'),
+    });
+
+    expect(() => buildPluginMenu(loader, 'translime-plugin-demo')).not.toThrow();
+    expect(plugin.metadataLoaded).toBeUndefined();
+    expect(itemIds(buildPluginMenu(loader, 'translime-plugin-demo').items)).not.toContain(
+      'open-plugin-setting-panel',
+    );
+  });
+
+  it('隔离插件不在主进程预读元数据，避免顶层代码双进程执行', () => {
+    const { loader, plugin } = createLoader({
+      isolated: true,
+      exports: 'dist/index.cjs.js',
+      pluginPath: tempPluginDir,
+    });
+
+    buildPluginMenu(loader, 'translime-plugin-demo');
+
+    expect(plugin.metadataLoaded).toBeUndefined();
+    expect(plugin.settingMenu).toEqual([]);
   });
 
   it('带 UI 且未固定 windowUrl 的插件才展示窗口模式开关，并透传选中态', () => {

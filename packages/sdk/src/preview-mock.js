@@ -5,13 +5,37 @@
 
 const STORAGE_PREFIX = 'translime-preview-settings:';
 
+// initPreviewMock 默认注入 mock IPC 客户端，由 setPreviewIpcMocks 更新活动 mock 表
+let activeMockIpc = null;
+
 /**
  * Mock IPC 实现
+ * @param {Object} [mockHandlers] 声明式 mock handler 表
+ *   键为事件名（可带或不带 `@插件ID` 后缀），值为 (...args) => result；
+ *   invoke 命中时返回其返回值（支持 Promise），未命中返回 null
  * @returns {Object}
  */
-export function createMockIpc() {
-  return {
+export function createMockIpc(mockHandlers = {}) {
+  let handlers = mockHandlers || {};
+  const resolveMockHandler = (channel) => {
+    if (typeof handlers[channel] === 'function') {
+      return handlers[channel];
+    }
+    const baseName = String(channel).split('@')[0];
+    if (baseName && baseName !== channel && typeof handlers[baseName] === 'function') {
+      return handlers[baseName];
+    }
+    return null;
+  };
+  const mockIpc = {
     invoke: async (channel, ...args) => {
+      const handler = resolveMockHandler(channel);
+      if (handler) {
+        const result = await handler(...args);
+        // eslint-disable-next-line no-console
+        console.log('[Preview Mock] ipc.invoke:', channel, args, '=>', result);
+        return result;
+      }
       // eslint-disable-next-line no-console
       console.log('[Preview Mock] ipc.invoke:', channel, args);
       return null;
@@ -40,7 +64,24 @@ export function createMockIpc() {
       // eslint-disable-next-line no-console
       console.log('[Preview Mock] ipc.removeAllListeners:', channel);
     },
+    setMockHandlers(nextHandlers) {
+      handlers = nextHandlers || {};
+    },
   };
+  return mockIpc;
+}
+
+/**
+ * 更新当前 preview 会话的声明式 IPC mock 表
+ * @description 由 preview shell（startPreview）在初始化 mock 环境后调用，
+ * 传入 vite 插件配置的 ipcMocks；未初始化时为空操作
+ * @param {Object} [mockHandlers] 与 createMockIpc 相同的 handler 表
+ * @returns {void}
+ */
+export function setPreviewIpcMocks(mockHandlers) {
+  if (activeMockIpc) {
+    activeMockIpc.setMockHandlers(mockHandlers);
+  }
 }
 
 /**
@@ -243,10 +284,11 @@ export function createMockLogger() {
 
 /**
  * 创建完整的 mock electron 对象
+ * @param {Object} [mockHandlers] 声明式 IPC mock handler 表
  * @returns {Object}
  */
-export function createMockElectron() {
-  const mockIpc = createMockIpc();
+export function createMockElectron(mockHandlers = {}) {
+  const mockIpc = createMockIpc(mockHandlers);
   return {
     useIpc: () => mockIpc,
     dialog: createMockDialog(),
@@ -300,15 +342,17 @@ export function createMockTs() {
 /**
  * 初始化 preview mock 环境
  * 将 mock 对象注入到 window
+ * @param {Object} [mockHandlers] 声明式 IPC mock handler 表
  */
-export function initPreviewMock() {
+export function initPreviewMock(mockHandlers = {}) {
   if (typeof window === 'undefined') {
     return;
   }
 
   // 只在未定义时注入，避免覆盖真实环境
   if (!window.electron) {
-    window.electron = createMockElectron();
+    window.electron = createMockElectron(mockHandlers);
+    activeMockIpc = window.electron.useIpc();
     // eslint-disable-next-line no-console
     console.log('[Preview Mock] window.electron injected');
   }

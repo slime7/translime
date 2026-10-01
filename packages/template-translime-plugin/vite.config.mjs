@@ -8,7 +8,9 @@ const config = ({ mode }) => ({
   envDir: process.cwd(),
   build: {
     minify: false,
-    sourcemap: mode === 'development' ? 'inline' : false,
+    // 非生产构建（dev / watch）输出 inline sourcemap，
+    // 供宿主 --inspect 启动时在 VSCode 中断点调试插件主进程源码
+    sourcemap: mode === 'production' ? false : 'inline',
     target: 'node20',
     outDir: './dist',
     // watch 模式下 UI 构建会并行写入同一个 dist，清空会删掉对方产物

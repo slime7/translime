@@ -65,6 +65,21 @@ export default defineConfig(({ mode }) => {
 
 `@scope` 限制选择器匹配范围，但继承属性以及 `@keyframes`、`@font-face`、`@property` 等全局命名空间仍遵循浏览器原生语义。插件应继续使用唯一的动画、字体和自定义属性名称，并通过插件专用 `@layer` 控制级联优先级。
 
+## 插件元数据（manifest）编辑期校验
+
+SDK 附带 `translime-plugin.schema.json`，描述插件 `package.json` 的 `plugin` 字段与
+`engines.translime` 等约束。在 `package.json` 中引用即可在编辑器中获得字段补全与校验
+（写错激活事件、命令缺 id 等问题无需等宿主加载才发现）：
+
+```json
+{
+  "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json"
+}
+```
+
+该文件随 `translime-sdk` 一同发布，也会随 `github-page` 部署到上述地址；插件模板的
+`package.json` 已默认引用。
+
 ## 代码示例
 
 ### 主进程
@@ -92,6 +107,20 @@ const { VBtn, VCard } = useVuetifyComponents();
 - `getMainStore()`: 获取主程序全局 Store。
 - `usePluginConfig(pluginId)`: 获取当前插件配置读写工具。
 - `usePluginInterop()`: 获取插件间通信工具。
+- `defineIpcHandlers(handlers)`: 定义并校验 `ipcHandlers` 导出：`type` 不需要（也不能）带
+  `@插件ID` 后缀，宿主注册通道时自动追加；对缺 `type` / 缺 `handler` / `type` 带 `@` 的
+  条目在激活前直接抛错。
+
+```javascript
+import { defineIpcHandlers, useLogger } from 'translime-sdk';
+
+export const ipcHandlers = defineIpcHandlers([
+  {
+    type: 'get-data',
+    handler: ({ sendToClient }) => async (query) => ({ ok: true, query }),
+  },
+]);
+```
 
 #### 插件间通信
 
@@ -122,7 +151,18 @@ const doSomething = async () => {
 
 ### 渲染进程 (Renderer Process)
 
-- `useIpc()`: 获取 IPC 工具。
+- `useIpc()`: 获取 IPC 工具（事件名需自带 `@插件ID` 后缀）。
+- `useIpc(pluginId)`: 获取插件专用 IPC 客户端，`invoke` / `send` / `on` / `detach` 的
+  事件名自动补全 `@插件ID` 后缀，无需手拼字符串；显式包含 `@` 的事件名保持原样。
+
+```javascript
+import { useIpc } from 'translime-sdk';
+
+const ipc = useIpc('my-plugin-id');
+await ipc.invoke('get-data', query);      // 实际调用 'get-data@my-plugin-id'
+ipc.on('data-changed', (data) => { ... }); // 接收主进程 sendToClient 推送
+```
+
 - `useVuetify()`: 获取 Vuetify 实例。
 - `useVuetifyComponents()`: 获取所有 Vuetify 组件。
 - `useVuetifyDirectives()`: 获取所有 Vuetify 指令。
@@ -232,6 +272,7 @@ Preview 模式允许你在普通浏览器中预览和调试插件 UI，无需依
 - 完整的 Vuetify 支持：Preview Shell 自动提供 Vuetify 组件和主题。
 - mde-vue 支持：插件安装 mde-vue 后，Preview Shell 自动全局注册 mat-* 组件并提供 `window.mde$`（未安装时自动跳过）。
 - API Mock：IPC、Dialog、Shell、插件设置等接口都有对应 mock。
+- 声明式 IPC Mock：通过 `previewIpcMocks` 提供 mock handler 表，`invoke` 命中时返回 mock 结果而不是 `null`，UI 联调不再只靠日志。
 - 设置持久化：插件设置使用 `localStorage` 存储。
 
 ### 快速开始
@@ -264,16 +305,26 @@ export default defineConfig(() => ({
   plugins: [
     translimeSdk({
       previewComponent: './src/ui/ui.vue',
+      // 可选：声明式 IPC mock 模块（默认导出 handler 表）
+      previewIpcMocks: './src/preview-mocks.mjs',
     }),
   ],
 }));
+```
+
+`preview-mocks.mjs` 的键为事件名（可带或不带 `@插件ID` 后缀），值为 `(...args) => result`：
+
+```javascript
+export default {
+  'get-data': async (query) => ({ ok: true, items: ['mock-1', 'mock-2'] }),
+};
 ```
 
 ### Mock API 行为
 
 | API | Mock 行为 |
 |-----|----------|
-| `useIpc().invoke()` | 打印调用日志，返回 `null` |
+| `useIpc().invoke()` | 命中 `previewIpcMocks` 表时返回其返回值（支持 Promise）；未命中打印调用日志并返回 `null` |
 | `getPluginSetting()` | 从 `localStorage` 读取 |
 | `setPluginSetting()` | 保存到 `localStorage` |
 | `useClipboard()` | 使用浏览器 Clipboard API |

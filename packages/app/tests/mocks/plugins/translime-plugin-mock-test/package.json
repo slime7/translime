@@ -18,8 +18,7 @@
     "description": "Mock plugin for testing features and settings",
     "icon": "./icon.png",
     "activationEvents": [
-      "onView",
-      "onStartup"
+      "onView"
     ],
     "dependencies": [],
     "optionalDependencies": [],

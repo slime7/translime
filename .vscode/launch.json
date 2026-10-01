@@ -1,0 +1,38 @@
+{
+  // 调试配置：先启动宿主开发模式，再附加调试器。
+  // - 主进程：`pnpm dev` 固定以 --inspect=5858 启动 Electron，
+  //   插件主进程代码与宿主同进程，插件包以 watch 模式构建时输出
+  //   inline sourcemap，可直接在插件源码（如 packages/translime-plugin-*/index.js）打断点。
+  // - 渲染进程：先运行 `pnpm dev:cdp`（开启 9222 CDP），插件 UI 的 webview
+  //   页面也可用插件页标题栏的 inspect 按钮打开 devtools。
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "附加到 translime 宿主主进程 (5858)",
+      "type": "node",
+      "request": "attach",
+      "port": 5858,
+      "restart": true,
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ]
+    },
+    {
+      "name": "附加到 translime 渲染进程 (CDP 9222)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "附加宿主全部进程",
+      "configurations": [
+        "附加到 translime 宿主主进程 (5858)",
+        "附加到 translime 渲染进程 (CDP 9222)"
+      ]
+    }
+  ]
+}

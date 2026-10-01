@@ -10,8 +10,8 @@
 
     <pre>{{ setting }}</pre>
 
-    <v-btn color="primary" @click="showVuetify">
-      vuetify component
+    <v-btn color="primary" @click="callTestIpc">
+      call test-ipc
     </v-btn>
   </div>
 </template>
@@ -20,23 +20,37 @@
 import { onMounted, ref } from 'vue';
 import {
   getPluginSetting,
-  useVuetifyComponents,
-  useVuetifyDirectives,
+  useIpc,
 } from 'translime-sdk';
 
 defineOptions({
   name: 'UiExample',
 });
 
+const id = 'translime-plugin-example';
+// useIpc 传入插件 ID 后，事件名自动补全 `@插件ID` 后缀，
+// 无需再手拼 'test-ipc@translime-plugin-example' 字符串
+const ipc = useIpc(id);
+
 const setting = ref({});
 const input = ref('');
 const msg = ref('hello');
-const showVuetify = () => {
-  console.log(useVuetifyComponents(), useVuetifyDirectives());
+
+const callTestIpc = async () => {
+  // 对应主进程 ipcHandlers 中的 'test-ipc'
+  const result = await ipc.invoke('test-ipc', 'hello from ui', 123);
+  // eslint-disable-next-line no-console
+  console.log('test-ipc result:', result);
+
+  // 接收主进程 sendToClient('test-ipc-reply@插件ID') 的主动推送
+  ipc.on('test-ipc-reply', (data) => {
+    // eslint-disable-next-line no-console
+    console.log('test-ipc-reply:', data);
+  });
 };
 
 onMounted(async () => {
-  setting.value = await getPluginSetting('translime-plugin-example');
+  setting.value = await getPluginSetting(id);
 });
 </script>
 

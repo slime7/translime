@@ -135,6 +135,47 @@ const processPlugin = (plugin) => {
 };
 
 /**
+ * 确保插件的静态元数据（settingMenu 等声明式导出）已读入插件对象。
+ *
+ * 与激活的区别：这里只加载入口模块并合并声明式导出，供菜单与设置面板在
+ * 插件激活前读取（类似 VSCode 从 manifest 读取静态 contributes）；
+ * 不注册 IPC / 命令 / libs，也不执行 pluginDidLoad。pluginMenu 的点击
+ * 语义伴随激活，仍在激活时合并。
+ *
+ * 入口模块经由 require 缓存与激活共享，预读不会导致顶层代码重复执行；
+ * 停用/卸载时的按插件缓存清理同样保证 dev 重建后能读到最新产物。
+ *
+ * 隔离插件（plugin.isolated）的入口运行在 utilityProcess，主进程不做预读，
+ * 避免顶层代码在两个进程各执行一次。
+ *
+ * @param {object} loader - `PluginLoader` 实例。
+ * @param {string} packageName - 插件包名。
+ * @returns {object} 插件对象（加载成功时带 settingMenu 与 metadataLoaded 标记）。
+ */
+const ensurePluginMetadata = (loader, packageName) => {
+  const plugin = loader.getPlugin(packageName);
+  if (!plugin || plugin.active || plugin.metadataLoaded) {
+    return plugin;
+  }
+  if (plugin.isolated || !plugin.exports) {
+    return plugin;
+  }
+  try {
+    const pluginExports = path.join(plugin.pluginPath, plugin.exports);
+    const pluginImport = requireFresh(`${pluginExports}`);
+    plugin.settingMenu = pluginImport.settingMenu;
+    plugin.metadataLoaded = true;
+  } catch (err) {
+    // 入口缺失/损坏时交由激活流程呈现 build-missing / load-error，
+    // 这里保持插件对象不变，菜单侧表现为不展示「设置」项
+    logger.warn(`[plugin] 读取插件静态元数据失败: ${packageName}`, {
+      error: err.message,
+    });
+  }
+  return plugin;
+};
+
+/**
  * 触发与某个激活事件匹配的插件集合。
  *
  * @param {object} loader - `PluginLoader` 实例。
@@ -563,6 +604,11 @@ const disablePlugin = (loader, packageName, options = {}) => {
   }
 
   const isDev = plugin.dev;
+  // 元数据与运行期导出随停用一并失效：require 缓存已按插件清理，
+  // 下次菜单打开或激活会重新读取最新入口产物
+  delete plugin.metadataLoaded;
+  delete plugin.settingMenu;
+  delete plugin.pluginMenu;
   const preservedBlockedBy = Array.isArray(plugin.blockedBy) ? [...plugin.blockedBy] : [];
   const preservedMissingDependencies = Array.isArray(plugin.missingDependencies)
     ? [...plugin.missingDependencies]
@@ -683,6 +729,7 @@ export {
   disablePlugin,
   enablePlugin,
   ensurePluginIpcReady,
+  ensurePluginMetadata,
   executeCommand,
   getDependents,
   onPluginSettingSave,

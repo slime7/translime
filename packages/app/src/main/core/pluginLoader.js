@@ -19,6 +19,7 @@ import {
   disablePlugin,
   enablePlugin,
   ensurePluginIpcReady,
+  ensurePluginMetadata,
   executeCommand,
   getDependents,
   onPluginSettingSave,
@@ -267,6 +268,19 @@ class PluginLoader extends EventEmitter {
    */
   restartPlugin(packageName) {
     return restartPlugin(this, packageName);
+  }
+
+  /**
+   * 确保插件静态元数据（settingMenu 等声明式导出）已加载。
+   *
+   * 只加载入口模块并合并声明式导出，不触发激活、不执行 pluginDidLoad，
+   * 供菜单与设置面板在插件激活前读取。
+   *
+   * @param {string} packageName - 插件包名。
+   * @returns {object} 插件对象。
+   */
+  ensurePluginMetadata(packageName) {
+    return ensurePluginMetadata(this, packageName);
   }
 
   /**

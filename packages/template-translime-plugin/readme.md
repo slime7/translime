@@ -13,6 +13,13 @@
 
 `preview:ui` 仍然保留，但只作为局部 UI 试验的辅助工具。涉及布局、主题、窗口模式、设置面板和宿主集成行为时，应以宿主内效果为准。
 
+### 断点调试插件主进程
+
+1. 在插件目录运行 `pnpm dev`（同时 watch 主进程与 UI 构建；非生产构建输出 inline sourcemap）。
+2. 在宿主开发模式（translime 仓库根目录 `pnpm dev`，固定以 `--inspect=5858` 启动 Electron）下启用插件。
+3. 在 VSCode 中使用仓库根目录 `.vscode/launch.json` 的「附加到 translime 宿主主进程 (5858)」配置附加调试器，即可直接在插件主进程源码（如 `index.js`）打断点。
+4. 渲染进程需要 CDP 调试时，用 `pnpm dev:cdp`（9222 端口）启动宿主并使用 launch.json 的对应配置；插件 UI 也可在插件页标题栏用 inspect 按钮直接打开 webview devtools。
+
 ## 本地开发测试
 
 利用 `link` 命令将本地插件包添加到 Translime 的开发目录中进行测试。
@@ -51,6 +58,8 @@
 
 ```json5
 {
+  // 引用 SDK 的 manifest JSON schema，编辑器可获得字段补全与校验
+  "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
   "name": "your-plugin-name",
   "version": "1.0.0",
   "main": "./dist/index.cjs.js", // 插件后端逻辑入口
@@ -219,11 +228,15 @@ export const pluginWillUnload = () => {
 ### 3. IPC 通信 (`ipcHandlers`)
 
 插件可以通过 `ipcHandlers` 定义与前端 UI 交互的接口。Translime 采用 `invoke` 模式。
+推荐使用 SDK 的 `defineIpcHandlers`：`type` 不需要带 `@插件ID` 后缀（宿主注册通道时自动追加），
+缺 `type` / 缺 `handler` / 误带 `@` 的条目会在插件激活前直接抛错。
 
 ```javascript
-export const ipcHandlers = [
+import { defineIpcHandlers } from 'translime-sdk';
+
+export const ipcHandlers = defineIpcHandlers([
   {
-    type: 'test-ipc', // UI 端通过 ipc.invoke('test-ipc@plugin-id', ...args) 调用
+    type: 'test-ipc', // UI 端通过 useIpc('插件ID').invoke('test-ipc', ...args) 调用
     /**
      * @param {object} context 包含工具函数，如 sendToClient
      * @returns {Function} 返回一个函数处理请求
@@ -238,8 +251,8 @@ export const ipcHandlers = [
         return { success: false, message: e.message };
       }
     },
-  }
-];
+  },
+]);
 ```
 
 如果在 manifest 中声明了 `onIpc:test-ipc`，那么第一次调用 `test-ipc@plugin-id` 前，宿主会先激活你的插件，再把请求路由到对应 handler。
@@ -375,11 +388,16 @@ const { VBtn, VCard } = useVuetifyComponents();
 ```javascript
 import { useIpc } from 'translime-sdk';
 
-const ipc = useIpc();
+// 推荐：传入插件 ID，事件名自动补全 `@插件ID` 后缀，无需手拼字符串
+const ipc = useIpc('my-plugin-id');
+const result = await ipc.invoke('test-ipc', arg1, arg2);
 
-// 调用主进程定义的接口，格式为 'handlerName@pluginId'
-// 注意：必须带上 @pluginId 后缀，以便系统准确路由到对应插件
-const result = await ipc.invoke('test-ipc@my-plugin-id', arg1, arg2);
+// 接收主进程 sendToClient('event-name') 的主动推送（同样自动补全后缀）
+ipc.on('event-name', (data) => { ... });
+
+// 也可以不传插件 ID 使用原始客户端，此时事件名必须自带 'handlerName@pluginId' 后缀
+const rawIpc = useIpc();
+const sameResult = await rawIpc.invoke('test-ipc@my-plugin-id', arg1, arg2);
 ```
 
 #### 2. 插件设置管理

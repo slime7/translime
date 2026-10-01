@@ -5,6 +5,12 @@ interface TranslimeSdkOptions {
    * Preview 模式下要渲染的组件路径
    */
   previewComponent?: string;
+  /**
+   * Preview 模式下的声明式 IPC mock 模块路径。
+   * 该模块默认导出 `{ [事件名]: (...args) => result }`；
+   * 事件名可带或不带 `@插件ID` 后缀，invoke 命中时返回其返回值，未命中返回 null
+   */
+  previewIpcMocks?: string;
 }
 
 /**

@@ -519,10 +519,13 @@ const refreshDevPlugins = async () => {
 const pluginCardRefs = ref([]);
 const devPluginWizardRef = ref(null);
 
-const openPluginSettingPanel = () => {
+const openPluginSettingPanel = async () => {
   const query = { ...route.query };
   const settingPluginId = query.setting;
   if (settingPluginId && pluginCardRefs.value && pluginCardRefs.value.length) {
+    // settingMenu 在插件激活时才由主进程合并进插件对象，渲染端 store 可能
+    // 还停留在激活前的快照；先刷新一次插件数据，避免配置面板渲染为空
+    await getPlugins();
     const findPluginRef = pluginCardRefs.value.find((r) => r.pluginId === settingPluginId);
     if (findPluginRef) {
       findPluginRef.showSettingPanel();

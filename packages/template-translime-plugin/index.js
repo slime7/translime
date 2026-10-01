@@ -1,87 +1,29 @@
-import { useLogger, usePluginConfig, usePluginInterop } from 'translime-sdk';
-import EventEmitter from 'node:events';
+import { useLogger, usePluginConfig, defineIpcHandlers } from 'translime-sdk';
 
 const id = 'translime-plugin-example';
 const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: id, context: 'Main' }) : baseLogger;
 
 const pluginConfig = usePluginConfig(id);
-let captureCompleteListener = null;
-let activeHdrApi = null;
-
-const registerHdrCaptureListener = (hdrApi) => {
-  if (!hdrApi) return;
-  // 如果之前已经注册过，先移除
-  if (activeHdrApi && captureCompleteListener) {
-    activeHdrApi.offCaptureComplete(captureCompleteListener);
-  }
-
-  captureCompleteListener = ({ path, hdrPath, type }) => {
-    logger.info(`[${id}] 截图完成: type=${type}, path=${path}, hdrPath=${hdrPath}`);
-  };
-
-  hdrApi.onCaptureComplete(captureCompleteListener);
-  activeHdrApi = hdrApi;
-};
-
-const unregisterHdrCaptureListener = () => {
-  if (activeHdrApi && captureCompleteListener) {
-    activeHdrApi.offCaptureComplete(captureCompleteListener);
-  }
-  captureCompleteListener = null;
-  activeHdrApi = null;
-};
-
-let activateListener = null;
 
 // 加载时执行
 const pluginDidLoad = () => {
-  // eslint-disable-next-line no-console
-  console.log('plugin loaded');
+  logger.info(`[${id}] plugin loaded`);
   const setting = pluginConfig.get('setting', {});
-  // eslint-disable-next-line no-console
-  console.log('settings: ', setting);
-
-  const interop = usePluginInterop();
-  if (interop) {
-    // 启动时如果 HDR 截图插件已启用，则直接注册监听
-    const hdrApi = interop.getExports('translime-plugin-hdr-capture');
-    registerHdrCaptureListener(hdrApi);
-
-    // 监听后续插件状态变化（例如禁用后重新启用）
-    activateListener = (pluginId, exports) => {
-      if (pluginId === 'translime-plugin-hdr-capture') {
-        // eslint-disable-next-line no-console
-        console.log(`[${id}] 监听到 HDR 截图插件激活，重新注册监听器`);
-        registerHdrCaptureListener(exports);
-      }
-    };
-    interop.on('activated', activateListener);
-  }
+  logger.info(`[${id}] settings:`, setting);
 };
 
 // 禁用时执行
 const pluginWillUnload = () => {
-  // eslint-disable-next-line no-console
-  console.log('plugin unloaded');
-
-  // 移除捕获回调监听
-  unregisterHdrCaptureListener();
-
-  const interop = usePluginInterop();
-  if (interop && activateListener) {
-    interop.off('activated', activateListener);
-    activateListener = null;
-  }
+  logger.info(`[${id}] plugin unloaded`);
 };
 
 // 设置保存时执行
 const pluginSettingSaved = () => {
-  // eslint-disable-next-line no-console
-  console.log('plugin setting saved');
+  logger.info(`[${id}] plugin setting saved`);
 };
 
-// 插件设置表单
+// 插件设置表单：覆盖全部控件类型，可作设置面板的参照实现
 const settingMenu = [
   // 文本框
   {
@@ -91,14 +33,13 @@ const settingMenu = [
     required: false, // 是否必填
     placeholder: '输入提示',
   },
-  // 密码文本框
+  // 密码框
   {
     type: 'password',
     name: '密码',
     required: true,
     placeholder: '请输入密码',
   },
-  // 开关
   {
     type: 'switch',
     name: '开关',
@@ -121,7 +62,7 @@ const settingMenu = [
       },
     ],
   },
-  // 单选框
+  // 单选框 / 下拉列表
   {
     type: 'radio',
     name: '单选',
@@ -134,7 +75,6 @@ const settingMenu = [
     required: true,
     choices: ['foo', 'bar'],
   },
-  // 文件选择
   {
     key: 'file-1',
     type: 'file',
@@ -160,39 +100,44 @@ const pluginMenu = [
     id: `${id}-custom-menu`,
     label: 'custom menu',
     click() {
-      // eslint-disable-next-line no-console
-      console.log('custom menu clicked');
+      logger.info(`[${id}] custom menu clicked`);
     },
   },
 ];
 
 // ipc 定义
-const ipcHandlers = [
+// defineIpcHandlers 提供结构校验：type 不需要也不能带 `@插件ID` 后缀，
+// 宿主注册通道时会自动追加；UI 端用 useIpc('插件ID') 调用时 SDK 也会自动补全
+const ipcHandlers = defineIpcHandlers([
   {
-    type: 'test-ipc', // 调用时需加上`@${id}`，此处为 'test-ipc@translime-plugin-example'
+    type: 'test-ipc',
     handler: ({ sendToClient }) => (arg1, arg2) => {
-      // eslint-disable-next-line no-console
-      console.log('test-ipc', 'test ipc from plugin: ', arg1, arg2);
+      logger.info(`[${id}] test ipc from plugin:`, arg1, arg2);
+      // 主动推送给 UI（可选）：UI 端 ipc.on('test-ipc-reply', callback) 接收
       sendToClient(`test-ipc-reply@${id}`, 'test ipc reply from plugin');
+      return { success: true, message: '响应结果' };
     },
   },
-];
+]);
 
-// 跨插件通信（可选）
-// 通过导出 libs 对象，可以将数据、方法或事件暴露给其他插件使用
-const bus = new EventEmitter();
+// 跨插件通信（可选）：导出 libs 对象，其他插件可通过 usePluginInterop() 访问
 let counter = 0;
+const counterListeners = new Set();
 
 const libs = {
   getCounter: () => counter,
   increment: () => {
     counter += 1;
-    bus.emit('counter-changed', counter);
+    counterListeners.forEach((fn) => fn(counter));
   },
-  onCounterChanged: (fn) => bus.on('counter-changed', fn),
-  offCounterChanged: (fn) => bus.off('counter-changed', fn),
+  onCounterChanged: (fn) => {
+    counterListeners.add(fn);
+    return () => counterListeners.delete(fn);
+  },
 };
 
+// 插件命令：与 package.json 中 plugin.contributes.commands 的静态声明配套，
+// 宿主会先激活插件再执行对应 handler
 const commands = [
   {
     id: 'translime-plugin-example.increment-counter',

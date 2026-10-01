@@ -146,6 +146,7 @@
       <li>运行 <code>pnpm install && pnpm dev</code> 同时监听两套构建；构建产物变化后，宿主会 <b>自动重启该插件</b>（需开启「显示开发中插件」），无需手动操作。</li>
       <li>手动刷新可用插件中心的 <b>刷新开发中插件</b> 按钮或卡片右键 <b>重启插件</b>。</li>
       <li>调试 UI：卡片右键可打开插件 webview 的 DevTools；调试主进程逻辑：宿主内置 <b>日志查看器</b>。</li>
+      <li>断点调试主进程：宿主开发模式以 <code>--inspect=5858</code> 启动，VSCode 附加该端口即可在插件 <code>index.js</code> 中打断点（插件 <code>pnpm dev</code> 的 watch 构建自带 inline sourcemap）。</li>
       <li>独立窗口插件可在 manifest 中声明 <code>windowUrl.dev</code> 指向本地 dev server，获得热更新。</li>
     </ul>
     <div class="tip">
@@ -154,6 +155,7 @@
 
     <h2>四、SDK 与 manifest</h2>
     <p>插件通过 <a href="https://www.npmjs.com/package/translime-sdk" target="_blank">translime-sdk</a> 访问宿主能力，API 与环境边界见 <a href="https://github.com/slime7/translime/blob/dev/packages/sdk/README.md" target="_blank">SDK 文档</a>。常用约定：</p>
+    <p>建议在 <code>package.json</code> 中加一行 <code>"$schema": "https://slime7.github.io/translime/translime-plugin.schema.json"</code>，编辑器即可对 manifest 字段做补全与校验（从模板创建的插件已默认包含）。</p>
     <table>
       <tr><th>约定</th><th>说明</th></tr>
       <tr><td>包名</td><td>必须以 <code>translime-plugin-</code> 开头，小写字母、数字、连字符</td></tr>

@@ -1,4 +1,5 @@
 {
+  "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
   "name": "translime-plugin-example",
   "version": "3.0.0",
   "description": "a plugin example",

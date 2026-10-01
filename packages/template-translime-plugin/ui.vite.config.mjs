@@ -17,7 +17,10 @@ export default defineConfig(({ mode }) => {
   const plugins = [
     vue(),
     // tailwindcss(), // 可选
-    translimeSdk(),
+    translimeSdk({
+      // preview 模式下的声明式 IPC mock，见 preview-mocks.mjs
+      previewIpcMocks: './preview-mocks.mjs',
+    }),
   ];
 
   if (isPreview) {
@@ -33,7 +36,8 @@ export default defineConfig(({ mode }) => {
     envDir: process.cwd(),
     build: {
       minify: false,
-      sourcemap: isPreview ? 'inline' : false,
+      // watch 构建输出 inline sourcemap，便于 webview devtools 定位插件 UI 源码
+      sourcemap: mode === 'production' ? false : 'inline',
       target: 'node20',
       outDir: './dist',
       lib: {

@@ -57,7 +57,7 @@ flowchart LR
   - `plugin-loader/constants.js`：路径、状态与激活常量
   - `plugin-loader/discovery.js`：目录扫描、manifest 解析、依赖图与激活索引
   - `plugin-loader/metadata.js`：manifest 安全读取、`engines.translime` 兼容校验、manifest 警告收集与状态刷新
-  - `plugin-loader/runtime.js`：激活、启停、命令执行与 IPC 就绪；生命周期回调（`pluginDidLoad`/`pluginWillUnload`/`pluginSettingSaved`）异常隔离，激活全程记录耗时
+  - `plugin-loader/runtime.js`：激活、启停、命令执行与 IPC 就绪；生命周期回调（`pluginDidLoad`/`pluginWillUnload`/`pluginSettingSaved`）异常隔离，激活全程记录耗时；静态元数据（`settingMenu`）支持激活前按需延迟加载，未激活/未启用插件也能打开配置面板
   - `plugin-loader/isolatedRuntime.js`：隔离模式宿主侧，fork utilityProcess 并桥接 IPC/命令/日志，子进程崩溃转为 `load-error`
   - `plugin-loader/pluginSenderRegistry.js`：插件渲染端（webview / 独立窗口）归属登记，供 IPC 收口校验
   - `plugin-loader/installer.js` 与 `plugin-loader/packageInstaller.js`：插件安装与卸载
@@ -96,10 +96,11 @@ flowchart LR
 
 ### SDK（packages/sdk）
 
-- `src/index.js` 与 `src/index.d.ts`：运行时 API 与类型（主进程、渲染进程、通用三组）。
-- `src/vite-plugin.js`：`translimeSdk()` Vite 插件与 `createPluginCssIsolationPlugins()` CSS 提取、注入和去重封装；插件选择器作用域由宿主 app 运行时完成。
+- `src/index.js` 与 `src/index.d.ts`：运行时 API 与类型（主进程、渲染进程、通用三组）；`useIpc(pluginId)` 为事件名自动补全 `@插件ID` 后缀，`defineIpcHandlers()` 在激活前校验 `ipcHandlers` 导出结构。
+- `src/vite-plugin.js`：`translimeSdk()` Vite 插件与 `createPluginCssIsolationPlugins()` CSS 提取、注入和去重封装；插件选择器作用域由宿主 app 运行时完成。preview 模式支持 `previewIpcMocks` 声明式 IPC mock。
 - `src/preview/` 与 `src/preview-mock.js`：浏览器 preview 模式 shell 与 mock 实现。
 - `src/electronNetAdapter.js`：基于 `window.ts.net` 的 axios adapter。
+- `translime-plugin.schema.json`：插件 manifest（package.json 的 `plugin` 字段与 `engines.translime`）的 JSON schema，随 npm 发布并部署到 github-page，供插件 package.json 的 `$schema` 引用做编辑期校验。
 - 发布产物：`dist/index.(js|cjs)`、`dist/vite-plugin.*`、`dist/preview.*`、`dist/preview-mock.*` 与类型声明。
 
 ### 插件包（packages/translime-plugin-*）

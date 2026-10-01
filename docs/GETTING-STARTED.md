@@ -120,9 +120,16 @@ node .agents/plugin-scaffold/create-plugin.mjs --name translime-plugin-your-name
 3. 在宿主设置中开启"显示开发中插件"，进入插件页面启用并验证。
 4. 重新构建后使用插件卡片上的重载入口刷新。
 
+### 断点调试插件主进程
+
+1. 在插件目录运行 `pnpm dev`（非生产构建输出 inline sourcemap）。
+2. 宿主开发模式（`pnpm dev`）固定以 `--inspect=5858` 启动 Electron，插件主进程代码与宿主同进程运行。
+3. 在 VSCode 中使用仓库根目录 `.vscode/launch.json` 的「附加到 translime 宿主主进程 (5858)」配置，即可直接在插件主进程源码中打断点。
+4. 渲染进程需要 CDP 调试时，用 `pnpm dev:cdp`（9222 端口）启动宿主并使用 launch.json 的对应配置；插件 UI 也可在插件页标题栏用 inspect 按钮打开 webview devtools。
+
 ### 调试插件 UI（preview 模式）
 
-部分插件提供 `preview:ui` 脚本（如 `pnpm --filter translime-plugin-example run preview:ui`），在普通浏览器中运行 SDK 提供的 preview shell，mock 宿主 API。涉及布局、主题、窗口模式与宿主集成行为时，以宿主内效果为准。
+部分插件提供 `preview:ui` 脚本（如 `pnpm --filter translime-plugin-example run preview:ui`），在普通浏览器中运行 SDK 提供的 preview shell，mock 宿主 API。在 `translimeSdk()` 配置 `previewIpcMocks` 指向一个默认导出 `{ [事件名]: (...args) => result }` 的模块，可让 `ipc.invoke` 在 preview 中返回声明式 mock 结果。涉及布局、主题、窗口模式与宿主集成行为时，以宿主内效果为准。
 
 ## 常见故障
 

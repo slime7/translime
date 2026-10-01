@@ -123,15 +123,71 @@ export function usePluginInterop() {
 // ----------------------------------------------------------------------
 
 /**
- * 获取 IPC 通信工具
- * @description 仅在 **渲染进程 (Renderer Process)** 环境可用
- * @returns {Object|null} 包含 invoke, send, on 等方法的对象
+ * 为插件事件名补全 `@插件ID` 后缀。
+ * 宿主按 `事件名@插件ID` 路由；显式带 `@` 的事件名视为已限定，保持原样。
+ * @param {string} type 事件名
+ * @param {string} pluginId 插件 ID
+ * @returns {string}
  */
-export function useIpc() {
-  if (typeof window !== 'undefined' && window.electron?.useIpc) {
-    return window.electron.useIpc();
+const qualifyIpcType = (type, pluginId) => (
+  String(type).includes('@') ? type : `${type}@${pluginId}`
+);
+
+/**
+ * 获取 IPC 通信工具
+ * @description 仅在 **渲染进程 (Renderer Process)** 环境可用。
+ * 传入 pluginId 时返回插件专用客户端：invoke / send / on / detach 的事件名
+ * 会自动补全 `@插件ID` 后缀，插件代码无需再手拼 `'事件名@插件ID'` 字符串；
+ * 显式包含 `@` 的事件名保持原样。不传 pluginId 时行为与旧版一致，返回原始客户端。
+ * @param {string} [pluginId] 插件 ID (通常与 package.json 中的 name 一致)
+ * @returns {Object|null} 包含 invoke, send, on, detach 方法的对象
+ */
+export function useIpc(pluginId) {
+  const baseIpc = (typeof window !== 'undefined' && window.electron?.useIpc)
+    ? window.electron.useIpc()
+    : null;
+  if (!baseIpc) {
+    return null;
   }
-  return null;
+  if (!pluginId) {
+    return baseIpc;
+  }
+  return {
+    invoke: (type, ...args) => baseIpc.invoke(qualifyIpcType(type, pluginId), ...args),
+    send: (type, data) => baseIpc.send(qualifyIpcType(type, pluginId), data),
+    on: (type, callback) => baseIpc.on(qualifyIpcType(type, pluginId), callback),
+    detach: (type) => baseIpc.detach(qualifyIpcType(type, pluginId)),
+  };
+}
+
+// ----------------------------------------------------------------------
+// Plugin Main Entrypoint Helpers (Main Process)
+// ----------------------------------------------------------------------
+
+/**
+ * 定义插件主进程 IPC handler。
+ * @description 仅用于 **主进程** 导出的 `ipcHandlers`。宿主注册通道时会自动追加
+ * `@插件ID` 后缀，因此 `type` 不应包含 `@`；对合法入参原样返回 handlers，
+ * 对缺 type / 缺 handler / type 带 `@` 的条目在激活前直接抛错，避免问题延迟到运行期。
+ * @param {Array<{type: string, handler: Function}>} handlers IPC handler 定义数组
+ * @returns {Array<{type: string, handler: Function}>} 原样返回的 handlers
+ */
+export function defineIpcHandlers(handlers) {
+  if (!Array.isArray(handlers)) {
+    throw new Error('defineIpcHandlers 需要传入 ipcHandlers 数组');
+  }
+  handlers.forEach((entry, index) => {
+    if (!entry || typeof entry.type !== 'string' || !entry.type) {
+      throw new Error(`defineIpcHandlers: 第 ${index} 项缺少字符串类型的 type 字段`);
+    }
+    if (typeof entry.handler !== 'function') {
+      throw new Error(`defineIpcHandlers: "${entry.type}" 缺少 handler 函数`);
+    }
+    if (entry.type.includes('@')) {
+      throw new Error(`defineIpcHandlers: "${entry.type}" 不应包含 @，宿主注册通道时会自动追加 @插件ID 后缀`);
+    }
+  });
+  return handlers;
 }
 
 /**

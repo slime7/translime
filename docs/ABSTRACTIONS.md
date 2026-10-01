@@ -36,6 +36,10 @@
 （激活后不注册主进程能力），并记录 manifest 警告。入口已声明但产物缺失才视为 `build-missing`。
 插件 ID 即包名，必须全局唯一，且符合 `translime-plugin-[a-z0-9-]+`。
 
+manifest 的编辑期校验与字段补全通过 JSON schema 提供：`packages/sdk/translime-plugin.schema.json`
+（随 SDK 发布并部署到 github-page），插件 package.json 以 `$schema` 引用；schema 与宿主解析
+保持同一份字段契约。
+
 ## 插件状态机
 
 | 状态 | 含义 |
@@ -80,7 +84,7 @@ stateDiagram-v2
 ## 命名与序列化约定
 
 - 包名：`translime-plugin-*`（小写字母、数字、连字符）。
-- IPC 事件：`事件名@插件ID`，例如 `ipc.invoke('get-data@translime-plugin-example')`。
+- IPC 事件：`事件名@插件ID`，例如 `ipc.invoke('get-data@translime-plugin-example')`；渲染端 `useIpc(pluginId)` 与主进程 `defineIpcHandlers` 的 `type` 均可省略后缀，由 SDK / 宿主自动补全。
 - 构建产物：主进程入口 `index.cjs.js`（CJS），UI 入口 `ui.esm.js`（ESM）。
 - 图标：Material Design Icons（md）风格，禁止 `mdi-` 前缀。
 - 配置键：`plugin.<插件ID>.settings.<key>`。
@@ -99,11 +103,18 @@ stateDiagram-v2
 | `ipcHandlers` | IPC handler 数组，handler 接收 `{ sendToClient }` |
 | `commands` | 运行期命令处理函数 |
 
+`settingMenu` 属于声明式元数据：宿主在构建插件上下文菜单时按需加载入口模块并合并
+（`ensurePluginMetadata`，只读静态导出，不注册 IPC / 命令 / libs，也不执行
+`pluginDidLoad`），因此未激活、未启用的插件同样能随时打开配置面板；配置读写走
+config store，保存时的 `pluginSettingSaved` 仅在插件处于激活态时回调。入口模块经
+require 缓存与激活共享，预读不会重复执行顶层代码；停用/卸载会随缓存清理一并失效
+静态元数据。`pluginMenu` 的点击语义伴随激活，仍在激活时合并。
+
 ## SDK 环境边界
 
 | API | 环境 |
 | --- | --- |
-| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()` | 主进程（隔离模式下抛错） |
+| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()`、`defineIpcHandlers()` | 主进程（前三个在隔离模式下抛错） |
 | `useIpc()`、`useVuetify*()`、`useMat()` / `useMde()`、`useMatComponents()`、`useMatDirectives()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
 | `useLogger()`、`isPreviewMode()`、`isIsolatedMode()` | 通用 |
 

@@ -14,7 +14,7 @@ import { aliases, md } from 'vuetify/iconsets/md';
 import { md3 } from 'vuetify/blueprints';
 import 'vuetify/styles';
 
-import { initPreviewMock } from '../preview-mock';
+import { initPreviewMock, setPreviewIpcMocks } from '../preview-mock';
 import PreviewApp from './App.vue';
 
 /**
@@ -22,12 +22,18 @@ import PreviewApp from './App.vue';
  * @param {Object} pluginComponent - 要预览的插件 Vue 组件
  * @param {Object} options - 可选配置
  * @param {string} options.mountId - 挂载元素 ID，默认 'app'
+ * @param {Object} [options.ipcMocks] - 声明式 IPC mock handler 表
+ *   （键为事件名，值为 (...args) => result），由 vite 插件
+ *   `translimeSdk({ previewIpcMocks })` 指向的模块提供默认值
  */
 export async function startPreview(pluginComponent, options = {}) {
-  const { mountId = 'app' } = options;
+  const { mountId = 'app', ipcMocks } = options;
 
-  // 初始化 mock 环境
+  // 初始化 mock 环境（SDK 导入时的副作用可能已初始化过，这里只补齐 mock 表）
   initPreviewMock();
+  if (ipcMocks) {
+    setPreviewIpcMocks(ipcMocks);
+  }
 
   // 创建 Vuetify 实例（与主程序保持一致）
   const vuetify = createVuetify({

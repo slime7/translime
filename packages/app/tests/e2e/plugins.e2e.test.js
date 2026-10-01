@@ -58,8 +58,10 @@ test.describe('插件生态与管理交互 (Plugins E2E)', () => {
     // 搜索框与两个操作按钮必须仍在同一行
     expect(Math.abs(searchRect.y - installRect.y)).toBeLessThan(16);
     expect(Math.abs(searchRect.y - refreshRect.y)).toBeLessThan(16);
-    // 搜索框右缘与第一个按钮左缘之间不允许出现大空档
-    expect(installRect.x - (searchRect.x + searchRect.width)).toBeLessThan(48);
+    // 搜索框右缘与第一个按钮左缘之间不允许出现大空档。
+    // 阈值需覆盖 mat-search 输入框元素盒右侧的内边距（元素盒宽于视觉胶囊），
+    // “按钮换行/行中出现大片空白”由上方 y 轴同行断言保证
+    expect(installRect.x - (searchRect.x + searchRect.width)).toBeLessThan(96);
   });
 
   test('首次进入插件页面时应显示插件标题栏', async ({ electronContext }) => {
@@ -114,6 +116,31 @@ test.describe('插件生态与管理交互 (Plugins E2E)', () => {
     // 防止的回归：清空搜索自动跳回已安装页签
     await expect(pluginCard).not.toBeVisible({ timeout: 3000 });
     await expect(marketSplash).not.toBeVisible();
+  });
+
+  test('未激活的插件也能直接打开配置面板并渲染设置项', async ({ electronContext }) => {
+    const { page } = electronContext;
+
+    await page.locator('.plugin-center').first().waitFor({ state: 'visible', timeout: 10000 });
+    const pluginCard = page.locator('[data-test="plugin-card"][data-test-package="translime-plugin-mock-test"]').first();
+    await expect(pluginCard).toBeVisible({ timeout: 10000 });
+
+    // mock 插件声明 onView 激活，此时从未激活；设置项属于声明式元数据，
+    // 打开卡片菜单时应延迟加载入口的 settingMenu（不触发激活）
+    const menuBtn = pluginCard.locator('[data-test="plugin-menu-btn"]').first();
+    await menuBtn.click();
+    const menuItem = page.getByRole('menuitem', { name: '设置' }).first();
+    await expect(menuItem).toBeVisible({ timeout: 8000 });
+    await menuItem.click();
+
+    // 防止的回归：settingMenu 在激活时才合并进主进程插件对象，若菜单不
+    // 延迟加载元数据、或面板打开前不刷新渲染端数据，配置面板会渲染成只有
+    // 提示文案的空面板
+    const settingDialog = page.locator('[data-test="plugin-setting-dialog"]').first();
+    await expect(settingDialog).toBeVisible({ timeout: 8000 });
+    await expect(settingDialog).toContainText('文本1', { timeout: 8000 });
+    await expect(settingDialog).toContainText('下拉菜单');
+    await expect(settingDialog).toContainText('文件选择1');
   });
 
   test('插件搜索框右键应弹出文本编辑菜单', async ({ electronContext }) => {

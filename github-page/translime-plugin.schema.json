@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://slime7.github.io/translime/translime-plugin.schema.json",
+  "title": "Translime 插件 package.json",
+  "description": "translime 插件包的 package.json 校验规则。plugin 字段与 engines.translime 由宿主在加载时解析；在 package.json 中通过 $schema 引用本文件可获得编辑期补全与校验。",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^translime-plugin-[a-z0-9-]+$",
+      "description": "插件包名，即插件 ID，必须全局唯一且以 translime-plugin- 开头"
+    },
+    "version": {
+      "type": "string",
+      "description": "语义化版本号"
+    },
+    "description": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "private": {
+      "type": "boolean"
+    },
+    "main": {
+      "type": "string",
+      "description": "插件主进程入口（如 dist/index.cjs.js）；未声明时插件作为纯 UI 插件运行并记录 manifest 警告"
+    },
+    "exports": {
+      "type": "object"
+    },
+    "files": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "$schema": {
+      "type": "string"
+    },
+    "engines": {
+      "type": "object",
+      "properties": {
+        "translime": {
+          "type": "string",
+          "description": "兼容的宿主版本 semver 范围（如 '>=0.6.0'）；缺省视为兼容任意版本，声明后由宿主校验，不满足时插件进入 incompatible 状态"
+        }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^//": {}
+      },
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "插件展示名称"
+        },
+        "description": {
+          "type": "string",
+          "description": "插件功能描述"
+        },
+        "icon": {
+          "type": "string",
+          "description": "插件图标路径，相对插件根目录（可选）"
+        },
+        "ui": {
+          "type": "string",
+          "description": "UI 入口产物（如 dist/ui.esm.js），宿主以 webview 内嵌加载"
+        },
+        "windowUrl": {
+          "type": "string",
+          "description": "独立窗口模式 HTML 入口或 URL；声明后插件以独立 BrowserWindow 打开"
+        },
+        "windowUrl.dev": {
+          "type": "string",
+          "description": "开发模式专用窗口地址，覆盖 windowUrl（仅 plugins_dev 中的开发插件生效）"
+        },
+        "activationEvents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "oneOf": [
+              {
+                "enum": ["onStartup", "onAppReady", "onView"]
+              },
+              {
+                "pattern": "^onCommand:[a-z0-9-]+(\\.[a-z0-9-]+)+$",
+                "description": "执行对应静态命令前激活"
+              },
+              {
+                "pattern": "^onIpc:.+$",
+                "description": "第一次收到对应 IPC 调用前激活"
+              }
+            ]
+          },
+          "description": "激活时机数组，缺省等价于 [\"onStartup\"]；带 UI 的工具型插件优先使用 onView"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^translime-plugin-[a-z0-9-]+$"
+          },
+          "description": "硬依赖插件列表，启用前必须满足，否则插件进入 blocked 状态"
+        },
+        "optionalDependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^translime-plugin-[a-z0-9-]+$"
+          },
+          "description": "可选依赖插件列表，仅用于能力发现"
+        },
+        "isolated": {
+          "type": "boolean",
+          "description": "true 时主进程代码运行在独立 utilityProcess 中；不支持 libs 导出与 getMainStore / usePluginConfig / usePluginInterop"
+        },
+        "contributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "commands": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "命令 ID，需与主进程导出的 commands[].id 一致；缺少 id 会记录 manifest 警告"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "命令展示标题"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

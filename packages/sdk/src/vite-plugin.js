@@ -130,11 +130,15 @@ export function createPluginCssIsolationPlugins(styleId) {
  *
  * @param {Object} options - 插件选项
  * @param {string} [options.previewComponent] - Preview 模式下的入口组件路径（默认为 build.lib.entry）
+ * @param {string} [options.previewIpcMocks] - Preview 模式下的声明式 IPC mock 模块路径，
+ *   该模块默认导出 `{ [事件名]: (...args) => result }`；事件名可带或不带 `@插件ID` 后缀，
+ *   invoke 命中时返回其返回值，未命中返回 null
  * @returns {import('vite').Plugin}
  */
 export function translimeSdk(options = {}) {
   let isPreviewMode = false;
   let resolvedPreviewComponent = '';
+  let resolvedPreviewMocksPath = '';
 
   return {
     name: 'translime-sdk-plugin',
@@ -157,6 +161,14 @@ export function translimeSdk(options = {}) {
       // 规范化路径（Vite 需要 ./ 或 / 开头）
       if (resolvedPreviewComponent && !resolvedPreviewComponent.startsWith('./') && !resolvedPreviewComponent.startsWith('/')) {
         resolvedPreviewComponent = `./${resolvedPreviewComponent}`;
+      }
+
+      // Preview 模式的声明式 IPC mock 模块路径（默认导出 handler 表）
+      if (isPreviewMode && options.previewIpcMocks) {
+        resolvedPreviewMocksPath = options.previewIpcMocks;
+        if (!resolvedPreviewMocksPath.startsWith('./') && !resolvedPreviewMocksPath.startsWith('/')) {
+          resolvedPreviewMocksPath = `./${resolvedPreviewMocksPath}`;
+        }
       }
 
       // 基础配置（通用）
@@ -242,11 +254,15 @@ export function translimeSdk(options = {}) {
     // ----------------------------------------------------------------------
     load(id) {
       if (id === RESOLVED_VIRTUAL_PREVIEW_ENTRY) {
-        // 生成引导代码：导入 Preview 框架 + 用户插件组件
+        // 生成引导代码：导入 Preview 框架 + 用户插件组件（+ 可选 IPC mock 表）
         const componentPath = resolvedPreviewComponent || './src/ui/ui.vue';
+        const mocksImport = resolvedPreviewMocksPath
+          ? `import PreviewIpcMocks from '${resolvedPreviewMocksPath}';\n`
+          : '';
+        const mocksArg = resolvedPreviewMocksPath ? 'PreviewIpcMocks' : 'undefined';
         return `import { startPreview } from 'translime-sdk/preview';
 import PluginComponent from '${componentPath}';
-startPreview(PluginComponent);
+${mocksImport}startPreview(PluginComponent, { ipcMocks: ${mocksArg} });
 `;
       }
       return null;
