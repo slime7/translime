@@ -26,6 +26,7 @@ import {
   normalizeCustomDir,
   normalizeGameNameKey,
 } from './utils/custom-dirs';
+import createSyncService from './utils/sync/sync-service';
 
 const pluginId = 'translime-plugin-steam-save-backup';
 const { mainStore } = global;
@@ -42,6 +43,18 @@ const getPathSetting = (settings, key) => {
   }
   return '';
 };
+
+const syncService = createSyncService({
+  pluginId,
+  getConfig: (key, defaultValue) => config?.get(key, defaultValue),
+  setConfig: (key, value) => {
+    config?.set(key, value);
+  },
+  resolveBackupRoot: async () => {
+    const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
+    return resolveBackupRoot(getPathSetting(settings, 'customBackupRoot'));
+  },
+});
 
 // 从设置中获取排除列表
 const getExcludeList = () => {
@@ -169,11 +182,15 @@ export const pluginDidLoad = async () => {
     steamPath = customSteamPath;
     console.log('使用自定义 Steam 路径：', steamPath);
   }
+
+  // 激活后延迟对账，不阻塞加载（docs/auto-sync-research.md §5 NAS 掉线风险）
+  syncService.onActivated();
 };
 
 // 禁用时执行
 export const pluginWillUnload = () => {
   console.log(`${pluginId} unloaded`);
+  syncService.dispose();
 };
 
 // IPC 定义 - 使用 invoke 模式，直接返回结果
@@ -290,7 +307,12 @@ export const ipcHandlers = [
           pathsToBackup,
           backupRoot,
           normalizedSources,
+          { machineId: syncService.ensureMachineId() },
         );
+        if (result.success) {
+          // 备份完成后自动推送远端（docs/auto-sync-research.md §2 触发时机）
+          syncService.onBackupCreated(gameId);
+        }
         return result;
       } catch (e) {
         return { success: false, message: e.message };
@@ -459,6 +481,65 @@ export const ipcHandlers = [
       } catch (e) {
         return { success: false, message: e.message };
       }
+    },
+  },
+  {
+    type: 'sync-get-status',
+    handler: () => async () => ({ success: true, status: syncService.getStatus() }),
+  },
+  {
+    type: 'sync-set-config',
+    handler: () => async (syncConfig) => {
+      try {
+        if (!syncConfig || typeof syncConfig !== 'object') {
+          return { success: false, message: '参数不完整' };
+        }
+        if (syncConfig.enabled && !String(syncConfig.target || '').trim()) {
+          return { success: false, message: '启用同步前需要填写远程目标' };
+        }
+        syncService.setSyncConfig(syncConfig);
+        // 启用并保存后立即对账一次，让状态尽快可见；未启用时 trigger 被 canRun 忽略
+        syncService.trigger('manual');
+        return { success: true, status: syncService.getStatus() };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-check-rclone',
+    handler: () => async ({ rclonePath } = {}) => {
+      try {
+        const probe = await syncService.checkRclone(rclonePath);
+        return { success: probe.ok, rclone: probe };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-now',
+    handler: () => async () => {
+      try {
+        const status = syncService.getStatus();
+        if (!status.config.enabled || !status.config.target) {
+          return { success: false, message: '请先在同步设置中启用并配置远程目标' };
+        }
+        const result = syncService.trigger('manual');
+        if (result === 'ignored') {
+          return { success: false, message: '请先在同步设置中启用并配置远程目标' };
+        }
+        return { success: true, result };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-cancel',
+    handler: () => async () => {
+      syncService.cancel();
+      return { success: true };
     },
   },
 ];

@@ -22,18 +22,27 @@ packages/translime-plugin-steam-save-backup/
 │   ├── index.js            # 主进程入口 (Main Process Entry)
 │   ├── ui/                 # 渲染进程 (UI)
 │   │   ├── ui.vue          # 插件 UI 主组件
-│   │   ├── components/     # UI 子组件（游戏卡片/详情对话框/自定义目录对话框等）
-│   │   └── composables/    # useSteamSaveBackup 组合式状态
+│   │   ├── components/     # UI 子组件（游戏卡片/详情对话框/自定义目录对话框/远程同步对话框等）
+│   │   ├── composables/    # useSteamSaveBackup / useSyncStatus 组合式状态
+│   │   └── preview-mocks.mjs # preview 模式声明式 IPC mock
 │   └── utils/              # 逻辑与辅助工具 (Logic & Helpers)
 │       ├── backup.js       # 备份/还原核心逻辑
 │       ├── custom-dirs.js  # 自定义存档目录枚举与去重
 │       ├── fs-wrapper.js   # 文件系统命令封装
 │       ├── save-sources.js # 存档来源模型（steam-cloud / custom-directory）
 │       ├── steam.js        # Steam 路径检测与游戏扫描
-│       └── vdf-parser.js   # Steam VDF 文件解析器
+│       ├── vdf-parser.js   # Steam VDF 文件解析器
+│       └── sync/           # 远程同步（rclone 引擎，见 docs/auto-sync-research.md）
+│           ├── rclone.js       # rclone 子进程封装（执行/探测/取消注册）
+│           ├── manifest.js     # 备份清单构建与对账计划（纯逻辑）
+│           ├── engine.js       # 对账引擎 runSync（拉清单/改名/上传/下载）
+│           ├── queue.js        # 串行队列 + 指数退避重试
+│           └── sync-service.js # 配置/持久状态/触发编排
+├── tests/                  # vitest 单元测试（utils 与 sync 模块）
+├── docs/auto-sync-research.md # 远程同步调研（协议与方案依据）
 ├── package.json            # 依赖项与插件元数据
-├── vite.config.js          # 主进程构建配置
-└── ui.vite.config.js       # UI 构建配置
+├── vite.config.mjs         # 主进程构建配置
+└── ui.vite.config.mjs      # UI 构建配置
 ```
 
 ## 3. 开发规范 (Development Guidelines)
@@ -88,11 +97,19 @@ packages/translime-plugin-steam-save-backup/
     2.  `remove-custom-save-dir` 按 gameName+dir 移除条目；添加/移除后 UI 重新扫描。
     3.  `scan-games` 时按游戏名（大小写不敏感）合并：与扫描游戏同名的目录并入该游戏 `saveSources`；未命中的条目按名称生成自定义游戏（appid 为 `custom-<名称哈希>`，`isCustom: true`），与 Steam 游戏一同出现在列表中参与备份/还原。
 
+*   **远程同步（rclone 引擎，方案见 `docs/auto-sync-research.md`）**:
+    *   **模型**: 远程是单一可靠源，多台本地各自与远程对账。备份目录不可变、目录名（时间戳）即幂等键，同步退化为集合对账：本地独有 → 上传；远端独有 → 下载；同名目录摘要不一致（两机同秒备份）→ 本地改名为 `<ts>-<machineId>` 保留两份。
+    *   **完整性约定**: 数据文件先复制，`info.json` 收尾写入——远端/本地目录只要缺 `info.json` 即视为传输中断残留，不进清单；下次对账自动补齐。`note` 备注是本地元数据，摘要比对时忽略。
+    *   **引擎**: `rclone copy <target> <stage> --include /*/*/info.json` 一次拉取全部远端 `info.json` 构成清单；逐目录 `rclone copy --exclude info.json` + `rclone copyto .../info.json` 上传/下载。目标支持 rclone remote（`mydrive:path`，OAuth 由用户系统 rclone 配置承担）与本地/UNC 路径（NAS、挂载盘）。
+    *   **触发**: 备份成功后（`onBackupCreated`，标记脏游戏）、插件激活后延迟 5s、对话框「立即同步」手动触发。串行队列 + 自动触发失败指数退避重试（30s→1m→2m，上限 3 次），手动触发取消等待中的重试立即执行。
+    *   **状态**: `sync-get-status` 返回 phase（running/retry-wait/idle）、配置、rclone 探测结果、脏游戏列表与上次报告（perGame 上传/下载/冲突计数）；UI 轮询驱动（运行期 1.5s，空闲自停），游戏卡片显示「同步中 / 待上传 / 已同步」chip，工具栏同步按钮在失败时切换为 `cloud_off`。
+    *   **v1 边界**: 不做远端自动清理与墓碑（删除由远端主导，本地删除会在下次同步时回补，删除确认框中有提示）；rclone 二进制不自带，探测系统 PATH 或用户在设置中填写路径；`machineId`（UUID）持久化在 `plugin.<id>.syncState`，新备份的 `info.json` 附带 `createdBy`。
+
 ## 4. 特别注意事项 (Special Notes)
 
 *   **文档同步**: 每次完成新功能或修改核心逻辑后，**必须同步更新本文件 (`memo.md`)**，以保持项目的一致性与可维护性。
 *   **当前状态**:
-    *   状态: 稳定。核心备份/还原功能已实现；UI 已迁移到 mde-vue（Material 3 Expressive）。
-    *   近期更改: UI 从 Vuetify 4 全量迁移到 mde-vue（组件由宿主 `window.mde$` 提供）；manifest 升级（`$schema`、`engines.translime >= 0.7.0`、显式 `activationEvents: ["onView"]`）；新增「手动添加」自定义存档目录功能（`customSaveDirs` 设置、`add/remove-custom-save-dir` IPC、扫描时按游戏名合并为 `custom-directory` 来源并参与备份，未命中扫描列表的条目生成 `isCustom` 自定义游戏，支持非 Steam 游戏）；页面布局重构为 `mat-layout` + `mat-app-bar`（滚动条贴边、无双层滚动），工具栏窄窗收缩为图标按钮。远程自动同步的调研见 `docs/auto-sync-research.md`（远程为单一可靠源、多本地对账模型）。
+    *   状态: 稳定。核心备份/还原功能已实现；UI 已迁移到 mde-vue（Material 3 Expressive）；远程同步（rclone 引擎）已实现集合对账、串行队列与每游戏同步状态。
+    *   近期更改: 新增远程同步功能（`src/utils/sync/`，依据 `docs/auto-sync-research.md` 的 rclone 方案）：`sync-get-status` / `sync-set-config` / `sync-check-rclone` / `sync-now` / `sync-cancel` IPC；工具栏「同步」按钮与 `SyncSettingsDialog`（启用开关、远程目标、rclone 路径与检测、立即同步/取消、上次对账摘要）；游戏卡片同步状态 chip；备份创建写入 `createdBy`（machineId）；`preview-mocks.mjs` 提供含同步状态的 preview mock。此前：UI 从 Vuetify 4 全量迁移到 mde-vue（组件由宿主 `window.mde$` 提供）；manifest 升级（`$schema`、`engines.translime >= 0.7.0`、显式 `activationEvents: ["onView"]`）；新增「手动添加」自定义存档目录功能；页面布局重构为 `mat-layout` + `mat-app-bar`，工具栏窄窗收缩为图标按钮。
 *   **Vite 配置**: 主进程和 UI 使用不同的配置文件，请确保修改对应配置。
 *   **构建**: `npm run build` 同时构建插件主逻辑和 UI。

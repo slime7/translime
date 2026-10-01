@@ -60,13 +60,37 @@
     <mat-card-content>
       <div class="py-2">
         <div class="flex justify-between items-center">
-          <mat-chip
-            variant="assist"
-            :color="game.backupCount > 0 ? 'tertiary' : undefined"
-            class="font-medium"
-          >
-            {{ game.backupCount || 0 }} 个备份
-          </mat-chip>
+          <div class="flex items-center gap-2">
+            <mat-chip
+              variant="assist"
+              :color="game.backupCount > 0 ? 'tertiary' : undefined"
+              class="font-medium"
+            >
+              {{ game.backupCount || 0 }} 个备份
+            </mat-chip>
+
+            <mat-tooltip
+              v-if="syncState"
+              :content="syncState.detail || syncState.label"
+              location="top"
+            >
+              <template #activator>
+                <mat-chip
+                  variant="assist"
+                  :color="syncChipColor"
+                >
+                  <template #leading>
+                    <mat-icon
+                      :icon="syncState.icon"
+                      size="18px"
+                      :class="{ 'sync-spinning': syncState.key === 'syncing' }"
+                    />
+                  </template>
+                  {{ syncState.label }}
+                </mat-chip>
+              </template>
+            </mat-tooltip>
+          </div>
 
           <mat-icon
             icon="chevron_right"
@@ -79,7 +103,10 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue';
+import { gameSyncState } from '../composables/useSyncStatus';
+
+const props = defineProps({
   game: {
     type: Object,
     required: true,
@@ -91,6 +118,17 @@ defineProps({
 });
 
 defineEmits(['open', 'exclude']);
+
+const syncState = computed(() => gameSyncState(props.game.appid));
+const syncChipColor = computed(() => {
+  if (syncState.value?.key === 'pending') {
+    return 'secondary';
+  }
+  if (syncState.value?.key === 'synced') {
+    return 'tertiary';
+  }
+  return undefined;
+});
 </script>
 
 <style scoped>
@@ -113,5 +151,16 @@ defineEmits(['open', 'exclude']);
 
 .card-chevron {
   color: var(--mat-sys-color-outline);
+}
+
+/* 同步进行中的图标旋转；名称带插件前缀避免污染全局命名空间 */
+@keyframes steam-save-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sync-spinning {
+  animation: steam-save-sync-spin 1.5s linear infinite;
 }
 </style>

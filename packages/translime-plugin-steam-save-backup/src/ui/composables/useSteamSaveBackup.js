@@ -9,6 +9,7 @@ import {
   saveSourcesToSavePaths,
   steamSavePathsToSaveSources,
 } from '../../utils/save-sources';
+import { refreshSyncStatus, syncStatus } from './useSyncStatus';
 
 const PLUGIN_ID = 'translime-plugin-steam-save-backup';
 
@@ -165,6 +166,8 @@ export default function useSteamSaveBackup() {
         if (selectedGame.value) {
           loadBackups(selectedGame.value.appid);
         }
+        // 备份成功后主进程会自动对账，刷新一次同步状态以显示“待上传/同步中”
+        refreshSyncStatus();
       } else {
         showMessage(res.message || '备份失败', 'error');
       }
@@ -217,13 +220,17 @@ export default function useSteamSaveBackup() {
   };
 
   const deleteAppBackup = (backup) => {
+    // 远端是可靠源：启用同步时本地删除不传播，需提示用户删除会在下次同步时回补
+    const syncHint = syncStatus.value?.config?.enabled
+      ? '已启用远程同步：本地删除不会传播到远端，该备份会在下次同步时重新下载；彻底删除请直接清理远端目录。'
+      : '';
     confirmDialog.value = {
       show: true,
       title: '删除备份',
       icon: 'delete',
       color: 'error',
       message: `确定要删除 ${formatTime(backup.backupTime)} 的备份吗？`,
-      detail: '此操作不可撤销。',
+      detail: ['此操作不可撤销。', syncHint].filter(Boolean).join(' '),
       confirmText: '确认删除',
       onConfirm: async () => {
         loading.value.delete = backup.id;

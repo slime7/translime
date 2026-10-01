@@ -29,8 +29,9 @@ export const resolveBackupRoot = async (customPath) => {
  * @param {Array<{root: number, relativePath: string, absolutePath: string, files: string[], sourceId?: string, sourceType?: string, sourceLabel?: string}>} savePaths 存档路径信息数组
  * @param {string} [customBackupRoot] 自定义备份根目录
  * @param {Array<Object>} [saveSources] 存档来源元数据
+ * @param {{machineId?: string}} [options] 附加选项，machineId 会写入 info.json 的 createdBy
  */
-export async function backupSave(gameId, gameName, savePaths, customBackupRoot, saveSources = []) {
+export async function backupSave(gameId, gameName, savePaths, customBackupRoot, saveSources = [], options = {}) {
   const backupRoot = await resolveBackupRoot(customBackupRoot);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(backupRoot, gameId.toString(), timestamp);
@@ -95,6 +96,7 @@ export async function backupSave(gameId, gameName, savePaths, customBackupRoot, 
     gameName,
     savePaths: backedUpPaths,
     sources: getBackupSourcesMetadata(saveSources, backedUpPaths),
+    ...(options.machineId ? { createdBy: options.machineId } : {}),
     backupTime: new Date().toISOString(),
     timestamp,
     note: '',

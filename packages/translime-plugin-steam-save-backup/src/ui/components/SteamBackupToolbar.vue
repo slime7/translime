@@ -2,6 +2,21 @@
   <div class="flex items-center gap-2">
     <template v-if="collapsed">
       <mat-tooltip
+        content="远程同步"
+        location="bottom"
+      >
+        <template #activator>
+          <mat-btn
+            :icon="syncIcon"
+            variant="filled-tonal"
+            :loading="syncRunning"
+            aria-label="远程同步设置"
+            @click="$emit('open-sync')"
+          />
+        </template>
+      </mat-tooltip>
+
+      <mat-tooltip
         content="打开备份目录"
         location="bottom"
       >
@@ -49,6 +64,15 @@
     <template v-else>
       <mat-btn
         variant="filled-tonal"
+        :prefix="syncIcon"
+        :loading="syncRunning"
+        @click="$emit('open-sync')"
+      >
+        同步
+      </mat-btn>
+
+      <mat-btn
+        variant="filled-tonal"
         prefix="folder_open"
         :loading="openDirLoading"
         @click="$emit('open-backup-dir')"
@@ -77,7 +101,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const props = defineProps({
   collapsed: {
     type: Boolean,
     default: false,
@@ -90,7 +116,17 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  syncRunning: {
+    type: Boolean,
+    default: false,
+  },
+  syncError: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-defineEmits(['open-backup-dir', 'add-custom-dir', 'scan-games']);
+defineEmits(['open-backup-dir', 'add-custom-dir', 'scan-games', 'open-sync']);
+
+const syncIcon = computed(() => (props.syncError ? 'cloud_off' : 'cloud_sync'));
 </script>

@@ -15,9 +15,12 @@
           :collapsed="collapsed"
           :open-dir-loading="loading.openDir"
           :scan-loading="loading.scan"
+          :sync-running="syncRunning"
+          :sync-error="syncError"
           @open-backup-dir="openBackupDir"
           @add-custom-dir="customDirOpen = true"
           @scan-games="scanGames"
+          @open-sync="syncDialogOpen = true"
         />
       </template>
     </mat-app-bar>
@@ -64,6 +67,8 @@
       @changed="scanGames"
     />
 
+    <SyncSettingsDialog v-model="syncDialogOpen" />
+
     <mat-snackbar
       v-model="snackbar.show"
       :duration="3000"
@@ -92,6 +97,7 @@
 
 <script setup>
 import {
+  computed,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -106,7 +112,9 @@ import HiddenGamesPanel from './components/HiddenGamesPanel.vue';
 import LoadingState from './components/LoadingState.vue';
 import NoteDialog from './components/NoteDialog.vue';
 import SteamBackupToolbar from './components/SteamBackupToolbar.vue';
+import SyncSettingsDialog from './components/SyncSettingsDialog.vue';
 import useSteamSaveBackup from './composables/useSteamSaveBackup';
+import { refreshSyncStatus, stopSyncStatusPolling, syncStatus } from './composables/useSyncStatus';
 
 defineOptions({
   name: 'SteamSaveBackupUi',
@@ -115,7 +123,15 @@ defineOptions({
 const layoutRef = ref(null);
 const collapsed = ref(false);
 const customDirOpen = ref(false);
+const syncDialogOpen = ref(false);
 const previewMode = isPreviewMode();
+
+const syncRunning = computed(() => syncStatus.value?.phase === 'running');
+const syncError = computed(() => Boolean(
+  syncStatus.value?.config?.enabled
+  && syncStatus.value?.phase !== 'running'
+  && syncStatus.value?.lastError,
+));
 
 let resizeObserver;
 
@@ -125,10 +141,12 @@ onMounted(() => {
     collapsed.value = entries[0].contentRect.width < 640;
   });
   resizeObserver.observe(layoutRef.value?.$el ?? layoutRef.value);
+  refreshSyncStatus();
 });
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
+  stopSyncStatusPolling();
 });
 
 const {

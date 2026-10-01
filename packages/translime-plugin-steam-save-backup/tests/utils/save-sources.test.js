@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   createCustomDirectorySource,
   createSteamCloudSource,
-  saveSourcesToSavePaths,
   SAVE_SOURCE_TYPES,
+  saveSourcesToSavePaths,
 } from '../../src/utils/save-sources';
 
 describe('saveSourcesToSavePaths', () => {

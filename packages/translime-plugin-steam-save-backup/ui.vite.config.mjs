@@ -14,7 +14,9 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
     tailwindcss(),
-    translimeSdk(),
+    translimeSdk({
+      previewIpcMocks: './src/ui/preview-mocks.mjs',
+    }),
     ...createPluginCssIsolationPlugins('translime-plugin-steam-save-backup'),
   ],
   envDir: process.cwd(),

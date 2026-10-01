@@ -40,7 +40,7 @@ pnpm dev:cdp
 - 构建 SDK：`pnpm -C packages/sdk run build`（产物在 `packages/sdk/dist`，含类型声明）
 - SDK lint：`pnpm -C packages/sdk run lint` 与 `pnpm -C packages/sdk run lint:style`
 - 构建插件：`pnpm --filter <插件包名> run build`
-- 插件测试：`pnpm --filter translime-plugin-bangumi-logs run test`、`pnpm --filter translime-plugin-hdr-capture run test`
+- 插件测试：`pnpm --filter translime-plugin-bangumi-logs run test`、`pnpm --filter translime-plugin-hdr-capture run test`、`pnpm --filter translime-plugin-steam-save-backup run test`
 - 检查并发布所有新版本：`pnpm run publish:package`；指定包补发：`pnpm run publish:package -- --name <包名>`。本地命令需要 npm 发布凭据，GitHub Actions 使用 Trusted Publishing/OIDC。
 
 根目录 `package.json` 的 `lint` 脚本指向不存在的 `src/`，请使用各包的 lint 脚本。
