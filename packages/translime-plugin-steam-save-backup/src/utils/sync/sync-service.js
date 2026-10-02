@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { resolveConflict, runSync, SyncCancelledError } from './engine';
+import {
+  deleteRemoteBackup as deleteRemoteBackupOp, resolveConflict, runSync, SyncCancelledError,
+} from './engine';
 import { createExec, probeRclone } from './rclone';
 import createSyncQueue from './queue';
 
@@ -170,6 +172,38 @@ const createSyncService = ({
   };
 
   /**
+   * 删除远端的一份备份（“同时删除远程存档”）。
+   * 远端目录名是 gameId + 时间戳，语义不直观，因此由本地删除动作携带执行，
+   * 并联动清理同一目录的未处理冲突条目（两端都已删除，冲突自然消解）。
+   */
+  const removeRemoteBackup = async ({ gameId, dir }) => {
+    const syncConfig = readSyncConfig();
+    if (!syncConfig.enabled || !syncConfig.target) {
+      throw new Error('同步未启用或未配置远程目标');
+    }
+    cancelled = false;
+    const backupExec = await prepareExec();
+    try {
+      await deleteRemoteBackupOp({
+        exec: backupExec,
+        target: syncConfig.target,
+        gameId: String(gameId),
+        dir,
+        isCancelled: () => cancelled,
+      });
+    } finally {
+      backupExec.killAll();
+    }
+
+    writePersistedState({
+      conflicts: readPersistedState().conflicts.filter(
+        (item) => !(String(item.gameId) === String(gameId) && item.dir === dir),
+      ),
+    });
+    return getStatus();
+  };
+
+  /**
    * 处理单个同步冲突（Steam Cloud 式三选一）。
    * 成功后立即从持久状态移除该冲突，并触发一次对账确认两端一致。
    */
@@ -243,6 +277,13 @@ const createSyncService = ({
 
     trigger(reason = 'auto') {
       return queue.trigger(reason);
+    },
+
+    removeRemoteBackup,
+
+    isRemoteDeletionAvailable() {
+      const syncConfig = readSyncConfig();
+      return Boolean(syncConfig.enabled && syncConfig.target);
     },
 
     resolveOneConflict,

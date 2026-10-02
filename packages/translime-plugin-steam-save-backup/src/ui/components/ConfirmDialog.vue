@@ -18,6 +18,15 @@
       {{ dialog.detail }}
     </div>
 
+    <div
+      v-if="dialog.switchLabel"
+      style="margin-top: 12px"
+    >
+      <mat-switch v-model="switchChecked">
+        {{ dialog.switchLabel }}
+      </mat-switch>
+    </div>
+
     <template #actions>
       <mat-spacer />
 
@@ -33,7 +42,7 @@
         variant="filled"
         :color="matColor"
         :loading="dialog.loading"
-        @click="$emit('confirm')"
+        @click="$emit('confirm', switchChecked)"
       >
         {{ dialog.confirmText }}
       </mat-btn>
@@ -42,7 +51,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import {
+  computed,
+  ref,
+  watch,
+} from 'vue';
 
 const props = defineProps({
   modelValue: {
@@ -61,6 +74,13 @@ const visible = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value),
 });
+
+// 可选的附加开关（如“同时删除远程存档”），随确认事件把选中状态回传给调用方
+const switchChecked = ref(false);
+
+watch(() => props.dialog, (dialog) => {
+  switchChecked.value = Boolean(dialog?.switchDefault);
+}, { immediate: true, deep: true });
 
 // mde-vue 语义色没有 warning，把 warning 映射为 tertiary
 const matColor = computed(() => {

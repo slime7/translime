@@ -178,14 +178,14 @@ export default function useSteamSaveBackup() {
     }
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (switchValue) => {
     if (!confirmDialog.value.onConfirm) {
       return;
     }
 
     confirmDialog.value.loading = true;
     try {
-      await confirmDialog.value.onConfirm();
+      await confirmDialog.value.onConfirm(switchValue);
     } finally {
       confirmDialog.value.loading = false;
       confirmDialog.value.show = false;
@@ -220,27 +220,44 @@ export default function useSteamSaveBackup() {
   };
 
   const deleteAppBackup = (backup) => {
-    // 远端是可靠源：启用同步时本地删除不传播，需提示用户删除会在下次同步时回补
-    const syncHint = syncStatus.value?.config?.enabled
-      ? '已启用远程同步：本地删除不会传播到远端，该备份会在下次同步时重新下载；彻底删除请直接清理远端目录。'
+    // 启用远程同步时提供“同时删除远程存档”：远端目录名是 gameId + 时间戳，
+    // 无法直观确认归属，因此由本地删除动作携带执行，并在文案中标注游戏名与远端位置
+    const remoteAvailable = Boolean(syncStatus.value?.config?.enabled && syncStatus.value?.config?.target);
+    const remotePath = remoteAvailable
+      ? `${syncStatus.value.config.target}/${selectedGame.value?.appid || ''}/${backup.id}.zip`
       : '';
     confirmDialog.value = {
       show: true,
       title: '删除备份',
       icon: 'delete',
       color: 'error',
-      message: `确定要删除 ${formatTime(backup.backupTime)} 的备份吗？`,
-      detail: ['此操作不可撤销。', syncHint].filter(Boolean).join(' '),
+      message: `确定要删除「${selectedGame.value?.name || backup.gameName || ''}」${formatTime(backup.backupTime)} 的备份吗？`,
+      detail: [
+        '此操作不可撤销。',
+        remoteAvailable ? `勾选后将同时删除远程存档：${remotePath}` : '',
+      ].filter(Boolean).join(' '),
       confirmText: '确认删除',
-      onConfirm: async () => {
+      switchLabel: remoteAvailable ? '同时删除远程存档' : '',
+      switchDefault: false,
+      onConfirm: async (deleteRemote) => {
         loading.value.delete = backup.id;
         try {
-          const res = await ipc.invoke(`delete-backup@${PLUGIN_ID}`, backup.path);
+          const res = await ipc.invoke(`delete-backup@${PLUGIN_ID}`, {
+            backupPath: backup.path,
+            deleteRemote: Boolean(deleteRemote),
+          });
           if (res.success) {
-            showMessage('备份已删除');
+            if (res.warning) {
+              showMessage(res.warning, 'error');
+            } else if (res.remoteDeleted) {
+              showMessage('备份已删除（含远程存档）');
+            } else {
+              showMessage('备份已删除');
+            }
             if (selectedGame.value) {
               loadBackups(selectedGame.value.appid);
             }
+            refreshSyncStatus();
           } else {
             showMessage(res.message || '删除失败', 'error');
           }

@@ -253,11 +253,6 @@
         >
           {{ formError }}
         </div>
-
-        <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
-          远端是可靠源：本地删除的备份会在下次同步时从远端重新下载，
-          彻底删除请直接清理远端目录（v1 暂不做自动清理与删除传播）。
-        </div>
       </div>
     </template>
 

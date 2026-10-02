@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { readInfoFromArchive } from './archive';
 import { pathExists, readdir, readJson } from '../fs-wrapper';
 
 /**
@@ -62,6 +63,48 @@ export const buildManifest = async (root) => {
   const gameIds = await listChildDirs(root);
   const entries = await Promise.all(gameIds.map((gameId) => buildGameEntry(root, gameId)));
   return Object.fromEntries(entries.filter(Boolean));
+};
+
+/**
+ * 构建远端备份清单（暂存目录布局与远端一致）。
+ * 远端自 v1.6 起以单个 zip 表示一份备份（`<gameId>/<时间戳>.zip`）；
+ * v1.5 及之前的目录格式备份（`<gameId>/<时间戳>/info.json`）作为 legacy 返回，
+ * 由对账流程自动迁移为 zip 并清理旧目录。
+ *
+ * @returns {Promise<{ zips: Object<string, Object<string, string>>, legacy: Array<{gameId: string, ts: string, digest: string}> }>}
+ */
+export const buildRemoteInventory = async (root) => {
+  const zips = {};
+  const legacy = [];
+  const collectChild = (gameId, gameDir) => async (child) => {
+    if (child.isFile() && child.name.endsWith('.zip')) {
+      const ts = child.name.slice(0, -'.zip'.length);
+      const info = await readInfoFromArchive(path.join(gameDir, child.name));
+      if (!info) {
+        return;
+      }
+      if (!zips[gameId]) {
+        zips[gameId] = {};
+      }
+      zips[gameId][ts] = infoDigest(info);
+      return;
+    }
+    if (child.isDirectory()) {
+      const digest = await readInfoDigest(path.join(gameDir, child.name, 'info.json'));
+      if (!digest) {
+        return;
+      }
+      legacy.push({ gameId, ts: child.name, digest });
+    }
+  };
+  const collectGame = async (gameId) => {
+    const gameDir = path.join(root, gameId);
+    const children = await readdir(gameDir, { withFileTypes: true });
+    await Promise.all(children.map(collectChild(gameId, gameDir)));
+  };
+  const gameIds = await listChildDirs(root);
+  await Promise.all(gameIds.map((gameId) => collectGame(gameId)));
+  return { zips, legacy };
 };
 
 /**

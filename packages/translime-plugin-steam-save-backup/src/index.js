@@ -1,4 +1,5 @@
 import { shell } from 'electron';
+import path from 'node:path';
 import { ensureDir, pathExists, stat } from './utils/fs-wrapper';
 import {
   findSavePaths,
@@ -353,10 +354,32 @@ export const ipcHandlers = [
   },
   {
     type: 'delete-backup',
-    handler: () => async (backupPath) => {
+    handler: () => async (payload) => {
       try {
+        const isObject = payload !== null && typeof payload === 'object';
+        const backupPath = isObject ? payload.backupPath : payload;
+        const deleteRemote = Boolean(isObject && payload.deleteRemote);
+
         const result = await deleteBackup(backupPath);
-        return result;
+        if (!result.success) {
+          return result;
+        }
+
+        // 本地已删除；勾选“同时删除远程存档”时联动清理远端（zip 与旧目录格式都处理）
+        let remoteDeleted = false;
+        let warning = null;
+        if (deleteRemote && syncService.isRemoteDeletionAvailable()) {
+          const gameId = path.basename(path.dirname(backupPath));
+          const dir = path.basename(backupPath);
+          try {
+            await syncService.removeRemoteBackup({ gameId, dir });
+            remoteDeleted = true;
+          } catch (remoteError) {
+            warning = `远程删除失败：${remoteError.message}`;
+            console.warn('删除远程备份失败：', remoteError);
+          }
+        }
+        return { success: true, remoteDeleted, warning };
       } catch (e) {
         return { success: false, message: e.message };
       }
