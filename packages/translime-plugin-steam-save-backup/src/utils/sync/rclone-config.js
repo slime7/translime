@@ -95,6 +95,7 @@ export const BACKEND_TYPES = [
         key: 'user',
         label: '用户名',
         type: 'text',
+        placeholder: '目标设备的账户名（如 Windows / NAS 登录名）',
       },
       {
         key: 'pass',
@@ -105,6 +106,7 @@ export const BACKEND_TYPES = [
         key: 'domain',
         label: '域（可选）',
         type: 'text',
+        placeholder: '用邮箱（UPN）登录 Windows 目标时填目标机器名',
       },
     ],
   },
@@ -215,13 +217,19 @@ export const parseAuthorizeToken = (stdout) => {
  * 构建 `rclone config create` 参数。
  * - OAuth：config_token 为 JSON，不能加 --obscure（对应官方 headless 授权配方）
  * - 表单凭据：--obscure 让 rclone 只对密码类字段做混淆存储
+ * 普通字段去除首尾空白；密码字段原样传递（密码本身可能包含空格）
  */
 export const buildCreateArgs = (type, name, values = {}, token = null) => {
   const backend = findBackendType(type);
   const args = ['config', 'create', name, type];
+  const passwordKeys = new Set((backend?.fields || [])
+    .filter((field) => field.type === 'password')
+    .map((field) => field.key));
 
   Object.keys(values).forEach((key) => {
-    const value = String(values[key] ?? '').trim();
+    const value = passwordKeys.has(key)
+      ? String(values[key] ?? '')
+      : String(values[key] ?? '').trim();
     if (!value) {
       return;
     }
@@ -354,4 +362,131 @@ export const createRemote = async (exec, {
     throw new Error(`创建远程失败：${tailOutput(createResult.stderr)}`);
   }
   return name;
+};
+
+/**
+ * 构建 `rclone config update` 参数：只携带非空字段（空值字段的处理见 updateRemote）。
+ * - 密码不做 trim（密码本身可能包含空格）
+ * - 表单后端 --obscure 让 rclone 混淆密码后存储
+ */
+export const buildUpdateArgs = (type, name, values = {}) => {
+  const backend = findBackendType(type);
+  const passwordKeys = new Set((backend?.fields || [])
+    .filter((field) => field.type === 'password')
+    .map((field) => field.key));
+
+  const args = ['config', 'update', name];
+  Object.keys(values).forEach((key) => {
+    const raw = String(values[key] ?? '');
+    const value = passwordKeys.has(key) ? raw : raw.trim();
+    if (!value.trim()) {
+      return;
+    }
+    args.push(`${key}=${value}`);
+  });
+  if (backend?.auth === 'fields') {
+    args.push('--obscure');
+  }
+  return args;
+};
+
+/**
+ * 解析 `rclone config show <name>` 输出为键值对象（密码保持混淆态）
+ */
+export const parseConfigShow = (stdout) => {
+  const config = {};
+  (stdout || '').split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('[')) {
+      return;
+    }
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) {
+      return;
+    }
+    config[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+  });
+  return config;
+};
+
+/**
+ * 读取单个远程的配置（含类型与混淆态凭据，供编辑回填）
+ */
+export const getRemoteConfig = async (exec, name) => {
+  const result = await exec(['config', 'show', name]);
+  if (result.code !== 0) {
+    throw new Error(`读取远程配置失败：${tailOutput(result.stderr)}`);
+  }
+  const config = parseConfigShow(result.stdout);
+  if (!config.type) {
+    throw new Error(`远程「${name}」缺少后端类型，请直接编辑 rclone 配置文件`);
+  }
+  return config;
+};
+
+/**
+ * 更新既有远程：
+ * - 非空字段以 config update 携带（密码不做 trim，可能包含空格）
+ * - 表单清空的字段以 config unset 从配置移除（写空串会被 rclone 原样存储，
+ *   后端会拿到空选项；例如 SMB 的空 domain）
+ * - 密码留空 = 保持不变，既不更新也不移除
+ */
+export const updateRemote = async (exec, { name, type, values = {} }) => {
+  const existing = await getRemoteConfig(exec, name).catch(() => ({}));
+  const backend = findBackendType(type);
+  const passwordKeys = new Set((backend?.fields || [])
+    .filter((field) => field.type === 'password')
+    .map((field) => field.key));
+
+  const updateArgs = buildUpdateArgs(type, name, values);
+  const clearedKeys = [];
+  Object.keys(values).forEach((key) => {
+    const value = String(values[key] ?? '').trim();
+    // existing[key] 需用 != null 判断：配置中已存在但值为空串的键同样要清掉
+    if (!value && !passwordKeys.has(key) && existing[key] != null) {
+      clearedKeys.push(key);
+    }
+  });
+
+  if (updateArgs.length > 3) {
+    const result = await exec(updateArgs);
+    if (result.code !== 0) {
+      throw new Error(`更新远程失败：${tailOutput(result.stderr)}`);
+    }
+  }
+  await Promise.all(clearedKeys.map(async (key) => {
+    const result = await exec(['config', 'unset', name, key]);
+    if (result.code !== 0) {
+      throw new Error(`更新远程失败：${tailOutput(result.stderr)}`);
+    }
+  }));
+  return name;
+};
+
+/**
+ * 删除系统 rclone 配置中的远程（条目不存在视为已删除）
+ */
+export const deleteRemote = async (exec, name) => {
+  const remotes = await listRemotes(exec);
+  if (!remotes.includes(name)) {
+    return;
+  }
+  const result = await exec(['config', 'delete', name]);
+  if (result.code !== 0) {
+    throw new Error(`删除远程失败：${tailOutput(result.stderr)}`);
+  }
+};
+
+/**
+ * 连接测试：列出给定远程路径，验证凭据与可达性。
+ * 注意 SMB 等后端的根路径列举（枚举共享名）不触发真实认证，
+ * 传入带子路径的目标（如 `name:share`）才能验证凭据。
+ * 连接失败不抛错，由调用方决定提示方式。
+ */
+export const checkRemoteConnection = async (exec, target) => {
+  const result = await exec(['lsd', target], { timeoutMs: 30 * 1000 });
+  if (result.code === 0) {
+    return { ok: true, error: null };
+  }
+  return { ok: false, error: tailOutput(result.stderr, 300) || `退出码 ${result.code}` };
 };

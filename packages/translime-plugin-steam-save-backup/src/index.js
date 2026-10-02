@@ -27,15 +27,21 @@ import {
   normalizeCustomDir,
   normalizeGameNameKey,
 } from './utils/custom-dirs';
+import { listGhostGames, upsertKnownGames } from './utils/known-games';
 import createSyncService from './utils/sync/sync-service';
+import { discoverSmbHostName } from './utils/sync/netbios';
 import { createExec } from './utils/sync/rclone';
 import {
   BACKEND_TYPES,
+  checkRemoteConnection,
   createRemote,
+  deleteRemote,
   findBackendType,
+  getRemoteConfig,
   listRemotes,
   remoteNameFor,
   runAuthorize,
+  updateRemote,
 } from './utils/sync/rclone-config';
 
 const pluginId = 'translime-plugin-steam-save-backup';
@@ -45,12 +51,16 @@ let steamPath = null;
 // 进行中的 OAuth 授权进程（sync-cancel-authorize 取消用）
 let currentAuthorize = null;
 
-// 表单值填充后端默认值，只保留非空项
+// 表单值填充后端默认值，只保留非空项；密码不 trim（密码本身可能包含空格）
 const mergeFieldValues = (backend, rawValues = {}) => {
   const merged = {};
   (backend.fields || []).forEach((field) => {
-    const raw = String(rawValues?.[field.key] ?? '').trim();
-    merged[field.key] = raw || (field.default != null ? String(field.default) : '');
+    const raw = String(rawValues?.[field.key] ?? '');
+    let value = raw.trim();
+    if (field.type === 'password' && value) {
+      value = raw;
+    }
+    merged[field.key] = value || (field.default != null ? String(field.default) : '');
   });
   return merged;
 };
@@ -125,6 +135,26 @@ const saveCustomSaveDirs = (list) => {
     return;
   }
   config.set(`plugin.${pluginId}.settings.customSaveDirs`, list);
+};
+
+// 已登记游戏的云存档配置注册表（appid → { appid, name, savePaths }）：
+// 游戏卸载后扫描不到，凭登记条目仍可列出并管理其存档备份
+const getKnownGames = () => {
+  if (!config) {
+    return {};
+  }
+  const val = config.get(`plugin.${pluginId}.settings.knownGames`, {});
+  if (!val || typeof val !== 'object' || Array.isArray(val)) {
+    return {};
+  }
+  return val;
+};
+
+const saveKnownGames = (knownGames) => {
+  if (!config) {
+    return;
+  }
+  config.set(`plugin.${pluginId}.settings.knownGames`, knownGames);
 };
 
 // 为游戏构造自定义目录存档源（枚举目录内文件，目录缺失或为空时返回空数组）
@@ -285,6 +315,16 @@ export const ipcHandlers = [
         }));
         games.push(...customGames);
 
+        // 登记扫描到游戏的云存档配置；已卸载（不在扫描结果中）但登记过且本地仍有
+        // 备份的游戏仍进入列表——saveSources 置空，仅保留还原 / 删除 / 同步管理能力
+        const knownGames = upsertKnownGames(getKnownGames(), games);
+        const ghostGames = await listGhostGames(knownGames, games, getBackupCount, backupRoot);
+        games.push(...ghostGames.map((game) => ({
+          ...game,
+          excluded: excludeList.includes(game.appid),
+        })));
+        saveKnownGames(knownGames);
+
         const userIds = await getSteamUserIds(currentSteamPath);
         return {
           success: true, games, userIds, steamPath: currentSteamPath,
@@ -358,17 +398,17 @@ export const ipcHandlers = [
       try {
         const isObject = payload !== null && typeof payload === 'object';
         const backupPath = isObject ? payload.backupPath : payload;
-        const deleteRemote = Boolean(isObject && payload.deleteRemote);
+        const deleteRemoteFlag = Boolean(isObject && payload.deleteRemote);
 
         const result = await deleteBackup(backupPath);
         if (!result.success) {
           return result;
         }
 
-        // 本地已删除；勾选“同时删除远程存档”时联动清理远端（备份目录与散落的整包 zip 都处理）
+        // 本地已删除；勾选“同时删除远程存档”时联动清理远端备份目录
         let remoteDeleted = false;
         let warning = null;
-        if (deleteRemote && syncService.isRemoteDeletionAvailable()) {
+        if (deleteRemoteFlag && syncService.isRemoteDeletionAvailable()) {
           const gameId = path.basename(path.dirname(backupPath));
           const dir = path.basename(backupPath);
           try {
@@ -542,8 +582,7 @@ export const ipcHandlers = [
           return { success: false, message: '启用同步前需要填写远程目标' };
         }
         syncService.setSyncConfig(syncConfig);
-        // 启用并保存后立即对账一次，让状态尽快可见；未启用时 trigger 被 canRun 忽略
-        syncService.trigger('manual');
+        // 保存只落盘，不触发同步：同步在对话框关闭（本次打开期间保存过）或「立即同步」时进行
         return { success: true, status: syncService.getStatus() };
       } catch (e) {
         return { success: false, message: e.message };
@@ -592,7 +631,16 @@ export const ipcHandlers = [
       try {
         const binary = syncService.resolveBinaryPath();
         const exec = createExec(async () => binary);
-        const remotes = await listRemotes(exec);
+        const names = await listRemotes(exec);
+        // 附带后端类型：主视图据此决定「修改」是否可用（OAuth 远程无可编辑表单字段）
+        const remotes = await Promise.all(names.map(async (name) => {
+          try {
+            const remoteConfig = await getRemoteConfig(exec, name);
+            return { name, type: remoteConfig.type };
+          } catch {
+            return { name, type: null };
+          }
+        }));
         return { success: true, remotes };
       } catch (e) {
         return { success: false, message: e.message };
@@ -605,7 +653,7 @@ export const ipcHandlers = [
   },
   {
     type: 'sync-create-remote',
-    handler: ({ sendToClient }) => async ({ type, values } = {}) => {
+    handler: ({ sendToClient }) => async ({ type, values, editName } = {}) => {
       try {
         const backend = findBackendType(type);
         if (!backend) {
@@ -621,29 +669,140 @@ export const ipcHandlers = [
         const binary = syncService.resolveBinaryPath();
         const exec = createExec(async () => binary);
 
-        let token = null;
-        if (backend.auth === 'oauth') {
-          // rclone 会自动打开默认浏览器；授权链接同时推送给 UI 作为备用入口
-          const authorize = runAuthorize(binary, type, {
-            onUrl: (url) => {
-              sendToClient(`sync-authorize-url@${pluginId}`, { url });
-            },
+        let name;
+        if (editName && backend.auth === 'fields') {
+          // 编辑既有远程：只更新表单提交的字段，未填写的密码保持原值
+          name = await updateRemote(exec, {
+            name: editName,
+            type,
+            values: mergeFieldValues(backend, values),
           });
-          currentAuthorize = authorize;
-          try {
-            token = await authorize.promise;
-          } finally {
-            currentAuthorize = null;
+        } else {
+          let token = null;
+          if (backend.auth === 'oauth') {
+            // rclone 会自动打开默认浏览器；授权链接同时推送给 UI 作为备用入口
+            const authorize = runAuthorize(binary, type, {
+              onUrl: (url) => {
+                sendToClient(`sync-authorize-url@${pluginId}`, { url });
+              },
+            });
+            currentAuthorize = authorize;
+            try {
+              token = await authorize.promise;
+            } finally {
+              currentAuthorize = null;
+            }
+          }
+
+          name = await createRemote(exec, {
+            type,
+            name: remoteNameFor(type),
+            values: mergeFieldValues(backend, values),
+            token,
+          });
+        }
+        return { success: true, remote: `${name}:` };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-test-remote',
+    handler: () => async ({ name, subPath } = {}) => {
+      try {
+        if (!name) {
+          return { success: false, message: '参数不完整' };
+        }
+        const binary = syncService.resolveBinaryPath();
+        const exec = createExec(async () => binary);
+        // 连接测试是独立动作：目标带子路径（如 SMB 的共享名）才会触发真实认证，
+        // 根路径列举在部分服务器上不校验凭据，结果不代表连接可用
+        const target = subPath ? `${name}:${subPath}` : `${name}:`;
+        const connection = await checkRemoteConnection(exec, target);
+        if (connection.ok === false && connection.error
+          && /logon is invalid|bad username|authentication/i.test(connection.error)) {
+          const remoteConfig = await getRemoteConfig(exec, name).catch(() => null);
+          if (remoteConfig && String(remoteConfig.user || '').includes('@') && !remoteConfig.domain) {
+            // 手机客户端在发现阶段会自动带入服务器机器名作为域；rclone 不拆分 user@domain，
+            // 空域 + UPN 用户名在 Windows 目标上按本地账户名匹配必然失败，这里补上同等自动化
+            const machineName = await discoverSmbHostName(String(remoteConfig.host || ''));
+            if (machineName) {
+              const updateResult = await exec(['config', 'update', name, `domain=${machineName}`, '--obscure']);
+              if (updateResult.code === 0) {
+                const retry = await checkRemoteConnection(exec, target);
+                if (retry.ok) {
+                  // 域必须落盘，否则同步时仍用旧配置，「测试成功、同步失败」；
+                  // domain 一并返回给 UI 回填表单输入框，让自动发现对用户可见
+                  return {
+                    success: true,
+                    connection: {
+                      ok: true, error: null, note: `已自动补上域 ${machineName}`, domain: machineName,
+                    },
+                  };
+                }
+                // 重试仍失败：还原刚写入的域，按普通失败提示
+                await exec(['config', 'unset', name, 'domain']);
+              }
+            }
+            connection.error += '；用户名含 @ 时按 UPN 登录，需要在「域」中填写目标机器名（可在目标设备上运行 hostname 查看），或改用目标设备的本地账户名';
           }
         }
-
-        const name = await createRemote(exec, {
-          type,
-          name: remoteNameFor(type),
-          values: mergeFieldValues(backend, values),
-          token,
+        return { success: true, connection };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-get-remote',
+    handler: () => async ({ name } = {}) => {
+      try {
+        if (!name) {
+          return { success: false, message: '参数不完整' };
+        }
+        const binary = syncService.resolveBinaryPath();
+        const exec = createExec(async () => binary);
+        const remoteConfig = await getRemoteConfig(exec, name);
+        const backend = findBackendType(remoteConfig.type);
+        if (!backend) {
+          return { success: false, message: `不支持的后端类型：${remoteConfig.type}` };
+        }
+        // 只回填非密码字段；密码一律不回填，编辑时留空表示保持不变
+        const values = {};
+        (backend.fields || []).forEach((field) => {
+          if (field.type === 'password') {
+            return;
+          }
+          const stored = remoteConfig[field.key];
+          if (stored != null) {
+            values[field.key] = stored;
+          }
         });
-        return { success: true, remote: `${name}:` };
+        return { success: true, remote: { name, type: remoteConfig.type, values } };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-delete-remote',
+    handler: () => async ({ name } = {}) => {
+      try {
+        if (!name) {
+          return { success: false, message: '参数不完整' };
+        }
+        const binary = syncService.resolveBinaryPath();
+        const exec = createExec(async () => binary);
+        await deleteRemote(exec, name);
+        // 删除的只是连接配置；远程目标正引用它时一并清空，避免同步指向已删除的远程
+        const syncConfig = syncService.getSyncConfig();
+        let targetCleared = false;
+        if (syncConfig.target === `${name}:`) {
+          syncService.setSyncConfig({ ...syncConfig, target: '' });
+          targetCleared = true;
+        }
+        return { success: true, targetCleared, status: syncService.getStatus() };
       } catch (e) {
         return { success: false, message: e.message };
       }

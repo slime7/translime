@@ -52,8 +52,7 @@ const downloadBackup = async (exec, remoteDir, localDir, tempDir) => {
   }
 };
 
-// 旧目录格式备份的下载（仅用于远端旧格式的迁移与冲突处理；
-// 旧格式上传已废弃，取回后一律重新打包上传）
+// 散文件目录形态备份的下载（远端存在未打包备份时用于自动迁移与冲突处理；取回后重新打包上传）
 const downloadDir = async (exec, remoteDir, localDir) => {
   const dataResult = await exec(['copy', remoteDir, localDir, '--exclude', 'info.json']);
   if (dataResult.code !== 0) {
@@ -87,8 +86,8 @@ const listRemoteFiles = async (exec, remoteDir) => {
     .filter(Boolean);
 };
 
-// 从文件名列表归纳每个备份目录的形态：是否已有 data.zip（新格式）、
-// 除 info.json / data.zip 外还残留哪些顶层子目录（旧格式数据目录或中断残留）
+// 从文件名列表归纳每个备份目录的形态：是否已有 data.zip（数据包）、
+// 除 info.json / data.zip 外还残留哪些顶层子目录（散文件数据目录或中断残留）
 const describeGameEntries = (files) => {
   const entries = {};
   files.forEach((rel) => {
@@ -138,8 +137,8 @@ const readConflictMeta = async (infoPath) => {
  *   数据包仅在真正需要下载时传输。
  * - 同名备份摘要不一致（内容分叉）不自动合并：记入报告的 conflicts 并排除在
  *   自动动作之外，由用户通过 resolveConflict 选择“覆盖本地 / 覆盖远程 / 保留两份”。
- * - 旧目录格式（散文件 data_N）的远端备份自动迁移为数据包：需要时先取回本地，
- *   打包上传后清理旧数据目录；与本地内容分叉的旧目录同样走冲突确认。
+ * - 散文件目录形态（data_N）的远端备份自动迁移为数据包：需要时先取回本地，
+ *   打包上传后清理散文件数据目录；与本地内容分叉的散文件目录同样走冲突确认。
  *
  * @param {object} options
  * @param {(args: string[], options?: {timeoutMs?: number}) => Promise<{code: number, stdout: string, stderr: string}>} options.exec rclone 执行器
@@ -201,7 +200,7 @@ export const runSync = async ({
     const localManifest = await buildManifest(backupRoot);
     const plan = planSync(localManifest, remoteManifest);
 
-    // 每个远端游戏一次递归文件名列举，区分新旧格式并收集旧格式残留子目录
+    // 每个远端游戏一次递归文件名列举，识别数据包与散文件目录形态并收集散文件残留子目录
     const gameEntryMap = {};
     await Promise.all(Object.keys(remoteManifest).map(async (gameId) => {
       const files = await listRemoteFiles(exec, joinRemote(target, gameId));
@@ -224,7 +223,7 @@ export const runSync = async ({
       };
     }));
 
-    // 同名同摘要的旧格式目录 → 迁移为数据包；分叉的旧目录保持冲突待处理，不做迁移
+    // 同名同摘要的散文件目录 → 迁移为数据包；分叉的散文件目录保持冲突待处理，不做迁移
     const legacySame = [];
     Object.keys(remoteManifest).forEach((gameId) => {
       Object.keys(remoteManifest[gameId]).forEach((ts) => {
@@ -263,7 +262,7 @@ export const runSync = async ({
       if (gameEntryMap[download.gameId]?.[download.ts]?.hasZip) {
         await downloadBackup(exec, remoteDir, localDir, tempDir);
       } else {
-        // 旧目录格式：取回后立即迁移为数据包，远端不再保留散文件形态
+        // 散文件目录形态：取回后立即迁移为数据包，远端不保留散文件形态
         await downloadDir(exec, remoteDir, localDir);
         record(download.gameId, 'downloads');
         done += 1;
@@ -324,7 +323,7 @@ export const listRemoteGameEntries = async (exec, target, gameId) => {
     .filter(Boolean);
 };
 
-// 清理远端备份目录里除 info.json / data.zip 外的残留子目录（旧格式数据目录等）
+// 清理远端备份目录里除 info.json / data.zip 外的残留子目录（散文件数据目录等）
 const purgeStaleChildren = async (exec, remoteDir) => {
   const children = new Set();
   (await listRemoteFiles(exec, remoteDir)).forEach((rel) => {
@@ -339,14 +338,14 @@ const purgeStaleChildren = async (exec, remoteDir) => {
 /**
  * 处理单个同步冲突（Steam Cloud 式三选一）：
  * - overwrite-local：以远程为准，删除本地版本后回补下载
- * - overwrite-remote：以本地为准，本地版本打包上传覆盖远程（旧格式残留一并清理）
+ * - overwrite-remote：以本地为准，本地版本打包上传覆盖远程（散文件残留一并清理）
  * - keep-both：本地版本改名 `<dir>-<machineId>` 保留并上传，远程原件回补下载
- *   （远端旧格式原件不在此处迁移，下次对账自动转为数据包）
+ *   （远端散文件原件不在此处迁移，下次对账自动转为数据包）
  *
  * @param {object} options
  * @param {string} options.mode 'overwrite-local' | 'overwrite-remote' | 'keep-both'
  * @param {string} options.machineId 本机标识（keep-both 改名后缀）
- * @param {string} [options.remoteKind] 远端条目格式 'zip'（数据包）| 'dir'（旧目录格式）
+ * @param {string} [options.remoteKind] 远端条目形态 'zip'（数据包）| 'dir'（散文件目录）
  * @param {string[]} [options.existingNames] 远端已存在的条目名（缺省时自动列举）
  */
 export const resolveConflict = async ({
@@ -419,10 +418,9 @@ export const resolveConflict = async ({
 };
 
 /**
- * 删除远端的一份备份（目录与散落的整包 zip 都清理；条目不存在视为已删除）。
+ * 删除远端的一份备份（整个备份目录清理；条目不存在视为已删除）。
  * 用于“同时删除远程存档”。
  */
 export const deleteRemoteBackup = async (exec, target, gameId, dir) => {
   await purgeRemote(exec, joinRemote(target, String(gameId), dir));
-  await purgeRemote(exec, joinRemote(target, String(gameId), `${dir}.zip`));
 };

@@ -25,7 +25,13 @@
         </mat-tooltip>
 
         <div
-          v-if="game.isCustom"
+          v-if="game.uninstalled"
+          class="game-subtitle"
+        >
+          未安装 · 仅存档管理
+        </div>
+        <div
+          v-else-if="game.isCustom"
           class="game-subtitle"
         >
           自定义游戏

@@ -57,7 +57,7 @@ const writeRemotePair = async (gameId, timestamp, info) => {
   await fs.rm(path.join(tmpRoot, 'pair-src'), { recursive: true, force: true });
 };
 
-// 在模拟远端放置一份旧目录格式备份（info.json + 散文件 data_N）
+// 在模拟远端放置一份散文件目录形态备份（info.json + 散文件 data_N）
 const writeRemoteLegacy = async (gameId, timestamp, info) => {
   const dir = path.join(remoteRoot, gameId, timestamp);
   await fs.mkdir(path.join(dir, 'data_0'), { recursive: true });
@@ -67,7 +67,7 @@ const writeRemoteLegacy = async (gameId, timestamp, info) => {
 
 /**
  * 基于磁盘上的“模拟远端”实现 rclone 命令：copy/copyto/moveto/purge/lsf 都
- * 真实操作文件，使打包、原子改名、元数据外置与旧格式迁移得到端到端验证
+ * 真实操作文件，使打包、原子改名、元数据外置与散文件目录迁移得到端到端验证
  */
 const makeFakeExec = () => {
   const remotePath = (p) => p.replaceAll('/', path.sep);
@@ -250,23 +250,6 @@ describe('runSync 上传', () => {
       stageDir,
     })).rejects.toThrow('读取远端清单失败');
   });
-
-  it('历史遗留的整包 zip（`<ts>.zip`）不进清单：本地同名备份仍按新格式上传，残留文件原样保留待手动清理', async () => {
-    await writeBackup(backupRoot, '123', 'ts-flat', baseInfo('123', 'ts-flat'));
-    // 模拟旧版本（整包 zip 格式）在远端的残留
-    const { createArchive } = await import('../../src/utils/sync/archive');
-    const helperDir = await writeBackup(backupRoot, '123', 'ts-flat-helper', baseInfo('123', 'ts-flat'));
-    await createArchive(helperDir, path.join(remoteRoot, '123', 'ts-flat.zip'));
-    await fs.rm(path.join(backupRoot, '123', 'ts-flat-helper'), { recursive: true, force: true });
-
-    const report = await runWithFakeExec([]);
-
-    // 本地备份以新格式目录上传；整包 zip 不参与对账也不被改动
-    expect(report.totals.uploads).toBe(1);
-    const remoteEntries = (await fs.readdir(path.join(remoteRoot, '123'))).sort();
-    expect(remoteEntries).toEqual(['ts-flat', 'ts-flat.zip']);
-    await expect(fs.stat(path.join(remoteRoot, '123', 'ts-flat', 'data.zip'))).resolves.toBeTruthy();
-  });
 });
 
 describe('runSync 下载', () => {
@@ -308,8 +291,8 @@ describe('runSync 下载', () => {
   });
 });
 
-describe('runSync 旧目录格式迁移', () => {
-  it('远端旧目录格式且本地缺失：先取回本地，打包上传后清理旧数据目录（downloads 与 migrated 各计一次）', async () => {
+describe('runSync 散文件目录迁移', () => {
+  it('远端散文件目录且本地缺失：先取回本地，打包上传后清理散文件数据目录（downloads 与 migrated 各计一次）', async () => {
     await writeRemoteLegacy('123', 'ts-legacy', baseInfo('123', 'ts-legacy'));
 
     const report = await runWithFakeExec([]);
@@ -325,7 +308,7 @@ describe('runSync 旧目录格式迁移', () => {
     });
   });
 
-  it('本地与远端旧目录格式内容一致：无需下载，直接打包上传并清理旧数据目录', async () => {
+  it('本地与远端散文件目录内容一致：无需下载，直接打包上传并清理散文件数据目录', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
     await writeRemoteLegacy('123', 'ts1', baseInfo('123', 'ts1'));
 
@@ -343,7 +326,7 @@ describe('runSync 旧目录格式迁移', () => {
     });
   });
 
-  it('旧目录格式与本地内容分叉时不自动迁移，转为冲突待处理（远端目录保持不动）', async () => {
+  it('散文件目录与本地内容分叉时不自动迁移，转为冲突待处理（远端目录保持不动）', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
     await writeRemoteLegacy('123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
 
@@ -515,7 +498,7 @@ describe('resolveConflict', () => {
     });
   });
 
-  it('overwrite-remote（旧目录格式）：上传数据包覆盖后清理旧数据目录，远端收敛为新格式', async () => {
+  it('overwrite-remote（散文件目录）：上传数据包覆盖后清理散文件数据目录，远端收敛为数据包形态', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
     await writeRemoteLegacy('123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
     const exec = makeFakeExec();
@@ -533,7 +516,7 @@ describe('resolveConflict', () => {
     expect(remoteInfo.createdBy).toBe('machine-a');
   });
 
-  it('keep-both（旧目录格式）：远端旧目录保留不动，下次对账自动迁移为数据包', async () => {
+  it('keep-both（散文件目录）：远端散文件目录保留不动，下次对账自动迁移为数据包', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
     await writeRemoteLegacy('123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
     const exec = makeFakeExec();
@@ -588,14 +571,10 @@ describe('远端条目列举与删除', () => {
     expect(entries.sort()).toEqual(['ts1', 'ts2']);
   });
 
-  it('deleteRemoteBackup 同时清理备份目录与历史整包 zip，条目不存在不报错', async () => {
+  it('deleteRemoteBackup 清理远端备份目录，条目不存在不报错', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
     await writeRemoteLegacy('123', 'ts2', baseInfo('123', 'ts2'));
     await writeRemotePair('123', 'ts3', baseInfo('123', 'ts3'));
-    const { createArchive } = await import('../../src/utils/sync/archive');
-    const helperDir = await writeBackup(backupRoot, '123', 'helper', baseInfo('123', 'helper'));
-    await createArchive(helperDir, path.join(remoteRoot, '123', 'ts1.zip'));
-    await fs.rm(helperDir, { recursive: true, force: true });
     await runWithFakeExec([]);
 
     await deleteRemoteBackup(makeFakeExec(), target, '123', 'ts1');

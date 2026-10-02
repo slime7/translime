@@ -23,6 +23,21 @@ const mockGames = [
     backupCount: 1,
     excluded: false,
   },
+  {
+    appid: '413150',
+    name: 'Stardew Valley',
+    uninstalled: true,
+    installDir: null,
+    libraryPath: null,
+    savePaths: [
+      {
+        root: 2, relativePath: 'StardewValley', absolutePath: 'C:/mock/Documents/StardewValley', files: ['SaveGames'],
+      },
+    ],
+    saveSources: [],
+    backupCount: 3,
+    excluded: false,
+  },
 ];
 
 const mockStatus = {
@@ -86,7 +101,13 @@ export default {
     success: true,
     status: { ...mockStatus, config: { ...mockStatus.config, ...syncConfig } },
   }),
-  'sync-list-remotes': async () => ({ success: true, remotes: ['mydrive', 'nas-webdav'] }),
+  'sync-list-remotes': async () => ({
+    success: true,
+    remotes: [
+      { name: 'mydrive', type: 'drive' },
+      { name: 'translime-webdav', type: 'webdav' },
+    ],
+  }),
   'sync-backend-types': async () => ({
     success: true,
     backends: [
@@ -130,6 +151,25 @@ export default {
     ],
   }),
   'sync-create-remote': async () => ({ success: true, remote: 'translime-drive:' }),
+  'sync-test-remote': async ({ name } = {}) => ({
+    success: true,
+    // 真实实现返回 rclone lsd 的结果；失败时 { ok: false, error: '<rclone 原始错误>' }
+    connection: name === 'translime-webdav'
+      ? { ok: false, error: 'mock：连接被拒绝' }
+      : { ok: true, error: null },
+  }),
+  'sync-get-remote': async ({ name }) => ({
+    success: true,
+    remote: {
+      name,
+      type: 'webdav',
+      // 密码不回填：编辑时留空表示保持不变
+      values: {
+        url: 'https://dav.example.com/dav/', vendor: 'nextcloud', user: 'mock-user',
+      },
+    },
+  }),
+  'sync-delete-remote': async () => ({ success: true, targetCleared: true }),
   'sync-cancel-authorize': async () => ({ success: true }),
   'sync-resolve-conflict': async ({ gameId, dir }) => ({
     success: true,

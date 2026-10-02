@@ -9,7 +9,18 @@
     <save-paths-panel :game="selectedGame" />
 
     <div
-      v-if="!canBackup"
+      v-if="selectedGame?.uninstalled"
+      role="status"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-secondary-container); color: var(--mat-sys-color-on-secondary-container)"
+    >
+      <mat-icon icon="info" />
+      <span>
+        该游戏已从 Steam 卸载；仍可还原、删除其存档备份，重新安装后可继续备份。
+      </span>
+    </div>
+
+    <div
+      v-else-if="!canBackup"
       role="status"
       style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-tertiary-container); color: var(--mat-sys-color-on-tertiary-container)"
     >
