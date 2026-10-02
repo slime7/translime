@@ -43,7 +43,21 @@ const writeBackup = async (root, gameId, timestamp, info) => {
   return dir;
 };
 
-// 在模拟远端放置一份旧目录格式备份
+// 在模拟远端放置一份新格式备份：`<gameId>/<ts>/` 目录下的 data.zip（不含 info.json）与 info.json
+const writeRemotePair = async (gameId, timestamp, info) => {
+  const srcDir = path.join(tmpRoot, 'pair-src', gameId, timestamp);
+  await fs.mkdir(path.join(srcDir, 'data_0'), { recursive: true });
+  await fs.writeFile(path.join(srcDir, 'data_0', 'save.dat'), `remote-${gameId}-${timestamp}`);
+  await fs.writeFile(path.join(srcDir, 'info.json'), JSON.stringify(info), 'utf8');
+  const { createArchive } = await import('../../src/utils/sync/archive');
+  const remoteDir = path.join(remoteRoot, gameId, timestamp);
+  await fs.mkdir(remoteDir, { recursive: true });
+  await createArchive(srcDir, path.join(remoteDir, 'data.zip'), { excludeInfo: true });
+  await fs.copyFile(path.join(srcDir, 'info.json'), path.join(remoteDir, 'info.json'));
+  await fs.rm(path.join(tmpRoot, 'pair-src'), { recursive: true, force: true });
+};
+
+// 在模拟远端放置一份旧目录格式备份（info.json + 散文件 data_N）
 const writeRemoteLegacy = async (gameId, timestamp, info) => {
   const dir = path.join(remoteRoot, gameId, timestamp);
   await fs.mkdir(path.join(dir, 'data_0'), { recursive: true });
@@ -53,12 +67,12 @@ const writeRemoteLegacy = async (gameId, timestamp, info) => {
 
 /**
  * 基于磁盘上的“模拟远端”实现 rclone 命令：copy/copyto/moveto/purge/lsf 都
- * 真实操作文件，使 zip 打包、原子改名与旧格式迁移得到端到端验证
+ * 真实操作文件，使打包、原子改名、元数据外置与旧格式迁移得到端到端验证
  */
 const makeFakeExec = () => {
   const remotePath = (p) => p.replaceAll('/', path.sep);
   const copyIntoStage = async () => {
-    // 模拟 staging：把远端的 zip 与旧格式 info.json 复制进 stage（保持目录结构）
+    // 模拟 staging：只把远端的 `<game>/<ts>/info.json` 复制进 stage（保持目录结构）
     const walk = async (dir, rel) => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       await Promise.all(entries.map(async (entry) => {
@@ -68,9 +82,8 @@ const makeFakeExec = () => {
           await walk(entryPath, entryRel);
           return;
         }
-        const isZip = entry.name.endsWith('.zip');
         const isInfo = entryRel.split('/').length === 3 && entry.name === 'info.json';
-        if (!isZip && !isInfo) {
+        if (!isInfo) {
           return;
         }
         const dest = path.join(stageDir, entryRel);
@@ -79,6 +92,23 @@ const makeFakeExec = () => {
       }));
     };
     await walk(remoteRoot, '');
+  };
+  const listFilesRecursive = async (dir) => {
+    const files = [];
+    const walk = async (current, rel) => {
+      const entries = await fs.readdir(current, { withFileTypes: true });
+      await Promise.all(entries.map(async (entry) => {
+        const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
+        const entryPath = path.join(current, entry.name);
+        if (entry.isDirectory()) {
+          await walk(entryPath, entryRel);
+          return;
+        }
+        files.push(entryRel);
+      }));
+    };
+    await walk(dir, '');
+    return files;
   };
 
   return async (args) => {
@@ -108,12 +138,28 @@ const makeFakeExec = () => {
       return { code: 0, stdout: '', stderr: '' };
     }
     if (cmd === 'purge') {
-      await fs.rm(remotePath(src), { recursive: true, force: true });
+      const targetPath = remotePath(src);
+      if (!(await fs.stat(targetPath).catch(() => null))) {
+        return { code: 3, stdout: '', stderr: 'Directory not found.' };
+      }
+      await fs.rm(targetPath, { recursive: true, force: true });
       return { code: 0, stdout: '', stderr: '' };
     }
     if (cmd === 'lsf') {
-      const entries = await fs.readdir(remotePath(src)).catch(() => []);
-      return { code: 0, stdout: `${entries.map((name) => `${name}/`).join('\n')}\n`, stderr: '' };
+      const base = remotePath(src);
+      if (!(await fs.stat(base).catch(() => null))) {
+        return { code: 3, stdout: '', stderr: 'Directory not found.' };
+      }
+      if (args.includes('--dirs-only')) {
+        const entries = await fs.readdir(base, { withFileTypes: true });
+        return {
+          code: 0,
+          stdout: `${entries.filter((entry) => entry.isDirectory()).map((entry) => `${entry.name}/`).join('\n')}\n`,
+          stderr: '',
+        };
+      }
+      const files = await listFilesRecursive(base);
+      return { code: 0, stdout: `${files.join('\n')}\n`, stderr: '' };
     }
     return { code: 0, stdout: '', stderr: '' };
   };
@@ -145,22 +191,35 @@ afterEach(async () => {
 });
 
 describe('runSync 上传', () => {
-  it('本地独有的备份打包上传为远端 zip：先传 .part 再 moveto 改名（远端只在完整时可见）', async () => {
+  it('本地独有的备份上传为新格式目录：先传 data.zip.part 再 moveto，最后写 info.json；数据包不含 info.json', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
     const calls = [];
 
     const report = await runWithFakeExec(calls);
 
-    // 远端出现完整 zip，无 .part 残留
-    await expect(fs.stat(path.join(remoteRoot, '123', 'ts1.zip'))).resolves.toBeTruthy();
+    // 远端出现 `<ts1>/` 目录：info.json 与 data.zip 并列，无 .part 残留
+    const backupEntries = (await fs.readdir(path.join(remoteRoot, '123', 'ts1'))).sort();
+    expect(backupEntries).toEqual(['data.zip', 'info.json']);
     const remoteEntries = await fs.readdir(path.join(remoteRoot, '123'));
-    expect(remoteEntries).toEqual(['ts1.zip']);
+    expect(remoteEntries).toEqual(['ts1']);
 
-    // 调用序列：copyto 传 .part → moveto 改名
-    expect(calls.some(([cmd, , dest]) => cmd === 'copyto' && dest.replaceAll('\\', '/').endsWith('ts1.zip.part'))).toBe(true);
-    expect(calls.some(([cmd, src, dest]) => cmd === 'moveto'
-      && src.replaceAll('\\', '/').endsWith('ts1.zip.part')
-      && dest.replaceAll('\\', '/').endsWith('ts1.zip'))).toBe(true);
+    // 数据包不含 info.json（元数据外置，对账无需解包），数据文件完整
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip(path.join(remoteRoot, '123', 'ts1', 'data.zip'));
+    expect(zip.getEntry('info.json')).toBeNull();
+    expect(zip.getEntry('data_0/save.dat')).toBeTruthy();
+    // 外置 info.json 与本地一致
+    const remoteInfo = JSON.parse(await fs.readFile(path.join(remoteRoot, '123', 'ts1', 'info.json'), 'utf8'));
+    expect(remoteInfo.gameId).toBe('123');
+
+    // 调用顺序：copyto 传 .part → moveto 改名 → copyto 写 info.json（存在即完整）
+    const normalize = (value) => String(value).replaceAll('\\', '/');
+    const partIdx = calls.findIndex(([cmd, , dest]) => cmd === 'copyto' && normalize(dest).endsWith('ts1/data.zip.part'));
+    const moveIdx = calls.findIndex(([cmd, src]) => cmd === 'moveto' && normalize(src).endsWith('ts1/data.zip.part'));
+    const infoIdx = calls.findIndex(([cmd, , dest]) => cmd === 'copyto' && normalize(dest).endsWith('ts1/info.json'));
+    expect(partIdx).toBeGreaterThanOrEqual(0);
+    expect(moveIdx).toBeGreaterThan(partIdx);
+    expect(infoIdx).toBeGreaterThan(moveIdx);
 
     expect(report.ok).toBe(true);
     expect(report.totals).toEqual({
@@ -191,39 +250,53 @@ describe('runSync 上传', () => {
       stageDir,
     })).rejects.toThrow('读取远端清单失败');
   });
+
+  it('历史遗留的整包 zip（`<ts>.zip`）不进清单：本地同名备份仍按新格式上传，残留文件原样保留待手动清理', async () => {
+    await writeBackup(backupRoot, '123', 'ts-flat', baseInfo('123', 'ts-flat'));
+    // 模拟旧版本（整包 zip 格式）在远端的残留
+    const { createArchive } = await import('../../src/utils/sync/archive');
+    const helperDir = await writeBackup(backupRoot, '123', 'ts-flat-helper', baseInfo('123', 'ts-flat'));
+    await createArchive(helperDir, path.join(remoteRoot, '123', 'ts-flat.zip'));
+    await fs.rm(path.join(backupRoot, '123', 'ts-flat-helper'), { recursive: true, force: true });
+
+    const report = await runWithFakeExec([]);
+
+    // 本地备份以新格式目录上传；整包 zip 不参与对账也不被改动
+    expect(report.totals.uploads).toBe(1);
+    const remoteEntries = (await fs.readdir(path.join(remoteRoot, '123'))).sort();
+    expect(remoteEntries).toEqual(['ts-flat', 'ts-flat.zip']);
+    await expect(fs.stat(path.join(remoteRoot, '123', 'ts-flat', 'data.zip'))).resolves.toBeTruthy();
+  });
 });
 
 describe('runSync 下载', () => {
-  it('远端独有的 zip 备份下载并解压为本地目录（新装机取回全部备份）', async () => {
+  it('远端独有的新格式备份下载并解压为本地目录（新装机取回全部备份）', async () => {
     await writeBackup(backupRoot, '123', 'ts-synced', baseInfo('123', 'ts-synced'));
     await writeBackup(backupRoot, '123', 'ts-other', baseInfo('123', 'ts-other'));
-    // 首次同步：两份备份都上传为 zip
+    // 首次同步：两份备份都上传为新格式
     await runWithFakeExec([]);
     // 模拟新装机：本地备份全部丢失
     await fs.rm(path.join(backupRoot, '123'), { recursive: true, force: true });
 
     const report = await runWithFakeExec([]);
 
-    // 本地重新出现两个备份目录，内容来自远端 zip
+    // 本地重新出现两个备份目录，数据与元数据都来自远端
     const localDirs = (await fs.readdir(path.join(backupRoot, '123'))).sort();
     expect(localDirs).toEqual(['ts-other', 'ts-synced']);
     const restored = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts-other', 'info.json'), 'utf8'));
     expect(restored.gameId).toBe('123');
+    await expect(fs.stat(path.join(backupRoot, '123', 'ts-other', 'data_0', 'save.dat'))).resolves.toBeTruthy();
     expect(report.totals).toEqual({
       uploads: 0, downloads: 2, conflicts: 0, migrated: 0,
     });
   });
 
-  it('对端新上传的 zip 备份在下次对账时下载到本地（多设备收敛）', async () => {
-    // 本机上传 ts1 后模拟“另一台设备”直接向远端放置新 zip
+  it('对端新上传的新格式备份在下次对账时下载到本地（多设备收敛）', async () => {
+    // 本机上传 ts1 后模拟“另一台设备”直接向远端放置新格式备份
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
     await runWithFakeExec([]);
 
-    const peerInfo = baseInfo('123', 'ts-peer', { createdBy: 'other-machine' });
-    const stageHelperDir = await writeBackup(backupRoot, '123', 'ts-stage-helper', peerInfo);
-    const { createArchive } = await import('../../src/utils/sync/archive');
-    await createArchive(stageHelperDir, path.join(remoteRoot, '123', 'ts-peer.zip'));
-    await fs.rm(path.join(backupRoot, '123', 'ts-stage-helper'), { recursive: true, force: true });
+    await writeRemotePair('123', 'ts-peer', baseInfo('123', 'ts-peer', { createdBy: 'other-machine' }));
 
     const report = await runWithFakeExec([]);
 
@@ -236,19 +309,37 @@ describe('runSync 下载', () => {
 });
 
 describe('runSync 旧目录格式迁移', () => {
-  it('远端旧目录格式备份自动迁移为 zip：本地缺失时先取回，打包上传后清理旧目录', async () => {
+  it('远端旧目录格式且本地缺失：先取回本地，打包上传后清理旧数据目录（downloads 与 migrated 各计一次）', async () => {
     await writeRemoteLegacy('123', 'ts-legacy', baseInfo('123', 'ts-legacy'));
 
     const report = await runWithFakeExec([]);
 
-    // 远端只剩 zip，旧目录被清理
-    const remoteEntries = await fs.readdir(path.join(remoteRoot, '123'));
-    expect(remoteEntries).toEqual(['ts-legacy.zip']);
+    // 远端该备份目录只剩 info.json 与 data.zip，散文件目录被清理
+    const backupEntries = (await fs.readdir(path.join(remoteRoot, '123', 'ts-legacy'))).sort();
+    expect(backupEntries).toEqual(['data.zip', 'info.json']);
     // 本地取回了该备份
     const localInfo = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts-legacy', 'info.json'), 'utf8'));
     expect(localInfo.gameId).toBe('123');
     expect(report.totals).toEqual({
+      uploads: 0, downloads: 1, conflicts: 0, migrated: 1,
+    });
+  });
+
+  it('本地与远端旧目录格式内容一致：无需下载，直接打包上传并清理旧数据目录', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
+    await writeRemoteLegacy('123', 'ts1', baseInfo('123', 'ts1'));
+
+    const report = await runWithFakeExec([]);
+
+    const backupEntries = (await fs.readdir(path.join(remoteRoot, '123', 'ts1'))).sort();
+    expect(backupEntries).toEqual(['data.zip', 'info.json']);
+    expect(report.totals).toEqual({
       uploads: 0, downloads: 0, conflicts: 0, migrated: 1,
+    });
+    // 再次对账无任何动作（迁移幂等）
+    const second = await runWithFakeExec([]);
+    expect(second.totals).toEqual({
+      uploads: 0, downloads: 0, conflicts: 0, migrated: 0,
     });
   });
 
@@ -273,11 +364,11 @@ describe('runSync 旧目录格式迁移', () => {
 });
 
 describe('runSync 冲突', () => {
-  it('同名备份摘要不一致：不自动合并，报告 conflicts（zip 格式）并附两端展示信息', async () => {
+  it('同名备份摘要不一致：不自动合并，报告 conflicts（新格式）并附两端展示信息', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
     // 第一次同步上传 machine-a 版本
     await runWithFakeExec([]);
-    // 本地内容变化 → 与远端 zip 分叉
+    // 本地内容变化 → 与远端分叉
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-c' }));
 
     const report = await runWithFakeExec([]);
@@ -332,10 +423,9 @@ describe('resolveConflict', () => {
     gameId: '123',
     dir: 'ts1',
     machineId: '11111111-2222-3333-4444-555555555555',
-    stageDir,
   });
 
-  it('overwrite-local（zip）：删除本地版本并从远程 zip 回补（以远程为准）', async () => {
+  it('overwrite-local（新格式）：删除本地版本并从远程数据包回补（以远程为准）', async () => {
     // 远端持有 machine-b 版本
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
     const exec = makeFakeExec();
@@ -354,9 +444,10 @@ describe('resolveConflict', () => {
 
     const info = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1', 'info.json'), 'utf8'));
     expect(info.createdBy).toBe('machine-b');
+    await expect(fs.stat(path.join(backupRoot, '123', 'ts1', 'data_0', 'save.dat'))).resolves.toBeTruthy();
   });
 
-  it('overwrite-remote（zip）：本地版本打包上传覆盖远程（以本地为准）', async () => {
+  it('overwrite-remote（新格式）：本地版本打包上传覆盖远程（以本地为准）', async () => {
     // 远端持有 machine-b 版本
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
     const exec = makeFakeExec();
@@ -379,6 +470,8 @@ describe('resolveConflict', () => {
     });
     const localInfo = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1', 'info.json'), 'utf8'));
     expect(localInfo.createdBy).toBe('machine-a');
+    const remoteInfo = JSON.parse(await fs.readFile(path.join(remoteRoot, '123', 'ts1', 'info.json'), 'utf8'));
+    expect(remoteInfo.createdBy).toBe('machine-a');
     expect(report.conflicts).toHaveLength(0);
     expect(report.totals).toEqual({
       uploads: 0, downloads: 0, conflicts: 0, migrated: 0,
@@ -409,9 +502,9 @@ describe('resolveConflict', () => {
     const original = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1', 'info.json'), 'utf8'));
     expect(renamed.createdBy).toBe('machine-a');
     expect(original.createdBy).toBe('machine-b');
-    // 远端两份 zip 都在
+    // 远端两份备份目录都在
     const remoteEntries = (await fs.readdir(path.join(remoteRoot, '123'))).sort();
-    expect(remoteEntries).toEqual(['ts1-11111111.zip', 'ts1.zip']);
+    expect(remoteEntries).toEqual(['ts1', 'ts1-11111111']);
     // 再次对账无任何动作
     const report = await runSync({
       exec, target, backupRoot, stageDir,
@@ -422,7 +515,7 @@ describe('resolveConflict', () => {
     });
   });
 
-  it('旧目录格式的冲突：keep-both 处理完后远端旧目录被清理并迁移为 zip', async () => {
+  it('overwrite-remote（旧目录格式）：上传数据包覆盖后清理旧数据目录，远端收敛为新格式', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
     await writeRemoteLegacy('123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
     const exec = makeFakeExec();
@@ -431,23 +524,46 @@ describe('resolveConflict', () => {
       ...baseResolveOptions(),
       exec,
       remoteKind: 'dir',
+      mode: 'overwrite-remote',
+    });
+
+    const backupEntries = (await fs.readdir(path.join(remoteRoot, '123', 'ts1'))).sort();
+    expect(backupEntries).toEqual(['data.zip', 'info.json']);
+    const remoteInfo = JSON.parse(await fs.readFile(path.join(remoteRoot, '123', 'ts1', 'info.json'), 'utf8'));
+    expect(remoteInfo.createdBy).toBe('machine-a');
+  });
+
+  it('keep-both（旧目录格式）：远端旧目录保留不动，下次对账自动迁移为数据包', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
+    await writeRemoteLegacy('123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
+    const exec = makeFakeExec();
+
+    const result = await resolveConflict({
+      ...baseResolveOptions(),
+      exec,
+      remoteKind: 'dir',
       mode: 'keep-both',
     });
 
-    // 远端旧目录被清理，已上传本地改名副本；远程原件已取回本地（随下次对账打包上传）
-    const remoteEntries = await fs.readdir(path.join(remoteRoot, '123'));
-    expect(remoteEntries).toEqual(['ts1-11111111.zip']);
+    expect(result.renamedTo).toBe('ts1-11111111');
+    // 本地两份：改名保留的 machine-a 与回补的 machine-b 原件
     const renamed = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1-11111111', 'info.json'), 'utf8'));
     const original = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1', 'info.json'), 'utf8'));
     expect(renamed.createdBy).toBe('machine-a');
     expect(original.createdBy).toBe('machine-b');
-    // 后续对账把回补的原件也上传为 zip，两端收敛为两份
+    // 远端旧目录（含散文件）尚未动，改名副本已上传
+    expect((await fs.readdir(path.join(remoteRoot, '123'))).sort()).toEqual(['ts1', 'ts1-11111111']);
+    await expect(fs.stat(path.join(remoteRoot, '123', 'ts1', 'data_0', 'save.dat'))).resolves.toBeTruthy();
+
+    // 后续对账：旧目录自动迁移为数据包，两端收敛为两份新格式备份
     const report = await runSync({
       exec, target, backupRoot, stageDir,
     });
-    const remoteAfter = (await fs.readdir(path.join(remoteRoot, '123'))).sort();
-    expect(remoteAfter).toEqual(['ts1-11111111.zip', 'ts1.zip']);
+    const backupEntries = (await fs.readdir(path.join(remoteRoot, '123', 'ts1'))).sort();
+    expect(backupEntries).toEqual(['data.zip', 'info.json']);
+    expect((await fs.readdir(path.join(remoteRoot, '123'))).sort()).toEqual(['ts1', 'ts1-11111111']);
     expect(report.conflicts).toHaveLength(0);
+    expect(report.totals.migrated).toBe(1);
   });
 
   it('未知处理方式直接报错，不产生任何文件操作', async () => {
@@ -464,23 +580,27 @@ describe('resolveConflict', () => {
 });
 
 describe('远端条目列举与删除', () => {
-  it('listRemoteGameEntries 返回远端条目名（zip 与目录）', async () => {
-    const { createArchive } = await import('../../src/utils/sync/archive');
-    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
-    await createArchive(path.join(backupRoot, '123', 'ts1'), path.join(remoteRoot, '123', 'ts1.zip'));
-    await writeRemoteLegacy('123', 'ts2', baseInfo('123', 'ts2'));
+  it('listRemoteGameEntries 返回远端备份目录名', async () => {
+    await writeRemotePair('123', 'ts1', baseInfo('123', 'ts1'));
+    await writeRemotePair('123', 'ts2', baseInfo('123', 'ts2'));
 
     const entries = await listRemoteGameEntries(makeFakeExec(), target, '123');
-    expect(entries.sort()).toEqual(['ts1.zip', 'ts2']);
+    expect(entries.sort()).toEqual(['ts1', 'ts2']);
   });
 
-  it('deleteRemoteBackup 同时清理 zip 与旧目录格式，条目不存在不报错', async () => {
+  it('deleteRemoteBackup 同时清理备份目录与历史整包 zip，条目不存在不报错', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
     await writeRemoteLegacy('123', 'ts2', baseInfo('123', 'ts2'));
+    await writeRemotePair('123', 'ts3', baseInfo('123', 'ts3'));
+    const { createArchive } = await import('../../src/utils/sync/archive');
+    const helperDir = await writeBackup(backupRoot, '123', 'helper', baseInfo('123', 'helper'));
+    await createArchive(helperDir, path.join(remoteRoot, '123', 'ts1.zip'));
+    await fs.rm(helperDir, { recursive: true, force: true });
     await runWithFakeExec([]);
 
     await deleteRemoteBackup(makeFakeExec(), target, '123', 'ts1');
     await deleteRemoteBackup(makeFakeExec(), target, '123', 'ts2');
+    await deleteRemoteBackup(makeFakeExec(), target, '123', 'ts3');
     await deleteRemoteBackup(makeFakeExec(), target, '123', 'not-exist');
 
     const remoteEntries = await fs.readdir(path.join(remoteRoot, '123'));

@@ -224,7 +224,7 @@ export default function useSteamSaveBackup() {
     // 无法直观确认归属，因此由本地删除动作携带执行，并在文案中标注游戏名与远端位置
     const remoteAvailable = Boolean(syncStatus.value?.config?.enabled && syncStatus.value?.config?.target);
     const remotePath = remoteAvailable
-      ? `${syncStatus.value.config.target}/${selectedGame.value?.appid || ''}/${backup.id}.zip`
+      ? `${syncStatus.value.config.target}/${selectedGame.value?.appid || ''}/${backup.id}/`
       : '';
     confirmDialog.value = {
       show: true,

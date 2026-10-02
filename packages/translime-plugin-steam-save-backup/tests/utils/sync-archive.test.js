@@ -11,13 +11,10 @@ import {
 import {
   createArchive,
   extractArchive,
-  readInfoFromArchive,
 } from '../../src/utils/sync/archive';
-import { buildRemoteInventory, infoDigest } from '../../src/utils/sync/manifest';
 
 let tmpRoot;
 let backupDir;
-let remoteDir;
 let zipPath;
 
 const baseInfo = {
@@ -34,10 +31,8 @@ const baseInfo = {
 beforeEach(async () => {
   tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'save-backup-sync-archive-'));
   backupDir = path.join(tmpRoot, 'backup', '123', 'ts1');
-  remoteDir = path.join(tmpRoot, 'remote');
   zipPath = path.join(tmpRoot, 'ts1.zip');
   await fs.mkdir(path.join(backupDir, 'data_0', 'nested'), { recursive: true });
-  await fs.mkdir(path.join(remoteDir, '123'), { recursive: true });
   await fs.writeFile(path.join(backupDir, 'data_0', 'save.dat'), 'save-data');
   await fs.writeFile(path.join(backupDir, 'data_0', 'nested', 'deep.sav'), 'deep-data');
   await fs.writeFile(path.join(backupDir, 'info.json'), JSON.stringify(baseInfo), 'utf8');
@@ -63,6 +58,23 @@ describe('createArchive / extractArchive 往返', () => {
     expect(info.gameId).toBe('123');
   });
 
+  it('excludeInfo 打包远端数据包：不含 info.json 但保留全部数据文件（元数据外置，远端可不解包读元数据）', async () => {
+    const dataZip = path.join(tmpRoot, 'data.zip');
+    await createArchive(backupDir, dataZip, { excludeInfo: true });
+
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip(dataZip);
+    expect(zip.getEntry('info.json')).toBeNull();
+    expect(zip.getEntry('data_0/save.dat')).toBeTruthy();
+    expect(zip.getEntry('data_0/nested/deep.sav')).toBeTruthy();
+
+    // 数据包解压后不含 info.json，由对账流程单独回补元数据
+    const dest = path.join(tmpRoot, 'restored');
+    await extractArchive(dataZip, dest);
+    const entries = await fs.readdir(dest);
+    expect(entries).toEqual(['data_0']);
+  });
+
   it('解压时 info.json 最后写入（中断残留表现为缺 info.json，可被对账自动修复）', async () => {
     await createArchive(backupDir, zipPath);
 
@@ -72,59 +84,5 @@ describe('createArchive / extractArchive 往返', () => {
     const entries = await fs.readdir(dest);
     expect(entries).toContain('info.json');
     expect(entries).toContain('data_0');
-  });
-});
-
-describe('readInfoFromArchive', () => {
-  it('读取 zip 内的 info.json，供远端清单构建摘要', async () => {
-    await createArchive(backupDir, zipPath);
-
-    const info = await readInfoFromArchive(zipPath);
-    expect(info.gameId).toBe('123');
-    expect(infoDigest(info)).toBe(infoDigest(baseInfo));
-  });
-
-  it('缺失或损坏的 zip 返回 null（不进入远端清单，待下次同步修复）', async () => {
-    await expect(readInfoFromArchive(path.join(tmpRoot, 'not-exist.zip'))).resolves.toBeNull();
-
-    const corrupt = path.join(tmpRoot, 'corrupt.zip');
-    await fs.writeFile(corrupt, 'not-a-zip');
-    await expect(readInfoFromArchive(corrupt)).resolves.toBeNull();
-
-    const noInfo = path.join(tmpRoot, 'no-info.zip');
-    await fs.writeFile(noInfo, 'placeholder');
-    const AdmZip = (await import('adm-zip')).default;
-    const zip = new AdmZip();
-    zip.addFile('data_0/save.dat', Buffer.from('x'));
-    await zip.writeZipPromise(noInfo);
-    await expect(readInfoFromArchive(noInfo)).resolves.toBeNull();
-  });
-});
-
-describe('buildRemoteInventory', () => {
-  it('zip 与旧目录格式分别进入 zips 清单与 legacy 迁移列表', async () => {
-    await createArchive(backupDir, path.join(remoteDir, '123', 'ts1.zip'));
-    const legacyDir = path.join(remoteDir, '123', 'ts2');
-    await fs.mkdir(path.join(legacyDir, 'data_0'), { recursive: true });
-    const legacyInfo = { ...baseInfo, timestamp: 'ts2' };
-    await fs.writeFile(path.join(legacyDir, 'info.json'), JSON.stringify(legacyInfo), 'utf8');
-
-    const { zips, legacy } = await buildRemoteInventory(remoteDir);
-
-    expect(Object.keys(zips)).toEqual(['123']);
-    expect(zips['123'].ts1).toBe(infoDigest(baseInfo));
-    expect(legacy).toEqual([{ gameId: '123', ts: 'ts2', digest: infoDigest(legacyInfo) }]);
-  });
-
-  it('损坏的 zip 与缺 info.json 的目录都不进入清单（传输中断残留待修复）', async () => {
-    await fs.writeFile(path.join(remoteDir, '123', 'broken.zip'), 'not-a-zip');
-    const emptyDir = path.join(remoteDir, '123', 'ts-empty');
-    await fs.mkdir(emptyDir, { recursive: true });
-    await fs.writeFile(path.join(emptyDir, 'save.dat'), 'x');
-
-    const { zips, legacy } = await buildRemoteInventory(remoteDir);
-
-    expect(zips).toEqual({});
-    expect(legacy).toEqual([]);
   });
 });

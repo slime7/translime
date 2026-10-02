@@ -1,10 +1,8 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createArchive, extractArchive, readInfoFromArchive } from './archive';
-import {
-  buildManifest, buildRemoteInventory, planSync, uniqueDirName,
-} from './manifest';
+import { createArchive, extractArchive } from './archive';
+import { buildManifest, planSync, uniqueDirName } from './manifest';
 import { isRemoteNotFound, tailOutput } from './rclone';
 
 export class SyncCancelledError extends Error {
@@ -18,34 +16,44 @@ const joinRemote = (target, ...parts) => [target.replace(/[\\/]+$/, ''), ...part
 
 const machineSuffix = (machineId) => String(machineId || '').slice(0, 8) || 'local';
 
-// 上传：先传 `.part` 临时名再 moveto 改名，远端只在完整时出现最终名（原子可见）
-const uploadArchive = async (exec, localDir, remoteZip, tempDir) => {
-  const tempZip = path.join(tempDir, `${path.basename(remoteZip)}.uploading`);
-  await createArchive(localDir, tempZip);
-  const partRemote = `${remoteZip}.part`;
+// 远端一份备份 = <gameId>/<时间戳>/ 目录下的 data.zip（不含 info.json）与 info.json：
+// 元数据外置后对账只需拉取各备份的 info.json，不解包即可比对摘要。
+// 数据包先传（.part → moveto 原子可见），info.json 收尾写入：存在 info.json 即完整（研究方案 §4.1）
+const uploadBackup = async (exec, localDir, remoteDir, tempDir) => {
+  const tempZip = path.join(tempDir, `${path.basename(remoteDir)}.uploading`);
+  await createArchive(localDir, tempZip, { excludeInfo: true });
+  const partRemote = `${remoteDir}/data.zip.part`;
   const partResult = await exec(['copyto', tempZip, partRemote]);
   if (partResult.code !== 0) {
     throw new Error(`上传备份失败：${tailOutput(partResult.stderr)}`);
   }
-  const moveResult = await exec(['moveto', partRemote, remoteZip]);
+  const moveResult = await exec(['moveto', partRemote, `${remoteDir}/data.zip`]);
   if (moveResult.code !== 0) {
     throw new Error(`完成备份上传失败：${tailOutput(moveResult.stderr)}`);
   }
   await fs.rm(tempZip, { force: true });
+  const infoResult = await exec(['copyto', path.join(localDir, 'info.json'), `${remoteDir}/info.json`]);
+  if (infoResult.code !== 0) {
+    throw new Error(`上传备份元数据失败：${tailOutput(infoResult.stderr)}`);
+  }
 };
 
-const downloadArchive = async (exec, remoteZip, localDir, tempDir) => {
-  const tempZip = path.join(tempDir, `${path.basename(remoteZip)}.downloading`);
-  const result = await exec(['copyto', remoteZip, tempZip]);
+const downloadBackup = async (exec, remoteDir, localDir, tempDir) => {
+  const tempZip = path.join(tempDir, `${path.basename(remoteDir)}.downloading`);
+  const result = await exec(['copyto', `${remoteDir}/data.zip`, tempZip]);
   if (result.code !== 0) {
     throw new Error(`下载备份失败：${tailOutput(result.stderr)}`);
   }
   await extractArchive(tempZip, localDir);
   await fs.rm(tempZip, { force: true });
+  const infoResult = await exec(['copyto', `${remoteDir}/info.json`, path.join(localDir, 'info.json')]);
+  if (infoResult.code !== 0) {
+    throw new Error(`下载备份元数据失败：${tailOutput(infoResult.stderr)}`);
+  }
 };
 
-// 目录格式备份的下载（仅用于 v1.5 旧格式远端的自动迁移与冲突处理；
-// 目录格式上传已废弃，一律改为打包上传）
+// 旧目录格式备份的下载（仅用于远端旧格式的迁移与冲突处理；
+// 旧格式上传已废弃，取回后一律重新打包上传）
 const downloadDir = async (exec, remoteDir, localDir) => {
   const dataResult = await exec(['copy', remoteDir, localDir, '--exclude', 'info.json']);
   if (dataResult.code !== 0) {
@@ -60,8 +68,46 @@ const downloadDir = async (exec, remoteDir, localDir) => {
 const purgeRemote = async (exec, remotePath) => {
   const result = await exec(['purge', remotePath]);
   if (result.code !== 0 && !isRemoteNotFound(result)) {
-    throw new Error(`清理远端旧格式备份失败：${tailOutput(result.stderr)}`);
+    throw new Error(`清理远端路径失败：${tailOutput(result.stderr)}`);
   }
+};
+
+// 递归列举远端目录下全部文件名（不含内容，开销极小），目录不存在返回空
+const listRemoteFiles = async (exec, remoteDir) => {
+  const result = await exec(['lsf', remoteDir, '-R', '--files-only']);
+  if (result.code !== 0) {
+    if (isRemoteNotFound(result)) {
+      return [];
+    }
+    throw new Error(`读取远端目录失败：${tailOutput(result.stderr)}`);
+  }
+  return (result.stdout || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/\\/g, '/'))
+    .filter(Boolean);
+};
+
+// 从文件名列表归纳每个备份目录的形态：是否已有 data.zip（新格式）、
+// 除 info.json / data.zip 外还残留哪些顶层子目录（旧格式数据目录或中断残留）
+const describeGameEntries = (files) => {
+  const entries = {};
+  files.forEach((rel) => {
+    const slash = rel.indexOf('/');
+    if (slash <= 0) {
+      return;
+    }
+    const ts = rel.slice(0, slash);
+    const child = rel.slice(slash + 1);
+    const entry = entries[ts] || (entries[ts] = { hasZip: false, legacyChildren: new Set() });
+    if (child === 'data.zip') {
+      entry.hasZip = true;
+      return;
+    }
+    if (child !== 'info.json') {
+      entry.legacyChildren.add(child.split('/')[0]);
+    }
+  });
+  return entries;
 };
 
 // 串行执行异步步骤：对账按目录逐个进行（rclone 调用与取消检查必须保序），用 reduce 链表达顺序
@@ -86,13 +132,14 @@ const readConflictMeta = async (infoPath) => {
 
 /**
  * 执行一次全量对账（docs/auto-sync-research.md §4.2）：
- * 拉取远端全部备份元数据构成远端清单 → 与本地清单比对 → 逐备份上传/下载。
- * - 远端自 v1.6 起以单个 zip 表示一份备份（小文件多的存档目录打包传输更高效）；
- *   本地保持目录形态不变。
+ * 拉取远端全部 info.json 构成远端清单 → 与本地清单比对 → 逐备份上传/下载。
+ * - 远端一份备份 = `<gameId>/<时间戳>/` 目录下的 data.zip（不含 info.json）与
+ *   info.json；本地保持目录形态不变。对账只需暂存 info.json（每份几 KB），
+ *   数据包仅在真正需要下载时传输。
  * - 同名备份摘要不一致（内容分叉）不自动合并：记入报告的 conflicts 并排除在
  *   自动动作之外，由用户通过 resolveConflict 选择“覆盖本地 / 覆盖远程 / 保留两份”。
- * - v1.5 目录格式的远端备份自动迁移为 zip：需要时先取回本地，打包上传后清理
- *   旧目录；与本地内容分叉的旧目录同样走冲突确认。
+ * - 旧目录格式（散文件 data_N）的远端备份自动迁移为数据包：需要时先取回本地，
+ *   打包上传后清理旧数据目录；与本地内容分叉的旧目录同样走冲突确认。
  *
  * @param {object} options
  * @param {(args: string[], options?: {timeoutMs?: number}) => Promise<{code: number, stdout: string, stderr: string}>} options.exec rclone 执行器
@@ -112,6 +159,7 @@ export const runSync = async ({
 }) => {
   const startedAt = new Date().toISOString();
   const perGame = {};
+  let migratedCount = 0;
   const record = (gameId, key) => {
     if (!perGame[gameId]) {
       perGame[gameId] = {
@@ -131,14 +179,11 @@ export const runSync = async ({
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'translime-sync-zip-'));
   try {
     assertAlive();
-    // 一次拉取远端全部备份元数据：zip 整包入 stage（zip 内 info.json 无法远端过滤），
-    // 旧目录格式只取 info.json
+    // 一次拉取远端全部备份元数据：info.json 每份几 KB，构成清单即足够对账
     const stageResult = await exec([
       'copy',
       target,
       stage,
-      '--include',
-      '/*/*/*.zip',
       '--include',
       '/*/*/info.json',
       '--transfers',
@@ -152,99 +197,95 @@ export const runSync = async ({
     }
     assertAlive();
 
-    const { zips: remoteManifest, legacy } = await buildRemoteInventory(stage);
+    const remoteManifest = await buildManifest(stage);
     const localManifest = await buildManifest(backupRoot);
     const plan = planSync(localManifest, remoteManifest);
 
-    const conflicts = [];
-
-    // 旧目录格式 → zip 的自动迁移；与本地内容分叉的旧目录转为冲突待处理
-    await runSequential(legacy, async ({ gameId, ts, digest }) => {
-      assertAlive();
-      const localDigest = localManifest?.[gameId]?.[ts];
-      const legacyDir = joinRemote(target, gameId, ts);
-      const localDir = path.join(backupRoot, gameId, ts);
-
-      if (localDigest && localDigest !== digest) {
-        const local = await readConflictMeta(path.join(backupRoot, gameId, ts, 'info.json'));
-        const remote = await readConflictMeta(path.join(stage, gameId, ts, 'info.json'));
-        conflicts.push({
-          gameId,
-          dir: ts,
-          gameName: local.gameName || remote.gameName,
-          remoteKind: 'dir',
-          local,
-          remote,
-          detectedAt: new Date().toISOString(),
-        });
-        record(gameId, 'conflicts');
-        return;
-      }
-
-      if (!localDigest) {
-        onProgress({ phase: 'download', gameId, dir: ts });
-        await downloadDir(exec, legacyDir, localDir);
-        record(gameId, 'downloads');
-      }
-      onProgress({ phase: 'upload', gameId, dir: ts });
-      await uploadArchive(exec, localDir, joinRemote(target, gameId, `${ts}.zip`), tempDir);
-      await purgeRemote(exec, legacyDir);
-      record(gameId, 'migrated');
-    });
-
+    // 每个远端游戏一次递归文件名列举，区分新旧格式并收集旧格式残留子目录
+    const gameEntryMap = {};
+    await Promise.all(Object.keys(remoteManifest).map(async (gameId) => {
+      const files = await listRemoteFiles(exec, joinRemote(target, gameId));
+      gameEntryMap[gameId] = describeGameEntries(files);
+    }));
     assertAlive();
 
-    const zipConflicts = await Promise.all(plan.conflicts.map(async ({ gameId, ts }) => {
+    const conflicts = await Promise.all(plan.conflicts.map(async ({ gameId, ts }) => {
       const local = await readConflictMeta(path.join(backupRoot, gameId, ts, 'info.json'));
-      const remote = await readInfoFromArchive(path.join(stage, gameId, `${ts}.zip`)) || {};
-      const remoteMeta = {
-        backupTime: typeof remote.backupTime === 'string' ? remote.backupTime : null,
-        createdBy: typeof remote.createdBy === 'string' ? remote.createdBy : null,
-        gameName: typeof remote.gameName === 'string' ? remote.gameName : null,
-      };
+      const remote = await readConflictMeta(path.join(stage, gameId, ts, 'info.json'));
       record(gameId, 'conflicts');
       return {
         gameId,
         dir: ts,
-        gameName: local.gameName || remoteMeta.gameName,
-        remoteKind: 'zip',
+        gameName: local.gameName || remote.gameName,
+        remoteKind: gameEntryMap[gameId]?.[ts]?.hasZip ? 'zip' : 'dir',
         local,
-        remote: remoteMeta,
+        remote,
         detectedAt: new Date().toISOString(),
       };
     }));
-    conflicts.push(...zipConflicts);
+
+    // 同名同摘要的旧格式目录 → 迁移为数据包；分叉的旧目录保持冲突待处理，不做迁移
+    const legacySame = [];
+    Object.keys(remoteManifest).forEach((gameId) => {
+      Object.keys(remoteManifest[gameId]).forEach((ts) => {
+        if (gameEntryMap[gameId]?.[ts]?.hasZip) {
+          return;
+        }
+        const localDigest = localManifest?.[gameId]?.[ts];
+        if (localDigest && localDigest === remoteManifest[gameId][ts]) {
+          legacySame.push({ gameId, ts });
+        }
+      });
+    });
+
+    const migrateLegacy = async ({ gameId, ts }) => {
+      const localDir = path.join(backupRoot, gameId, ts);
+      const remoteDir = joinRemote(target, gameId, ts);
+      onProgress({ phase: 'upload', gameId, dir: ts });
+      await uploadBackup(exec, localDir, remoteDir, tempDir);
+      const staleChildren = [...(gameEntryMap[gameId]?.[ts]?.legacyChildren || [])];
+      await runSequential(staleChildren, (child) => purgeRemote(exec, `${remoteDir}/${child}`));
+      migratedCount += 1;
+      record(gameId, 'migrated');
+    };
+    await runSequential(legacySame, migrateLegacy);
 
     const total = plan.uploads.length + plan.downloads.length;
     let done = 0;
-
-    await runSequential(plan.uploads, async (upload) => {
-      assertAlive();
-      onProgress({
-        phase: 'upload', done, total, gameId: upload.gameId, dir: upload.ts,
-      });
-      await uploadArchive(
-        exec,
-        path.join(backupRoot, upload.gameId, upload.ts),
-        joinRemote(target, upload.gameId, `${upload.ts}.zip`),
-        tempDir,
-      );
-      record(upload.gameId, 'uploads');
-      done += 1;
-    });
 
     await runSequential(plan.downloads, async (download) => {
       assertAlive();
       onProgress({
         phase: 'download', done, total, gameId: download.gameId, dir: download.ts,
       });
-      await downloadArchive(
+      const localDir = path.join(backupRoot, download.gameId, download.ts);
+      const remoteDir = joinRemote(target, download.gameId, download.ts);
+      if (gameEntryMap[download.gameId]?.[download.ts]?.hasZip) {
+        await downloadBackup(exec, remoteDir, localDir, tempDir);
+      } else {
+        // 旧目录格式：取回后立即迁移为数据包，远端不再保留散文件形态
+        await downloadDir(exec, remoteDir, localDir);
+        record(download.gameId, 'downloads');
+        done += 1;
+        await migrateLegacy({ gameId: download.gameId, ts: download.ts });
+        return;
+      }
+      record(download.gameId, 'downloads');
+      done += 1;
+    });
+
+    await runSequential(plan.uploads, async (upload) => {
+      assertAlive();
+      onProgress({
+        phase: 'upload', done, total, gameId: upload.gameId, dir: upload.ts,
+      });
+      await uploadBackup(
         exec,
-        joinRemote(target, download.gameId, `${download.ts}.zip`),
-        path.join(backupRoot, download.gameId, download.ts),
+        path.join(backupRoot, upload.gameId, upload.ts),
+        joinRemote(target, upload.gameId, upload.ts),
         tempDir,
       );
-      record(download.gameId, 'downloads');
+      record(upload.gameId, 'uploads');
       done += 1;
     });
 
@@ -258,7 +299,7 @@ export const runSync = async ({
         uploads: plan.uploads.length,
         downloads: plan.downloads.length,
         conflicts: plan.conflicts.length,
-        migrated: legacy.length - conflicts.filter((item) => item.remoteKind === 'dir').length,
+        migrated: migratedCount,
       },
     };
   } finally {
@@ -283,17 +324,29 @@ export const listRemoteGameEntries = async (exec, target, gameId) => {
     .filter(Boolean);
 };
 
+// 清理远端备份目录里除 info.json / data.zip 外的残留子目录（旧格式数据目录等）
+const purgeStaleChildren = async (exec, remoteDir) => {
+  const children = new Set();
+  (await listRemoteFiles(exec, remoteDir)).forEach((rel) => {
+    const top = rel.split('/')[0];
+    if (top && top !== 'info.json' && top !== 'data.zip') {
+      children.add(top);
+    }
+  });
+  await runSequential([...children], (child) => purgeRemote(exec, `${remoteDir}/${child}`));
+};
+
 /**
  * 处理单个同步冲突（Steam Cloud 式三选一）：
  * - overwrite-local：以远程为准，删除本地版本后回补下载
- * - overwrite-remote：以本地为准，本地版本打包上传覆盖远程
+ * - overwrite-remote：以本地为准，本地版本打包上传覆盖远程（旧格式残留一并清理）
  * - keep-both：本地版本改名 `<dir>-<machineId>` 保留并上传，远程原件回补下载
- * 远程为旧目录格式时，处理完成后迁移为 zip 并清理旧目录。
+ *   （远端旧格式原件不在此处迁移，下次对账自动转为数据包）
  *
  * @param {object} options
  * @param {string} options.mode 'overwrite-local' | 'overwrite-remote' | 'keep-both'
  * @param {string} options.machineId 本机标识（keep-both 改名后缀）
- * @param {string} [options.remoteKind] 远端条目格式 'zip' | 'dir'
+ * @param {string} [options.remoteKind] 远端条目格式 'zip'（数据包）| 'dir'（旧目录格式）
  * @param {string[]} [options.existingNames] 远端已存在的条目名（缺省时自动列举）
  */
 export const resolveConflict = async ({
@@ -310,34 +363,30 @@ export const resolveConflict = async ({
 }) => {
   const gameDir = path.join(backupRoot, String(gameId));
   const localDir = path.join(gameDir, dir);
-  const remoteZip = joinRemote(target, String(gameId), `${dir}.zip`);
-  const legacyDir = joinRemote(target, String(gameId), dir);
+  const remoteDir = joinRemote(target, String(gameId), dir);
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'translime-sync-zip-'));
   const assertAlive = () => {
     if (isCancelled()) {
       throw new SyncCancelledError();
     }
   };
+  const downloadRemote = () => (remoteKind === 'dir'
+    ? downloadDir(exec, remoteDir, localDir)
+    : downloadBackup(exec, remoteDir, localDir, tempDir));
 
   try {
     assertAlive();
 
     if (mode === 'overwrite-local') {
       await fs.rm(localDir, { recursive: true, force: true });
-      if (remoteKind === 'dir') {
-        await downloadDir(exec, legacyDir, localDir);
-        await uploadArchive(exec, localDir, remoteZip, tempDir);
-        await purgeRemote(exec, legacyDir);
-      } else {
-        await downloadArchive(exec, remoteZip, localDir, tempDir);
-      }
+      await downloadRemote();
       return { mode };
     }
 
     if (mode === 'overwrite-remote') {
-      await uploadArchive(exec, localDir, remoteZip, tempDir);
+      await uploadBackup(exec, localDir, remoteDir, tempDir);
       if (remoteKind === 'dir') {
-        await purgeRemote(exec, legacyDir);
+        await purgeStaleChildren(exec, remoteDir);
       }
       return { mode };
     }
@@ -352,20 +401,13 @@ export const resolveConflict = async ({
       // 先改名保留本地版本，再回补下载远程原件（顺序不能反，否则下载会覆盖本地分叉副本）
       await fs.rename(localDir, renamedDir);
       try {
-        if (remoteKind === 'dir') {
-          await downloadDir(exec, legacyDir, localDir);
-        } else {
-          await downloadArchive(exec, remoteZip, localDir, tempDir);
-        }
-        await uploadArchive(exec, renamedDir, joinRemote(target, String(gameId), `${newName}.zip`), tempDir);
+        await downloadRemote();
+        await uploadBackup(exec, renamedDir, joinRemote(target, String(gameId), newName), tempDir);
       } catch (e) {
         // 失败时还原本地目录名（下载已重建的原件让位），冲突保持未处理状态等待重试
         await fs.rm(localDir, { recursive: true, force: true }).catch(() => {});
         await fs.rename(renamedDir, localDir).catch(() => {});
         throw e;
-      }
-      if (remoteKind === 'dir') {
-        await purgeRemote(exec, legacyDir);
       }
       return { mode, renamedTo: newName };
     }
@@ -377,10 +419,10 @@ export const resolveConflict = async ({
 };
 
 /**
- * 删除远端的一份备份（zip 与旧目录格式都清理；条目不存在视为已删除）。
+ * 删除远端的一份备份（目录与散落的整包 zip 都清理；条目不存在视为已删除）。
  * 用于“同时删除远程存档”。
  */
 export const deleteRemoteBackup = async (exec, target, gameId, dir) => {
-  await purgeRemote(exec, joinRemote(target, String(gameId), `${dir}.zip`));
   await purgeRemote(exec, joinRemote(target, String(gameId), dir));
+  await purgeRemote(exec, joinRemote(target, String(gameId), `${dir}.zip`));
 };

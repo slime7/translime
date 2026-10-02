@@ -5,11 +5,12 @@ import AdmZip from 'adm-zip';
 const INFO_ENTRY = 'info.json';
 
 /**
- * 将备份目录打包为 zip（含 info.json）。
+ * 将备份目录打包为 zip。
  * 备份数量多的游戏逐文件同步会在 SMB / 云盘上付出大量往返延迟，
  * 打包后每次备份只传输单个文件；本地备份保持目录形态不变。
+ * `excludeInfo` 用于远端数据包：info.json 与数据包分开存放，便于不解包直接读取元数据。
  */
-export const createArchive = async (dir, zipPath) => {
+export const createArchive = async (dir, zipPath, { excludeInfo = false } = {}) => {
   const zip = new AdmZip();
   const walk = async (current, rel) => {
     const entries = await fs.readdir(current, { withFileTypes: true });
@@ -18,6 +19,9 @@ export const createArchive = async (dir, zipPath) => {
       const entryPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
         await walk(entryPath, entryRel);
+        return;
+      }
+      if (excludeInfo && entryRel === INFO_ENTRY) {
         return;
       }
       zip.addFile(entryRel, await fs.readFile(entryPath));
@@ -45,21 +49,5 @@ export const extractArchive = async (zipPath, destDir) => {
   const infoEntry = zip.getEntry(INFO_ENTRY);
   if (infoEntry) {
     await fs.writeFile(path.join(destDir, INFO_ENTRY), infoEntry.getData());
-  }
-};
-
-/**
- * 读取备份 zip 内的 info.json；损坏或缺失返回 null（该包不进入清单）
- */
-export const readInfoFromArchive = async (zipPath) => {
-  try {
-    const zip = new AdmZip(zipPath);
-    const entry = zip.getEntry(INFO_ENTRY);
-    if (!entry) {
-      return null;
-    }
-    return JSON.parse(entry.getData().toString('utf8').replace(/^\uFEFF/, ''));
-  } catch {
-    return null;
   }
 };

@@ -365,7 +365,7 @@ export const ipcHandlers = [
           return result;
         }
 
-        // 本地已删除；勾选“同时删除远程存档”时联动清理远端（zip 与旧目录格式都处理）
+        // 本地已删除；勾选“同时删除远程存档”时联动清理远端（备份目录与散落的整包 zip 都处理）
         let remoteDeleted = false;
         let warning = null;
         if (deleteRemote && syncService.isRemoteDeletionAvailable()) {

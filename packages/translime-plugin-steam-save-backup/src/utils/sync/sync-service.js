@@ -229,6 +229,7 @@ const createSyncService = ({
         gameId,
         dir,
         mode,
+        remoteKind: known.remoteKind === 'dir' ? 'dir' : 'zip',
         machineId: ensureMachineId(),
         isCancelled: () => cancelled,
       });
