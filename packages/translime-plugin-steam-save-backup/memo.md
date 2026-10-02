@@ -100,16 +100,21 @@ packages/translime-plugin-steam-save-backup/
 *   **远程同步（rclone 引擎，方案见 `docs/auto-sync-research.md`）**:
     *   **模型**: 远程是单一可靠源，多台本地各自与远程对账。备份目录不可变、目录名（时间戳）即幂等键，同步退化为集合对账：本地独有 → 上传；远端独有 → 下载；同名目录摘要不一致（两机同秒备份）→ 本地改名为 `<ts>-<machineId>` 保留两份。
     *   **完整性约定**: 数据文件先复制，`info.json` 收尾写入——远端/本地目录只要缺 `info.json` 即视为传输中断残留，不进清单；下次对账自动补齐。`note` 备注是本地元数据，摘要比对时忽略。
-    *   **引擎**: `rclone copy <target> <stage> --include /*/*/info.json` 一次拉取全部远端 `info.json` 构成清单；逐目录 `rclone copy --exclude info.json` + `rclone copyto .../info.json` 上传/下载。目标支持 rclone remote（`mydrive:path`，OAuth 由用户系统 rclone 配置承担）与本地/UNC 路径（NAS、挂载盘）。
+    *   **引擎**: `rclone copy <target> <stage> --include /*/*/info.json` 一次拉取全部远端 `info.json` 构成清单；逐目录 `rclone copy --exclude info.json` + `rclone copyto .../info.json` 上传/下载。目标支持 rclone remote（`mydrive:path`）与本地/UNC 路径（NAS、挂载盘）。
     *   **触发**: 备份成功后（`onBackupCreated`，标记脏游戏）、插件激活后延迟 5s、对话框「立即同步」手动触发。串行队列 + 自动触发失败指数退避重试（30s→1m→2m，上限 3 次），手动触发取消等待中的重试立即执行。
     *   **状态**: `sync-get-status` 返回 phase（running/retry-wait/idle）、配置、rclone 探测结果、脏游戏列表与上次报告（perGame 上传/下载/冲突计数）；UI 轮询驱动（运行期 1.5s，空闲自停），游戏卡片显示「同步中 / 待上传 / 已同步」chip，工具栏同步按钮在失败时切换为 `cloud_off`。
+    *   **远程管理（v1.4 新增）**: 同步设置对话框内可创建远程，无需手动执行 `rclone config`。
+        *   `sync-backend-types` 返回内置后端元数据（`src/utils/sync/rclone-config.js` 的 `BACKEND_TYPES`）：Google Drive / OneDrive / Dropbox 走 OAuth（`rclone authorize <type>` 本地回调，rclone 自动打开浏览器，授权链接经 `sync-authorize-url@<id>` 推送给 UI 作备用入口，`sync-cancel-authorize` 可中断）；WebDAV / SMB / SFTP / S3 兼容走表单凭据。
+        *   `sync-create-remote` 校验必填项后执行：OAuth 后端 `rclone config create <name> <type> config_token=<json>`（token 不加 `--obscure`），表单后端 `rclone config create <name> <type> key=value... --obscure`（密码类字段由 rclone 混淆存储）；同名远程先 `config delete` 再重建。OneDrive 附加 `--auto-confirm` 自动完成驱动器选择。
+        *   远程统一命名 `translime-<type>`，写入系统 rclone 配置（不传 `--config`，复用用户已有配置）；创建成功后自动把远程目标填为 `<name>:`。
+        *   主视图提供「远程位置」下拉（`sync-list-remotes`）与 rclone 下载链接（rclone.org/downloads）；设置中的 rclone 路径对同步与远程管理同时生效。
     *   **v1 边界**: 不做远端自动清理与墓碑（删除由远端主导，本地删除会在下次同步时回补，删除确认框中有提示）；rclone 二进制不自带，探测系统 PATH 或用户在设置中填写路径；`machineId`（UUID）持久化在 `plugin.<id>.syncState`，新备份的 `info.json` 附带 `createdBy`。
 
 ## 4. 特别注意事项 (Special Notes)
 
 *   **文档同步**: 每次完成新功能或修改核心逻辑后，**必须同步更新本文件 (`memo.md`)**，以保持项目的一致性与可维护性。
 *   **当前状态**:
-    *   状态: 稳定。核心备份/还原功能已实现；UI 已迁移到 mde-vue（Material 3 Expressive）；远程同步（rclone 引擎）已实现集合对账、串行队列与每游戏同步状态。
-    *   近期更改: 新增远程同步功能（`src/utils/sync/`，依据 `docs/auto-sync-research.md` 的 rclone 方案）：`sync-get-status` / `sync-set-config` / `sync-check-rclone` / `sync-now` / `sync-cancel` IPC；工具栏「同步」按钮与 `SyncSettingsDialog`（启用开关、远程目标、rclone 路径与检测、立即同步/取消、上次对账摘要）；游戏卡片同步状态 chip；备份创建写入 `createdBy`（machineId）；`preview-mocks.mjs` 提供含同步状态的 preview mock。此前：UI 从 Vuetify 4 全量迁移到 mde-vue（组件由宿主 `window.mde$` 提供）；manifest 升级（`$schema`、`engines.translime >= 0.7.0`、显式 `activationEvents: ["onView"]`）；新增「手动添加」自定义存档目录功能；页面布局重构为 `mat-layout` + `mat-app-bar`，工具栏窄窗收缩为图标按钮。
+    *   状态: 稳定。核心备份/还原功能已实现；UI 已迁移到 mde-vue（Material 3 Expressive）；远程同步（rclone 引擎）已实现集合对账、串行队列、每游戏同步状态与插件内远程管理（后端选择 / 凭据 / OAuth 授权）。
+    *   近期更改: 新增插件内远程管理（`sync-list-remotes` / `sync-backend-types` / `sync-create-remote` / `sync-cancel-authorize` IPC 与对话框远程管理视图，OAuth 走 `rclone authorize` 本地回调）；设置页增加 rclone 下载链接。此前：远程同步功能（`src/utils/sync/`，依据 `docs/auto-sync-research.md` 的 rclone 方案）：`sync-get-status` / `sync-set-config` / `sync-check-rclone` / `sync-now` / `sync-cancel` IPC；工具栏「同步」按钮与 `SyncSettingsDialog`；游戏卡片同步状态 chip；备份创建写入 `createdBy`（machineId）；`preview-mocks.mjs` 提供含同步状态的 preview mock。更早：UI 从 Vuetify 4 全量迁移到 mde-vue；manifest 升级；「手动添加」自定义存档目录功能；页面布局重构为 `mat-layout` + `mat-app-bar`。
 *   **Vite 配置**: 主进程和 UI 使用不同的配置文件，请确保修改对应配置。
 *   **构建**: `npm run build` 同时构建插件主逻辑和 UI。

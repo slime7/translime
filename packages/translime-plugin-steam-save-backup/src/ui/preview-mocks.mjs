@@ -76,4 +76,49 @@ export default {
     success: true,
     status: { ...mockStatus, config: { ...mockStatus.config, ...syncConfig } },
   }),
+  'sync-list-remotes': async () => ({ success: true, remotes: ['mydrive', 'nas-webdav'] }),
+  'sync-backend-types': async () => ({
+    success: true,
+    backends: [
+      {
+        id: 'drive',
+        label: 'Google Drive',
+        auth: 'oauth',
+        hint: '点击授权后在浏览器完成 Google 登录，rclone 官方应用承担 OAuth',
+      },
+      {
+        id: 'webdav',
+        label: 'WebDAV（坚果云 / Nextcloud / Alist 等）',
+        auth: 'fields',
+        hint: '填写服务地址与账号密码',
+        fields: [
+          {
+            key: 'url',
+            label: '服务地址',
+            type: 'text',
+            required: true,
+            placeholder: '例如：https://dav.jianguoyun.com/dav/',
+          },
+          {
+            key: 'vendor',
+            label: '服务类型',
+            type: 'select',
+            default: 'other',
+            choices: [
+              { title: '其他 (Other)', value: 'other' },
+              { title: 'Nextcloud', value: 'nextcloud' },
+            ],
+          },
+          {
+            key: 'user', label: '用户名', type: 'text', required: true,
+          },
+          {
+            key: 'pass', label: '密码 / 应用密码', type: 'password', required: true,
+          },
+        ],
+      },
+    ],
+  }),
+  'sync-create-remote': async () => ({ success: true, remote: 'translime-drive:' }),
+  'sync-cancel-authorize': async () => ({ success: true }),
 };

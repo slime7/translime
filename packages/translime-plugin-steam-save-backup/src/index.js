@@ -27,11 +27,32 @@ import {
   normalizeGameNameKey,
 } from './utils/custom-dirs';
 import createSyncService from './utils/sync/sync-service';
+import { createExec } from './utils/sync/rclone';
+import {
+  BACKEND_TYPES,
+  createRemote,
+  findBackendType,
+  listRemotes,
+  remoteNameFor,
+  runAuthorize,
+} from './utils/sync/rclone-config';
 
 const pluginId = 'translime-plugin-steam-save-backup';
 const { mainStore } = global;
 const config = mainStore?.config;
 let steamPath = null;
+// 进行中的 OAuth 授权进程（sync-cancel-authorize 取消用）
+let currentAuthorize = null;
+
+// 表单值填充后端默认值，只保留非空项
+const mergeFieldValues = (backend, rawValues = {}) => {
+  const merged = {};
+  (backend.fields || []).forEach((field) => {
+    const raw = String(rawValues?.[field.key] ?? '').trim();
+    merged[field.key] = raw || (field.default != null ? String(field.default) : '');
+  });
+  return merged;
+};
 
 const getPathSetting = (settings, key) => {
   const value = settings?.[key];
@@ -539,6 +560,79 @@ export const ipcHandlers = [
     type: 'sync-cancel',
     handler: () => async () => {
       syncService.cancel();
+      return { success: true };
+    },
+  },
+  {
+    type: 'sync-list-remotes',
+    handler: () => async () => {
+      try {
+        const binary = syncService.resolveBinaryPath();
+        const exec = createExec(async () => binary);
+        const remotes = await listRemotes(exec);
+        return { success: true, remotes };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-backend-types',
+    handler: () => async () => ({ success: true, backends: BACKEND_TYPES }),
+  },
+  {
+    type: 'sync-create-remote',
+    handler: ({ sendToClient }) => async ({ type, values } = {}) => {
+      try {
+        const backend = findBackendType(type);
+        if (!backend) {
+          return { success: false, message: '不支持的后端类型' };
+        }
+        const missing = (backend.fields || [])
+          .filter((field) => field.required && !String(values?.[field.key] ?? '').trim())
+          .map((field) => field.label);
+        if (missing.length > 0) {
+          return { success: false, message: `请填写：${missing.join('、')}` };
+        }
+
+        const binary = syncService.resolveBinaryPath();
+        const exec = createExec(async () => binary);
+
+        let token = null;
+        if (backend.auth === 'oauth') {
+          // rclone 会自动打开默认浏览器；授权链接同时推送给 UI 作为备用入口
+          const authorize = runAuthorize(binary, type, {
+            onUrl: (url) => {
+              sendToClient(`sync-authorize-url@${pluginId}`, { url });
+            },
+          });
+          currentAuthorize = authorize;
+          try {
+            token = await authorize.promise;
+          } finally {
+            currentAuthorize = null;
+          }
+        }
+
+        const name = await createRemote(exec, {
+          type,
+          name: remoteNameFor(type),
+          values: mergeFieldValues(backend, values),
+          token,
+        });
+        return { success: true, remote: `${name}:` };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'sync-cancel-authorize',
+    handler: () => async () => {
+      if (currentAuthorize) {
+        currentAuthorize.cancel();
+        currentAuthorize = null;
+      }
       return { success: true };
     },
   },

@@ -151,6 +151,10 @@ const createSyncService = ({
   return {
     getSyncConfig: readSyncConfig,
 
+    resolveBinaryPath() {
+      return resolveBinary(readSyncConfig());
+    },
+
     setSyncConfig({ enabled, target, rclonePath }) {
       setConfig(settingsKey, {
         enabled: Boolean(enabled),

@@ -42,17 +42,29 @@ defineOptions({
   name: 'PreviewApp',
 });
 
-// 主题切换
-const currentTheme = ref('light');
+// 初始主题跟随系统明暗偏好：preview 运行在浏览器中拿不到宿主 app 的主题配置，
+// 跟随系统是能做到的最接近宿主表现的行为
+const prefersDark = typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-color-scheme: dark)').matches;
+const currentTheme = ref(prefersDark ? 'dark' : 'light');
 
 // 插件组件
 const pluginComponent = shallowRef(null);
 
+const applyMdeMode = (mode) => {
+  if (window.mde$?.theme?.setMode) {
+    window.mde$.theme.setMode(mode);
+  }
+};
+
 const toggleTheme = () => {
-  currentTheme.value = currentTheme.value === 'light' ? 'dark' : 'light';
+  const next = currentTheme.value === 'light' ? 'dark' : 'light';
+  currentTheme.value = next;
+  applyMdeMode(next);
 };
 
 onMounted(() => {
+  applyMdeMode(currentTheme.value);
   if (window.__PREVIEW_PLUGIN_COMPONENT__) {
     pluginComponent.value = window.__PREVIEW_PLUGIN_COMPONENT__;
   }

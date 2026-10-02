@@ -6,131 +6,266 @@
     close-on-back
     title="远程同步"
   >
-    <div style="display: flex; flex-direction: column; gap: 16px; padding-bottom: 4px">
-      <mat-switch v-model="form.enabled">
-        启用远程同步（备份后与插件启动时自动对账）
-      </mat-switch>
+    <!-- 远程管理视图：选择后端类型 → 填凭据 / OAuth 授权 → 创建远程 -->
+    <template v-if="view === 'remote'">
+      <div style="display: flex; flex-direction: column; gap: 16px; padding-bottom: 4px">
+        <mat-select
+          v-model="selectedType"
+          label="存储后端"
+          :items="backendItems"
+          variant="outlined"
+          color="primary"
+          style="width: 100%"
+        />
 
-      <mat-text-field
-        v-model="form.target"
-        style="width: 100%"
-        label="远程目标"
-        placeholder="例如：mydrive:SteamBackups 或 D:\Backups\Steam"
-        variant="outlined"
-        color="primary"
-        :max-length="300"
-      />
-      <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant); margin-top: -10px">
-        支持 rclone 远程（remote:路径）与本地/网络路径（NAS、挂载盘）。
-        云盘等 rclone 远程请先在系统 rclone 中完成配置与授权。
-      </div>
+        <div
+          v-if="currentBackend?.hint"
+          style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant); margin-top: -8px"
+        >
+          {{ currentBackend.hint }}
+        </div>
 
-      <mat-text-field
-        v-model="form.rclonePath"
-        style="width: 100%"
-        label="rclone 路径（可选）"
-        placeholder="留空则使用系统 PATH 中的 rclone"
-        variant="outlined"
-        color="primary"
-        readonly
-        @click="pickRclone"
-      >
-        <template #trailing>
-          <mat-btn
-            icon="folder_open"
-            variant="standard"
-            size="small"
-            aria-label="选择 rclone 可执行文件"
-            @click.stop="pickRclone"
+        <template v-for="field in currentFields" :key="field.key">
+          <mat-select
+            v-if="field.type === 'select'"
+            v-model="fieldValues[field.key]"
+            :label="field.label"
+            :items="field.choices"
+            variant="outlined"
+            color="primary"
+            style="width: 100%"
+          />
+          <mat-text-field
+            v-else
+            v-model="fieldValues[field.key]"
+            :type="field.type === 'password' ? 'password' : 'text'"
+            :label="field.label"
+            :placeholder="field.placeholder"
+            variant="outlined"
+            color="primary"
+            style="width: 100%"
           />
         </template>
-      </mat-text-field>
 
-      <div style="display: flex; align-items: center; gap: 12px">
-        <mat-btn
-          variant="text"
-          prefix="search"
-          :loading="probing"
-          @click="probe"
+        <div
+          v-if="authorizeWaiting"
+          style="display: flex; flex-direction: column; gap: 8px; font-size: .875rem"
         >
-          检测 rclone
-        </mat-btn>
-        <span
-          v-if="probeResult"
-          :style="{ fontSize: '.875rem', color: probeResult.ok ? 'var(--mat-sys-color-primary)' : 'var(--mat-sys-color-error)' }"
-        >
-          {{ probeResult.ok ? `rclone v${probeResult.version} 可用` : `不可用：${probeResult.error}` }}
-        </span>
-      </div>
+          <span style="color: var(--mat-sys-color-primary)">等待浏览器授权完成…</span>
+          <span
+            v-if="authorizeUrl"
+            style="color: var(--mat-sys-color-on-surface-variant); word-break: break-all"
+          >
+            浏览器未打开？
+            <a
+              :href="authorizeUrl"
+              style="color: var(--mat-sys-color-primary)"
+              @click.prevent="openAuthorizeUrl"
+            >点此打开授权页面</a>
+          </span>
+          <mat-btn
+            variant="text"
+            color="error"
+            @click="cancelAuthorize"
+          >
+            取消授权
+          </mat-btn>
+        </div>
 
-      <mat-divider style="margin-block: 4px" />
-
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: .875rem; color: var(--mat-sys-color-on-surface-variant)">
-        <span v-if="phase === 'running'">正在同步…</span>
-        <span v-else-if="lastRunAt">上次同步：{{ formatTime(lastRunAt) }}</span>
-        <span v-else>尚未同步过</span>
-        <span v-if="reportSummary">{{ reportSummary }}</span>
-        <span
-          v-if="lastError"
+        <div
+          v-if="formError"
           role="alert"
-          style="color: var(--mat-sys-color-error); word-break: break-all"
+          style="font-size: .875rem; color: var(--mat-sys-color-error); word-break: break-all"
         >
-          {{ lastError }}
-        </span>
-      </div>
+          {{ formError }}
+        </div>
 
-      <div
-        v-if="formError"
-        role="alert"
-        style="font-size: .875rem; color: var(--mat-sys-color-error)"
-      >
-        {{ formError }}
+        <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
+          远程以「translime-后端名」写入系统 rclone 配置，重复创建会覆盖旧凭据；
+          令牌与密码只保存在本机 rclone 配置文件中。
+        </div>
       </div>
+    </template>
 
-      <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
-        远端是可靠源：本地删除的备份会在下次同步时从远端重新下载，
-        彻底删除请直接清理远端目录（v1 暂不做自动清理与删除传播）。
+    <!-- 主视图：开关 / 目标 / 检测 / 状态 -->
+    <template v-else>
+      <div style="display: flex; flex-direction: column; gap: 16px; padding-bottom: 4px">
+        <mat-switch v-model="form.enabled">
+          启用远程同步（备份后与插件启动时自动对账）
+        </mat-switch>
+
+        <mat-select
+          v-model="selectedRemote"
+          label="远程位置"
+          :items="remoteItems"
+          variant="outlined"
+          color="primary"
+          supporting-text="选择已有远程自动填入目标；本地或 NAS 路径选第一项直接填写"
+          style="width: 100%"
+        />
+
+        <mat-text-field
+          v-model="form.target"
+          style="width: 100%"
+          label="远程目标"
+          placeholder="例如：mydrive:SteamBackups 或 D:\Backups\Steam"
+          variant="outlined"
+          color="primary"
+          :max-length="300"
+        />
+
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: -8px">
+          <mat-btn
+            variant="text"
+            prefix="add"
+            @click="openRemoteSetup"
+          >
+            新建 / 授权远程
+          </mat-btn>
+          <span style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
+            在目标后追加子目录即可，例如 mydrive:SteamBackups
+          </span>
+        </div>
+
+        <mat-text-field
+          v-model="form.rclonePath"
+          style="width: 100%"
+          label="rclone 路径（可选）"
+          placeholder="留空则使用系统 PATH 中的 rclone"
+          variant="outlined"
+          color="primary"
+          readonly
+          @click="pickRclone"
+        >
+          <template #trailing>
+            <mat-btn
+              icon="folder_open"
+              variant="standard"
+              size="small"
+              aria-label="选择 rclone 可执行文件"
+              @click.stop="pickRclone"
+            />
+          </template>
+        </mat-text-field>
+
+        <div style="display: flex; align-items: center; gap: 12px">
+          <mat-btn
+            variant="text"
+            prefix="search"
+            :loading="probing"
+            @click="probe"
+          >
+            检测 rclone
+          </mat-btn>
+          <span
+            v-if="probeResult"
+            :style="{ fontSize: '.875rem', color: probeResult.ok ? 'var(--mat-sys-color-primary)' : 'var(--mat-sys-color-error)' }"
+          >
+            {{ probeResult.ok ? `rclone v${probeResult.version} 可用` : `不可用：${probeResult.error}` }}
+          </span>
+        </div>
+
+        <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant); margin-top: -8px">
+          未安装 rclone？
+          <a
+            href="https://rclone.org/downloads/"
+            style="color: var(--mat-sys-color-primary)"
+            @click.prevent="openDownloads"
+          >前往 rclone.org/downloads 下载</a>
+        </div>
+
+        <mat-divider style="margin-block: 4px" />
+
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: .875rem; color: var(--mat-sys-color-on-surface-variant)">
+          <span v-if="phase === 'running'">正在同步…</span>
+          <span v-else-if="lastRunAt">上次同步：{{ formatTime(lastRunAt) }}</span>
+          <span v-else>尚未同步过</span>
+          <span v-if="reportSummary">{{ reportSummary }}</span>
+          <span
+            v-if="lastError"
+            role="alert"
+            style="color: var(--mat-sys-color-error); word-break: break-all"
+          >
+            {{ lastError }}
+          </span>
+        </div>
+
+        <div
+          v-if="formError"
+          role="alert"
+          style="font-size: .875rem; color: var(--mat-sys-color-error)"
+        >
+          {{ formError }}
+        </div>
+
+        <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
+          远端是可靠源：本地删除的备份会在下次同步时从远端重新下载，
+          彻底删除请直接清理远端目录（v1 暂不做自动清理与删除传播）。
+        </div>
       </div>
-    </div>
+    </template>
 
     <template #actions>
       <mat-spacer />
 
-      <mat-btn
-        v-if="phase === 'running'"
-        variant="text"
-        color="error"
-        @click="cancel"
-      >
-        取消同步
-      </mat-btn>
-      <mat-btn
-        v-else
-        variant="text"
-        prefix="cloud_sync"
-        :disabled="!form.enabled || !form.target"
-        @click="syncNow"
-      >
-        立即同步
-      </mat-btn>
+      <template v-if="view === 'remote'">
+        <mat-btn
+          variant="text"
+          :disabled="authorizeWaiting"
+          @click="backToMain"
+        >
+          返回
+        </mat-btn>
 
-      <mat-btn
-        variant="text"
-        @click="visible = false"
-      >
-        关闭
-      </mat-btn>
+        <mat-btn
+          variant="filled"
+          color="primary"
+          :prefix="currentBackend?.auth === 'oauth' ? 'cloud_sync' : 'add'"
+          :disabled="!selectedType"
+          :loading="creating"
+          @click="createRemoteFromForm"
+        >
+          {{ currentBackend?.auth === 'oauth' ? '授权并创建' : '创建远程' }}
+        </mat-btn>
+      </template>
 
-      <mat-btn
-        variant="filled"
-        color="primary"
-        prefix="save"
-        :disabled="form.enabled && !form.target"
-        :loading="saving"
-        @click="save"
-      >
-        保存
-      </mat-btn>
+      <template v-else>
+        <mat-btn
+          v-if="phase === 'running'"
+          variant="text"
+          color="error"
+          @click="cancel"
+        >
+          取消同步
+        </mat-btn>
+        <mat-btn
+          v-else
+          variant="text"
+          prefix="cloud_sync"
+          :disabled="!form.enabled || !form.target"
+          @click="syncNow"
+        >
+          立即同步
+        </mat-btn>
+
+        <mat-btn
+          variant="text"
+          @click="visible = false"
+        >
+          关闭
+        </mat-btn>
+
+        <mat-btn
+          variant="filled"
+          color="primary"
+          prefix="save"
+          :disabled="form.enabled && !form.target"
+          :loading="saving"
+          @click="save"
+        >
+          保存
+        </mat-btn>
+      </template>
     </template>
   </mat-dialog>
 </template>
@@ -138,11 +273,17 @@
 <script setup>
 import {
   computed,
+  onBeforeUnmount,
+  onMounted,
   reactive,
   ref,
   watch,
 } from 'vue';
-import { useDialog } from 'translime-sdk';
+import {
+  openLink,
+  useDialog,
+  useIpc,
+} from 'translime-sdk';
 import {
   cancelSync,
   checkRclone,
@@ -152,6 +293,8 @@ import {
   triggerSyncNow,
 } from '../composables/useSyncStatus';
 
+const PLUGIN_ID = 'translime-plugin-steam-save-backup';
+
 const props = defineProps({
   modelValue: {
     type: Boolean,
@@ -160,6 +303,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
+
+const ipc = useIpc();
 
 const visible = computed({
   get: () => props.modelValue,
@@ -172,6 +317,18 @@ const saving = ref(false);
 const probing = ref(false);
 const probeResult = ref(null);
 
+// 远程管理视图状态
+const view = ref('main');
+const backends = ref([]);
+const remotes = ref([]);
+const loadingRemotes = ref(false);
+const selectedRemote = ref('');
+const selectedType = ref(null);
+const fieldValues = reactive({});
+const creating = ref(false);
+const authorizeWaiting = ref(false);
+const authorizeUrl = ref('');
+
 const phase = computed(() => syncStatus.value?.phase || 'idle');
 const lastRunAt = computed(() => syncStatus.value?.lastRunAt || null);
 const lastError = computed(() => syncStatus.value?.lastError || null);
@@ -183,6 +340,18 @@ const reportSummary = computed(() => {
   return `上次对账：上传 ${totals.uploads} · 下载 ${totals.downloads} · 冲突保留 ${totals.renames}`;
 });
 
+const currentBackend = computed(() => backends.value.find((item) => item.id === selectedType.value) || null);
+const currentFields = computed(() => currentBackend.value?.fields || []);
+const backendItems = computed(() => backends.value.map((item) => ({
+  title: item.label,
+  value: item.id,
+  subtitle: item.hint,
+})));
+const remoteItems = computed(() => [
+  { title: '本地 / 网络路径（直接填写）', value: '' },
+  ...remotes.value.map((remote) => ({ title: `${remote}:`, value: `${remote}:` })),
+]);
+
 const formatTime = (isoString) => new Date(isoString).toLocaleString('zh-CN', {
   year: 'numeric',
   month: '2-digit',
@@ -191,17 +360,98 @@ const formatTime = (isoString) => new Date(isoString).toLocaleString('zh-CN', {
   minute: '2-digit',
 });
 
+const resetFormError = () => {
+  formError.value = '';
+};
+
 watch(visible, (open) => {
   if (open) {
-    formError.value = '';
+    resetFormError();
     probeResult.value = null;
+    view.value = 'main';
     const config = syncStatus.value?.config;
     form.enabled = Boolean(config?.enabled);
     form.target = config?.target || '';
     form.rclonePath = config?.rclonePath || '';
+    selectedRemote.value = remotes.value.find((remote) => `${remote}:` === form.target) ? `${form.target}` : '';
     refreshSyncStatus();
   }
 });
+
+// 选择已有远程时把目标同步为该远程根；选回本地路径则清空让用户手填
+watch(selectedRemote, (value) => {
+  form.target = value || '';
+});
+
+watch(selectedType, () => {
+  resetFormError();
+  Object.keys(fieldValues).forEach((key) => {
+    delete fieldValues[key];
+  });
+  (currentBackend.value?.fields || []).forEach((field) => {
+    fieldValues[field.key] = field.default != null ? String(field.default) : '';
+  });
+});
+
+// 主进程在 rclone authorize 启动后推送本地回调授权链接
+const onAuthorizeUrl = (payload) => {
+  if (payload?.url) {
+    authorizeUrl.value = payload.url;
+  }
+};
+
+onMounted(() => {
+  ipc?.on('sync-authorize-url', onAuthorizeUrl);
+});
+
+onBeforeUnmount(() => {
+  ipc?.detach('sync-authorize-url');
+});
+
+const loadRemotes = async () => {
+  loadingRemotes.value = true;
+  try {
+    const res = await ipc.invoke(`sync-list-remotes@${PLUGIN_ID}`);
+    if (res?.success) {
+      remotes.value = res.remotes || [];
+    } else if (res?.message) {
+      formError.value = res.message;
+    }
+  } catch (err) {
+    formError.value = err.message || '读取远程列表失败';
+  } finally {
+    loadingRemotes.value = false;
+  }
+};
+
+const loadBackends = async () => {
+  if (backends.value.length > 0) {
+    return;
+  }
+  try {
+    const res = await ipc.invoke(`sync-backend-types@${PLUGIN_ID}`);
+    if (res?.success) {
+      backends.value = res.backends || [];
+    }
+  } catch {
+    // 后端类型表加载失败时保持为空，UI 显示无选项
+  }
+};
+
+const openRemoteSetup = async () => {
+  resetFormError();
+  view.value = 'remote';
+  loadBackends();
+  loadRemotes();
+};
+
+const backToMain = () => {
+  if (authorizeWaiting.value) {
+    return;
+  }
+  resetFormError();
+  view.value = 'main';
+};
 
 const pickRclone = async () => {
   const dialog = useDialog();
@@ -213,13 +463,13 @@ const pickRclone = async () => {
   });
   if (!result.canceled && result.filePaths.length > 0) {
     [form.rclonePath] = result.filePaths;
-    formError.value = '';
+    resetFormError();
   }
 };
 
 const probe = async () => {
   probing.value = true;
-  formError.value = '';
+  resetFormError();
   try {
     const res = await checkRclone(form.rclonePath);
     probeResult.value = res?.rclone || { ok: false, error: res?.message || '检测失败' };
@@ -230,8 +480,72 @@ const probe = async () => {
   }
 };
 
+const openAuthorizeUrl = () => {
+  if (authorizeUrl.value) {
+    openLink(authorizeUrl.value);
+  }
+};
+
+const openDownloads = () => {
+  openLink('https://rclone.org/downloads/');
+};
+
+const cancelAuthorize = async () => {
+  try {
+    await ipc.invoke(`sync-cancel-authorize@${PLUGIN_ID}`);
+  } finally {
+    authorizeWaiting.value = false;
+    creating.value = false;
+    formError.value = '授权已取消';
+  }
+};
+
+const applyCreatedRemote = (remote) => {
+  form.target = remote;
+  selectedRemote.value = remote;
+  view.value = 'main';
+};
+
+const createRemoteFromForm = async () => {
+  if (!selectedType.value || creating.value || authorizeWaiting.value) {
+    return;
+  }
+  const missing = currentFields.value
+    .filter((field) => field.required && !String(fieldValues[field.key] ?? '').trim())
+    .map((field) => field.label);
+  if (missing.length > 0) {
+    formError.value = `请填写：${missing.join('、')}`;
+    return;
+  }
+
+  creating.value = true;
+  if (currentBackend.value?.auth === 'oauth') {
+    authorizeWaiting.value = true;
+    authorizeUrl.value = '';
+  }
+  resetFormError();
+  try {
+    const res = await ipc.invoke(`sync-create-remote@${PLUGIN_ID}`, {
+      type: selectedType.value,
+      values: { ...fieldValues },
+    });
+    if (res?.success) {
+      formError.value = '';
+      applyCreatedRemote(res.remote);
+      loadRemotes();
+    } else {
+      formError.value = res?.message || '创建远程失败';
+    }
+  } catch (err) {
+    formError.value = err.message || '创建远程失败';
+  } finally {
+    creating.value = false;
+    authorizeWaiting.value = false;
+  }
+};
+
 const syncNow = async () => {
-  formError.value = '';
+  resetFormError();
   const res = await triggerSyncNow();
   if (!res?.success) {
     formError.value = res?.message || '触发同步失败';
@@ -248,7 +562,7 @@ const save = async () => {
     return;
   }
   saving.value = true;
-  formError.value = '';
+  resetFormError();
   try {
     const res = await setSyncConfig({ ...form });
     if (!res?.success) {
