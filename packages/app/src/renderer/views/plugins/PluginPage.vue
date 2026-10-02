@@ -111,11 +111,11 @@ export default {
       if (!isEmbeddedRoute.value || !pluginId.value || !loaderVisible.value || !preloadPath.value) {
         return;
       }
+      // cacheKey 由 store 依据 loadTime 变化推导（仅在插件重启时重建 webview）
       store.setEmbeddedPluginWebview(pluginId.value, {
         src: webviewSrc.value,
         preloadPath: preloadPath.value,
         loadTime: pluginLoadTime.value,
-        cacheKey: `${pluginId.value}:${pluginLoadTime.value || 0}`,
       });
     };
 

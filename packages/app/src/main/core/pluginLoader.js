@@ -163,6 +163,21 @@ class PluginLoader extends EventEmitter {
   }
 
   /**
+   * 只执行插件发现（目录扫描与状态推导），不激活任何插件。
+   *
+   * 供启动编排把发现阶段提前到与渲染首屏并行执行；
+   * `onStartup` 插件的激活仍由 `activateStartupPlugins()` 在
+   * 主窗口首屏就绪后收尾，保证插件代码执行时渲染端已就绪。
+   *
+   * @returns {Array<object>} 扫描后的插件列表。
+   */
+  scanPlugins() {
+    const plugins = resolvePlugins(this, { activate: false });
+    syncDevPluginWatchers(this);
+    return plugins;
+  }
+
+  /**
    * `resolvePlugins()` 的历史兼容别名。
    *
    * @returns {Array<object>}

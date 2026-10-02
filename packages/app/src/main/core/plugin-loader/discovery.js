@@ -220,9 +220,13 @@ const activateStartupPlugins = (loader) => {
  * 扫描正式插件与开发插件目录，并重建整体插件状态。
  *
  * @param {object} loader - `PluginLoader` 实例。
- * @returns {Array<object>} 最新插件列表。
+ * @param {object} [options={}] - 扫描选项。
+ * @param {boolean} [options.activate=true] - 是否在扫描后立即激活 `onStartup` 插件。
+ * 启动编排会把发现阶段提前到与渲染首屏并行执行，此时只做扫描，
+ * 插件代码的执行仍等待 `main-renderer-ready` 后由 `activateStartupPlugins` 收尾。
+ * @returns {Array<object>} 扫描后的插件列表。
  */
-const resolvePlugins = (loader) => {
+const resolvePlugins = (loader, { activate = true } = {}) => {
   try {
     fs.accessSync(PLUGIN_MODULES_PATH_DEV);
   } catch (err) {
@@ -253,7 +257,9 @@ const resolvePlugins = (loader) => {
   loader.plugins = [...modules, ...devModules];
   buildDependencyGraph(loader);
   rebuildActivationIndexes(loader);
-  activateStartupPlugins(loader);
+  if (activate) {
+    activateStartupPlugins(loader);
+  }
   loader.emit('init', loader.plugins);
   return loader.plugins;
 };

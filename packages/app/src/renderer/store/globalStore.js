@@ -50,12 +50,23 @@ const useGlobalStore = defineStore('globalStore', {
       if (!packageName) {
         return;
       }
+      const existing = this.embeddedPluginWebviews[packageName];
+      // loadTime 从 0 变为具体值属于首次激活，插件 UI 产物并未变化；
+      // 只有两个非零 loadTime 交替（插件重启）才更换 cacheKey 重建 webview，
+      // 避免激活收尾的插件列表刷新把加载中的插件 UI 整个重载
+      const prevLoadTime = existing?.loadTime || 0;
+      const nextLoadTime = webviewInfo.loadTime || 0;
+      const isRestart = prevLoadTime > 0 && nextLoadTime > 0 && prevLoadTime !== nextLoadTime;
+      const cacheKey = isRestart
+        ? `${packageName}:${nextLoadTime}`
+        : existing?.cacheKey || `${packageName}:${nextLoadTime || prevLoadTime}`;
       this.embeddedPluginWebviews = {
         ...this.embeddedPluginWebviews,
         [packageName]: {
           packageName,
-          ...this.embeddedPluginWebviews[packageName],
+          ...existing,
           ...webviewInfo,
+          cacheKey,
         },
       };
     },

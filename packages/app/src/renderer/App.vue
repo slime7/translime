@@ -16,6 +16,7 @@ import useToast from '@/hooks/useToast';
 import globalStore from '@/store/globalStore';
 import HostMenu from '@/components/HostMenu.vue';
 import { appConfigStore } from '@/utils';
+import waitForCriticalFonts from '@/utils/fonts';
 import {
   getDefaultThemeColor,
   normalizeThemeColor,
@@ -154,6 +155,9 @@ handleAppArgv();
 onMounted(async () => {
   await router.isReady();
   if (route.name !== 'PluginWindow' && route.name !== 'PluginRender') {
+    // 首屏图标字体就绪后再通知主进程切换窗口，避免切换后图标闪现连字文本；
+    // 主进程也会在收到该事件后完成启动激活再展示主窗口
+    await waitForCriticalFonts();
     ipcRaw.send('main-renderer-ready');
   }
 

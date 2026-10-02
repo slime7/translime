@@ -558,8 +558,8 @@ watch(() => route.query.t, () => {
 });
 let firstActivation = true;
 onActivated(() => {
-  // 首次激活早于 App.vue 发送 main-renderer-ready，此时主进程插件加载器未就绪，
-  // 触发 GET_PLUGINS 会得到「插件未初始化」错误；启动拉取交给 App.vue，这里只管后续切回页面时刷新
+  // 启动时的插件列表拉取由 App.vue 负责，这里只处理切回页面时的刷新，
+  // 避免与首屏拉取重复请求
   if (firstActivation) {
     firstActivation = false;
   } else {

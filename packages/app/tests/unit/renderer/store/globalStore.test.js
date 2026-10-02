@@ -72,6 +72,23 @@ describe('globalStore', () => {
     });
   });
 
+  describe('setEmbeddedPluginWebview', () => {
+    it('首次激活（loadTime 0→非 0）不更换 cacheKey，只有插件重启时才重建 webview', () => {
+      // 启动期激活收尾会推送插件列表刷新，若此时更换 cacheKey，
+      // 加载中的插件 webview 会被销毁重建，插件 UI 状态丢失
+      const store = useGlobalStore();
+
+      store.setEmbeddedPluginWebview('translime-plugin-a', { src: 'app://a', loadTime: 0 });
+      expect(store.embeddedPluginWebviews['translime-plugin-a'].cacheKey).toBe('translime-plugin-a:0');
+
+      store.setEmbeddedPluginWebview('translime-plugin-a', { src: 'app://a', loadTime: 111 });
+      expect(store.embeddedPluginWebviews['translime-plugin-a'].cacheKey).toBe('translime-plugin-a:0');
+
+      store.setEmbeddedPluginWebview('translime-plugin-a', { src: 'app://a', loadTime: 222 });
+      expect(store.embeddedPluginWebviews['translime-plugin-a'].cacheKey).toBe('translime-plugin-a:222');
+    });
+  });
+
   describe('updatePlugin', () => {
     it('应该正确更新已存在的插件', () => {
       const store = useGlobalStore();

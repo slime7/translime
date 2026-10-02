@@ -4,6 +4,7 @@ import {
   protocol,
 } from 'electron';
 import EventEmitter from 'node:events';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import createMainWindow from './main';
 import appManager from './utils/useAppManager';
 import logger from './utils/logger';
@@ -14,14 +15,23 @@ import setupDeepLink, { linkHandler } from './core/deepLink';
 import * as autoUpdate from './core/autoUpdate';
 import { setupLinuxDesktopIntegration } from './utils/linuxDesktopIntegration';
 
+/**
+ * 插件状态变化推送给渲染端的防抖间隔（毫秒）。
+ *
+ * 启动阶段多个插件接连完成激活，逐个推送会让渲染端重复拉取插件列表。
+ */
+const PLUGINS_CHANGED_DEBOUNCE = 150;
+
 class CreateElectronApp extends EventEmitter {
   constructor() {
     super();
     this.isDevelopment = process.env.NODE_ENV === 'development';
+    this.pluginsChangedTimer = null;
   }
 
   init() {
     this.base();
+    this.onPluginSettled();
     this.onAppReady();
     this.onAppQuit();
 
@@ -76,15 +86,17 @@ class CreateElectronApp extends EventEmitter {
 
     ipcMain.on('main-renderer-ready', () => {
       setupDeepLink();
+      // 插件发现已在应用就绪时与首屏并行完成，这里在切换窗口前补齐
+      // onStartup 激活，保证主窗口亮相时字体与插件状态均已就绪
+      appManager.getPluginLoader()?.activateStartupPlugins();
+
       if (appManager.getLaunchWin()) {
         appManager.getLaunchWin().close();
         appManager.setLaunchWin(null);
       }
       appManager.getWin().show();
 
-      // 开始加载插件
-      appManager.setPluginLoader(pluginLoader);
-      appManager.getPluginLoader().getPlugins();
+      // onAppReady 插件按约定在主窗口稳定后异步激活
       setTimeout(() => {
         appManager.getPluginLoader()?.triggerActivation('onAppReady');
       }, 0);
@@ -95,6 +107,28 @@ class CreateElectronApp extends EventEmitter {
         autoUpdate.checkForUpdates();
       }, 15000);
     });
+  }
+
+  /**
+   * 把插件激活收尾（含隔离插件的异步握手）防抖后推送给渲染端。
+   *
+   * 渲染端只在启动时拉取一次插件列表，晚于拉取才完成的激活
+   * （典型是隔离插件）会让插件卡片停留在过期的激活状态。
+   *
+   * @returns {void}
+   */
+  onPluginSettled() {
+    const notifyPluginsChanged = () => {
+      if (this.pluginsChangedTimer) {
+        clearTimeout(this.pluginsChangedTimer);
+      }
+      this.pluginsChangedTimer = setTimeout(() => {
+        this.pluginsChangedTimer = null;
+        appManager.getIpc()?.sendToAllWindows(ipcType.PLUGINS_CHANGED);
+      }, PLUGINS_CHANGED_DEBOUNCE);
+    };
+    pluginLoader.on('plugin:enabled', notifyPluginsChanged);
+    pluginLoader.on('plugin:error', notifyPluginsChanged);
   }
 
   onAppReady() {
@@ -124,6 +158,12 @@ class CreateElectronApp extends EventEmitter {
         createTray();
         createLaunchWindow();
         createMainWindow();
+        // 插件发现与渲染进程首屏并行执行：只扫描目录与解析清单，
+        // 插件代码的激活等 main-renderer-ready 后再收尾。
+        // Ipc 实例在 createMainWindow 中同步创建，激活期注册的
+        // 插件 IPC handler 依赖它，必须放在 createMainWindow 之后
+        appManager.setPluginLoader(pluginLoader);
+        pluginLoader.scanPlugins();
         if (process.platform === 'win32') {
           app.setAppUserModelId(this.isDevelopment ? process.execPath : 'translime.app');
         } else if (process.platform === 'linux' && typeof app.setDesktopName === 'function') {

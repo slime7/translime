@@ -200,6 +200,36 @@ describe('pluginLoader', () => {
     });
   });
 
+  describe('scanPlugins', () => {
+    it('扫描阶段只做发现不激活 onStartup 插件，激活由 activateStartupPlugins 收尾', () => {
+      // 启动编排把发现阶段提前到与渲染首屏并行执行，此时不允许执行插件代码
+      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
+        dependencies: {
+          'translime-plugin-scan-test': '1.0.0',
+        },
+      }));
+      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
+        name: 'translime-plugin-scan-test',
+        plugin: {
+          title: 'Scan Test Plugin',
+        },
+      }));
+      mockFs.accessSync.mockReturnValue(undefined);
+
+      pluginLoader.scanPlugins();
+
+      expect(pluginLoader.plugins).toHaveLength(1);
+      expect(pluginLoader.plugins[0].packageName).toBe('translime-plugin-scan-test');
+      expect(pluginLoader.plugins[0].active).toBe(false);
+      expect(pluginLoader.plugins[0].status).toBe('ready');
+
+      pluginLoader.activateStartupPlugins();
+
+      expect(pluginLoader.plugins[0].active).toBe(true);
+      expect(pluginLoader.plugins[0].status).toBe('active');
+    });
+  });
+
   describe('readPlugins: dev state', () => {
     it('开发插件未构建时应标记为 build-missing', () => {
       mockFs.readFileSync.mockReturnValue(JSON.stringify({

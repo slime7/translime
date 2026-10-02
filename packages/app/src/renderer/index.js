@@ -9,8 +9,12 @@ import App from './App.vue';
 import router from './router';
 import createNaviDirective from './plugins/directive/navi';
 import { installPluginStyleIsolation } from './utils/pluginStyleIsolation';
+import waitForCriticalFonts from './utils/fonts';
 
 installPluginStyleIsolation();
+
+// 与渲染进程启动并行预载首屏图标字体，缩短 main-renderer-ready 前的等待
+waitForCriticalFonts();
 
 const pinia = createPinia();
 
