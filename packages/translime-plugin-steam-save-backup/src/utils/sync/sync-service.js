@@ -184,13 +184,7 @@ const createSyncService = ({
     cancelled = false;
     const backupExec = await prepareExec();
     try {
-      await deleteRemoteBackupOp({
-        exec: backupExec,
-        target: syncConfig.target,
-        gameId: String(gameId),
-        dir,
-        isCancelled: () => cancelled,
-      });
+      await deleteRemoteBackupOp(backupExec, syncConfig.target, String(gameId), dir);
     } finally {
       backupExec.killAll();
     }
