@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { runSync, SyncCancelledError } from './engine';
+import { resolveConflict, runSync, SyncCancelledError } from './engine';
 import { createExec, probeRclone } from './rclone';
 import createSyncQueue from './queue';
 
@@ -44,12 +44,13 @@ const createSyncService = ({
     const raw = getConfig(stateKey);
     if (!raw || typeof raw !== 'object') {
       return {
-        machineId: null, dirtyGames: [], lastReport: null, lastError: null, lastRunAt: null,
+        machineId: null, dirtyGames: [], conflicts: [], lastReport: null, lastError: null, lastRunAt: null,
       };
     }
     return {
       machineId: typeof raw.machineId === 'string' ? raw.machineId : null,
       dirtyGames: Array.isArray(raw.dirtyGames) ? raw.dirtyGames.map(String) : [],
+      conflicts: Array.isArray(raw.conflicts) ? raw.conflicts : [],
       lastReport: raw.lastReport || null,
       lastError: typeof raw.lastError === 'string' ? raw.lastError : null,
       lastRunAt: typeof raw.lastRunAt === 'string' ? raw.lastRunAt : null,
@@ -106,7 +107,6 @@ const createSyncService = ({
         exec,
         target: syncConfig.target,
         backupRoot: await resolveBackupRoot(),
-        machineId: ensureMachineId(),
         isCancelled: () => cancelled,
       });
       writePersistedState({
@@ -114,6 +114,8 @@ const createSyncService = ({
         lastError: null,
         lastRunAt: report.finishedAt,
         dirtyGames: [],
+        // 冲突清单以最近一次对账为准；用户处理过的条目会在处理成功后即时移除
+        conflicts: report.conflicts || [],
       });
     } catch (e) {
       if (e instanceof SyncCancelledError) {
@@ -148,10 +150,65 @@ const createSyncService = ({
       config: readSyncConfig(),
       rclone: rcloneProbe,
       dirtyGames: persisted.dirtyGames,
+      conflicts: persisted.conflicts,
       lastReport: persisted.lastReport,
       lastError: persisted.lastError,
       lastRunAt: persisted.lastRunAt,
     };
+  };
+
+  const prepareExec = async () => {
+    const syncConfig = readSyncConfig();
+    const binary = resolveBinary(syncConfig);
+    rcloneProbe = await probeRclone(binary);
+    if (!rcloneProbe.ok) {
+      throw new Error(
+        `未找到可用的 rclone（${binary}）：${rcloneProbe.error}。请安装 rclone 或在同步设置中填写可执行文件路径。`,
+      );
+    }
+    return createExec(async () => rcloneProbe.path);
+  };
+
+  /**
+   * 处理单个同步冲突（Steam Cloud 式三选一）。
+   * 成功后立即从持久状态移除该冲突，并触发一次对账确认两端一致。
+   */
+  const resolveOneConflict = async ({ gameId, dir, mode }) => {
+    const syncConfig = readSyncConfig();
+    if (!syncConfig.enabled || !syncConfig.target) {
+      throw new Error('同步未启用或未配置远程目标');
+    }
+    const known = readPersistedState().conflicts.find(
+      (item) => String(item.gameId) === String(gameId) && item.dir === dir,
+    );
+    if (!known) {
+      throw new Error('冲突不存在或已处理');
+    }
+
+    cancelled = false;
+    const conflictExec = await prepareExec();
+    try {
+      await resolveConflict({
+        exec: conflictExec,
+        target: syncConfig.target,
+        backupRoot: await resolveBackupRoot(),
+        gameId,
+        dir,
+        mode,
+        machineId: ensureMachineId(),
+        isCancelled: () => cancelled,
+      });
+    } finally {
+      conflictExec.killAll();
+    }
+
+    writePersistedState({
+      conflicts: readPersistedState().conflicts.filter(
+        (item) => !(String(item.gameId) === String(gameId) && item.dir === dir),
+      ),
+    });
+    queue.trigger('manual');
+    return getStatus();
   };
 
   return {
@@ -187,6 +244,8 @@ const createSyncService = ({
     trigger(reason = 'auto') {
       return queue.trigger(reason);
     },
+
+    resolveOneConflict,
 
     onBackupCreated(gameId) {
       const persisted = readPersistedState();

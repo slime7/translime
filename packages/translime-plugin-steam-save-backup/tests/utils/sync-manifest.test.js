@@ -13,6 +13,7 @@ import {
   canonicalStringify,
   infoDigest,
   planSync,
+  uniqueDirName,
 } from '../../src/utils/sync/manifest';
 
 let tmpRoot;
@@ -115,41 +116,26 @@ describe('planSync', () => {
 
     expect(plan.uploads).toEqual([{ gameId: 'g1', ts: 'ts1' }]);
     expect(plan.downloads).toEqual([{ gameId: 'g1', ts: 'ts3' }]);
-    expect(plan.renames).toEqual([]);
+    expect(plan.conflicts).toEqual([]);
   });
 
   it('两端一致的目录不产生任何动作（幂等：重复同步为空操作）', () => {
     const manifest = { g1: { ts1: 'd1', ts2: 'd2' } };
 
-    const plan = planSync(manifest, manifest, 'machine-a');
+    const plan = planSync(manifest, manifest);
 
-    expect(plan).toEqual({ uploads: [], downloads: [], renames: [] });
+    expect(plan).toEqual({ uploads: [], downloads: [], conflicts: [] });
   });
 
-  it('同名目录摘要不一致时：本地改名保留、改名副本上传、远端原件下载（两份备份都不丢失）', () => {
+  it('同名目录摘要不一致时进入冲突清单，不产生任何自动动作（分叉交由用户处理）', () => {
     const local = { g1: { ts1: 'local-digest' } };
     const remote = { g1: { ts1: 'remote-digest' } };
 
-    // machineId 取前 8 位作为改名后缀
-    const plan = planSync(local, remote, 'machine1-rest-of-uuid');
+    const plan = planSync(local, remote);
 
-    expect(plan.renames).toEqual([{ gameId: 'g1', from: 'ts1', to: 'ts1-machine1' }]);
-    expect(plan.uploads).toEqual([{ gameId: 'g1', ts: 'ts1-machine1' }]);
-    expect(plan.downloads).toEqual([{ gameId: 'g1', ts: 'ts1' }]);
-  });
-
-  it('改名目标名已被占用时追加序号，避免覆盖既有备份目录', () => {
-    const local = {
-      g1: {
-        ts1: 'local-digest',
-        'ts1-machine1': 'other',
-      },
-    };
-    const remote = { g1: { ts1: 'remote-digest' } };
-
-    const plan = planSync(local, remote, 'machine1-more');
-
-    expect(plan.renames).toEqual([{ gameId: 'g1', from: 'ts1', to: 'ts1-machine1-2' }]);
+    expect(plan.uploads).toEqual([]);
+    expect(plan.downloads).toEqual([]);
+    expect(plan.conflicts).toEqual([{ gameId: 'g1', ts: 'ts1' }]);
   });
 
   it('多游戏互不影响，仅备注差异的同名目录不视为冲突', () => {
@@ -163,19 +149,16 @@ describe('planSync', () => {
       g3: { tsY: 'only-remote' },
     };
 
-    const plan = planSync(local, remote, 'machine-a');
+    const plan = planSync(local, remote);
 
-    expect(plan.renames).toEqual([]);
+    expect(plan.conflicts).toEqual([]);
     expect(plan.uploads).toEqual([{ gameId: 'g2', ts: 'tsX' }]);
     expect(plan.downloads).toEqual([{ gameId: 'g3', ts: 'tsY' }]);
   });
 
-  it('machineId 为空时使用 local 后缀，冲突处理不因缺省标识而崩溃', () => {
-    const local = { g1: { ts1: 'local-digest' } };
-    const remote = { g1: { ts1: 'remote-digest' } };
-
-    const plan = planSync(local, remote, '');
-
-    expect(plan.renames).toEqual([{ gameId: 'g1', from: 'ts1', to: 'ts1-local' }]);
+  it('uniqueDirName 依次追加序号，供冲突“保留两份”改名时避免覆盖既有目录', () => {
+    expect(uniqueDirName('ts1-machine1', new Set())).toBe('ts1-machine1');
+    expect(uniqueDirName('ts1-machine1', new Set(['ts1-machine1']))).toBe('ts1-machine1-2');
+    expect(uniqueDirName('ts1-machine1', new Set(['ts1-machine1', 'ts1-machine1-2']))).toBe('ts1-machine1-3');
   });
 });

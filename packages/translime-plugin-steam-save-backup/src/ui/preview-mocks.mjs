@@ -33,15 +33,25 @@ const mockStatus = {
     ok: true, version: '1.75.1', path: 'rclone', error: null,
   },
   dirtyGames: ['1245620'],
+  conflicts: [
+    {
+      gameId: '1245620',
+      dir: '2026-10-01T10-00-00-000Z',
+      gameName: 'Hades',
+      local: { backupTime: '2026-10-01T10:00:00.000Z', createdBy: 'aaaa1111-0000-0000-0000-000000000000' },
+      remote: { backupTime: '2026-10-01T09:30:00.000Z', createdBy: 'bbbb2222-0000-0000-0000-000000000000' },
+      detectedAt: '2026-10-01T10:05:00.000Z',
+    },
+  ],
   lastReport: {
     startedAt: '2026-10-01T10:00:00.000Z',
     finishedAt: '2026-10-01T10:00:12.000Z',
     ok: true,
     perGame: {
-      1245620: { uploads: 1, downloads: 0, renames: 0 },
-      'custom-hollowknight': { uploads: 0, downloads: 1, renames: 0 },
+      1245620: { uploads: 1, downloads: 0, conflicts: 1 },
+      'custom-hollowknight': { uploads: 0, downloads: 1, conflicts: 0 },
     },
-    totals: { uploads: 1, downloads: 1, renames: 0 },
+    totals: { uploads: 1, downloads: 1, conflicts: 1 },
   },
   lastError: null,
   lastRunAt: '2026-10-01T10:00:12.000Z',
@@ -121,4 +131,13 @@ export default {
   }),
   'sync-create-remote': async () => ({ success: true, remote: 'translime-drive:' }),
   'sync-cancel-authorize': async () => ({ success: true }),
+  'sync-resolve-conflict': async ({ gameId, dir }) => ({
+    success: true,
+    status: {
+      ...mockStatus,
+      conflicts: mockStatus.conflicts.filter(
+        (item) => !(item.gameId === String(gameId) && item.dir === dir),
+      ),
+    },
+  }),
 };

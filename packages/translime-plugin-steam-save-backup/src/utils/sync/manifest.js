@@ -66,23 +66,21 @@ export const buildManifest = async (root) => {
 
 /**
  * 对账计划（docs/auto-sync-research.md §4.2）：
- * - 本地独有 → uploads；远端独有 → downloads
- * - 同名目录摘要不一致（两机同秒各建备份等）→ 本地改名为 `<timestamp>-<machineId>`
- *   保留两份：改名后的本地目录作为新目录上传，远端原件回补下载
- * 调用方需先应用 renames（物理改名）再执行 uploads，此时本地目录名与 uploads.ts 一致。
+ * - 本地独有 → uploads；远端独有 → downloads（不同时间戳目录的并集即多设备收敛，保持自动）
+ * - 同名目录摘要不一致（同一备份在两端内容分叉）→ conflicts：
+ *   不自动合并，交由用户选择“覆盖本地 / 覆盖远程 / 保留两份”（Steam Cloud 式冲突确认）
  */
 
 // 改名目标名冲突时追加 -2、-3… 序号，避免覆盖既有备份目录
-const uniqueDirName = (candidate, takenNames, attempt = 1) => {
+export const uniqueDirName = (candidate, takenNames, attempt = 1) => {
   const name = attempt === 1 ? candidate : `${candidate}-${attempt}`;
   return takenNames.has(name) ? uniqueDirName(candidate, takenNames, attempt + 1) : name;
 };
 
-export const planSync = (localManifest, remoteManifest, machineId) => {
+export const planSync = (localManifest, remoteManifest) => {
   const uploads = [];
   const downloads = [];
-  const renames = [];
-  const suffix = String(machineId || '').slice(0, 8) || 'local';
+  const conflicts = [];
 
   const gameIds = new Set([
     ...Object.keys(localManifest || {}),
@@ -92,30 +90,23 @@ export const planSync = (localManifest, remoteManifest, machineId) => {
   gameIds.forEach((gameId) => {
     const local = localManifest?.[gameId] || {};
     const remote = remoteManifest?.[gameId] || {};
-    const taken = new Set([...Object.keys(local), ...Object.keys(remote)]);
-    const renamedFrom = new Set();
 
     Object.keys(local).forEach((ts) => {
       if (!(ts in remote)) {
         uploads.push({ gameId, ts });
         return;
       }
-      if (local[ts] === remote[ts]) {
-        return;
+      if (local[ts] !== remote[ts]) {
+        conflicts.push({ gameId, ts });
       }
-      const to = uniqueDirName(`${ts}-${suffix}`, taken);
-      taken.add(to);
-      renamedFrom.add(ts);
-      renames.push({ gameId, from: ts, to });
-      uploads.push({ gameId, ts: to });
     });
 
     Object.keys(remote).forEach((ts) => {
-      if (!(ts in local) || renamedFrom.has(ts)) {
+      if (!(ts in local)) {
         downloads.push({ gameId, ts });
       }
     });
   });
 
-  return { uploads, downloads, renames };
+  return { uploads, downloads, conflicts };
 };

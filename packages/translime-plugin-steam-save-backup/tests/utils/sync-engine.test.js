@@ -8,7 +8,7 @@ import {
   expect,
   it,
 } from 'vitest';
-import { runSync, SyncCancelledError } from '../../src/utils/sync/engine';
+import { resolveConflict, runSync, SyncCancelledError } from '../../src/utils/sync/engine';
 
 let tmpRoot;
 let backupRoot;
@@ -60,7 +60,6 @@ const runWithFakeExec = (calls, overrides) => runSync({
   exec: createFakeExec(calls, overrides),
   target: 'sync-target',
   backupRoot,
-  machineId: '11111111-2222-3333-4444-555555555555',
   stageDir,
 });
 
@@ -92,8 +91,8 @@ describe('runSync 上传', () => {
     expect(ts1InfoIndex).toBeGreaterThan(ts1CopyIndex);
 
     expect(report.ok).toBe(true);
-    expect(report.totals).toEqual({ uploads: 2, downloads: 0, renames: 0 });
-    expect(report.perGame['123']).toEqual({ uploads: 2, downloads: 0, renames: 0 });
+    expect(report.totals).toEqual({ uploads: 2, downloads: 0, conflicts: 0 });
+    expect(report.perGame['123']).toEqual({ uploads: 2, downloads: 0, conflicts: 0 });
   });
 
   it('远端根目录尚不存在（rclone 退出码 3）视为空远端，全部上传而不是失败（首次同步）', async () => {
@@ -147,28 +146,153 @@ describe('runSync 下载', () => {
     // 一致的目录不应有任何远端 → 本地的数据复制
     expect(calls.some(([cmd, src]) => cmd === 'copy' && src === 'sync-target/123/ts-synced')).toBe(false);
 
-    expect(report.totals).toEqual({ uploads: 0, downloads: 1, renames: 0 });
+    expect(report.totals).toEqual({ uploads: 0, downloads: 1, conflicts: 0 });
   });
 });
 
 describe('runSync 冲突', () => {
-  it('同名目录摘要不一致：本地目录改名为 <ts>-<machineId> 后上传副本，并回补下载远端原件（两份都保留）', async () => {
+  it('同名目录摘要不一致：不自动合并，报告 conflicts 并附两端展示信息，本地目录保持原样', async () => {
     await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
     await writeBackup(stageDir, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
     const calls = [];
 
     const report = await runWithFakeExec(calls);
 
-    const renamedDir = path.join(backupRoot, '123', 'ts1-11111111');
-    await expect(fs.stat(renamedDir)).resolves.toBeTruthy();
-    await expect(fs.stat(path.join(backupRoot, '123', 'ts1'))).rejects.toThrow();
+    // 本地目录未被改名或删除
+    await expect(fs.stat(path.join(backupRoot, '123', 'ts1'))).resolves.toBeTruthy();
+    // 除拉取清单外没有任何上传/下载动作（staging 调用本身是 copy sync-target → stage）
+    const actionCalls = calls.filter(([cmd, src]) => (cmd === 'copy' || cmd === 'copyto') && src !== 'sync-target');
+    expect(actionCalls).toHaveLength(0);
 
-    expect(calls.some(([, src]) => src === renamedDir)).toBe(true);
+    expect(report.conflicts).toEqual([{
+      gameId: '123',
+      dir: 'ts1',
+      gameName: 'Test Game',
+      local: { backupTime: '2026-10-01T10:00:00.000Z', createdBy: 'machine-a', gameName: 'Test Game' },
+      remote: { backupTime: '2026-10-01T10:00:00.000Z', createdBy: 'machine-b', gameName: 'Test Game' },
+      detectedAt: report.conflicts[0].detectedAt,
+    }]);
+    expect(report.totals).toEqual({ uploads: 0, downloads: 0, conflicts: 1 });
+    expect(report.perGame['123']).toEqual({ uploads: 0, downloads: 0, conflicts: 1 });
+  });
+});
+
+describe('resolveConflict', () => {
+  const baseResolveOptions = () => ({
+    target: 'sync-target',
+    backupRoot,
+    gameId: '123',
+    dir: 'ts1',
+    machineId: '11111111-2222-3333-4444-555555555555',
+    stageDir,
+  });
+
+  it('overwrite-local：删除本地版本并从远程回补（以远程为准）', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
+    await writeBackup(stageDir, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
+    const calls = [];
+
+    await resolveConflict({
+      ...baseResolveOptions(),
+      exec: createFakeExec(calls, {
+        // 模拟 rclone copy：把 stage 里的远端目录复制到本地
+        copy: async (args) => {
+          if (args[1] === 'sync-target/123/ts1' && args[2] === path.join(backupRoot, '123', 'ts1')) {
+            await fs.cp(path.join(stageDir, '123', 'ts1'), path.join(backupRoot, '123', 'ts1'), { recursive: true, force: true });
+          }
+          return { code: 0, stdout: '', stderr: '' };
+        },
+        copyto: async (args) => {
+          if (args[1] === 'sync-target/123/ts1/info.json') {
+            await fs.copyFile(path.join(stageDir, '123', 'ts1', 'info.json'), args[2]);
+          }
+          return { code: 0, stdout: '', stderr: '' };
+        },
+      }),
+      mode: 'overwrite-local',
+    });
+
+    const info = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1', 'info.json'), 'utf8'));
+    expect(info.createdBy).toBe('machine-b');
+    expect(calls.some(([cmd, src]) => cmd === 'copy' && src === 'sync-target/123/ts1')).toBe(true);
+  });
+
+  it('overwrite-remote：本地版本上传覆盖远程（以本地为准）', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
+    await writeBackup(stageDir, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
+    const calls = [];
+
+    await resolveConflict({
+      ...baseResolveOptions(),
+      exec: createFakeExec(calls, {
+        copy: async () => ({ code: 0, stdout: '', stderr: '' }),
+      }),
+      mode: 'overwrite-remote',
+    });
+
+    // 本地目录保持原样
+    const info = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1', 'info.json'), 'utf8'));
+    expect(info.createdBy).toBe('machine-a');
+    // 先复制数据文件（排除 info.json），最后 copyto 写 info.json
+    const copyIndex = calls.findIndex(([cmd]) => cmd === 'copy');
+    const copytoIndex = calls.findIndex(([cmd]) => cmd === 'copyto');
+    expect(copyIndex).toBeGreaterThan(-1);
+    expect(copytoIndex).toBeGreaterThan(copyIndex);
+    expect(calls[copytoIndex][1].endsWith('info.json')).toBe(true);
+  });
+
+  it('keep-both：本地改名（machineId 后缀）保留并上传，远程原件回补下载（两份都保留）', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-a' }));
+    await writeBackup(stageDir, '123', 'ts1', baseInfo('123', 'ts1', { createdBy: 'machine-b' }));
+    const calls = [];
+
+    const result = await resolveConflict({
+      ...baseResolveOptions(),
+      exec: createFakeExec(calls, {
+        lsf: async () => ({ code: 0, stdout: 'other/\n', stderr: '' }),
+        copy: async (args) => {
+          // 上传改名副本
+          if (args[1] === path.join(backupRoot, '123', 'ts1-11111111')) {
+            await fs.cp(args[1], path.join(stageDir, '123', 'ts1-11111111'), { recursive: true, force: true });
+          }
+          // 回补下载远程原件
+          if (args[1] === 'sync-target/123/ts1' && args[2] === path.join(backupRoot, '123', 'ts1')) {
+            await fs.cp(path.join(stageDir, '123', 'ts1'), path.join(backupRoot, '123', 'ts1'), { recursive: true, force: true });
+          }
+          return { code: 0, stdout: '', stderr: '' };
+        },
+        copyto: async (args) => {
+          if (args[1] === 'sync-target/123/ts1/info.json') {
+            await fs.copyFile(path.join(stageDir, '123', 'ts1', 'info.json'), args[2]);
+          }
+          return { code: 0, stdout: '', stderr: '' };
+        },
+      }),
+      mode: 'keep-both',
+    });
+
+    expect(result.renamedTo).toBe('ts1-11111111');
+    // 本地两份都在：改名副本（本地原内容）+ 回补的原件（远程内容）
+    const renamed = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1-11111111', 'info.json'), 'utf8'));
+    const original = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts1', 'info.json'), 'utf8'));
+    expect(renamed.createdBy).toBe('machine-a');
+    expect(original.createdBy).toBe('machine-b');
+    // 上传目标使用了新目录名，不覆盖远程原件
     expect(calls.some(([, , dest]) => dest === 'sync-target/123/ts1-11111111')).toBe(true);
-    expect(calls.some(([, src]) => src === 'sync-target/123/ts1')).toBe(true);
+  });
 
-    expect(report.totals).toEqual({ uploads: 1, downloads: 1, renames: 1 });
-    expect(report.perGame['123']).toEqual({ uploads: 1, downloads: 1, renames: 1 });
+  it('未知处理方式直接报错，不产生任何文件操作', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
+    const calls = [];
+
+    await expect(resolveConflict({
+      ...baseResolveOptions(),
+      exec: createFakeExec(calls),
+      mode: 'nonsense',
+    })).rejects.toThrow('未知的冲突处理方式');
+
+    await expect(fs.stat(path.join(backupRoot, '123', 'ts1'))).resolves.toBeTruthy();
+    expect(calls).toHaveLength(0);
   });
 });
 
@@ -189,7 +313,6 @@ describe('runSync 取消', () => {
       },
       target: 'sync-target',
       backupRoot,
-      machineId: 'machine-a',
       stageDir,
       isCancelled: () => cancelled,
     })).rejects.toThrow(SyncCancelledError);

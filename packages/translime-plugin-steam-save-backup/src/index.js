@@ -636,6 +636,20 @@ export const ipcHandlers = [
       return { success: true };
     },
   },
+  {
+    type: 'sync-resolve-conflict',
+    handler: () => async ({ gameId, dir, mode } = {}) => {
+      try {
+        if (!gameId || !dir || !mode) {
+          return { success: false, message: '参数不完整' };
+        }
+        const status = await syncService.resolveOneConflict({ gameId, dir, mode });
+        return { success: true, status };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
 ];
 
 export default {

@@ -80,6 +80,16 @@
       </span>
     </mat-snackbar>
 
+    <mat-snackbar
+      v-model="syncSnackbar.show"
+      :duration="6000"
+      closable
+    >
+      <span :style="syncSnackbar.color === 'error' ? 'color: var(--mat-sys-color-inverse-primary)' : undefined">
+        {{ syncSnackbar.text }}
+      </span>
+    </mat-snackbar>
+
     <NoteDialog
       v-model="noteDialog.show"
       v-model:note="noteDialog.note"
@@ -101,6 +111,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  watch,
 } from 'vue';
 import { isPreviewMode } from 'translime-sdk';
 import ConfirmDialog from './components/ConfirmDialog.vue';
@@ -126,12 +137,33 @@ const customDirOpen = ref(false);
 const syncDialogOpen = ref(false);
 const previewMode = isPreviewMode();
 
+const syncSnackbar = ref({ show: false, text: '', color: 'success' });
+
 const syncRunning = computed(() => syncStatus.value?.phase === 'running');
 const syncError = computed(() => Boolean(
   syncStatus.value?.config?.enabled
   && syncStatus.value?.phase !== 'running'
   && syncStatus.value?.lastError,
 ));
+
+// 新检出同步冲突时提醒用户到同步设置中处理（自动同步对冲突目录保持暂停）
+const knownConflictKeys = ref(new Set());
+watch(syncStatus, (status) => {
+  const conflicts = status?.conflicts || [];
+  if (conflicts.length === 0) {
+    knownConflictKeys.value = new Set();
+    return;
+  }
+  const fresh = conflicts.filter((item) => !knownConflictKeys.value.has(`${item.gameId}:${item.dir}`));
+  if (knownConflictKeys.value.size > 0 && fresh.length > 0) {
+    syncSnackbar.value = {
+      show: true,
+      text: `检测到 ${fresh.length} 个同步冲突，请在“同步”设置中处理`,
+      color: 'error',
+    };
+  }
+  knownConflictKeys.value = new Set(conflicts.map((item) => `${item.gameId}:${item.dir}`));
+}, { deep: true });
 
 let resizeObserver;
 

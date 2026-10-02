@@ -176,6 +176,62 @@
 
         <mat-divider style="margin-block: 4px" />
 
+        <!-- 同步冲突：同名备份在两端内容分叉，需用户选择处理方式 -->
+        <div
+          v-if="conflicts.length > 0"
+          style="display: flex; flex-direction: column; gap: 12px"
+        >
+          <div style="font-size: .9375rem; font-weight: 500; color: var(--mat-sys-color-error)">
+            检测到 {{ conflicts.length }} 个同步冲突（同名备份在本地与远程内容不同，已暂停自动同步）
+          </div>
+
+          <div
+            v-for="conflict in conflicts"
+            :key="`${conflict.gameId}:${conflict.dir}`"
+            style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--mat-sys-color-outline-variant); border-radius: 12px"
+          >
+            <div style="font-weight: 500; word-break: break-all">
+              {{ conflict.gameName || conflict.gameId }}
+            </div>
+            <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant); word-break: break-all">
+              备份目录：{{ conflict.dir }}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px; font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
+              <span>本地版本：{{ conflictMetaText(conflict.local) }}</span>
+              <span>远程版本：{{ conflictMetaText(conflict.remote) }}</span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px">
+              <mat-btn
+                variant="text"
+                prefix="cloud_download"
+                :disabled="resolvingKey !== ''"
+                :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:overwrite-local`"
+                @click="resolve(conflict, 'overwrite-local')"
+              >
+                覆盖本地
+              </mat-btn>
+              <mat-btn
+                variant="text"
+                prefix="cloud_upload"
+                :disabled="resolvingKey !== ''"
+                :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:overwrite-remote`"
+                @click="resolve(conflict, 'overwrite-remote')"
+              >
+                覆盖远程
+              </mat-btn>
+              <mat-btn
+                variant="text"
+                prefix="library_add"
+                :disabled="resolvingKey !== ''"
+                :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:keep-both`"
+                @click="resolve(conflict, 'keep-both')"
+              >
+                保留两份
+              </mat-btn>
+            </div>
+          </div>
+        </div>
+
         <div style="display: flex; flex-direction: column; gap: 6px; font-size: .875rem; color: var(--mat-sys-color-on-surface-variant)">
           <span v-if="phase === 'running'">正在同步…</span>
           <span v-else-if="lastRunAt">上次同步：{{ formatTime(lastRunAt) }}</span>
@@ -288,6 +344,7 @@ import {
   cancelSync,
   checkRclone,
   refreshSyncStatus,
+  resolveSyncConflict,
   setSyncConfig,
   syncStatus,
   triggerSyncNow,
@@ -328,8 +385,10 @@ const fieldValues = reactive({});
 const creating = ref(false);
 const authorizeWaiting = ref(false);
 const authorizeUrl = ref('');
+const resolvingKey = ref('');
 
 const phase = computed(() => syncStatus.value?.phase || 'idle');
+const conflicts = computed(() => syncStatus.value?.conflicts || []);
 const lastRunAt = computed(() => syncStatus.value?.lastRunAt || null);
 const lastError = computed(() => syncStatus.value?.lastError || null);
 const reportSummary = computed(() => {
@@ -337,7 +396,7 @@ const reportSummary = computed(() => {
   if (!totals) {
     return '';
   }
-  return `上次对账：上传 ${totals.uploads} · 下载 ${totals.downloads} · 冲突保留 ${totals.renames}`;
+  return `上次对账：上传 ${totals.uploads} · 下载 ${totals.downloads} · 冲突 ${totals.conflicts ?? 0}`;
 });
 
 const currentBackend = computed(() => backends.value.find((item) => item.id === selectedType.value) || null);
@@ -490,6 +549,32 @@ const openAuthorizeUrl = () => {
 
 const openDownloads = () => {
   openLink('https://rclone.org/downloads/');
+};
+
+// 冲突两侧的展示信息：备份时间 + 来源机器标识前 8 位
+const conflictMetaText = (meta) => {
+  if (!meta || (!meta.backupTime && !meta.createdBy)) {
+    return '未知';
+  }
+  const time = meta.backupTime ? formatTime(meta.backupTime) : '时间未知';
+  const machine = meta.createdBy ? `（来源 ${String(meta.createdBy).slice(0, 8)}）` : '';
+  return `${time}${machine}`;
+};
+
+const resolve = async (conflict, mode) => {
+  const key = `${conflict.gameId}:${conflict.dir}:${mode}`;
+  resolvingKey.value = key;
+  formError.value = '';
+  try {
+    const res = await resolveSyncConflict({ gameId: conflict.gameId, dir: conflict.dir, mode });
+    if (!res?.success) {
+      formError.value = res?.message || '处理冲突失败';
+    }
+  } catch (err) {
+    formError.value = err.message || '处理冲突失败';
+  } finally {
+    resolvingKey.value = '';
+  }
 };
 
 const cancelAuthorize = async () => {

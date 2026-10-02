@@ -92,6 +92,17 @@ export const setSyncConfig = async (syncConfig) => {
 
 export const checkRclone = async (rclonePath) => getIpc().invoke(`sync-check-rclone@${PLUGIN_ID}`, { rclonePath });
 
+export const resolveSyncConflict = async ({ gameId, dir, mode }) => {
+  const res = await getIpc().invoke(`sync-resolve-conflict@${PLUGIN_ID}`, { gameId, dir, mode });
+  if (res?.success) {
+    status.value = res.status;
+    if (status.value?.phase === 'running') {
+      ensurePolling();
+    }
+  }
+  return res;
+};
+
 export const stopSyncStatusPolling = () => {
   stopPolling();
   if (retryTimer) {
@@ -102,6 +113,7 @@ export const stopSyncStatusPolling = () => {
 
 /**
  * 每游戏的同步状态（docs/auto-sync-research.md §2 状态可见）：
+ * 同步冲突（同名备份两端内容分叉，待用户处理）/
  * 同步中 / 待上传（本地新备份未推送）/ 已同步（出现在上次对账报告中）
  */
 export const gameSyncState = (gameId) => {
@@ -109,10 +121,13 @@ export const gameSyncState = (gameId) => {
   if (!current?.config?.enabled) {
     return null;
   }
+  const id = String(gameId);
+  if (current.conflicts?.some((item) => String(item.gameId) === id)) {
+    return { key: 'conflict', label: '同步冲突', icon: 'sync_problem' };
+  }
   if (current.phase === 'running') {
     return { key: 'syncing', label: '同步中', icon: 'sync' };
   }
-  const id = String(gameId);
   if (current.dirtyGames?.includes(id)) {
     return { key: 'pending', label: '待上传', icon: 'cloud_upload' };
   }

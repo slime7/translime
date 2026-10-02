@@ -121,6 +121,9 @@ defineEmits(['open', 'exclude']);
 
 const syncState = computed(() => gameSyncState(props.game.appid));
 const syncChipColor = computed(() => {
+  if (syncState.value?.key === 'conflict') {
+    return 'error';
+  }
   if (syncState.value?.key === 'pending') {
     return 'secondary';
   }
