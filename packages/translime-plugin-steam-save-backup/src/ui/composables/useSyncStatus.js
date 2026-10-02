@@ -7,6 +7,7 @@ const PLUGIN_ID = 'translime-plugin-steam-save-backup';
 const status = ref(null);
 let ipcInstance = null;
 let pollTimer = null;
+let retryTimer = null;
 
 const getIpc = () => {
   if (!ipcInstance) {
@@ -24,17 +25,18 @@ const stopPolling = () => {
 
 export const syncStatus = status;
 
-// 只拉取一次状态，不管理轮询
+// 只拉取一次状态，不管理轮询；返回是否成功
 const fetchStatus = async () => {
   try {
     const res = await getIpc().invoke(`sync-get-status@${PLUGIN_ID}`);
     if (res?.success) {
       status.value = res.status;
+      return true;
     }
   } catch {
-    // 轮询失败保留上次状态
+    // 失败时保留上次状态
   }
-  return status.value;
+  return false;
 };
 
 // 运行期间轮询刷新；转空闲后自动停止
@@ -51,7 +53,14 @@ const ensurePolling = () => {
 };
 
 export async function refreshSyncStatus() {
-  await fetchStatus();
+  const ok = await fetchStatus();
+  // 初始加载失败（如插件正在被 watcher 重启）：有限重试，避免同步状态永久为空
+  if (!ok && status.value === null && !retryTimer) {
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      refreshSyncStatus();
+    }, 3000);
+  }
   if (status.value?.phase === 'running') {
     ensurePolling();
   }
@@ -83,7 +92,13 @@ export const setSyncConfig = async (syncConfig) => {
 
 export const checkRclone = async (rclonePath) => getIpc().invoke(`sync-check-rclone@${PLUGIN_ID}`, { rclonePath });
 
-export const stopSyncStatusPolling = stopPolling;
+export const stopSyncStatusPolling = () => {
+  stopPolling();
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+};
 
 /**
  * 每游戏的同步状态（docs/auto-sync-research.md §2 状态可见）：

@@ -34,7 +34,8 @@ export const writeJson = async (file, object, options = {}) => {
 
 export const readJson = async (file) => {
   const str = await fs.readFile(file, 'utf8');
-  return JSON.parse(str);
+  // 兼容部分 Windows 编辑器写入的 UTF-8 BOM
+  return JSON.parse(str.replace(/^\uFEFF/, ''));
 };
 
 export const remove = async (p) => {

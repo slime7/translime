@@ -81,11 +81,17 @@ const createSyncService = ({
     const syncConfig = readSyncConfig();
     const binary = resolveBinary(syncConfig);
 
-    rcloneProbe = await probeRclone(binary);
-    if (!rcloneProbe.ok) {
-      throw new Error(
-        `未找到可用的 rclone（${binary}）：${rcloneProbe.error}。请安装 rclone 或在同步设置中填写可执行文件路径。`,
-      );
+    try {
+      rcloneProbe = await probeRclone(binary);
+      if (!rcloneProbe.ok) {
+        throw new Error(
+          `未找到可用的 rclone（${binary}）：${rcloneProbe.error}。请安装 rclone 或在同步设置中填写可执行文件路径。`,
+        );
+      }
+    } catch (e) {
+      // 探测失败也要落到持久状态，否则“立即同步”的失败在 UI 上无痕迹
+      writePersistedState({ lastError: e.message, lastRunAt: new Date().toISOString() });
+      throw e;
     }
     // 探测阶段（可达 15s）收到取消：直接结束，且不得重置 cancelled 标志
     if (cancelled) {

@@ -364,17 +364,19 @@ const resetFormError = () => {
   formError.value = '';
 };
 
-watch(visible, (open) => {
+watch(visible, async (open) => {
   if (open) {
     resetFormError();
     probeResult.value = null;
     view.value = 'main';
+    // webview 实例会被缓存复用：打开时先取最新状态再填表单，
+    // 避免旧状态里的空配置在保存时覆盖刚写入的设置
+    await refreshSyncStatus();
     const config = syncStatus.value?.config;
     form.enabled = Boolean(config?.enabled);
     form.target = config?.target || '';
     form.rclonePath = config?.rclonePath || '';
     selectedRemote.value = remotes.value.find((remote) => `${remote}:` === form.target) ? `${form.target}` : '';
-    refreshSyncStatus();
   }
 });
 
