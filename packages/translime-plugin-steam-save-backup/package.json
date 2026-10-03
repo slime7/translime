@@ -30,6 +30,7 @@
     "src/icon.svg"
   ],
   "scripts": {
+    "lint": "eslint .",
     "dev": "vite build -c ui.vite.config.mjs --watch --mode preview",
     "build:plugin": "vite build",
     "build:ui": "vite build -c ui.vite.config.mjs",
@@ -42,6 +43,10 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",
     "electron": "~39.2.4",
+    "eslint": "~9.24.0",
+    "eslint-config-airbnb-extended": "^3.0.1",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-vue": "^10.0.0",
     "mde-vue": "git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda",
     "translime-sdk": "workspace:*",
     "vite": "^8.2.0",

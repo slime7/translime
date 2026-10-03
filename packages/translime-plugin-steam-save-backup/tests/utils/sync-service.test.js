@@ -1,16 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import createSyncService from '../../src/utils/sync/sync-service';
 
 const { execCalls, fakeExec } = vi.hoisted(() => {
-  const execCalls = [];
-  const fakeExec = Object.assign(
+  const calls = [];
+  const exec = Object.assign(
     async (args) => {
-      execCalls.push(args);
+      calls.push(args);
       return { code: 0, stdout: '', stderr: '' };
     },
     { killAll: vi.fn() },
   );
-  return { execCalls, fakeExec };
+  return { execCalls: calls, fakeExec: exec };
 });
 
 // mock 掉 rclone 进程探测与执行；引擎依赖的 isRemoteNotFound / tailOutput 保留真实实现

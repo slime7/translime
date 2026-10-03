@@ -635,6 +635,18 @@ importers:
       electron:
         specifier: ~39.2.4
         version: 39.2.4
+      eslint:
+        specifier: ~9.24.0
+        version: 9.24.0(jiti@2.6.1)
+      eslint-config-airbnb-extended:
+        specifier: ^3.0.1
+        version: 3.0.1(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.6.1))(typescript@5.9.3))(@typescript-eslint/utils@8.57.2(eslint@9.24.0(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-node@0.3.9)(eslint@9.24.0(jiti@2.6.1))(typescript@5.9.3)
+      eslint-import-resolver-alias:
+        specifier: ^1.1.2
+        version: 1.1.2(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.6.1))(typescript@5.9.3))(eslint@9.24.0(jiti@2.6.1)))
+      eslint-plugin-vue:
+        specifier: ^10.0.0
+        version: 10.6.2(@stylistic/eslint-plugin@5.10.0(eslint@9.24.0(jiti@2.6.1)))(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.6.1))(typescript@5.9.3))(eslint@9.24.0(jiti@2.6.1))(vue-eslint-parser@10.4.0(eslint@9.24.0(jiti@2.6.1)))
       mde-vue:
         specifier: git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda
         version: https://codeload.github.com/slime7/mde-vue/tar.gz/f339bf900fe9c525b6a6171553c0ddbfe3fa2bda(tailwindcss@4.1.18)(vue@3.5.40(typescript@5.9.3))
