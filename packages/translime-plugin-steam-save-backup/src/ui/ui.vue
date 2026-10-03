@@ -55,8 +55,11 @@
       :backups="backups"
       :loading="loading"
       :can-backup="canBackup"
+      :sync-running="syncRunning"
+      :sync-available="syncAvailable"
       :format-time="formatTime"
       @backup="backupGame"
+      @sync="syncNow"
       @restore="restoreBackup"
       @delete="deleteAppBackup"
       @edit-note="openNoteDialog"
@@ -125,7 +128,12 @@ import NoteDialog from './components/NoteDialog.vue';
 import SteamBackupToolbar from './components/SteamBackupToolbar.vue';
 import SyncSettingsDialog from './components/SyncSettingsDialog.vue';
 import useSteamSaveBackup from './composables/useSteamSaveBackup';
-import { refreshSyncStatus, stopSyncStatusPolling, syncStatus } from './composables/useSyncStatus';
+import {
+  refreshSyncStatus,
+  stopSyncStatusPolling,
+  syncStatus,
+  triggerSyncNow,
+} from './composables/useSyncStatus';
 
 defineOptions({
   name: 'SteamSaveBackupUi',
@@ -140,13 +148,26 @@ const previewMode = isPreviewMode();
 const syncSnackbar = ref({ show: false, text: '', color: 'success' });
 
 const syncRunning = computed(() => syncStatus.value?.phase === 'running');
+const syncAvailable = computed(() => Boolean(syncStatus.value?.config?.target));
 const syncError = computed(() => Boolean(
-  syncStatus.value?.config?.enabled
+  syncStatus.value?.config?.target
   && syncStatus.value?.phase !== 'running'
   && syncStatus.value?.lastError,
 ));
 
-// 新检出同步冲突时提醒用户到同步设置中处理（自动同步对冲突目录保持暂停）
+// 手动触发一次对账；失败信息经 snackbar 提示（lastError 也会进入同步设置页）
+const syncNow = async () => {
+  const res = await triggerSyncNow();
+  if (!res?.success) {
+    syncSnackbar.value = {
+      show: true,
+      text: res?.message || '触发同步失败',
+      color: 'error',
+    };
+  }
+};
+
+// 新检出同步冲突时提醒用户到同步设置中处理（对账跳过冲突目录，不会覆盖任一端）
 const knownConflictKeys = ref(new Set());
 watch(syncStatus, (status) => {
   const conflicts = status?.conflicts || [];
@@ -197,6 +218,7 @@ const {
   openBackupDir,
   scanGames,
   openGameDetails,
+  loadBackups,
   backupGame,
   handleConfirm,
   restoreBackup,
@@ -206,6 +228,16 @@ const {
   openNoteDialog,
   saveNote,
 } = useSteamSaveBackup();
+
+// 同步可能从远端下载新备份：结束后刷新弹窗内备份列表，并重扫卡片上的备份数
+watch(syncRunning, (running, wasRunning) => {
+  if (wasRunning && !running) {
+    if (dialog.value.show && selectedGame.value) {
+      loadBackups(selectedGame.value.appid);
+    }
+    scanGames();
+  }
+});
 </script>
 
 <style>

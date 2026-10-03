@@ -43,7 +43,7 @@ const mockGames = [
 const mockStatus = {
   phase: 'idle',
   pending: false,
-  config: { enabled: true, target: 'mydrive:SteamBackups', rclonePath: '' },
+  config: { target: 'mydrive:SteamBackups', rclonePath: '' },
   rclone: {
     ok: true, version: '1.75.1', path: 'rclone', error: null,
   },

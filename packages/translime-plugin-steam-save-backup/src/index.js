@@ -234,9 +234,6 @@ export const pluginDidLoad = async () => {
     steamPath = customSteamPath;
     console.log('使用自定义 Steam 路径：', steamPath);
   }
-
-  // 激活后延迟对账，不阻塞加载（docs/auto-sync-research.md §5 NAS 掉线风险）
-  syncService.onActivated();
 };
 
 // 禁用时执行
@@ -372,8 +369,8 @@ export const ipcHandlers = [
           { machineId: syncService.ensureMachineId() },
         );
         if (result.success) {
-          // 备份完成后自动推送远端（docs/auto-sync-research.md §2 触发时机）
-          syncService.onBackupCreated(gameId);
+          // 备份后只标记待上传，同步由用户在弹窗或同步设置中手动触发
+          syncService.markDirty(gameId);
         }
         return result;
       } catch (e) {
@@ -578,11 +575,8 @@ export const ipcHandlers = [
         if (!syncConfig || typeof syncConfig !== 'object') {
           return { success: false, message: '参数不完整' };
         }
-        if (syncConfig.enabled && !String(syncConfig.target || '').trim()) {
-          return { success: false, message: '启用同步前需要填写远程目标' };
-        }
         syncService.setSyncConfig(syncConfig);
-        // 保存只落盘，不触发同步：同步在对话框关闭（本次打开期间保存过）或「立即同步」时进行
+        // 保存只落盘，不触发同步；同步仅由「立即同步」或游戏备份弹窗中的「同步」按钮手动触发
         return { success: true, status: syncService.getStatus() };
       } catch (e) {
         return { success: false, message: e.message };
@@ -605,12 +599,12 @@ export const ipcHandlers = [
     handler: () => async () => {
       try {
         const status = syncService.getStatus();
-        if (!status.config.enabled || !status.config.target) {
-          return { success: false, message: '请先在同步设置中启用并配置远程目标' };
+        if (!status.config.target) {
+          return { success: false, message: '请先在同步设置中配置远程目标' };
         }
-        const result = syncService.trigger('manual');
+        const result = syncService.trigger();
         if (result === 'ignored') {
-          return { success: false, message: '请先在同步设置中启用并配置远程目标' };
+          return { success: false, message: '请先在同步设置中配置远程目标' };
         }
         return { success: true, result };
       } catch (e) {

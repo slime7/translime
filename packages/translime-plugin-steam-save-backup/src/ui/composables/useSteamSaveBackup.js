@@ -166,7 +166,7 @@ export default function useSteamSaveBackup() {
         if (selectedGame.value) {
           loadBackups(selectedGame.value.appid);
         }
-        // 备份成功后主进程会自动对账，刷新一次同步状态以显示“待上传/同步中”
+        // 备份后主进程标记“待上传”，刷新同步状态以更新游戏卡片提示
         refreshSyncStatus();
       } else {
         showMessage(res.message || '备份失败', 'error');
@@ -220,9 +220,9 @@ export default function useSteamSaveBackup() {
   };
 
   const deleteAppBackup = (backup) => {
-    // 启用远程同步时提供“同时删除远程存档”：远端目录名是 gameId + 时间戳，
+    // 配置远程目标后提供“同时删除远程存档”：远端目录名是 gameId + 时间戳，
     // 无法直观确认归属，因此由本地删除动作携带执行，并在文案中标注游戏名与远端位置
-    const remoteAvailable = Boolean(syncStatus.value?.config?.enabled && syncStatus.value?.config?.target);
+    const remoteAvailable = Boolean(syncStatus.value?.config?.target);
     const remotePath = remoteAvailable
       ? `${syncStatus.value.config.target}/${selectedGame.value?.appid || ''}/${backup.id}/`
       : '';
@@ -374,6 +374,7 @@ export default function useSteamSaveBackup() {
     openBackupDir,
     scanGames,
     openGameDetails,
+    loadBackups,
     backupGame,
     handleConfirm,
     restoreBackup,

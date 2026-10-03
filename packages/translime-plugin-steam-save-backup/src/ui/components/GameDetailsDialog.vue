@@ -40,6 +40,24 @@
     />
 
     <template #actions>
+      <mat-tooltip
+        :content="syncAvailable ? '将本地备份与远程位置对账' : '请先在同步设置中配置远程位置'"
+        location="top"
+      >
+        <template #activator>
+          <mat-btn
+            variant="text"
+            prefix="cloud_sync"
+            :loading="syncRunning"
+            :disabled="!syncAvailable"
+            aria-label="立即同步"
+            @click="$emit('sync')"
+          >
+            同步
+          </mat-btn>
+        </template>
+      </mat-tooltip>
+
       <mat-spacer />
 
       <mat-btn
@@ -89,6 +107,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  syncRunning: {
+    type: Boolean,
+    default: false,
+  },
+  syncAvailable: {
+    type: Boolean,
+    default: false,
+  },
   formatTime: {
     type: Function,
     required: true,
@@ -98,6 +124,7 @@ const props = defineProps({
 const emit = defineEmits([
   'update:modelValue',
   'backup',
+  'sync',
   'restore',
   'delete',
   'edit-note',

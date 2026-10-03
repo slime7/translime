@@ -10,8 +10,9 @@ const emptyProbe = () => ({
 });
 
 /**
- * 同步功能编排层：配置读写、持久状态（machineId / 脏游戏 / 上次报告）、
+ * 同步功能编排层：配置读写、持久状态（machineId / 待上传游戏 / 上次报告）、
  * rclone 探测与串行队列的组合。远程端是单一可靠源（docs/auto-sync-research.md §4）。
+ * 同步不自动运行：仅在用户手动触发（或处理冲突后补跑一次对账）。
  *
  * @param {object} options
  * @param {string} options.pluginId 插件 ID
@@ -27,16 +28,14 @@ const createSyncService = ({
 
   let cancelled = false;
   let exec = null;
-  let activateTimer = null;
   let rcloneProbe = emptyProbe();
 
   const readSyncConfig = () => {
     const raw = getConfig(settingsKey);
     if (!raw || typeof raw !== 'object') {
-      return { enabled: false, target: '', rclonePath: '' };
+      return { target: '', rclonePath: '' };
     }
     return {
-      enabled: Boolean(raw.enabled),
       target: typeof raw.target === 'string' ? raw.target.trim() : '',
       rclonePath: typeof raw.rclonePath === 'string' ? raw.rclonePath.trim() : '',
     };
@@ -75,10 +74,7 @@ const createSyncService = ({
 
   const resolveBinary = (syncConfig) => syncConfig.rclonePath || 'rclone';
 
-  const isConfigured = () => {
-    const syncConfig = readSyncConfig();
-    return syncConfig.enabled && Boolean(syncConfig.target);
-  };
+  const isConfigured = () => Boolean(readSyncConfig().target);
 
   const runOnce = async () => {
     const syncConfig = readSyncConfig();
@@ -121,7 +117,7 @@ const createSyncService = ({
       });
     } catch (e) {
       if (e instanceof SyncCancelledError) {
-        // 用户主动取消不算失败，不触发重试
+        // 用户主动取消不算失败
         return;
       }
       writePersistedState({ lastError: e.message, lastRunAt: new Date().toISOString() });
@@ -136,18 +132,11 @@ const createSyncService = ({
     canRun: isConfigured,
   });
 
-  const resolvePhase = (queueState) => {
-    if (queueState.running) {
-      return 'running';
-    }
-    return queueState.retryScheduled ? 'retry-wait' : 'idle';
-  };
-
   const getStatus = () => {
     const persisted = readPersistedState();
     const queueState = queue.getState();
     return {
-      phase: resolvePhase(queueState),
+      phase: queueState.running ? 'running' : 'idle',
       pending: queueState.pending,
       config: readSyncConfig(),
       rclone: rcloneProbe,
@@ -178,8 +167,8 @@ const createSyncService = ({
    */
   const removeRemoteBackup = async ({ gameId, dir }) => {
     const syncConfig = readSyncConfig();
-    if (!syncConfig.enabled || !syncConfig.target) {
-      throw new Error('同步未启用或未配置远程目标');
+    if (!syncConfig.target) {
+      throw new Error('未配置远程目标');
     }
     cancelled = false;
     const backupExec = await prepareExec();
@@ -203,8 +192,8 @@ const createSyncService = ({
    */
   const resolveOneConflict = async ({ gameId, dir, mode }) => {
     const syncConfig = readSyncConfig();
-    if (!syncConfig.enabled || !syncConfig.target) {
-      throw new Error('同步未启用或未配置远程目标');
+    if (!syncConfig.target) {
+      throw new Error('未配置远程目标');
     }
     const known = readPersistedState().conflicts.find(
       (item) => String(item.gameId) === String(gameId) && item.dir === dir,
@@ -236,7 +225,7 @@ const createSyncService = ({
         (item) => !(String(item.gameId) === String(gameId) && item.dir === dir),
       ),
     });
-    queue.trigger('manual');
+    queue.trigger();
     return getStatus();
   };
 
@@ -247,15 +236,11 @@ const createSyncService = ({
       return resolveBinary(readSyncConfig());
     },
 
-    setSyncConfig({ enabled, target, rclonePath }) {
+    setSyncConfig({ target, rclonePath }) {
       setConfig(settingsKey, {
-        enabled: Boolean(enabled),
         target: typeof target === 'string' ? target.trim() : '',
         rclonePath: typeof rclonePath === 'string' ? rclonePath.trim() : '',
       });
-      if (!enabled) {
-        queue.clearRetry();
-      }
       return getStatus();
     },
 
@@ -270,45 +255,29 @@ const createSyncService = ({
       return rcloneProbe;
     },
 
-    trigger(reason = 'auto') {
-      return queue.trigger(reason);
+    trigger() {
+      return queue.trigger();
     },
 
     removeRemoteBackup,
 
     isRemoteDeletionAvailable() {
-      const syncConfig = readSyncConfig();
-      return Boolean(syncConfig.enabled && syncConfig.target);
+      return isConfigured();
     },
 
     resolveOneConflict,
 
-    onBackupCreated(gameId) {
+    // 备份后仅记录待上传状态（驱动游戏卡片的“待上传”提示），同步等用户手动触发
+    markDirty(gameId) {
       const persisted = readPersistedState();
       const id = String(gameId);
       if (!persisted.dirtyGames.includes(id)) {
         writePersistedState({ dirtyGames: [...persisted.dirtyGames, id] });
       }
-      queue.trigger('backup');
-    },
-
-    // 激活后延迟对账，避免阻塞 pluginDidLoad
-    onActivated() {
-      if (!isConfigured()) {
-        return;
-      }
-      if (activateTimer) {
-        clearTimeout(activateTimer);
-      }
-      activateTimer = setTimeout(() => {
-        activateTimer = null;
-        queue.trigger('activate');
-      }, 5000);
     },
 
     cancel() {
       cancelled = true;
-      queue.clearRetry();
       if (exec) {
         exec.killAll();
       }
@@ -316,10 +285,6 @@ const createSyncService = ({
 
     dispose() {
       this.cancel();
-      if (activateTimer) {
-        clearTimeout(activateTimer);
-        activateTimer = null;
-      }
     },
 
     ensureMachineId,

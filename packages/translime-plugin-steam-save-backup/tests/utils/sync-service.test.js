@@ -27,7 +27,6 @@ vi.mock('../../src/utils/sync/rclone', async (importOriginal) => {
 
 const PLUGIN_ID = 'translime-plugin-steam-save-backup';
 const SYNC_SETTINGS = {
-  enabled: true,
   target: 'GDrive:translime-saves',
   rclonePath: 'C:/tools/rclone.exe',
 };
@@ -75,13 +74,49 @@ describe('sync-service removeRemoteBackup', () => {
     expect(fakeExec.killAll).toHaveBeenCalled();
   });
 
-  it('同步未启用时拒绝删除且不触发任何 rclone 调用', async () => {
+  it('未配置远程目标时拒绝删除且不触发任何 rclone 调用', async () => {
     // 防止回归：未配置远程目标时误执行远端删除
-    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, { ...SYNC_SETTINGS, enabled: false });
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, { target: '', rclonePath: '' });
 
     await expect(createService().removeRemoteBackup({ gameId: '123', dir: 'ts1' }))
-      .rejects.toThrow('同步未启用或未配置远程目标');
+      .rejects.toThrow('未配置远程目标');
 
     expect(execCalls).toEqual([]);
+  });
+});
+
+describe('sync-service 手动同步', () => {
+  beforeEach(() => {
+    execCalls.length = 0;
+    fakeExec.killAll.mockClear();
+    configStore = new Map();
+  });
+
+  it('markDirty 记录待上传游戏且不触发任何 rclone 调用（备份后不再自动推送远端）', async () => {
+    // 防止回归：多台本地各自与远端对账时，备份后自动上传会把其他机器已删除的远端备份传回来
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, SYNC_SETTINGS);
+
+    const service = createService();
+    service.markDirty('1245620');
+    service.markDirty('1245620');
+
+    expect(configStore.get(`plugin.${PLUGIN_ID}.syncState`).dirtyGames).toEqual(['1245620']);
+    expect(execCalls).toEqual([]);
+  });
+
+  it('未配置远程目标时 trigger 被忽略，不启动 rclone', async () => {
+    const service = createService();
+
+    expect(service.trigger()).toBe('ignored');
+    expect(execCalls).toEqual([]);
+  });
+
+  it('setSyncConfig 只持久化目标与 rclone 路径，状态不再携带 enabled', async () => {
+    const service = createService();
+
+    service.setSyncConfig({ target: '  GDrive:saves  ', rclonePath: 'rclone.exe' });
+
+    const { config } = service.getStatus();
+    expect(config).toEqual({ target: 'GDrive:saves', rclonePath: 'rclone.exe' });
   });
 });

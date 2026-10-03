@@ -103,12 +103,12 @@
       </div>
     </template>
 
-    <!-- 主视图：开关 / 目标 / 检测 / 状态 -->
+    <!-- 主视图：目标 / 检测 / 状态 -->
     <template v-else>
       <div style="display: flex; flex-direction: column; gap: 16px; padding-bottom: 4px">
-        <mat-switch v-model="form.enabled">
-          启用远程同步（备份后与插件启动时自动对账）
-        </mat-switch>
+        <div style="font-size: .875rem; color: var(--mat-sys-color-on-surface-variant)">
+          配置远程位置后，通过「立即同步」或游戏备份弹窗中的「同步」按钮手动对账；同步不会自动运行。
+        </div>
 
         <div style="display: flex; align-items: center; gap: 8px">
           <mat-select
@@ -217,7 +217,7 @@
           style="display: flex; flex-direction: column; gap: 12px"
         >
           <div style="font-size: .9375rem; font-weight: 500; color: var(--mat-sys-color-error)">
-            检测到 {{ conflicts.length }} 个同步冲突（同名备份在本地与远程内容不同，已暂停自动同步）
+            检测到 {{ conflicts.length }} 个同步冲突（同名备份在本地与远程内容不同，已跳过自动处理）
           </div>
 
           <div
@@ -339,7 +339,7 @@
           v-else
           variant="text"
           prefix="cloud_sync"
-          :disabled="!form.enabled || !form.target"
+          :disabled="!form.target"
           @click="syncNow"
         >
           立即同步
@@ -356,7 +356,6 @@
           variant="filled"
           color="primary"
           prefix="save"
-          :disabled="form.enabled && !form.target"
           :loading="saving"
           @click="save"
         >
@@ -417,7 +416,7 @@ const visible = computed({
   set: (value) => emit('update:modelValue', value),
 });
 
-const form = reactive({ enabled: false, target: '', rclonePath: '' });
+const form = reactive({ target: '', rclonePath: '' });
 const formError = ref('');
 const saving = ref(false);
 const probing = ref(false);
@@ -510,8 +509,6 @@ const resetFormError = () => {
 // 保存的同步配置仍是唯一事实源，记忆只用于对话框内的切换连续性
 const targetByRemote = reactive({});
 let lastRemoteKey = null;
-// 本次对话框打开期间是否保存过配置：关闭时据此触发一次对账
-let savedDuringOpen = false;
 watch(selectedRemote, (value) => {
   if (lastRemoteKey !== null) {
     targetByRemote[lastRemoteKey] = form.target;
@@ -522,7 +519,6 @@ watch(selectedRemote, (value) => {
 
 watch(visible, async (open) => {
   if (open) {
-    savedDuringOpen = false;
     resetFormError();
     probeResult.value = null;
     testResult.value = null;
@@ -531,7 +527,6 @@ watch(visible, async (open) => {
     // 避免旧状态里的空配置在保存时覆盖刚写入的设置
     await refreshSyncStatus();
     const config = syncStatus.value?.config;
-    form.enabled = Boolean(config?.enabled);
     form.rclonePath = config?.rclonePath || '';
     // 后端类型表驱动「修改」按钮的可用性（OAuth 远程不可编辑）；列表加载后再按已保存目标选中远程，
     // 目标含子路径（如 translime-smb:share）时也挂到所属远程名下，切换下拉不会丢
@@ -541,10 +536,6 @@ watch(visible, async (open) => {
     const matchedRemote = remotes.value.find((remote) => form.target.startsWith(`${remote.name}:`));
     targetByRemote[matchedRemote ? `${matchedRemote.name}:` : ''] = form.target;
     selectedRemote.value = matchedRemote ? `${matchedRemote.name}:` : '';
-  } else if (savedDuringOpen) {
-    // 完全保存后（关闭对话框）才触发对账：保存动作只落盘，不打断后续编辑
-    savedDuringOpen = false;
-    triggerSyncNow().catch(() => {});
   }
 });
 
@@ -874,18 +865,12 @@ const cancel = async () => {
 };
 
 const save = async () => {
-  if (form.enabled && !form.target.trim()) {
-    formError.value = '启用同步前需要填写远程目标';
-    return;
-  }
   saving.value = true;
   resetFormError();
   try {
     const res = await setSyncConfig({ ...form });
     if (!res?.success) {
       formError.value = res?.message || '保存失败';
-    } else {
-      savedDuringOpen = true;
     }
   } catch (err) {
     formError.value = err.message || '保存失败';

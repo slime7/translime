@@ -118,7 +118,7 @@ export const stopSyncStatusPolling = () => {
  */
 export const gameSyncState = (gameId) => {
   const current = status.value;
-  if (!current?.config?.enabled) {
+  if (!current?.config?.target) {
     return null;
   }
   const id = String(gameId);
