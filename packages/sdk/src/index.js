@@ -118,6 +118,43 @@ export function usePluginInterop() {
   return null;
 }
 
+/**
+ * @typedef {Object} TitleBarAction
+ * @property {string} [id] 预留：宿主按位置生成稳定 id，此字段被忽略
+ * @property {string} label 按钮文案（iconOnly 时作为 tooltip 与无障碍名称）
+ * @property {string} [icon] Material Symbols 图标名（不带 mdi- 前缀）
+ * @property {boolean} [iconOnly] 仅渲染图标按钮（需要 icon 与 label 同时存在）
+ * @property {string} [tooltip] 悬停提示
+ * @property {boolean} [enabled] 是否可用，默认可用
+ * @property {boolean} [visible] 是否渲染，默认渲染
+ * @property {Function} [click] 直按钮点击回调（主进程内执行，需为函数）
+ * @property {TitleBarAction[]} [submenu] 下拉子菜单，项内额外支持 `{ type: 'separator' }`
+ */
+
+/**
+ * 设置插件在宿主插件页顶栏（inspect 旁）按钮区的按钮。
+ * @description 仅在 **主进程 (Main Process)** 环境可用；隔离模式（plugin.isolated）下抛错。
+ * 传入数组整体替换该插件的按钮，传空数组或 null 清除；宿主在插件停用/重启时也会自动清除。
+ * 顶层数量与点击项数量有防御性上限（8 / 64），超出部分被忽略。
+ * 宿主过旧（无注册表）时返回 false，不影响插件其余功能。
+ * @param {string} pluginId 插件 ID (通常与 package.json 中的 name 一致)
+ * @param {TitleBarAction[]|null} actions 菜单模板
+ * @returns {boolean} 是否生效
+ */
+export function setTitleBarActions(pluginId, actions) {
+  if (isIsolatedMode()) {
+    isolatedUnsupported('setTitleBarActions');
+  }
+  if (actions != null && !Array.isArray(actions)) {
+    throw new Error('setTitleBarActions 需要传入按钮模板数组或 null');
+  }
+  if (typeof global === 'undefined' || !global.titleBarRegistry) {
+    // 宿主过旧：静默降级（不打日志，插件其余功能不受影响）
+    return false;
+  }
+  return global.titleBarRegistry.setTitleBarActions(pluginId, actions);
+}
+
 // ----------------------------------------------------------------------
 // UI & Renderer APIs (Renderer Process Only)
 // ----------------------------------------------------------------------
@@ -390,7 +427,20 @@ export async function openLink(...args) {
  */
 export function useLogger() {
   if (typeof global !== 'undefined' && global.mainStore) {
-    return global.mainStore?.logger || console;
+    const mainLogger = global.mainStore?.logger;
+    if (!mainLogger) {
+      return console;
+    }
+    // 宿主主进程 logger 是 winston 实例，log(level, message) 签名与 console 语义不同
+    // （logger.log('msg') 会在 winston 内部抛 TypeError 且异步上下文中被静默吞掉），
+    // 统一包装为 console 兼容接口：log 按 info 级别输出
+    return {
+      log: (...args) => mainLogger.info(...args),
+      info: (...args) => mainLogger.info(...args),
+      warn: (...args) => mainLogger.warn(...args),
+      error: (...args) => mainLogger.error(...args),
+      debug: (...args) => mainLogger.debug(...args),
+    };
   }
   if (typeof window !== 'undefined') {
     return window.ts?.logger || console;

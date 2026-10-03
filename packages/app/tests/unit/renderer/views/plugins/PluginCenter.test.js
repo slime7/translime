@@ -1,3 +1,5 @@
+/* eslint-disable vue/one-component-per-file */
+// 测试文件定义多个内联 harness 组件（搜索挂载点 / 路由占位页 / 根组件）
 import {
   beforeEach, describe, expect, it, vi,
 } from 'vitest';

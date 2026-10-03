@@ -11,21 +11,44 @@
       <span class="page-bar-title">Steam 存档备份</span>
 
       <template #trailing>
-        <SteamBackupToolbar
-          :collapsed="collapsed"
-          :open-dir-loading="loading.openDir"
-          :scan-loading="loading.scan"
-          :sync-running="syncRunning"
-          :sync-error="syncError"
-          @open-backup-dir="openBackupDir"
-          @add-custom-dir="customDirOpen = true"
-          @scan-games="scanGames"
-          @open-sync="syncDialogOpen = true"
-        />
+        <div class="bar-trailing">
+          <!-- 备份区工具栏在前、视图切换贴最右：切换视图时工具栏增减不会引起切换按钮位置跳动 -->
+          <SteamBackupToolbar
+            v-if="activeView === 'backup'"
+            :collapsed="collapsed"
+            :scan-loading="loading.scan"
+            @add-custom-dir="customDirOpen = true"
+            @scan-games="scanGames"
+          />
+
+          <!-- 顶部整页切换：备份区与直通云存档区完全隔离，避免与 Steam 云存档混淆 -->
+          <mat-btn-group
+            variant="connected"
+            selection="single"
+            shape="square"
+            size="small"
+            :selected="activeView"
+            @select="activeView = $event.nextSelected"
+          >
+            <mat-btn
+              value="backup"
+              icon="backup"
+              label="存档备份"
+            />
+            <mat-btn
+              value="passthrough"
+              icon="cloud_sync"
+              label="直通云存档"
+            />
+          </mat-btn-group>
+        </div>
       </template>
     </mat-app-bar>
 
-    <main class="save-backup-content">
+    <main
+      v-if="activeView === 'backup'"
+      class="save-backup-content"
+    >
       <LoadingState v-if="loading.scan && games.length === 0" />
 
       <GameGrid
@@ -46,6 +69,16 @@
       <EmptyGamesState
         v-if="!loading.scan && visibleGames.length === 0 && hiddenGames.length === 0"
         @scan="scanGames"
+      />
+    </main>
+
+    <main
+      v-else
+      class="save-backup-content"
+    >
+      <PassthroughView
+        :notify="showSyncSnackbar"
+        @open-sync="syncDialogOpen = true"
       />
     </main>
 
@@ -116,7 +149,7 @@ import {
   ref,
   watch,
 } from 'vue';
-import { isPreviewMode } from 'translime-sdk';
+import { isPreviewMode, useIpc } from 'translime-sdk';
 import ConfirmDialog from './components/ConfirmDialog.vue';
 import CustomSaveDirsDialog from './components/CustomSaveDirsDialog.vue';
 import EmptyGamesState from './components/EmptyGamesState.vue';
@@ -125,6 +158,7 @@ import GameGrid from './components/GameGrid.vue';
 import HiddenGamesPanel from './components/HiddenGamesPanel.vue';
 import LoadingState from './components/LoadingState.vue';
 import NoteDialog from './components/NoteDialog.vue';
+import PassthroughView from './components/passthrough/PassthroughView.vue';
 import SteamBackupToolbar from './components/SteamBackupToolbar.vue';
 import SyncSettingsDialog from './components/SyncSettingsDialog.vue';
 import useSteamSaveBackup from './composables/useSteamSaveBackup';
@@ -139,31 +173,28 @@ defineOptions({
   name: 'SteamSaveBackupUi',
 });
 
+const PLUGIN_ID = 'translime-plugin-steam-save-backup';
+
 const layoutRef = ref(null);
 const collapsed = ref(false);
 const customDirOpen = ref(false);
 const syncDialogOpen = ref(false);
+const activeView = ref('backup');
 const previewMode = isPreviewMode();
 
 const syncSnackbar = ref({ show: false, text: '', color: 'success' });
+const showSyncSnackbar = (text, color = 'success') => {
+  syncSnackbar.value = { show: true, text, color };
+};
 
 const syncRunning = computed(() => syncStatus.value?.phase === 'running');
 const syncAvailable = computed(() => Boolean(syncStatus.value?.config?.target));
-const syncError = computed(() => Boolean(
-  syncStatus.value?.config?.target
-  && syncStatus.value?.phase !== 'running'
-  && syncStatus.value?.lastError,
-));
 
 // 手动触发一次对账；失败信息经 snackbar 提示（lastError 也会进入同步设置页）
 const syncNow = async () => {
   const res = await triggerSyncNow();
   if (!res?.success) {
-    syncSnackbar.value = {
-      show: true,
-      text: res?.message || '触发同步失败',
-      color: 'error',
-    };
+    showSyncSnackbar(res?.message || '触发同步失败', 'error');
   }
 };
 
@@ -177,14 +208,33 @@ watch(syncStatus, (status) => {
   }
   const fresh = conflicts.filter((item) => !knownConflictKeys.value.has(`${item.gameId}:${item.dir}`));
   if (knownConflictKeys.value.size > 0 && fresh.length > 0) {
-    syncSnackbar.value = {
-      show: true,
-      text: `检测到 ${fresh.length} 个同步冲突，请在“同步”设置中处理`,
-      color: 'error',
-    };
+    showSyncSnackbar(`检测到 ${fresh.length} 个同步冲突，请在“同步”设置中处理`, 'error');
   }
   knownConflictKeys.value = new Set(conflicts.map((item) => `${item.gameId}:${item.dir}`));
 }, { deep: true });
+
+// 主进程后台事件（文件监控自动备份 / 远端删除跟随应用 / 顶栏打开同步设置）：提示并刷新状态
+// on/detach 需要自动补 @插件ID 后缀，useIpc 必须传入插件 ID（无参调用不补后缀，监听永远匹配不上）
+const ipc = useIpc(PLUGIN_ID);
+const onSyncNotify = (payload) => {
+  // 宿主顶栏「同步设置」按钮：任意视图都能弹出同步配置对话框
+  if (payload?.kind === 'open-sync-settings') {
+    syncDialogOpen.value = true;
+    return;
+  }
+  refreshSyncStatus();
+  if (payload?.kind === 'auto-backup') {
+    showSyncSnackbar(`已自动备份「${payload.gameName}」`);
+    return;
+  }
+  if (payload?.kind === 'backup-deleted') {
+    showSyncSnackbar(`远端已删除的备份已从本机移除：${payload.gameName || payload.dir}`, 'error');
+    return;
+  }
+  if (payload?.kind === 'passthrough-deleted') {
+    showSyncSnackbar(`远端已删除，本地存档「${payload.name}」已跟随移除`, 'error');
+  }
+};
 
 let resizeObserver;
 
@@ -195,10 +245,12 @@ onMounted(() => {
   });
   resizeObserver.observe(layoutRef.value?.$el ?? layoutRef.value);
   refreshSyncStatus();
+  ipc?.on('sync-notify', onSyncNotify);
 });
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
+  ipc?.detach('sync-notify', onSyncNotify);
   stopSyncStatusPolling();
 });
 
@@ -215,7 +267,6 @@ const {
   hiddenGames,
   canBackup,
   formatTime,
-  openBackupDir,
   scanGames,
   openGameDetails,
   loadBackups,
@@ -275,5 +326,11 @@ watch(syncRunning, (running, wasRunning) => {
 
 .save-backup-content {
   padding: 16px;
+}
+
+.bar-trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

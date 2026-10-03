@@ -231,39 +231,70 @@
             <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant); word-break: break-all">
               备份目录：{{ conflict.dir }}
             </div>
-            <div style="display: flex; flex-direction: column; gap: 2px; font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
-              <span>本地版本：{{ conflictMetaText(conflict.local) }}</span>
-              <span>远程版本：{{ conflictMetaText(conflict.remote) }}</span>
-            </div>
-            <div style="display: flex; flex-wrap: wrap; gap: 4px">
-              <mat-btn
-                variant="text"
-                prefix="cloud_download"
-                :disabled="resolvingKey !== ''"
-                :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:overwrite-local`"
-                @click="resolve(conflict, 'overwrite-local')"
-              >
-                覆盖本地
-              </mat-btn>
-              <mat-btn
-                variant="text"
-                prefix="cloud_upload"
-                :disabled="resolvingKey !== ''"
-                :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:overwrite-remote`"
-                @click="resolve(conflict, 'overwrite-remote')"
-              >
-                覆盖远程
-              </mat-btn>
-              <mat-btn
-                variant="text"
-                prefix="library_add"
-                :disabled="resolvingKey !== ''"
-                :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:keep-both`"
-                @click="resolve(conflict, 'keep-both')"
-              >
-                保留两份
-              </mat-btn>
-            </div>
+
+            <!-- 墓碑冲突：远端已删除，本机在删除时间点之后仍存在更新的备份，等用户确认去向 -->
+            <template v-if="conflict.kind === 'tombstone'">
+              <div style="display: flex; flex-direction: column; gap: 2px; font-size: .75rem; color: var(--mat-sys-color-error)">
+                <span>远端已删除{{ conflict.remote?.deletedAt ? `（删除时间：${formatTime(conflict.remote.deletedAt)}）` : '' }}，本机这份备份较新，未自动删除</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px">
+                <mat-btn
+                  variant="text"
+                  prefix="cloud_upload"
+                  :disabled="resolvingKey !== ''"
+                  :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:overwrite-remote`"
+                  @click="resolve(conflict, 'overwrite-remote')"
+                >
+                  恢复本备份
+                </mat-btn>
+                <mat-btn
+                  variant="text"
+                  color="error"
+                  prefix="delete"
+                  :disabled="resolvingKey !== ''"
+                  :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:confirm-deletion`"
+                  @click="resolve(conflict, 'confirm-deletion')"
+                >
+                  确认删除
+                </mat-btn>
+              </div>
+            </template>
+
+            <template v-else>
+              <div style="display: flex; flex-direction: column; gap: 2px; font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
+                <span>本地版本：{{ conflictMetaText(conflict.local) }}</span>
+                <span>远程版本：{{ conflictMetaText(conflict.remote) }}</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px">
+                <mat-btn
+                  variant="text"
+                  prefix="cloud_download"
+                  :disabled="resolvingKey !== ''"
+                  :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:overwrite-local`"
+                  @click="resolve(conflict, 'overwrite-local')"
+                >
+                  覆盖本地
+                </mat-btn>
+                <mat-btn
+                  variant="text"
+                  prefix="cloud_upload"
+                  :disabled="resolvingKey !== ''"
+                  :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:overwrite-remote`"
+                  @click="resolve(conflict, 'overwrite-remote')"
+                >
+                  覆盖远程
+                </mat-btn>
+                <mat-btn
+                  variant="text"
+                  prefix="library_add"
+                  :disabled="resolvingKey !== ''"
+                  :loading="resolvingKey === `${conflict.gameId}:${conflict.dir}:keep-both`"
+                  @click="resolve(conflict, 'keep-both')"
+                >
+                  保留两份
+                </mat-btn>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -409,7 +440,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
-const ipc = useIpc();
+// on 监听 sync-authorize-url 推送需要自动补 @插件ID 后缀；invoke 已显式带后缀不受影响
+const ipc = useIpc(PLUGIN_ID);
 
 const visible = computed({
   get: () => props.modelValue,
@@ -449,7 +481,15 @@ const reportSummary = computed(() => {
   if (!totals) {
     return '';
   }
-  return `上次对账：上传 ${totals.uploads} · 下载 ${totals.downloads} · 冲突 ${totals.conflicts ?? 0}`;
+  const parts = [
+    `上传 ${totals.uploads}`,
+    `下载 ${totals.downloads}`,
+    `冲突 ${totals.conflicts ?? 0}`,
+  ];
+  if (totals.deletions) {
+    parts.push(`应用远端删除 ${totals.deletions}`);
+  }
+  return `上次对账：${parts.join(' · ')}`;
 });
 
 const currentBackend = computed(() => backends.value.find((item) => item.id === selectedType.value) || null);

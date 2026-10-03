@@ -110,6 +110,34 @@ const { VBtn, VCard } = useVuetifyComponents();
 - `defineIpcHandlers(handlers)`: 定义并校验 `ipcHandlers` 导出：`type` 不需要（也不能）带
   `@插件ID` 后缀，宿主注册通道时自动追加；对缺 `type` / 缺 `handler` / `type` 带 `@` 的
   条目在激活前直接抛错。
+- `setTitleBarActions(pluginId, actions)`: 设置插件在宿主插件页顶栏（inspect 旁）按钮区
+  的按钮，支持直按钮与下拉菜单（Electron Menu 模板风格，含 `icon` / `tooltip` /
+  `enabled` / `visible` / 嵌套 `submenu`）。传入数组整体替换，传空数组或 `null` 清除；
+  宿主在插件停用/重启时自动清除。宿主过旧时返回 `false`，插件其余功能不受影响。
+
+```javascript
+import { setTitleBarActions } from 'translime-sdk';
+
+export const pluginDidLoad = () => {
+  setTitleBarActions('my-plugin-id', [
+    {
+      label: '打开数据目录',
+      icon: 'folder_open',
+      iconOnly: true,
+      click: () => shell.openPath(dataDir),
+    },
+    {
+      label: '更多操作',
+      icon: 'settings',
+      submenu: [
+        { label: '刷新', click: () => refresh() },
+        { type: 'separator' },
+        { label: '重置', enabled: false, click: () => reset() },
+      ],
+    },
+  ]);
+};
+```
 
 ```javascript
 import { defineIpcHandlers, useLogger } from 'translime-sdk';

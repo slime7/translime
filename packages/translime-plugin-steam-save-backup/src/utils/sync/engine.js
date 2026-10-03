@@ -1,8 +1,11 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { writeJson } from '../fs-wrapper';
 import { createArchive, extractArchive } from './archive';
-import { buildManifest, planSync, uniqueDirName } from './manifest';
+import {
+  buildManifest, collectManifestDetails, planSync, uniqueDirName,
+} from './manifest';
 import { isRemoteNotFound, tailOutput } from './rclone';
 
 export class SyncCancelledError extends Error {
@@ -115,7 +118,8 @@ const runSequential = (items, step) => items.reduce(
   Promise.resolve(),
 );
 
-// 冲突展示信息：从备份元数据提取时间与来源机器（摘要差异本身即冲突依据）
+// 冲突展示信息：从备份元数据提取时间与来源机器（摘要差异本身即冲突依据）；
+// deleted* 字段用于识别远端删除墓碑
 const readConflictMeta = async (infoPath) => {
   try {
     const info = JSON.parse((await fs.readFile(infoPath, 'utf8')).replace(/^\uFEFF/, ''));
@@ -123,9 +127,19 @@ const readConflictMeta = async (infoPath) => {
       backupTime: typeof info.backupTime === 'string' ? info.backupTime : null,
       createdBy: typeof info.createdBy === 'string' ? info.createdBy : null,
       gameName: typeof info.gameName === 'string' ? info.gameName : null,
+      deleted: Boolean(info.deleted),
+      deletedAt: typeof info.deletedAt === 'string' ? info.deletedAt : null,
+      deletedBy: typeof info.deletedBy === 'string' ? info.deletedBy : null,
     };
   } catch {
-    return { backupTime: null, createdBy: null, gameName: null };
+    return {
+      backupTime: null,
+      createdBy: null,
+      gameName: null,
+      deleted: false,
+      deletedAt: null,
+      deletedBy: null,
+    };
   }
 };
 
@@ -134,6 +148,8 @@ const readConflictMeta = async (infoPath) => {
  * 拉取远端全部 info.json 构成远端清单，与本地比对后执行上传与下载。
  * - 远端备份由 data.zip 与独立 info.json 组成，本地保持目录形态不变；仅在需要下载时传输数据包。
  * - 同名备份摘要不一致时记录为冲突，由用户选择覆盖本地、覆盖远程或保留两份。
+ * - 远端删除墓碑（info.json 带 deleted 标记）：本地副本自动跟随删除并计入报告；
+ *   本地在删除时间点之后仍有更新的转墓碑冲突待确认；本地缺失时不回补。
  * - 远端散文件备份（data_N）在对账时自动迁移为数据包，内容分叉同样走冲突确认。
  *
  * @param {object} options
@@ -158,7 +174,7 @@ export const runSync = async ({
   const record = (gameId, key) => {
     if (!perGame[gameId]) {
       perGame[gameId] = {
-        uploads: 0, downloads: 0, conflicts: 0, migrated: 0,
+        uploads: 0, downloads: 0, conflicts: 0, deletions: 0, migrated: 0,
       };
     }
     perGame[gameId][key] += 1;
@@ -192,13 +208,53 @@ export const runSync = async ({
     }
     assertAlive();
 
-    const remoteManifest = await buildManifest(stage);
+    const remoteDetails = await collectManifestDetails(stage);
+    const remoteManifest = remoteDetails.manifest;
+    const { tombstones } = remoteDetails;
     const localManifest = await buildManifest(backupRoot);
-    const plan = planSync(localManifest, remoteManifest);
+    const plan = planSync(localManifest, remoteManifest, tombstones);
+
+    // 远端已删除（墓碑）的备份：结合本地 backupTime 与 deletedAt 判定
+    // 「跟随删除并通知」或「删除冲突待确认」；本地缺失时不做任何动作（不回补）
+    const appliedDeletions = [];
+    const tombstoneConflicts = [];
+    await runSequential(plan.deletions, async ({ gameId, ts }) => {
+      assertAlive();
+      const tomb = tombstones[gameId]?.[ts] || {};
+      const localDir = path.join(backupRoot, gameId, ts);
+      const localMeta = await readConflictMeta(path.join(localDir, 'info.json'));
+      const deletedAtMs = Date.parse(tomb.deletedAt || '');
+      const backupTimeMs = Date.parse(localMeta.backupTime || '');
+      const shouldApply = !Number.isNaN(deletedAtMs) && !Number.isNaN(backupTimeMs)
+        && backupTimeMs <= deletedAtMs;
+      if (!shouldApply) {
+        // 删除时间不可知，或删除决定之后本端又生成过该备份：不自动删，转墓碑冲突
+        record(gameId, 'conflicts');
+        tombstoneConflicts.push({
+          gameId,
+          dir: ts,
+          kind: 'tombstone',
+          gameName: localMeta.gameName,
+          remoteKind: 'zip',
+          local: localMeta,
+          remote: { deletedAt: tomb.deletedAt, deletedBy: tomb.deletedBy || null },
+          detectedAt: new Date().toISOString(),
+        });
+        return;
+      }
+      onProgress({ phase: 'delete', gameId, dir: ts });
+      await fs.rm(localDir, { recursive: true, force: true });
+      appliedDeletions.push({ gameId, dir: ts, gameName: localMeta.gameName });
+      record(gameId, 'deletions');
+    });
 
     // 每个远端游戏一次递归文件名列举，识别数据包与散文件目录形态并收集散文件残留子目录
+    // （全部条目均为墓碑的游戏没有数据形态可言，跳过列举）
     const gameEntryMap = {};
-    await Promise.all(Object.keys(remoteManifest).map(async (gameId) => {
+    const activeGameIds = Object.keys(remoteManifest).filter((gameId) => (
+      Object.keys(remoteManifest[gameId]).some((ts) => !tombstones[gameId]?.[ts])
+    ));
+    await Promise.all(activeGameIds.map(async (gameId) => {
       const files = await listRemoteFiles(exec, joinRemote(target, gameId));
       gameEntryMap[gameId] = describeGameEntries(files);
     }));
@@ -218,11 +274,15 @@ export const runSync = async ({
         detectedAt: new Date().toISOString(),
       };
     }));
+    conflicts.push(...tombstoneConflicts);
 
     // 同名同摘要的散文件目录 → 迁移为数据包；分叉的散文件目录保持冲突待处理，不做迁移
     const legacySame = [];
     Object.keys(remoteManifest).forEach((gameId) => {
       Object.keys(remoteManifest[gameId]).forEach((ts) => {
+        if (tombstones[gameId]?.[ts]) {
+          return;
+        }
         if (gameEntryMap[gameId]?.[ts]?.hasZip) {
           return;
         }
@@ -290,10 +350,12 @@ export const runSync = async ({
       ok: true,
       perGame,
       conflicts,
+      deletions: appliedDeletions,
       totals: {
         uploads: plan.uploads.length,
         downloads: plan.downloads.length,
-        conflicts: plan.conflicts.length,
+        conflicts: plan.conflicts.length + tombstoneConflicts.length,
+        deletions: appliedDeletions.length,
         migrated: migratedCount,
       },
     };
@@ -414,9 +476,27 @@ export const resolveConflict = async ({
 };
 
 /**
- * 删除远端的一份备份（整个备份目录清理；条目不存在视为已删除）。
- * 用于“同时删除远程存档”。
+ * 删除远端的一份备份（「同时删除远程存档」）。
+ * 数据文件整体清理，但保留 info.json 并追加删除标记（墓碑）：
+ * 其他端对账时据此删除本地副本并跳过回补，防止仍持有该备份的端把它重新推上远端。
+ * 条目不存在视为已删除（仍写入墓碑，传播删除意图）。
+ *
+ * @param {object} [options.tombstoneInfo] 墓碑元数据（buildTombstoneInfo 构造，含原备份信息）
+ * @param {string} [options.tempDir] 墓碑文件暂存目录
  */
-export const deleteRemoteBackup = async (exec, target, gameId, dir) => {
-  await purgeRemote(exec, joinRemote(target, String(gameId), dir));
+export const deleteRemoteBackup = async (exec, target, gameId, dir, { tombstoneInfo = null, tempDir } = {}) => {
+  const remoteDir = joinRemote(target, String(gameId), dir);
+  await purgeRemote(exec, remoteDir);
+  if (tombstoneInfo && tempDir) {
+    const tombFile = path.join(tempDir, `${String(dir)}.deleted.json`);
+    await writeJson(tombFile, tombstoneInfo);
+    try {
+      const result = await exec(['copyto', tombFile, `${remoteDir}/info.json`]);
+      if (result.code !== 0) {
+        throw new Error(`写入远端删除标记失败：${tailOutput(result.stderr)}`);
+      }
+    } finally {
+      await fs.rm(tombFile, { force: true });
+    }
+  }
 };

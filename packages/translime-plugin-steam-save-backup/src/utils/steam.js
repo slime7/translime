@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { useLogger } from 'translime-sdk';
 import {
   pathExists,
   readdir,
@@ -7,6 +8,8 @@ import {
   stat,
 } from './fs-wrapper';
 import { parse as vdfParse } from './vdf-parser';
+
+const logger = useLogger();
 
 /**
  * 获取 Steam 安装路径
@@ -44,7 +47,7 @@ export async function getSteamPath() {
       return path.normalize(match[1]);
     }
   } catch (e) {
-    console.warn('查询 Steam 路径注册表失败：', e);
+    logger.warn('查询 Steam 路径注册表失败：', e);
   }
 
   return null;
@@ -74,7 +77,7 @@ export async function getLibraryFolders(steamPath) {
         });
       }
     } catch (e) {
-      console.error('解析 libraryfolders.vdf 失败：', e);
+      logger.error('解析 libraryfolders.vdf 失败：', e);
     }
   }
 
@@ -113,7 +116,7 @@ export async function scanInstalledGames(steamPath) {
           };
         }
       } catch (e) {
-        console.warn(`解析 ${file} 失败：`, e);
+        logger.warn(`解析 ${file} 失败：`, e);
       }
       return null;
     }));
@@ -324,7 +327,7 @@ function resolveRootPath(root, dirPath, ctx) {
     return path.join(userProfile, dirPath);
 
   default:
-    console.warn(`未知的 root 类型: ${root}，回退到 Steam Cloud remote 目录`);
+    logger.warn(`未知的 root 类型: ${root}，回退到 Steam Cloud remote 目录`);
     return path.join(ctx.appDir, 'remote', dirPath);
   }
 }
@@ -359,7 +362,7 @@ export async function findSavePaths(steamPath, appId, gameInstallDir = null) {
           });
         }
       } catch (e) {
-        console.warn(`解析 remotecache.vdf 失败 (${appId}):`, e);
+        logger.warn(`解析 remotecache.vdf 失败 (${appId}):`, e);
       }
     }
   }));

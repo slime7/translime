@@ -57,8 +57,6 @@ export const openPluginWindow = (plugin) => {
   const options = JSON.parse(JSON.stringify(plugin.windowOptions));
   delete options.windowUrl;
   if (process.env.NODE_ENV === 'development') {
-    console.log('plugin window url: ', url);
-    console.log('plugin window options: ', options);
     window.ts.logger.debug(`plugin window url: ${url}`);
     window.ts.logger.debug('plugin window options: ', { options });
   }

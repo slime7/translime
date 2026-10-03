@@ -1,36 +1,7 @@
 <template>
   <div class="flex items-center gap-2">
+    <!-- 打开备份目录与同步设置在宿主顶栏按钮区（两个视图共用） -->
     <template v-if="collapsed">
-      <mat-tooltip
-        content="远程同步"
-        location="bottom"
-      >
-        <template #activator>
-          <mat-btn
-            :icon="syncIcon"
-            variant="filled-tonal"
-            :loading="syncRunning"
-            aria-label="远程同步设置"
-            @click="$emit('open-sync')"
-          />
-        </template>
-      </mat-tooltip>
-
-      <mat-tooltip
-        content="打开备份目录"
-        location="bottom"
-      >
-        <template #activator>
-          <mat-btn
-            icon="folder_open"
-            variant="filled-tonal"
-            :loading="openDirLoading"
-            aria-label="打开备份目录"
-            @click="$emit('open-backup-dir')"
-          />
-        </template>
-      </mat-tooltip>
-
       <mat-tooltip
         content="手动添加存档目录"
         location="bottom"
@@ -64,24 +35,6 @@
     <template v-else>
       <mat-btn
         variant="filled-tonal"
-        :prefix="syncIcon"
-        :loading="syncRunning"
-        @click="$emit('open-sync')"
-      >
-        同步
-      </mat-btn>
-
-      <mat-btn
-        variant="filled-tonal"
-        prefix="folder_open"
-        :loading="openDirLoading"
-        @click="$emit('open-backup-dir')"
-      >
-        打开备份目录
-      </mat-btn>
-
-      <mat-btn
-        variant="filled-tonal"
         prefix="create_new_folder"
         @click="$emit('add-custom-dir')"
       >
@@ -101,14 +54,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-
-const props = defineProps({
+defineProps({
   collapsed: {
-    type: Boolean,
-    default: false,
-  },
-  openDirLoading: {
     type: Boolean,
     default: false,
   },
@@ -116,17 +63,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  syncRunning: {
-    type: Boolean,
-    default: false,
-  },
-  syncError: {
-    type: Boolean,
-    default: false,
-  },
 });
 
-defineEmits(['open-backup-dir', 'add-custom-dir', 'scan-games', 'open-sync']);
-
-const syncIcon = computed(() => (props.syncError ? 'cloud_off' : 'cloud_sync'));
+defineEmits(['add-custom-dir', 'scan-games']);
 </script>

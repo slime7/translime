@@ -15,6 +15,7 @@ import {
   runSync,
   SyncCancelledError,
 } from '../../src/utils/sync/engine';
+import { buildTombstoneInfo } from '../../src/utils/sync/manifest';
 
 let tmpRoot;
 let backupRoot;
@@ -223,10 +224,10 @@ describe('runSync 上传', () => {
 
     expect(report.ok).toBe(true);
     expect(report.totals).toEqual({
-      uploads: 1, downloads: 0, conflicts: 0, migrated: 0,
+      uploads: 1, downloads: 0, conflicts: 0, migrated: 0, deletions: 0,
     });
     expect(report.perGame['123']).toEqual({
-      uploads: 1, downloads: 0, conflicts: 0, migrated: 0,
+      uploads: 1, downloads: 0, conflicts: 0, migrated: 0, deletions: 0,
     });
   });
 
@@ -270,7 +271,7 @@ describe('runSync 下载', () => {
     expect(restored.gameId).toBe('123');
     await expect(fs.stat(path.join(backupRoot, '123', 'ts-other', 'data_0', 'save.dat'))).resolves.toBeTruthy();
     expect(report.totals).toEqual({
-      uploads: 0, downloads: 2, conflicts: 0, migrated: 0,
+      uploads: 0, downloads: 2, conflicts: 0, migrated: 0, deletions: 0,
     });
   });
 
@@ -286,7 +287,7 @@ describe('runSync 下载', () => {
     const restored = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts-peer', 'info.json'), 'utf8'));
     expect(restored.createdBy).toBe('other-machine');
     expect(report.totals).toEqual({
-      uploads: 0, downloads: 1, conflicts: 0, migrated: 0,
+      uploads: 0, downloads: 1, conflicts: 0, migrated: 0, deletions: 0,
     });
   });
 });
@@ -304,7 +305,7 @@ describe('runSync 散文件目录迁移', () => {
     const localInfo = JSON.parse(await fs.readFile(path.join(backupRoot, '123', 'ts-legacy', 'info.json'), 'utf8'));
     expect(localInfo.gameId).toBe('123');
     expect(report.totals).toEqual({
-      uploads: 0, downloads: 1, conflicts: 0, migrated: 1,
+      uploads: 0, downloads: 1, conflicts: 0, migrated: 1, deletions: 0,
     });
   });
 
@@ -317,12 +318,12 @@ describe('runSync 散文件目录迁移', () => {
     const backupEntries = (await fs.readdir(path.join(remoteRoot, '123', 'ts1'))).sort();
     expect(backupEntries).toEqual(['data.zip', 'info.json']);
     expect(report.totals).toEqual({
-      uploads: 0, downloads: 0, conflicts: 0, migrated: 1,
+      uploads: 0, downloads: 0, conflicts: 0, migrated: 1, deletions: 0,
     });
     // 再次对账无任何动作（迁移幂等）
     const second = await runWithFakeExec([]);
     expect(second.totals).toEqual({
-      uploads: 0, downloads: 0, conflicts: 0, migrated: 0,
+      uploads: 0, downloads: 0, conflicts: 0, migrated: 0, deletions: 0,
     });
   });
 
@@ -365,7 +366,7 @@ describe('runSync 冲突', () => {
       remote: { createdBy: 'machine-a' },
     });
     expect(report.totals).toEqual({
-      uploads: 0, downloads: 0, conflicts: 1, migrated: 0,
+      uploads: 0, downloads: 0, conflicts: 1, migrated: 0, deletions: 0,
     });
   });
 });
@@ -457,7 +458,7 @@ describe('resolveConflict', () => {
     expect(remoteInfo.createdBy).toBe('machine-a');
     expect(report.conflicts).toHaveLength(0);
     expect(report.totals).toEqual({
-      uploads: 0, downloads: 0, conflicts: 0, migrated: 0,
+      uploads: 0, downloads: 0, conflicts: 0, migrated: 0, deletions: 0,
     });
   });
 
@@ -494,7 +495,7 @@ describe('resolveConflict', () => {
     });
     expect(report.conflicts).toHaveLength(0);
     expect(report.totals).toEqual({
-      uploads: 0, downloads: 0, conflicts: 0, migrated: 0,
+      uploads: 0, downloads: 0, conflicts: 0, migrated: 0, deletions: 0,
     });
   });
 
@@ -584,5 +585,77 @@ describe('远端条目列举与删除', () => {
 
     const remoteEntries = await fs.readdir(path.join(remoteRoot, '123'));
     expect(remoteEntries).toEqual([]);
+  });
+});
+
+describe('远端删除墓碑', () => {
+  it('deleteRemoteBackup 清理数据但保留带删除标记的 info.json（其他端据此跟随删除）', async () => {
+    await writeRemotePair('123', 'ts1', baseInfo('123', 'ts1'));
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tomb-test-'));
+
+    await deleteRemoteBackup(makeFakeExec(), target, '123', 'ts1', {
+      tombstoneInfo: buildTombstoneInfo(baseInfo('123', 'ts1'), {
+        machineId: 'deleter-machine',
+        at: '2026-10-02T10:00:00.000Z',
+      }),
+      tempDir,
+    });
+    await fs.rm(tempDir, { recursive: true, force: true });
+
+    // 数据包已清理，目录仅剩墓碑元数据
+    const entries = (await fs.readdir(path.join(remoteRoot, '123', 'ts1'))).sort();
+    expect(entries).toEqual(['info.json']);
+    const info = JSON.parse(await fs.readFile(path.join(remoteRoot, '123', 'ts1', 'info.json'), 'utf8'));
+    expect(info.deleted).toBe(true);
+    expect(info.deletedAt).toBe('2026-10-02T10:00:00.000Z');
+    expect(info.deletedBy).toBe('deleter-machine');
+    // 原备份信息保留（UI 展示归属）
+    expect(info.gameId).toBe('123');
+    expect(info.gameName).toBe('Test Game');
+  });
+
+  it('对账时远端墓碑 + 本地备份未变 → 自动删除本地备份并计入 deletions，且绝不重新上传（防复活）', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1'));
+    await writeRemotePair('123', 'ts1', buildTombstoneInfo(baseInfo('123', 'ts1'), {
+      machineId: 'other',
+      at: '2099-01-01T00:00:00.000Z',
+    }));
+    const calls = [];
+
+    const report = await runWithFakeExec(calls);
+
+    expect(await fs.stat(path.join(backupRoot, '123', 'ts1')).catch(() => null)).toBe(null);
+    expect(report.totals.deletions).toBe(1);
+    expect(report.deletions).toEqual([{ gameId: '123', dir: 'ts1', gameName: 'Test Game' }]);
+    // 删除决定不允许被本端的上传推翻：不得出现该备份的上传动作
+    expect(calls.some((args) => args[0] === 'moveto')).toBe(false);
+  });
+
+  it('本地备份在删除时间点之后生成 → 转墓碑冲突且本地保留（删除后本机又重新备份过）', async () => {
+    await writeBackup(backupRoot, '123', 'ts1', baseInfo('123', 'ts1', { backupTime: '2026-10-03T00:00:00.000Z' }));
+    await writeRemotePair('123', 'ts1', buildTombstoneInfo(baseInfo('123', 'ts1'), {
+      machineId: 'other',
+      at: '2026-10-02T00:00:00.000Z',
+    }));
+
+    const report = await runWithFakeExec([]);
+
+    expect(report.conflicts).toHaveLength(1);
+    expect(report.conflicts[0].kind).toBe('tombstone');
+    expect(report.conflicts[0].remote.deletedAt).toBe('2026-10-02T00:00:00.000Z');
+    expect(report.totals.deletions).toBe(0);
+    expect(await fs.stat(path.join(backupRoot, '123', 'ts1'))).toBeTruthy();
+  });
+
+  it('远端墓碑且本地缺失 → 不回补下载（已删备份不在新设备复活）', async () => {
+    await writeRemotePair('123', 'ts1', buildTombstoneInfo(baseInfo('123', 'ts1'), {
+      machineId: 'other',
+      at: '2026-10-02T00:00:00.000Z',
+    }));
+
+    const report = await runWithFakeExec([]);
+
+    expect(report.totals.downloads).toBe(0);
+    expect(await fs.stat(path.join(backupRoot, '123')).catch(() => null)).toBe(null);
   });
 });

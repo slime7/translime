@@ -11,6 +11,7 @@ import logger from './utils/logger';
 import createLaunchWindow from './launch';
 import createTray from './core/tray';
 import pluginLoader from './core/pluginLoader';
+import titleBarRegistry from './core/titleBarRegistry';
 import setupDeepLink, { linkHandler } from './core/deepLink';
 import * as autoUpdate from './core/autoUpdate';
 import { setupLinuxDesktopIntegration } from './utils/linuxDesktopIntegration';
@@ -32,6 +33,7 @@ class CreateElectronApp extends EventEmitter {
   init() {
     this.base();
     this.onPluginSettled();
+    this.onTitleBarActionsChanged();
     this.onAppReady();
     this.onAppQuit();
 
@@ -125,6 +127,19 @@ class CreateElectronApp extends EventEmitter {
     };
     pluginLoader.on('plugin:enabled', notifyPluginsChanged);
     pluginLoader.on('plugin:error', notifyPluginsChanged);
+  }
+
+  /**
+   * 插件动态声明的顶栏按钮变化推送到所有窗口，渲染端更新插件页顶栏按钮区。
+   *
+   * @returns {void}
+   */
+  // eslint-disable-next-line class-methods-use-this
+  onTitleBarActionsChanged() {
+    titleBarRegistry.on('change', (itemsByPlugin) => {
+      logger.info(`[顶栏按钮] 注册变更: ${Object.keys(itemsByPlugin).join(', ') || '(空)'}`);
+      appManager.getIpc()?.sendToAllWindows(ipcType.TITLE_BAR_ACTIONS_CHANGED, itemsByPlugin);
+    });
   }
 
   onAppReady() {

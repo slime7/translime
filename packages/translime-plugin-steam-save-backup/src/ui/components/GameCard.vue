@@ -25,7 +25,13 @@
         </mat-tooltip>
 
         <div
-          v-if="game.uninstalled"
+          v-if="game.kind === 'passthrough'"
+          class="game-subtitle"
+        >
+          直通云存档
+        </div>
+        <div
+          v-else-if="game.uninstalled"
           class="game-subtitle"
         >
           未安装 · 仅存档管理
@@ -45,6 +51,7 @@
       </div>
 
       <mat-tooltip
+        v-if="game.kind !== 'passthrough'"
         content="隐藏此游戏"
         location="top"
       >
@@ -67,35 +74,59 @@
       <div class="py-2">
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-2">
-            <mat-chip
-              variant="assist"
-              :color="game.backupCount > 0 ? 'tertiary' : undefined"
-              class="font-medium"
-            >
-              {{ game.backupCount || 0 }} 个备份
-            </mat-chip>
+            <template v-if="game.kind === 'passthrough'">
+              <mat-tooltip
+                :content="game.ptStatus.detail || game.ptStatus.label"
+                location="top"
+              >
+                <template #activator>
+                  <mat-chip
+                    variant="assist"
+                    :color="ptChipColor"
+                  >
+                    <template #leading>
+                      <mat-icon
+                        :icon="game.ptStatus.icon"
+                        size="18px"
+                        :class="{ 'sync-spinning': game.ptStatus.key === 'syncing' }"
+                      />
+                    </template>
+                    {{ game.ptStatus.label }}
+                  </mat-chip>
+                </template>
+              </mat-tooltip>
+            </template>
+            <template v-else>
+              <mat-chip
+                variant="assist"
+                :color="game.backupCount > 0 ? 'tertiary' : undefined"
+                class="font-medium"
+              >
+                {{ game.backupCount || 0 }} 个备份
+              </mat-chip>
 
-            <mat-tooltip
-              v-if="syncState"
-              :content="syncState.detail || syncState.label"
-              location="top"
-            >
-              <template #activator>
-                <mat-chip
-                  variant="assist"
-                  :color="syncChipColor"
-                >
-                  <template #leading>
-                    <mat-icon
-                      :icon="syncState.icon"
-                      size="18px"
-                      :class="{ 'sync-spinning': syncState.key === 'syncing' }"
-                    />
-                  </template>
-                  {{ syncState.label }}
-                </mat-chip>
-              </template>
-            </mat-tooltip>
+              <mat-tooltip
+                v-if="syncState"
+                :content="syncState.detail || syncState.label"
+                location="top"
+              >
+                <template #activator>
+                  <mat-chip
+                    variant="assist"
+                    :color="syncChipColor"
+                  >
+                    <template #leading>
+                      <mat-icon
+                        :icon="syncState.icon"
+                        size="18px"
+                        :class="{ 'sync-spinning': syncState.key === 'syncing' }"
+                      />
+                    </template>
+                    {{ syncState.label }}
+                  </mat-chip>
+                </template>
+              </mat-tooltip>
+            </template>
           </div>
 
           <mat-icon
@@ -134,6 +165,20 @@ const syncChipColor = computed(() => {
     return 'secondary';
   }
   if (syncState.value?.key === 'synced') {
+    return 'tertiary';
+  }
+  return undefined;
+});
+
+// 直通条目状态芯片配色（冲突红 / 本地缺失警示 / 正常跟随主题）
+const ptChipColor = computed(() => {
+  if (props.game.ptStatus?.key === 'conflict') {
+    return 'error';
+  }
+  if (props.game.ptStatus?.key === 'missing') {
+    return 'secondary';
+  }
+  if (props.game.ptStatus?.key === 'ready') {
     return 'tertiary';
   }
   return undefined;

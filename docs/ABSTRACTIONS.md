@@ -110,11 +110,21 @@ config store，保存时的 `pluginSettingSaved` 仅在插件处于激活态时�
 require 缓存与激活共享，预读不会重复执行顶层代码；停用/卸载会随缓存清理一并失效
 静态元数据。`pluginMenu` 的点击语义伴随激活，仍在激活时合并。
 
+## 插件顶栏按钮区
+
+插件可在宿主插件页顶栏（inspect 旁）放置公共操作按钮，与插件自身 UI 分离。这是
+**运行期动态 API**（非入口导出）：插件主进程调用 SDK `setTitleBarActions(pluginId, actions)`
+整体声明按钮模板（`{ label, icon, iconOnly, tooltip, enabled, visible, click }` 直按钮
+或 `{ ..., submenu: [...] }` 下拉菜单，类似 Electron Menu 模板），宿主 `titleBarRegistry`
+保留点击函数、把可序列化描述随 `get-plugins` 下发并经 `title-bar-actions-changed` 推送
+渲染端（`PluginTitleBarActions`）。点击经 `run-title-bar-action` 通道回传主进程按 id 路径
+执行。传空数组或 `null` 清除；宿主在插件停用/重启时也会自动清除。
+
 ## SDK 环境边界
 
 | API | 环境 |
 | --- | --- |
-| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()`、`defineIpcHandlers()` | 主进程（前三个在隔离模式下抛错） |
+| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()`、`defineIpcHandlers()`、`setTitleBarActions()` | 主进程（除 `defineIpcHandlers` 外在隔离模式下抛错） |
 | `useIpc()`、`useVuetify*()`、`useMat()` / `useMde()`、`useMatComponents()`、`useMatDirectives()`、`useMatFunctions()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
 | `useLogger()`、`isPreviewMode()`、`isIsolatedMode()` | 通用 |
 

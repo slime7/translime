@@ -400,7 +400,7 @@ export function isPreviewMode(): boolean;
 
 /**
  * 当前是否运行在宿主的隔离插件子进程（plugin.isolated: true）中。
- * 隔离模式下 getMainStore / usePluginConfig / usePluginInterop 会抛错。
+ * 隔离模式下 getMainStore / usePluginConfig / usePluginInterop / setTitleBarActions 会抛错。
  */
 export function isIsolatedMode(): boolean;
 
@@ -443,6 +443,40 @@ export interface PluginInterop {
  * 获取插件间通信工具（仅主进程；隔离模式下抛错）
  */
 export function usePluginInterop(): PluginInterop | null;
+
+/**
+ * 插件顶栏按钮模板（Electron Menu 模板风格的宿主支持子集）：
+ * `{ label, icon?, iconOnly?, tooltip?, enabled?, visible?, click }` 直按钮，
+ * 或 `{ label, icon?, tooltip?, enabled?, visible?, submenu: [...] }` 下拉菜单；
+ * 子菜单内额外支持 `{ type: 'separator' }`，可继续嵌套 submenu
+ */
+export interface TitleBarAction {
+  /** 预留：宿主按位置生成稳定 id，此字段被忽略 */
+  id?: string;
+  label: string;
+  /** Material Symbols 图标名（不带 mdi- 前缀） */
+  icon?: string;
+  /** 仅渲染图标按钮（需要 icon 与 label 同时存在） */
+  iconOnly?: boolean;
+  tooltip?: string;
+  enabled?: boolean;
+  visible?: boolean;
+  /** 直按钮点击回调（在插件主进程内执行） */
+  click?(): void;
+  submenu?: TitleBarAction[];
+}
+
+/**
+ * 设置插件在宿主插件页顶栏（inspect 旁）按钮区的按钮（仅主进程；隔离模式下抛错）。
+ * 传入数组整体替换，传空数组或 null 清除；宿主停用/重启插件时自动清除。
+ * 宿主过旧（无注册表）时返回 false，不影响插件其余功能。
+ * @param pluginId 插件 ID (通常与 package.json 中的 name 一致)
+ * @param actions 菜单模板
+ */
+export function setTitleBarActions(
+  pluginId: string,
+  actions: TitleBarAction[] | null,
+): boolean;
 
 // ----------------------------------------------------------------------
 // 通用 API

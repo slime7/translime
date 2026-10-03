@@ -1,6 +1,7 @@
 <script setup>
 import useMenuStore from '@/store/menuStore';
 import useGlobalStore from '@/store/globalStore';
+import PluginTitleBarActions from './PluginTitleBarActions.vue';
 
 const emit = defineEmits(['inspect']);
 
@@ -40,6 +41,9 @@ const showContextMenu = (event) => {
     </mat-btn>
 
     <div class="grow" />
+
+    <!-- 插件经 SDK 动态声明的顶栏按钮区（直按钮/下拉菜单） -->
+    <plugin-title-bar-actions :plugin="props.plugin" />
 
     <mat-btn
       v-if="store.appSetting.showDevPlugin"

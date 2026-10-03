@@ -39,6 +39,9 @@
         </div>
       </div>
     </div>
+
+    <!-- 路径详情之后的附加内容（如直通存档的远端位置） -->
+    <slot name="append" />
   </mat-expansion-panel>
 </template>
 

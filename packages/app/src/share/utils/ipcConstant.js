@@ -29,6 +29,8 @@ export const GET_PLUGIN_SETTING = 'get-plugin-setting';
 export const SET_PLUGIN_SETTING = 'set-plugin-setting';
 export const OPEN_PLUGIN_CONTEXT_MENU = 'open-plugin-context-menu';
 export const PLUGIN_CONTEXT_MENU_ACTION = 'plugin-context-menu-action';
+export const RUN_TITLE_BAR_ACTION = 'run-title-bar-action';
+export const TITLE_BAR_ACTIONS_CHANGED = 'title-bar-actions-changed';
 export const OPEN_PLUGIN_SETTING_PANEL = 'open-plugin-setting-panel';
 export const PLUGINS_CHANGED = 'plugins-changed';
 export const DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG = 'dialog-show-certificate-trust-dialog';
@@ -100,6 +102,8 @@ export default {
   SET_PLUGIN_SETTING,
   OPEN_PLUGIN_CONTEXT_MENU,
   PLUGIN_CONTEXT_MENU_ACTION,
+  RUN_TITLE_BAR_ACTION,
+  TITLE_BAR_ACTIONS_CHANGED,
   OPEN_PLUGIN_SETTING_PANEL,
   PLUGINS_CHANGED,
   DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG,

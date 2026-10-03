@@ -1,4 +1,8 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {
+  afterEach,
   beforeEach,
   describe,
   expect,
@@ -124,5 +128,153 @@ describe('sync-service 手动同步', () => {
 
     const { config } = service.getStatus();
     expect(config).toEqual({ target: 'GDrive:saves', rclonePath: 'rclone.exe' });
+  });
+});
+
+describe('sync-service 远端删除墓碑', () => {
+  beforeEach(() => {
+    execCalls.length = 0;
+    fakeExec.killAll.mockClear();
+    configStore = new Map();
+  });
+
+  it('removeRemoteBackup 在 purge 后以 copyto 写入墓碑元数据（其他端据此跟随删除）', async () => {
+    // 防止回归：删除远程退化为纯 purge 会让其他端在下次对账时把已删备份回补/重新上传
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, SYNC_SETTINGS);
+
+    await createService().removeRemoteBackup({
+      gameId: '123',
+      dir: 'ts1',
+      info: { schemaVersion: 2, gameId: '123', backupTime: '2026-10-01T10:00:00.000Z' },
+    });
+
+    expect(execCalls).toContainEqual(['purge', 'GDrive:translime-saves/123/ts1']);
+    const copyto = execCalls.find((args) => args[0] === 'copyto');
+    expect(copyto).toBeTruthy();
+    expect(copyto[2].replaceAll('\\', '/')).toBe('GDrive:translime-saves/123/ts1/info.json');
+  });
+});
+
+describe('sync-service 直通对账接线', () => {
+  beforeEach(() => {
+    execCalls.length = 0;
+    fakeExec.killAll.mockClear();
+    configStore = new Map();
+  });
+
+  it('触发对账时附带执行直通服务对账，并共享 exec 与目标（单队列约束）', async () => {
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, SYNC_SETTINGS);
+    const runSyncCalls = [];
+    const passthrough = {
+      runSync: async (args) => {
+        runSyncCalls.push(args);
+        return null;
+      },
+      getStatus: () => ({ entryCount: 1 }),
+    };
+
+    const service = createService();
+    service.setPassthrough(passthrough);
+    // trigger 是即发即忘：等到队列回到 idle（对账含直通对账都已结束）再断言
+    service.trigger();
+    await vi.waitFor(() => {
+      expect(service.getStatus().phase).toBe('idle');
+    });
+
+    expect(runSyncCalls).toEqual([{
+      exec: fakeExec,
+      target: SYNC_SETTINGS.target,
+      isCancelled: expect.any(Function),
+    }]);
+  });
+
+  it('getStatus 透传直通状态，未接入直通时为 null', async () => {
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, SYNC_SETTINGS);
+
+    const bare = createService();
+    expect(bare.getStatus().passthrough).toBe(null);
+
+    const service = createService();
+    service.setPassthrough({ runSync: async () => null, getStatus: () => ({ entryCount: 2 }) });
+    expect(service.getStatus().passthrough).toEqual({ entryCount: 2 });
+  });
+});
+
+describe('sync-service 墓碑冲突处置', () => {
+  let backupRoot;
+
+  const createServiceWithRoot = () => createSyncService({
+    pluginId: PLUGIN_ID,
+    getConfig: (key, defaultValue) => (configStore.has(key) ? configStore.get(key) : defaultValue),
+    setConfig: (key, value) => {
+      configStore.set(key, value);
+    },
+    resolveBackupRoot: async () => backupRoot,
+  });
+
+  beforeEach(async () => {
+    execCalls.length = 0;
+    fakeExec.killAll.mockClear();
+    configStore = new Map();
+    backupRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'tomb-conflict-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(backupRoot, { recursive: true, force: true });
+  });
+
+  const seedTombstoneConflict = () => {
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, SYNC_SETTINGS);
+    configStore.set(`plugin.${PLUGIN_ID}.syncState`, {
+      machineId: 'machine-1',
+      dirtyGames: [],
+      conflicts: [{
+        gameId: '123',
+        dir: 'ts1',
+        kind: 'tombstone',
+        remoteKind: 'zip',
+        remote: { deletedAt: '2026-10-02T00:00:00.000Z' },
+      }],
+      lastReport: null,
+      lastError: null,
+      lastRunAt: null,
+    });
+  };
+
+  it('confirm-deletion：移除本地备份目录并清除冲突条目（远端墓碑保持）', async () => {
+    seedTombstoneConflict();
+    const localDir = path.join(backupRoot, '123', 'ts1');
+    await fs.mkdir(localDir, { recursive: true });
+    await fs.writeFile(path.join(localDir, 'keep.dat'), 'x', 'utf8');
+
+    const service = createServiceWithRoot();
+    const status = await service.resolveOneConflict({ gameId: '123', dir: 'ts1', mode: 'confirm-deletion' });
+
+    expect(await fs.stat(localDir).catch(() => null)).toBe(null);
+    expect(status.conflicts).toEqual([]);
+  });
+
+  it('墓碑冲突不接受内容冲突的三选一处理方式', async () => {
+    seedTombstoneConflict();
+
+    const service = createServiceWithRoot();
+    await expect(service.resolveOneConflict({ gameId: '123', dir: 'ts1', mode: 'keep-both' }))
+      .rejects.toThrow('远端已删除的备份仅支持');
+  });
+
+  it('confirm-deletion 不适用于普通内容冲突', async () => {
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, SYNC_SETTINGS);
+    configStore.set(`plugin.${PLUGIN_ID}.syncState`, {
+      machineId: 'machine-1',
+      dirtyGames: [],
+      conflicts: [{ gameId: '123', dir: 'ts1', remoteKind: 'zip' }],
+      lastReport: null,
+      lastError: null,
+      lastRunAt: null,
+    });
+
+    const service = createServiceWithRoot();
+    await expect(service.resolveOneConflict({ gameId: '123', dir: 'ts1', mode: 'confirm-deletion' }))
+      .rejects.toThrow('仅适用于远端删除冲突');
   });
 });

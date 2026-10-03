@@ -10,7 +10,9 @@ import {
 } from 'vitest';
 import {
   buildManifest,
+  buildTombstoneInfo,
   canonicalStringify,
+  collectManifestDetails,
   infoDigest,
   planSync,
   uniqueDirName,
@@ -124,7 +126,9 @@ describe('planSync', () => {
 
     const plan = planSync(manifest, manifest);
 
-    expect(plan).toEqual({ uploads: [], downloads: [], conflicts: [] });
+    expect(plan).toEqual({
+      uploads: [], downloads: [], conflicts: [], deletions: [],
+    });
   });
 
   it('同名目录摘要不一致时进入冲突清单，不产生任何自动动作（分叉交由用户处理）', () => {
@@ -160,5 +164,69 @@ describe('planSync', () => {
     expect(uniqueDirName('ts1-machine1', new Set())).toBe('ts1-machine1');
     expect(uniqueDirName('ts1-machine1', new Set(['ts1-machine1']))).toBe('ts1-machine1-2');
     expect(uniqueDirName('ts1-machine1', new Set(['ts1-machine1', 'ts1-machine1-2']))).toBe('ts1-machine1-3');
+  });
+});
+
+describe('远端删除墓碑', () => {
+  it('buildTombstoneInfo 保留原备份信息并追加删除标记（原对象不被修改）', () => {
+    const info = baseInfo('g1', 'ts1');
+
+    const tomb = buildTombstoneInfo(info, { machineId: 'm1', at: '2026-10-02T10:00:00.000Z' });
+
+    expect(tomb.deleted).toBe(true);
+    expect(tomb.deletedAt).toBe('2026-10-02T10:00:00.000Z');
+    expect(tomb.deletedBy).toBe('m1');
+    expect(tomb.gameId).toBe('g1');
+    expect(info.deleted).toBeUndefined();
+  });
+
+  it('collectManifestDetails 把 deleted 标记的 info.json 归入 tombstones，清单摘要照常构建', async () => {
+    await writeBackup(tmpRoot, 'g1', 'ts1', baseInfo('g1', 'ts1'));
+    await writeBackup(tmpRoot, 'g1', 'ts2', buildTombstoneInfo(baseInfo('g1', 'ts2'), {
+      machineId: 'm1', at: '2026-10-02T10:00:00.000Z',
+    }));
+    await writeBackup(tmpRoot, 'g2', 'tsX', baseInfo('g2', 'tsX'));
+
+    const { manifest, tombstones } = await collectManifestDetails(tmpRoot);
+
+    expect(manifest.g1.ts1).toEqual(expect.any(String));
+    expect(tombstones).toEqual({
+      g1: { ts2: { deletedAt: '2026-10-02T10:00:00.000Z', deletedBy: 'm1' } },
+    });
+    // buildManifest 仍返回摘要视图（本地清单继续可用）
+    expect((await buildManifest(tmpRoot)).g1.ts2).toEqual(expect.any(String));
+  });
+
+  it('planSync：被墓碑的条目进入 deletions，且既不上传也不下载、不产生摘要冲突（防止已删备份复活）', () => {
+    const tombstones = {
+      g1: { ts1: { deletedAt: '2026-10-02T00:00:00.000Z' } },
+      g1b: { tsT: { deletedAt: '2026-10-02T00:00:00.000Z' } },
+    };
+    const local = {
+      g1: { ts1: 'local-tomb' }, // 本地仍持有被删备份
+      g2: { tsA: 'local-only' },
+    };
+    const remote = {
+      g1: { ts1: 'remote-tomb' },
+      g1b: { tsT: 'remote-tomb-only' }, // 远端墓碑而本地缺失
+      g3: { tsB: 'remote-only' },
+    };
+
+    const plan = planSync(local, remote, tombstones);
+
+    expect(plan.deletions).toEqual([{ gameId: 'g1', ts: 'ts1' }]);
+    expect(plan.uploads).toEqual([{ gameId: 'g2', ts: 'tsA' }]);
+    expect(plan.downloads).toEqual([{ gameId: 'g3', ts: 'tsB' }]);
+    expect(plan.conflicts).toEqual([]);
+  });
+
+  it('planSync：未提供 tombstones 时行为与旧版一致（向后兼容）', () => {
+    const manifest = { g1: { ts1: 'd1' } };
+
+    const plan = planSync(manifest, manifest);
+
+    expect(plan).toEqual({
+      uploads: [], downloads: [], conflicts: [], deletions: [],
+    });
   });
 });

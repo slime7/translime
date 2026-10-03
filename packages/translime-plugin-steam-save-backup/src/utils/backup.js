@@ -1,5 +1,6 @@
 import path from 'node:path';
 import os from 'node:os';
+import { useLogger } from 'translime-sdk';
 import {
   copy,
   emptyDir,
@@ -11,6 +12,8 @@ import {
   writeJson,
 } from './fs-wrapper';
 import { getBackupSourcesMetadata } from './save-sources';
+
+const logger = useLogger();
 
 // 默认备份根目录
 const getDefaultBackupRoot = () => path.join(global.APPDATA_PATH || path.join(os.homedir(), 'Documents'), 'TranslimeSteamBackups');
@@ -47,7 +50,7 @@ export async function backupSave(gameId, gameName, savePaths, customBackupRoot, 
 
     // 检查源目录是否存在
     if (!(await pathExists(saveInfo.absolutePath))) {
-      console.warn(`存档路径不存在，跳过: ${saveInfo.absolutePath}`);
+      logger.warn(`存档路径不存在，跳过: ${saveInfo.absolutePath}`);
       return null;
     }
 
@@ -132,7 +135,7 @@ export async function getBackups(gameId, customBackupRoot) {
           id: dir, // 使用目录名作为 ID
         };
       } catch (e) {
-        console.warn(`Failed to read info.json in ${dir}:`, e);
+        logger.warn(`Failed to read info.json in ${dir}:`, e);
       }
     }
     return null;
@@ -208,7 +211,7 @@ export async function getBackupCount(gameId, customBackupRoot) {
     // 为了性能，这里不做深度检查，假设每个子项都是一个备份
     return dirs.length;
   } catch (e) {
-    console.warn(`获取备份数量失败 (${gameId}):`, e);
+    logger.warn(`获取备份数量失败 (${gameId}):`, e);
     return 0;
   }
 }

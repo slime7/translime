@@ -57,6 +57,17 @@ const mockStatus = {
       remote: { backupTime: '2026-10-01T09:30:00.000Z', createdBy: 'bbbb2222-0000-0000-0000-000000000000' },
       detectedAt: '2026-10-01T10:05:00.000Z',
     },
+    {
+      // 墓碑冲突：远端已删除，本机在删除时间点之后仍有更新
+      gameId: '413150',
+      dir: '2026-09-28T20-00-00-000Z',
+      gameName: 'Stardew Valley',
+      kind: 'tombstone',
+      remoteKind: 'zip',
+      local: { backupTime: '2026-09-29T08:00:00.000Z', createdBy: 'aaaa1111-0000-0000-0000-000000000000' },
+      remote: { deletedAt: '2026-09-28T22:00:00.000Z', deletedBy: 'bbbb2222-0000-0000-0000-000000000000' },
+      detectedAt: '2026-10-01T10:05:00.000Z',
+    },
   ],
   lastReport: {
     startedAt: '2026-10-01T10:00:00.000Z',
@@ -66,11 +77,38 @@ const mockStatus = {
       1245620: { uploads: 1, downloads: 0, conflicts: 1 },
       'custom-hollowknight': { uploads: 0, downloads: 1, conflicts: 0 },
     },
-    totals: { uploads: 1, downloads: 1, conflicts: 1 },
+    totals: {
+      uploads: 1, downloads: 1, conflicts: 1, deletions: 1,
+    },
   },
   lastError: null,
   lastRunAt: '2026-10-01T10:00:12.000Z',
+  passthrough: {
+    conflicts: [],
+    notifications: [],
+    lastError: null,
+    lastReport: {
+      startedAt: '2026-10-01T10:00:00.000Z',
+      finishedAt: '2026-10-01T10:00:09.000Z',
+      ok: true,
+      appliedDeletions: [],
+      conflicts: [],
+      updated: [{ entryId: 'custom-1abcd23', name: '空洞骑士' }],
+      skipped: [],
+      errors: [],
+    },
+    entryCount: 2,
+  },
 };
+
+const mockPassthroughEntries = [
+  {
+    entryId: 'custom-1abcd23', name: '空洞骑士', dir: 'C:/mock/Saved Games/Hollow Knight', localExists: true,
+  },
+  {
+    entryId: 'custom-9zzz88', name: '星露谷物语', dir: 'D:/Games/Stardew/Saves', localExists: false,
+  },
+];
 
 export default {
   'scan-games': async () => ({
@@ -180,4 +218,38 @@ export default {
       ),
     },
   }),
+  'passthrough-list': async () => ({
+    success: true,
+    entries: mockPassthroughEntries,
+    status: mockStatus.passthrough,
+  }),
+  'passthrough-add': async ({ name, dir }) => ({
+    success: true,
+    entries: [...mockPassthroughEntries, {
+      entryId: `custom-${name}`, name, dir, localExists: true,
+    }],
+  }),
+  'passthrough-remove': async ({ deleteRemote }) => ({
+    success: true,
+    remoteDeleted: Boolean(deleteRemote),
+  }),
+  'passthrough-open-dir': async () => ({ success: true }),
+  // 本地缺失的条目枚举不到文件，返回空来源（详情弹窗走无面板的兜底展示）
+  'passthrough-list-files': async ({ name } = {}) => ({
+    success: true,
+    sources: name === '星露谷物语'
+      ? []
+      : [{
+        id: 'passthrough:mock',
+        type: 'custom-directory',
+        label: '直通目录',
+        absolutePath: 'C:\\Games\\Saves\\Hollow Knight',
+        relativePath: '.',
+        files: ['user1.dat', 'settings.cfg'],
+        enabled: true,
+      }],
+    empty: name === '星露谷物语',
+  }),
+  'passthrough-restore': async () => ({ success: true }),
+  'passthrough-resolve': async () => ({ success: true }),
 };

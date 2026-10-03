@@ -4,7 +4,7 @@ import {
   ref,
   toRaw,
 } from 'vue';
-import { useIpc } from 'translime-sdk';
+import { useIpc, useLogger } from 'translime-sdk';
 import {
   saveSourcesToSavePaths,
   steamSavePathsToSaveSources,
@@ -31,9 +31,9 @@ const getGameSaveSources = (game) => {
 
 export default function useSteamSaveBackup() {
   const ipc = useIpc();
+  const logger = useLogger();
   const loading = ref({
     scan: false,
-    openDir: false,
     backup: false,
     restore: null,
     delete: null,
@@ -83,26 +83,12 @@ export default function useSteamSaveBackup() {
           }
         }
       } else {
-        console.error('加载备份失败', res.message);
+        logger.error('加载备份失败', res.message);
         showMessage('无法加载备份列表', 'error');
       }
     } catch (err) {
-      console.error('加载备份失败', err);
+      logger.error('加载备份失败', err);
       showMessage('无法加载备份列表', 'error');
-    }
-  };
-
-  const openBackupDir = async () => {
-    loading.value.openDir = true;
-    try {
-      const res = await ipc.invoke(`open-backup-dir@${PLUGIN_ID}`);
-      if (!res.success) {
-        showMessage(res.message || '打开目录失败', 'error');
-      }
-    } catch (err) {
-      showMessage(err.message || '打开目录失败', 'error');
-    } finally {
-      loading.value.openDir = false;
     }
   };
 
@@ -234,7 +220,7 @@ export default function useSteamSaveBackup() {
       message: `确定要删除「${selectedGame.value?.name || backup.gameName || ''}」${formatTime(backup.backupTime)} 的备份吗？`,
       detail: [
         '此操作不可撤销。',
-        remoteAvailable ? `勾选后将同时删除远程存档：${remotePath}` : '',
+        remoteAvailable ? `勾选后同时删除远程存档并写入删除标记，其他设备同步时自动跟随：${remotePath}` : '',
       ].filter(Boolean).join(' '),
       confirmText: '确认删除',
       switchLabel: remoteAvailable ? '同时删除远程存档' : '',
@@ -371,7 +357,6 @@ export default function useSteamSaveBackup() {
     hiddenGames,
     canBackup,
     formatTime,
-    openBackupDir,
     scanGames,
     openGameDetails,
     loadBackups,

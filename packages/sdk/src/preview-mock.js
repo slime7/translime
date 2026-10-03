@@ -32,36 +32,30 @@ export function createMockIpc(mockHandlers = {}) {
       const handler = resolveMockHandler(channel);
       if (handler) {
         const result = await handler(...args);
-        // eslint-disable-next-line no-console
+
         console.log('[Preview Mock] ipc.invoke:', channel, args, '=>', result);
         return result;
       }
-      // eslint-disable-next-line no-console
+
       console.log('[Preview Mock] ipc.invoke:', channel, args);
       return null;
     },
     send: (channel, ...args) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] ipc.send:', channel, args);
     },
     on: (channel, callback) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] ipc.on registered:', channel, Boolean(callback));
       return () => {
-        // eslint-disable-next-line no-console
         console.log('[Preview Mock] ipc.on removed:', channel);
       };
     },
     once: (channel, callback) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] ipc.once registered:', channel, Boolean(callback));
     },
     removeListener: (channel, callback) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] ipc.removeListener:', channel, Boolean(callback));
     },
     removeAllListeners: (channel) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] ipc.removeAllListeners:', channel);
     },
     setMockHandlers(nextHandlers) {
@@ -91,7 +85,6 @@ export function setPreviewIpcMocks(mockHandlers) {
 export function createMockDialog() {
   return {
     showOpenDialog: async (options) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] showOpenDialog:', options);
       // 在 preview 模式下，使用原生 file input 模拟
       return new Promise((resolve) => {
@@ -120,9 +113,8 @@ export function createMockDialog() {
       });
     },
     showSaveDialog: async (options) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] showSaveDialog:', options);
-      // eslint-disable-next-line no-alert
+
       const fileName = prompt('保存文件名：', options?.defaultPath || 'file.txt');
       return {
         canceled: !fileName,
@@ -130,15 +122,13 @@ export function createMockDialog() {
       };
     },
     showMessageBox: async (options) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] showMessageBox:', options);
       const result = window.confirm(options?.message || '');
       return { response: result ? 0 : 1 };
     },
     showErrorBox: (title, content) => {
-      // eslint-disable-next-line no-console
       console.error('[Preview Mock] showErrorBox:', title, content);
-      // eslint-disable-next-line no-alert
+
       alert(`${title}\n\n${content}`);
     },
   };
@@ -151,20 +141,17 @@ export function createMockDialog() {
 export function createMockShell() {
   return {
     openExternal: async (url) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] shell.openExternal:', url);
       window.open(url, '_blank');
     },
     openPath: async (path) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] shell.openPath:', path);
-      // eslint-disable-next-line no-alert
+
       alert(`[Preview] 无法在浏览器中打开路径: ${path}`);
     },
     showItemInFolder: (path) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] shell.showItemInFolder:', path);
-      // eslint-disable-next-line no-alert
+
       alert(`[Preview] 无法在浏览器中显示文件夹: ${path}`);
     },
   };
@@ -187,19 +174,17 @@ export function createMockClipboard() {
     writeText: async (text) => {
       try {
         await navigator.clipboard.writeText(text);
-        // eslint-disable-next-line no-console
+
         console.log('[Preview Mock] clipboard.writeText:', text);
       } catch (e) {
         console.warn('[Preview Mock] clipboard.writeText failed:', e);
       }
     },
     readImage: async () => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] clipboard.readImage: not supported in preview');
       return null;
     },
     writeImage: async () => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] clipboard.writeImage: not supported in preview');
     },
   };
@@ -212,27 +197,21 @@ export function createMockClipboard() {
 export function createMockWindowControl() {
   return {
     close: (windowId) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] windowControl.close:', windowId);
     },
     minimize: (windowId) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] windowControl.minimize:', windowId);
     },
     maximize: (windowId) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] windowControl.maximize:', windowId);
     },
     unmaximize: (windowId) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] windowControl.unmaximize:', windowId);
     },
     devtools: (windowId) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] windowControl.devtools:', windowId);
     },
     isMaximized: async (windowId) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] windowControl.isMaximized:', windowId);
       return false;
     },
@@ -259,7 +238,7 @@ export function createMockPluginSettings() {
       const key = `${STORAGE_PREFIX}${pluginId}`;
       try {
         localStorage.setItem(key, JSON.stringify(settings));
-        // eslint-disable-next-line no-console
+
         console.log('[Preview Mock] setPluginSetting:', pluginId, settings);
       } catch (e) {
         console.warn('[Preview Mock] setPluginSetting error:', e);
@@ -295,7 +274,6 @@ export function createMockElectron(mockHandlers = {}) {
     shell: createMockShell(),
     clipboard: createMockClipboard(),
     openLink: async (url) => {
-      // eslint-disable-next-line no-console
       console.log('[Preview Mock] openLink:', url);
       window.open(url, '_blank');
     },
@@ -322,7 +300,6 @@ export function createMockTs() {
     logger: createMockLogger(),
     net: {
       request: async (url, options) => {
-        // eslint-disable-next-line no-console
         console.log('[Preview Mock] net.request:', url, options);
         try {
           const response = await fetch(url, options);
@@ -353,13 +330,13 @@ export function initPreviewMock(mockHandlers = {}) {
   if (!window.electron) {
     window.electron = createMockElectron(mockHandlers);
     activeMockIpc = window.electron.useIpc();
-    // eslint-disable-next-line no-console
+
     console.log('[Preview Mock] window.electron injected');
   }
 
   if (!window.ts) {
     window.ts = createMockTs();
-    // eslint-disable-next-line no-console
+
     console.log('[Preview Mock] window.ts injected');
   }
 }

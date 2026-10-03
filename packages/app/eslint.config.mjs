@@ -44,4 +44,11 @@ export default [
       'import-x/extensions': 'off',
     },
   },
+  {
+    // preload 运行在宿主日志桥建立之前的隔离上下文，console 是唯一的诊断通道
+    files: ['src/preload/**/*.js'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ];

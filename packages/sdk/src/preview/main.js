@@ -248,7 +248,6 @@ export async function startPreview(pluginComponent, options = {}) {
 
   app.mount(`#${mountId}`);
 
-  // eslint-disable-next-line no-console
   console.log('[Preview] 插件预览模式已启动');
 
   return app;

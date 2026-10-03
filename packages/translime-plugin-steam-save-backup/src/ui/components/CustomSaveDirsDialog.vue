@@ -54,44 +54,86 @@
         已添加的自定义目录
       </div>
 
+      <!-- 单一列表：条目与移除确认同为列表项，相邻项自动收窄圆角；
+           常规模式下条目正文可自由排版，删除按钮与确认按钮直接放在项内 -->
       <!-- 列表末尾按钮的形变层会向下溢出几像素，末尾留白避免滚动区出现细微滚动条 -->
       <mat-list
-        interaction="multi-action"
+        interaction="none"
         style="padding-bottom: 8px"
       >
-        <mat-list-item
+        <template
           v-for="entry in customDirs"
           :key="`${entry.gameName}:${entry.dir}`"
         >
-          <span style="word-break: break-all">
-            {{ entry.gameName }}
-          </span>
-
-          <template #supporting>
-            <span style="word-break: break-all; color: var(--mat-sys-color-on-surface-variant); font-size: .75rem">
-              {{ entry.dir }}
+          <mat-list-item>
+            <span style="word-break: break-all">
+              {{ entry.gameName }}
             </span>
-          </template>
 
-          <template #trailing>
-            <mat-tooltip
-              content="移除该目录"
-              location="top"
-            >
-              <template #activator>
-                <mat-btn
-                  icon="delete"
-                  variant="standard"
-                  color="error"
-                  size="small"
-                  :loading="removingKey === `${entry.gameName}:${entry.dir}`"
-                  :aria-label="`移除目录 ${entry.dir}`"
-                  @click="removeDir(entry)"
-                />
-              </template>
-            </mat-tooltip>
-          </template>
-        </mat-list-item>
+            <template #supporting>
+              <span style="word-break: break-all; color: var(--mat-sys-color-on-surface-variant); font-size: .75rem">
+                {{ entry.dir }}
+              </span>
+            </template>
+
+            <template #trailing>
+              <mat-tooltip
+                content="移除该目录"
+                location="top"
+              >
+                <template #activator>
+                  <mat-btn
+                    icon="delete"
+                    variant="standard"
+                    color="error"
+                    size="small"
+                    :disabled="removingKey !== null"
+                    :aria-label="`移除目录 ${entry.dir}`"
+                    @click="startRemove(entry)"
+                  />
+                </template>
+              </mat-tooltip>
+            </template>
+          </mat-list-item>
+
+          <!-- 移除确认项：可选清理本地备份与远端备份（远端写删除标记） -->
+          <mat-list-item
+            v-if="removingKey === removeKeyOf(entry)"
+            data-remove-panel
+          >
+            <div style="font-weight: 500; color: var(--mat-sys-color-error)">
+              移除后不再自动备份该目录。
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 8px">
+              <mat-switch v-model="removeDeleteBackups">
+                删除本地备份
+              </mat-switch>
+              <mat-switch v-model="removeDeleteRemote">
+                同时删除远程存档
+              </mat-switch>
+            </div>
+            <div style="margin-top: 4px; font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
+              远端存档写入删除标记后，其他设备同步时自动跟随删除。
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px">
+              <mat-btn
+                variant="filled"
+                color="error"
+                :loading="removing"
+                @click="confirmRemove(entry)"
+              >
+                确认移除
+              </mat-btn>
+              <mat-btn
+                variant="text"
+                :disabled="removing"
+                @click="cancelRemove"
+              >
+                取消
+              </mat-btn>
+            </div>
+          </mat-list-item>
+        </template>
       </mat-list>
     </template>
 
@@ -122,6 +164,7 @@
 <script setup>
 import {
   computed,
+  nextTick,
   ref,
   watch,
 } from 'vue';
@@ -156,7 +199,6 @@ const gameName = ref('');
 const newDir = ref('');
 const formError = ref('');
 const adding = ref(false);
-const removingKey = ref('');
 const customDirs = ref([]);
 
 const canAdd = computed(() => Boolean(gameName.value.trim() && newDir.value) && !adding.value);
@@ -176,6 +218,8 @@ watch(visible, (open) => {
   if (open) {
     formError.value = '';
     loadCustomDirs();
+  } else {
+    removingKey.value = null;
   }
 });
 
@@ -220,25 +264,67 @@ const addDir = async () => {
   }
 };
 
-const removeDir = async (entry) => {
-  const key = `${entry.gameName}:${entry.dir}`;
+// ===== 移除确认流：点删除图标展开选项（删本地备份 / 删远程），确认后才执行 =====
+const removeKeyOf = (entry) => `${entry.gameName}:${entry.dir}`;
+const removingKey = ref(null);
+const removing = ref(false);
+const removeDeleteBackups = ref(false);
+const removeDeleteRemote = ref(false);
+
+const startRemove = async (entry) => {
+  formError.value = '';
+  const key = removeKeyOf(entry);
+  // 再次点击同一目录收起面板
+  if (removingKey.value === key) {
+    removingKey.value = null;
+    return;
+  }
+  removeDeleteBackups.value = false;
+  removeDeleteRemote.value = false;
   removingKey.value = key;
+  // 列表较长时确认面板可能展开在视口外：滚动到可见位置
+  await nextTick();
+  document.querySelector('[data-remove-panel]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+};
+
+const cancelRemove = () => {
+  removingKey.value = null;
+};
+
+const confirmRemove = async (entry) => {
+  removing.value = true;
   formError.value = '';
   try {
     const res = await ipc.invoke(`remove-custom-save-dir@${PLUGIN_ID}`, {
       gameName: entry.gameName,
       dir: entry.dir,
+      deleteBackups: removeDeleteBackups.value,
+      deleteRemote: removeDeleteRemote.value,
     });
     if (res.success) {
       customDirs.value = res.customDirs || [];
+      removingKey.value = null;
       emit('changed');
+      const messages = [];
+      if (res.removedBackups > 0) {
+        messages.push(`已删除 ${res.removedBackups} 份本地备份`);
+      }
+      if (res.remoteDeleted) {
+        messages.push('远端备份已写入删除标记');
+      }
+      if (Array.isArray(res.warnings) && res.warnings.length > 0) {
+        formError.value = messages.concat(res.warnings).join('；');
+      } else if (messages.length > 0) {
+        formError.value = '';
+        logger.info(messages.join('；'));
+      }
     } else {
       formError.value = res.message || '移除失败';
     }
   } catch (err) {
     formError.value = err.message || '移除失败';
   } finally {
-    removingKey.value = '';
+    removing.value = false;
   }
 };
 </script>

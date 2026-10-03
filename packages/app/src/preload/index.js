@@ -21,6 +21,14 @@ const ipcWhiteList = {
 
 const callbackCache = [];
 
+// 开发环境在 devtools 打印所有 renderer → main 的 IPC（公共出口，覆盖主窗口/插件 webview/插件窗口）
+const isDev = process.env.NODE_ENV === 'development';
+const logIpc = (action, channel, payload) => {
+  if (isDev) {
+    console.log(`[ipc] ${action}`, channel, payload);
+  }
+};
+
 const detachCallbacks = (type) => {
   for (let index = callbackCache.length - 1; index >= 0; index -= 1) {
     if (callbackCache[index].type === type) {
@@ -36,6 +44,7 @@ const api = {
   versions: process.versions,
   ipcRenderer: {
     send: (channel, data) => {
+      logIpc('send', channel, data);
       // whitelist channels
       const validChannels = ipcWhiteList.send;
       if (validChannels.includes(channel)) {
@@ -54,6 +63,7 @@ const api = {
       }
     },
     invoke: async (channel, ...data) => {
+      logIpc('invoke', channel, data);
       const validChannels = ipcWhiteList.invoke;
       if (validChannels.includes(channel)) {
         const result = await ipcRenderer.invoke(channel, ...data);

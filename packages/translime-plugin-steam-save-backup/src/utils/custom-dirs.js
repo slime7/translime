@@ -1,5 +1,8 @@
 import path from 'node:path';
+import { useLogger } from 'translime-sdk';
 import { readdir } from './fs-wrapper';
+
+const logger = useLogger();
 
 // 手动添加的自定义目录递归枚举上限，防止把整个盘符当成存档目录
 const MAX_CUSTOM_DIR_FILES = 1000;
@@ -27,7 +30,7 @@ export const listDirFiles = async (dir, options = {}) => {
     try {
       entries = await readdir(current, { withFileTypes: true });
     } catch (e) {
-      console.warn(`读取目录失败，跳过: ${current}`, e);
+      logger.warn(`读取目录失败，跳过: ${current}`, e);
       return;
     }
 

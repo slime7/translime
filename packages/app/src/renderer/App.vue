@@ -121,6 +121,17 @@ const onUpdatePlugins = () => {
 const offUpdatePlugins = () => {
   ipc.detach(ipcType.PLUGINS_CHANGED);
 };
+const onTitleBarActionsChanged = () => {
+  // 插件动态声明的顶栏按钮变化：全量映射按插件合并进插件列表，按钮区组件即时反映
+  ipc.on(ipcType.TITLE_BAR_ACTIONS_CHANGED, (itemsByPlugin) => {
+    Object.entries(itemsByPlugin || {}).forEach(([packageName, items]) => {
+      store.updatePlugin(packageName, { titleBarItems: items || [] });
+    });
+  });
+};
+const offTitleBarActionsChanged = () => {
+  ipc.detach(ipcType.TITLE_BAR_ACTIONS_CHANGED);
+};
 const onDeepLink = () => {
   ipc.on(ipcType.DEEP_LINK_OPEN, (params) => {
     if (params.install?.startsWith('translime-plugin-')) {
@@ -162,6 +173,7 @@ onMounted(async () => {
 
   getPlugins();
   onUpdatePlugins();
+  onTitleBarActionsChanged();
   onShowSettingPanel();
   onDeepLink();
   onIpcToast();
@@ -170,6 +182,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   offUpdatePlugins();
+  offTitleBarActionsChanged();
   offShowSettingPanel();
   offDeepLink();
   offIpcToast();

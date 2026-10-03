@@ -1,7 +1,7 @@
 {
   "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
   "name": "translime-plugin-steam-save-backup",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Steam 游戏存档备份与还原插件",
   "license": "MIT",
   "repository": {
@@ -59,7 +59,8 @@
     "description": "备份和还原 Steam 游戏存档",
     "icon": "src/icon.svg",
     "activationEvents": [
-      "onView"
+      "onView",
+      "onAppReady"
     ],
     "dependencies": [],
     "optionalDependencies": [],

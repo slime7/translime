@@ -72,6 +72,9 @@ flowchart LR
 - `core/ipcHandler.js`：注册宿主与插件的 IPC handler，提供插件激活入口。
 - `core/Ipc.js`：IPC 基础封装。
 - `core/pluginInterop.js`：已激活插件之间的 API 共享。
+- `core/titleBarRegistry.js`：插件顶栏按钮区注册表（SDK `setTitleBarActions` 动态声明），
+  保留点击函数、序列化描述随 `get-plugins` 下发，变更经 `title-bar-actions-changed` 推送，
+  点击经 `run-title-bar-action` 回传分发；插件停用/重启时随运行期注册一并清除。
 - `core/autoUpdate.js`：基于 electron-updater 的自动更新。
 - `core/deepLink.js`：`translime://` 深链注册与分发。
 - `core/netHandler.js`：暴露给 `window.ts.net` 的网络请求层。
@@ -84,6 +87,7 @@ flowchart LR
 - 插件兼容层（`plugins/vuetify.js` + `plugins/vuetifyCompat.js`）：Vuetify 4 仍随宿主初始化，并向所有加载宿主页面的文档（主窗口、插件窗口、内嵌 webview）提供 `window.vuetify$`（components/labs/directives）；`hooks/useTheme.js` 通过 `mdColorHelper`（@material/material-color-utilities）把配色写入 Vuetify theme，保证插件 UI 与宿主配色一致。
 - `plugins/matUi.js` 同时向插件提供 mde-vue 运行时 `window.mde$`（components/directives/functions/theme，functions 为 `snackbar()`/`dialog()`/`confirm()` 等命令式函数，与 `window.vuetify$` 对称），SDK 会把插件源码中的 `mat-*` / `mde-*` 组件引用注入为对该对象的解构；宿主与 SDK preview 均通过 `createMatUi` 全局注册 `mat-*` 组件与 `v-intersection`、`v-state-layer` 指令。
 - `views/plugins/`：插件列表、插件页与设置面板；`PluginRender.vue` 负责在 app renderer 中加载内嵌插件 UI，`EmbeddedPluginWebviews.vue` 负责在 `<webview>` 中加载插件 UI。
+- `views/Layout/components/PluginTitleBar.vue`：插件页顶栏（标题菜单 + inspect）；其旁的 `PluginTitleBarActions.vue` 渲染插件动态声明的顶栏按钮区（数据为 `get-plugins` 下发、`title-bar-actions-changed` 增量合并进 globalStore 的 `titleBarItems`，点击回传 `run-title-bar-action`）。
 - `utils/pluginStyleIsolation.js`：监听动态 `style`/`link` 节点，为内嵌插件样式保留插件 layer 并包裹 `@scope (.plugin-ui-loader[data-plugin-id="插件ID"])`；对 `:root`、`:host`、`html`、`body` 根级规则提供 `:scope` 兼容转换。
 - `components/JsonTree.vue`：日志详情的懒加载 JSON 树（替代 Vuetify labs 的 v-treeview）。
 - `PluginWindow.vue` 与 `views/Layout/PluginWindow.vue`：独立 BrowserWindow 形态的插件窗口。
@@ -96,7 +100,7 @@ flowchart LR
 
 ### SDK（packages/sdk）
 
-- `src/index.js` 与 `src/index.d.ts`：运行时 API 与类型（主进程、渲染进程、通用三组）；`useIpc(pluginId)` 为事件名自动补全 `@插件ID` 后缀，`defineIpcHandlers()` 在激活前校验 `ipcHandlers` 导出结构。
+- `src/index.js` 与 `src/index.d.ts`：运行时 API 与类型（主进程、渲染进程、通用三组）；`useIpc(pluginId)` 为事件名自动补全 `@插件ID` 后缀，`defineIpcHandlers()` 在激活前校验 `ipcHandlers` 导出结构，`setTitleBarActions()` 声明插件顶栏按钮区（宿主过旧时静默降级返回 false）。
 - `src/vite-plugin.js`：`translimeSdk()` Vite 插件与 `createPluginCssIsolationPlugins()` CSS 提取、注入和去重封装；插件选择器作用域由宿主 app 运行时完成。preview 模式支持 `previewIpcMocks` 声明式 IPC mock。
 - `src/preview/` 与 `src/preview-mock.js`：浏览器 preview 模式 shell 与 mock 实现。
 - `src/electronNetAdapter.js`：基于 `window.ts.net` 的 axios adapter。

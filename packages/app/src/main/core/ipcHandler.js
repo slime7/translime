@@ -36,6 +36,7 @@ import netHandler from './netHandler';
 import autoUpdate from './autoUpdate';
 import buildTextEditMenu from './textEditMenu';
 import { dispatchMenuAction } from './menuRegistry';
+import titleBarRegistry from './titleBarRegistry';
 import { getIpcSender } from './ipcContext';
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -352,7 +353,17 @@ const ipcHandler = {
   async [ipcType.GET_PLUGINS](packageName) {
     return withPluginLoader(async (loader) => {
       const plugins = packageName ? await loader.getPlugin(packageName) : await loader.getPlugins();
-      return JSON.parse(JSON.stringify(plugins));
+      const serialized = JSON.parse(JSON.stringify(plugins));
+      // 插件动态声明的顶栏按钮描述随插件列表下发，渲染端首屏即可渲染按钮区
+      const itemsByPlugin = titleBarRegistry.getSerializableActions();
+      (Array.isArray(serialized) ? serialized : [serialized]).forEach((plugin) => {
+        const items = itemsByPlugin[plugin.packageName];
+        if (items?.length) {
+          // eslint-disable-next-line no-param-reassign
+          plugin.titleBarItems = items;
+        }
+      });
+      return serialized;
     });
   },
   async [ipcType.INSTALL_PLUGIN](packageString) {
@@ -462,6 +473,12 @@ const ipcHandler = {
   },
   [ipcType.PLUGIN_CONTEXT_MENU_ACTION]({ menuId, itemId } = {}) {
     return dispatchMenuAction(menuId, itemId);
+  },
+  [ipcType.RUN_TITLE_BAR_ACTION]({ packageName, id } = {}) {
+    return titleBarRegistry.runTitleBarAction(
+      String(packageName || ''),
+      String(id || ''),
+    );
   },
   [ipcType.DIALOG_SHOW_OPEN_DIALOG](winOrOptions, options) {
     if (winOrOptions && typeof winOrOptions === 'string') {
