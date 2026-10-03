@@ -64,14 +64,14 @@
   "version": "1.0.0",
   "main": "./dist/index.cjs.js", // 插件后端逻辑入口
   "engines": {
-    "translime": ">=0.7.0" // 要求的宿主版本（semver 范围）；缺省视为兼容任意版本。UI 使用 mde-vue 时需 >=0.7.0
+    "translime": ">=0.7.0" // 要求的宿主版本（semver 范围）；未声明时默认兼容任意版本。UI 使用 mde-vue 时需 >=0.7.0
   },
   "plugin": {
     "title": "插件标题",
     "description": "插件的功能描述",
     "icon": "src/icon.svg",      // 插件图标路径（相对于插件根目录）
     "ui": "dist/ui.esm.js",       // 插件前端 UI 入口（如果包含 UI）
-    "activationEvents": ["onView"], // 激活时机，缺省时默认 onStartup
+    "activationEvents": ["onView"], // 激活时机，未声明时默认为 onStartup
     "dependencies": ["translime-plugin-foo"], // 硬依赖
     "optionalDependencies": ["translime-plugin-bar"], // 可选依赖
     "isolated": false,           // (可选) true 时主进程代码运行在独立 utilityProcess 中

@@ -222,8 +222,8 @@ const activateStartupPlugins = (loader) => {
  * @param {object} loader - `PluginLoader` 实例。
  * @param {object} [options={}] - 扫描选项。
  * @param {boolean} [options.activate=true] - 是否在扫描后立即激活 `onStartup` 插件。
- * 启动编排会把发现阶段提前到与渲染首屏并行执行，此时只做扫描，
- * 插件代码的执行仍等待 `main-renderer-ready` 后由 `activateStartupPlugins` 收尾。
+ * 与渲染首屏并行执行目录扫描与清单解析；
+ * `onStartup` 插件由 `activateStartupPlugins` 在主窗口首屏就绪后激活。
  * @returns {Array<object>} 扫描后的插件列表。
  */
 const resolvePlugins = (loader, { activate = true } = {}) => {

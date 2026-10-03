@@ -18,7 +18,7 @@ const machineSuffix = (machineId) => String(machineId || '').slice(0, 8) || 'loc
 
 // 远端一份备份 = <gameId>/<时间戳>/ 目录下的 data.zip（不含 info.json）与 info.json：
 // 元数据外置后对账只需拉取各备份的 info.json，不解包即可比对摘要。
-// 数据包先传（.part → moveto 原子可见），info.json 收尾写入：存在 info.json 即完整（研究方案 §4.1）
+// 数据包先传（.part → moveto 原子可见），info.json 收尾写入；完整备份以包含 info.json 为准
 const uploadBackup = async (exec, localDir, remoteDir, tempDir) => {
   const tempZip = path.join(tempDir, `${path.basename(remoteDir)}.uploading`);
   await createArchive(localDir, tempZip, { excludeInfo: true });
@@ -52,7 +52,7 @@ const downloadBackup = async (exec, remoteDir, localDir, tempDir) => {
   }
 };
 
-// 散文件目录形态备份的下载（远端存在未打包备份时用于自动迁移与冲突处理；取回后重新打包上传）
+// 下载散文件目录形态的远端备份
 const downloadDir = async (exec, remoteDir, localDir) => {
   const dataResult = await exec(['copy', remoteDir, localDir, '--exclude', 'info.json']);
   if (dataResult.code !== 0) {
@@ -130,15 +130,11 @@ const readConflictMeta = async (infoPath) => {
 };
 
 /**
- * 执行一次全量对账（docs/auto-sync-research.md §4.2）：
- * 拉取远端全部 info.json 构成远端清单 → 与本地清单比对 → 逐备份上传/下载。
- * - 远端一份备份 = `<gameId>/<时间戳>/` 目录下的 data.zip（不含 info.json）与
- *   info.json；本地保持目录形态不变。对账只需暂存 info.json（每份几 KB），
- *   数据包仅在真正需要下载时传输。
- * - 同名备份摘要不一致（内容分叉）不自动合并：记入报告的 conflicts 并排除在
- *   自动动作之外，由用户通过 resolveConflict 选择“覆盖本地 / 覆盖远程 / 保留两份”。
- * - 散文件目录形态（data_N）的远端备份自动迁移为数据包：需要时先取回本地，
- *   打包上传后清理散文件数据目录；与本地内容分叉的散文件目录同样走冲突确认。
+ * 执行全量对账：
+ * 拉取远端全部 info.json 构成远端清单，与本地比对后执行上传与下载。
+ * - 远端备份由 data.zip 与独立 info.json 组成，本地保持目录形态不变；仅在需要下载时传输数据包。
+ * - 同名备份摘要不一致时记录为冲突，由用户选择覆盖本地、覆盖远程或保留两份。
+ * - 远端散文件备份（data_N）在对账时自动迁移为数据包，内容分叉同样走冲突确认。
  *
  * @param {object} options
  * @param {(args: string[], options?: {timeoutMs?: number}) => Promise<{code: number, stdout: string, stderr: string}>} options.exec rclone 执行器
@@ -146,7 +142,7 @@ const readConflictMeta = async (infoPath) => {
  * @param {string} options.backupRoot 本地备份根目录
  * @param {() => boolean} [options.isCancelled] 取消检查
  * @param {(progress: object) => void} [options.onProgress] 进度回调
- * @param {string} [options.stageDir] 远端元数据暂存目录（测试注入用，缺省临时目录）
+ * @param {string} [options.stageDir] 远端元数据暂存目录（测试注入用，默认使用临时目录）
  */
 export const runSync = async ({
   exec,
@@ -346,7 +342,7 @@ const purgeStaleChildren = async (exec, remoteDir) => {
  * @param {string} options.mode 'overwrite-local' | 'overwrite-remote' | 'keep-both'
  * @param {string} options.machineId 本机标识（keep-both 改名后缀）
  * @param {string} [options.remoteKind] 远端条目形态 'zip'（数据包）| 'dir'（散文件目录）
- * @param {string[]} [options.existingNames] 远端已存在的条目名（缺省时自动列举）
+ * @param {string[]} [options.existingNames] 远端已存在的条目名（未指定时自动列举）
  */
 export const resolveConflict = async ({
   exec,

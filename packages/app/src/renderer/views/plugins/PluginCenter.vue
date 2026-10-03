@@ -558,8 +558,7 @@ watch(() => route.query.t, () => {
 });
 let firstActivation = true;
 onActivated(() => {
-  // 启动时的插件列表拉取由 App.vue 负责，这里只处理切回页面时的刷新，
-  // 避免与首屏拉取重复请求
+  // 切回插件中心页面时刷新插件列表
   if (firstActivation) {
     firstActivation = false;
   } else {

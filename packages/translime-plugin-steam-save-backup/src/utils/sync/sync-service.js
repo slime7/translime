@@ -10,9 +10,8 @@ const emptyProbe = () => ({
 });
 
 /**
- * 同步功能编排层：配置读写、持久状态（machineId / 待上传游戏 / 上次报告）、
- * rclone 探测与串行队列的组合。远程端是单一可靠源（docs/auto-sync-research.md §4）。
- * 同步不自动运行：仅在用户手动触发（或处理冲突后补跑一次对账）。
+ * 同步功能编排层：配置管理、持久状态维护、rclone 探测与串行队列调度。
+ * 同步仅由用户手动触发，或在处理冲突后自动补跑对账。
  *
  * @param {object} options
  * @param {string} options.pluginId 插件 ID

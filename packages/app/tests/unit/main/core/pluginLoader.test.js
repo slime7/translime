@@ -202,7 +202,7 @@ describe('pluginLoader', () => {
 
   describe('scanPlugins', () => {
     it('扫描阶段只做发现不激活 onStartup 插件，激活由 activateStartupPlugins 收尾', () => {
-      // 启动编排把发现阶段提前到与渲染首屏并行执行，此时不允许执行插件代码
+      // 扫描阶段仅发现插件，不执行插件代码
       mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
         dependencies: {
           'translime-plugin-scan-test': '1.0.0',

@@ -74,8 +74,7 @@ describe('globalStore', () => {
 
   describe('setEmbeddedPluginWebview', () => {
     it('首次激活（loadTime 0→非 0）不更换 cacheKey，只有插件重启时才重建 webview', () => {
-      // 启动期激活收尾会推送插件列表刷新，若此时更换 cacheKey，
-      // 加载中的插件 webview 会被销毁重建，插件 UI 状态丢失
+      // 首次激活不更换 cacheKey，避免刷新导致加载中的插件 UI 重载
       const store = useGlobalStore();
 
       store.setEmbeddedPluginWebview('translime-plugin-a', { src: 'app://a', loadTime: 0 });

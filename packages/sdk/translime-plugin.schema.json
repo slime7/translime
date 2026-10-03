@@ -47,7 +47,7 @@
       "properties": {
         "translime": {
           "type": "string",
-          "description": "兼容的宿主版本 semver 范围（如 '>=0.6.0'）；缺省视为兼容任意版本，声明后由宿主校验，不满足时插件进入 incompatible 状态"
+          "description": "兼容的宿主版本 semver 范围（如 '>=0.6.0'）；默认视为兼容任意版本，声明后由宿主校验，不满足时插件进入 incompatible 状态"
         }
       }
     },
@@ -100,7 +100,7 @@
               }
             ]
           },
-          "description": "激活时机数组，缺省等价于 [\"onStartup\"]；带 UI 的工具型插件优先使用 onView"
+          "description": "激活时机数组，默认等价于 [\"onStartup\"]；带 UI 的工具型插件优先使用 onView"
         },
         "dependencies": {
           "type": "array",

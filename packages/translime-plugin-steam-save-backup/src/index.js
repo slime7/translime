@@ -718,16 +718,14 @@ export const ipcHandlers = [
           && /logon is invalid|bad username|authentication/i.test(connection.error)) {
           const remoteConfig = await getRemoteConfig(exec, name).catch(() => null);
           if (remoteConfig && String(remoteConfig.user || '').includes('@') && !remoteConfig.domain) {
-            // 手机客户端在发现阶段会自动带入服务器机器名作为域；rclone 不拆分 user@domain，
-            // 空域 + UPN 用户名在 Windows 目标上按本地账户名匹配必然失败，这里补上同等自动化
+            // rclone 不拆分 user@domain；用户名含 @ 且未指定域时，获取目标 NetBIOS 机器名作为域重试认证
             const machineName = await discoverSmbHostName(String(remoteConfig.host || ''));
             if (machineName) {
               const updateResult = await exec(['config', 'update', name, `domain=${machineName}`, '--obscure']);
               if (updateResult.code === 0) {
                 const retry = await checkRemoteConnection(exec, target);
                 if (retry.ok) {
-                  // 域必须落盘，否则同步时仍用旧配置，「测试成功、同步失败」；
-                  // domain 一并返回给 UI 回填表单输入框，让自动发现对用户可见
+                  // 发现的域写入配置，并返回给渲染端回填输入框
                   return {
                     success: true,
                     connection: {

@@ -13,7 +13,7 @@ import waitForCriticalFonts from './utils/fonts';
 
 installPluginStyleIsolation();
 
-// 与渲染进程启动并行预载首屏图标字体，缩短 main-renderer-ready 前的等待
+// 渲染进程启动时预载首屏图标字体
 waitForCriticalFonts();
 
 const pinia = createPinia();

@@ -21,14 +21,14 @@
 | `icon` | 图标路径（可选），相对插件根目录 |
 | `ui` | UI 入口（如 `dist/ui.esm.js`），宿主以 webview 内嵌加载 |
 | `windowUrl` | 独立窗口模式 HTML 入口（可选）；`windowUrl.dev` 覆盖开发模式地址 |
-| `activationEvents` | 激活时机数组，缺省等价于 `["onStartup"]` |
+| `activationEvents` | 激活时机数组，默认等价于 `["onStartup"]` |
 | `dependencies` | 硬依赖插件列表，启用前必须满足 |
 | `optionalDependencies` | 可选依赖插件列表，仅用于能力发现 |
 | `isolated` | 隔离运行开关（可选）：`true` 时主进程代码运行在独立 utilityProcess 中，详见下方“隔离运行模式” |
 | `contributes.commands` | 静态命令声明：`{ id, title }` |
 
 宿主版本兼容在 package.json 顶层 `engines.translime` 声明（semver 范围，如 `">=0.6.0"`）。
-**缺省视为兼容**——旧插件无需声明即可继续运行；声明后由宿主在加载时校验，不满足时插件进入
+**默认视为兼容**——旧插件无需声明即可继续运行；声明后由宿主在加载时校验，不满足时插件进入
 `incompatible` 状态并保持停用。解析阶段收集的 `manifestWarnings`（无法识别的激活事件、缺少 id
 的命令、非法 engines 范围等）会随插件对象返回，由插件卡片展示。
 
@@ -73,13 +73,13 @@ stateDiagram-v2
 
 | 事件 | 触发时机 |
 | --- | --- |
-| `onStartup` | 主窗口首屏就绪后、窗口展示前激活（旧插件缺省行为） |
+| `onStartup` | 主窗口首屏就绪后、窗口展示前激活（默认行为） |
 | `onAppReady` | 主窗口稳定后异步激活，适合后台逻辑 |
 | `onView` | 打开插件页面或插件窗口前激活 |
 | `onCommand:<commandId>` | 执行对应静态命令前激活 |
 | `onIpc:<ipcType>` | 第一次收到对应 IPC 调用前激活 |
 
-建议：带 UI 的工具型插件优先使用 `onView`；需要驻留后台的插件才使用 `onStartup` / `onAppReady`；不要把昂贵初始化默认放在 `onStartup`（启动激活完成前主窗口不会展示，会拉长启动动画）。
+建议：带 UI 的工具型插件优先使用 `onView`；需要驻留后台的插件使用 `onStartup` / `onAppReady`；避免在 `onStartup` 执行耗时初始化，以免延长主窗口启动展示时间。
 
 ## 命名与序列化约定
 
@@ -147,8 +147,8 @@ manifest 声明 `plugin.isolated: true` 时，插件主进程代码运行在独�
 ## 不变量
 
 - 插件 ID 全局唯一且等于包名。
-- 激活时机必须声明，不把重初始化堆到启动阶段；`engines.translime` 缺省兼容，声明即校验。
-- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 mde-vue。插件 UI 可基于 Vuetify 4（兼容存量，宿主提供 `window.vuetify$` 运行时与 `--v-theme-*` 主题变量），也可基于 mde-vue（宿主提供 `window.mde$` 运行时：components/directives/functions/theme，functions 为 snackbar/dialog/confirm 等命令式函数，需 `engines.translime >= 0.7.0`）；两组运行时均由宿主提供，插件不打包组件库。
+- 激活时机必须声明，不把重初始化堆到启动阶段；`engines.translime` 默认兼容，声明即校验。
+- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 mde-vue。插件 UI 支持 Vuetify 4（宿主提供 `window.vuetify$` 运行时与 `--v-theme-*` 主题变量）或 mde-vue（宿主提供 `window.mde$` 运行时：components/directives/functions/theme，需 `engines.translime >= 0.7.0`）；运行时均由宿主提供，插件不打包组件库。
 - 宿主页面带 CSP 基线（禁远程脚本，`script-src 'self' 'unsafe-eval' blob:`），后续目标是移除 `unsafe-eval`。
 - `main-renderer-ready` 只允许主窗口首屏（含首屏关键字体）就绪后触发，插件渲染页不得重复触发；宿主收到该事件后先完成 `onStartup` 激活再展示主窗口，启动动画持续到内容就绪。
 - 真实宿主是主要验证环境，preview 模式不替代宿主内验证。

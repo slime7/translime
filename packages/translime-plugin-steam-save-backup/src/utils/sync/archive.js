@@ -5,10 +5,8 @@ import AdmZip from 'adm-zip';
 const INFO_ENTRY = 'info.json';
 
 /**
- * 将备份目录打包为 zip。
- * 备份数量多的游戏逐文件同步会在 SMB / 云盘上付出大量往返延迟，
- * 打包后每次备份只传输单个文件；本地备份保持目录形态不变。
- * `excludeInfo` 用于远端数据包：info.json 与数据包分开存放，便于不解包直接读取元数据。
+ * 将备份目录打包为 zip，本地备份保持目录形态不变。
+ * `excludeInfo` 用于分离 info.json，支持直接读取元数据。
  */
 export const createArchive = async (dir, zipPath, { excludeInfo = false } = {}) => {
   const zip = new AdmZip();
@@ -32,8 +30,7 @@ export const createArchive = async (dir, zipPath, { excludeInfo = false } = {}) 
 };
 
 /**
- * 解压备份 zip 到目标目录；info.json 最后写入——
- * 与目录格式一致，缺 info.json 的目录即传输中断残留，下次对账自动修复。
+ * 解压备份 zip 到目标目录，info.json 独立写入；缺 info.json 视为传输未完成状态。
  */
 export const extractArchive = async (zipPath, destDir) => {
   const zip = new AdmZip(zipPath);

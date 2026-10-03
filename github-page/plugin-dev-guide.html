@@ -160,7 +160,7 @@
       <tr><th>约定</th><th>说明</th></tr>
       <tr><td>包名</td><td>必须以 <code>translime-plugin-</code> 开头，小写字母、数字、连字符</td></tr>
       <tr><td>激活时机</td><td><code>plugin.activationEvents</code>：带 UI 的工具插件建议 <code>onView</code>，后台插件才用 <code>onStartup</code> / <code>onAppReady</code></td></tr>
-      <tr><td>宿主兼容</td><td><code>engines.translime</code>（semver），缺省视为兼容</td></tr>
+      <tr><td>宿主兼容</td><td><code>engines.translime</code>（semver），默认视为兼容</td></tr>
       <tr><td>IPC 命名</td><td><code>事件名@插件ID</code>，例如 <code>ipc.invoke('get-data@translime-plugin-demo')</code></td></tr>
       <tr><td>样式隔离</td><td>使用 SDK 的 <code>createPluginCssIsolationPlugins(pluginId)</code>，宿主运行时自动加 <code>@scope</code> 与 layer</td></tr>
       <tr><td>图标</td><td>Material Design Icons（md）风格，禁止 <code>mdi-</code> 前缀</td></tr>

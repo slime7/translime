@@ -4,7 +4,7 @@
 
 仓库是 pnpm workspace 单仓：`packages/app`（宿主应用，0.6.x）、`packages/sdk`（插件 SDK，1.0.x）与若干 `translime-plugin-*` 插件包。宿主基于 Electron，插件系统采用"描述符扫描 + 按触发激活"模型：启动时只解析 manifest 并构建依赖图，插件在其声明的激活事件（`onStartup`、`onView`、`onCommand`、`onIpc` 等）触发时才执行入口代码。插件 UI 默认运行在隔离的 `<webview>` 或独立 BrowserWindow 中；内嵌渲染路径由宿主 app 使用 `@scope` 与 CSS layer 限制插件样式的选择器作用域。
 
-插件主进程代码默认与宿主同进程运行，可通过 `plugin.isolated: true` 声明进入隔离模式（utilityProcess）；manifest 可用 `engines.translime` 声明宿主版本兼容范围（缺省视为兼容）。IPC 通道带归属登记：插件不能抢占他人通道，跨插件调用仅对暴露 `libs` 的插件放行。
+插件主进程代码默认与宿主同进程运行，可通过 `plugin.isolated: true` 声明进入隔离模式（utilityProcess）；manifest 可用 `engines.translime` 声明宿主版本兼容范围（默认视为兼容）。IPC 通道带归属登记：插件不能抢占他人通道，跨插件调用仅对暴露 `libs` 的插件放行。
 
 ## 架构原则
 
@@ -109,7 +109,7 @@ flowchart LR
 
 ## 关键数据流
 
-1. 插件发现：应用就绪后扫描 `userData/plugins`（发布插件）与 `userData/plugins_dev`（开发插件）下的 `node_modules`，与渲染进程首屏并行执行；读取各包 manifest，构建依赖图与激活索引，插件状态进入 `ready`。`onStartup` 插件的激活在主窗口首屏（含关键字体）就绪后、窗口展示前收尾，启动动画持续到内容就绪；晚于首屏拉取才完成的激活（典型是隔离插件的异步握手）由宿主推送 `plugins-changed` 让渲染端刷新。
+1. 插件发现：应用就绪后扫描 `userData/plugins`（发布插件）与 `userData/plugins_dev`（开发插件）下的 `node_modules`，与渲染进程首屏并行执行；读取各包 manifest，构建依赖图与激活索引，插件状态进入 `ready`。主窗口首屏（含关键字体）就绪后激活 `onStartup` 插件并展示主窗口，启动动画持续到内容就绪；异步激活（如隔离插件握手）在完成后由宿主推送 `plugins-changed` 通知渲染端刷新。
 2. 插件激活：激活事件触发后，宿主加载插件主进程入口（CJS，配合原生模块加载补丁），执行 `pluginDidLoad`，注册命令与 IPC handler，状态进入 `active`。
 3. IPC 调用：插件 UI 通过 `ipc.invoke('事件名@插件ID', ...)` 调用；宿主按插件 ID 路由到对应 `ipcHandlers`，handler 可拿到 `sendToClient` 主动推送；若插件尚未激活且声明了 `onIpc`，宿主先激活再路由。
 4. 插件 UI 加载：渲染进程请求 `load-plugin-ui`，`ui` 由 `PluginRender.vue` 在宿主 renderer 文档中动态加载（该路径可位于缓存的 webview 中），`windowUrl` 在独立窗口中加载；webview 实例在路由切换时缓存复用。

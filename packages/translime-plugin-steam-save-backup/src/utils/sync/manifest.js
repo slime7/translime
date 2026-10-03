@@ -18,8 +18,7 @@ export const canonicalStringify = (value) => {
 
 /**
  * 计算备份目录的内容摘要。
- * note 是本地元数据，不参与同步比对（docs/auto-sync-research.md §4.5），
- * 修改备注不得把同名备份误判为冲突。
+ * note 为本地元数据，不参与同步比对，修改备注不会引起冲突。
  */
 export const infoDigest = (info) => {
   const rest = { ...(info || {}) };
@@ -66,10 +65,9 @@ export const buildManifest = async (root) => {
 };
 
 /**
- * 对账计划（docs/auto-sync-research.md §4.2）：
- * - 本地独有 → uploads；远端独有 → downloads（不同时间戳目录的并集即多设备收敛，保持自动）
- * - 同名目录摘要不一致（同一备份在两端内容分叉）→ conflicts：
- *   不自动合并，交由用户选择“覆盖本地 / 覆盖远程 / 保留两份”（Steam Cloud 式冲突确认）
+ * 对账计划生成：
+ * - 本地独有 → uploads；远端独有 → downloads
+ * - 同名目录摘要不一致 → conflicts，由用户选择处理方式
  */
 
 // 改名目标名冲突时追加 -2、-3… 序号，避免覆盖既有备份目录

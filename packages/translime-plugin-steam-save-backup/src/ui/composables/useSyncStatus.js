@@ -112,9 +112,7 @@ export const stopSyncStatusPolling = () => {
 };
 
 /**
- * 每游戏的同步状态（docs/auto-sync-research.md §2 状态可见）：
- * 同步冲突（同名备份两端内容分叉，待用户处理）/
- * 同步中 / 待上传（本地新备份未推送）/ 已同步（出现在上次对账报告中）
+ * 每游戏的同步状态：同步冲突 / 同步中 / 待上传 / 已同步。
  */
 export const gameSyncState = (gameId) => {
   const current = status.value;

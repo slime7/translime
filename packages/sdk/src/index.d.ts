@@ -104,7 +104,7 @@ export interface PluginMenuEntry {
 }
 
 interface SettingMenuItemBase {
-  /** 配置存储键；缺省时取 name 的值 */
+  /** 配置存储键；未指定时默认取 name 的值 */
   key?: string;
   name: string;
   required?: boolean;

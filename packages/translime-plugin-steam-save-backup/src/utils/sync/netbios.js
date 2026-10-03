@@ -18,14 +18,12 @@ export const parseNetbiosName = (stdout) => {
 
 /**
  * 通过 nbtstat 查询 SMB 主机的 NetBIOS 机器名（仅 Windows，查询失败返回 null）。
- * 用途：邮箱（UPN）形式用户名的 NTLM 认证需要显式域名，机器名是本地登录的可用值。
  */
 export const discoverSmbHostName = async (host) => {
   if (process.platform !== 'win32' || !/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
     return null;
   }
-  // 绝对路径避免 PATH 差异；多网卡机器上 nbtstat 逐适配器查询可达十几秒，
-  // 超时过短会让自动补域被静默跳过
+  // 多网卡环境下 nbtstat 查询耗时较长，预留充足超时时间
   const nbtstat = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'nbtstat.exe');
   try {
     const stdout = await new Promise((resolve, reject) => {

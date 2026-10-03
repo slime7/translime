@@ -66,8 +66,8 @@ const toPluginTitle = (name) => String(name || '')
  *
  * @param {object} options - 替换参数。
  * @param {string} options.name - 插件包名。
- * @param {string} [options.title] - 展示标题，缺省由包名推导。
- * @param {string} [options.description] - 功能描述，缺省由标题推导。
+ * @param {string} [options.title] - 展示标题，默认由包名推导。
+ * @param {string} [options.description] - 功能描述，默认由标题推导。
  * @returns {Array<[string, string]>} 替换对数组。
  */
 const buildTemplateReplacements = ({ name, title, description }) => {
