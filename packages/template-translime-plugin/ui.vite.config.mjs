@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 // import tailwindcss from '@tailwindcss/vite';
-import vuetify from 'vite-plugin-vuetify';
 import {
   createPluginCssIsolationPlugins,
   translimeSdk,
@@ -23,9 +22,8 @@ export default defineConfig(({ mode }) => {
     }),
   ];
 
-  if (isPreview) {
-    plugins.push(vuetify());
-  } else {
+  // 非 preview 模式下添加 CSS 注入插件
+  if (!isPreview) {
     plugins.push(
       ...createPluginCssIsolationPlugins('translime-plugin-example'),
     );

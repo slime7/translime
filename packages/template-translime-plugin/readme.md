@@ -64,7 +64,7 @@
   "version": "1.0.0",
   "main": "./dist/index.cjs.js", // 插件后端逻辑入口
   "engines": {
-    "translime": ">=0.6.0" // 要求的宿主版本（semver 范围）；缺省视为兼容任意版本
+    "translime": ">=0.7.0" // 要求的宿主版本（semver 范围）；缺省视为兼容任意版本。UI 使用 mde-vue 时需 >=0.7.0
   },
   "plugin": {
     "title": "插件标题",
@@ -113,7 +113,7 @@
 
 ### 宿主版本兼容（engines.translime）
 
-- 在 `package.json` 的 `engines` 中声明 `translime` 字段（semver 范围），例如 `">=0.6.0"`。
+- 在 `package.json` 的 `engines` 中声明 `translime` 字段（semver 范围），例如 `">=0.7.0"`。
 - 宿主加载插件时会校验该范围；不满足时插件标记为 `incompatible` 并保持停用，不会执行入口代码。
 - 未声明（或声明为 `*`）视为兼容任意宿主版本，旧插件无需改动即可继续运行。
 
@@ -362,10 +362,11 @@ await executePluginCommand('translime-plugin-example.run', {
 #### 渲染进程 UI (src/ui/ui.vue)
 
 ```javascript
-import { useIpc, useVuetifyComponents } from 'translime-sdk';
+import { useIpc, useMatComponents } from 'translime-sdk';
 
 const ipc = useIpc();
-const { VBtn, VCard } = useVuetifyComponents();
+const { MatBtn, MatCard } = useMatComponents();
+// 模板中也可以直接写 mat-* 标签（如 <mat-btn />），SDK 编译期自动注入组件
 ```
 
 ### 核心 API

@@ -10,9 +10,9 @@
 
     <pre>{{ setting }}</pre>
 
-    <v-btn color="primary" @click="callTestIpc">
+    <mat-btn variant="filled" color="primary" @click="callTestIpc">
       call test-ipc
-    </v-btn>
+    </mat-btn>
   </div>
 </template>
 
