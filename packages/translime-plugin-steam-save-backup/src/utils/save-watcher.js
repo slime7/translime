@@ -6,7 +6,7 @@ import path from 'node:path';
  * - 每个目录一个 fs.watch(recursive) 监听，事件按目录防抖合并后回调
  * - 同步期间抑制回调（直通同步回写存档目录会再次触发事件），释放后的静默期内事件同样忽略；
  *   抑制期内发生过事件的目录在释放后补发一次，避免真实变更被静默丢弃
- * - pause/resume 供全屏游戏场景整体挂起：暂停期事件只记标记，恢复后统一补发一次
+ * - pause/resume 供宿主失焦期间整体挂起：暂停期事件只记标记，恢复后统一补发一次
  * - recursive 监听在 Windows / macOS 原生支持；个别平台不支持时监听失败走 onError，由外部降级
  */
 const createSaveWatcher = ({
@@ -114,7 +114,7 @@ const createSaveWatcher = ({
       });
     },
 
-    /** 全屏程序开始：全部目录挂起，防抖中的未决变更转入补发队列 */
+    /** 宿主失焦：全部目录挂起，防抖中的未决变更转入补发队列 */
     pause() {
       if (paused || closed) {
         return;
@@ -132,7 +132,7 @@ const createSaveWatcher = ({
       });
     },
 
-    /** 全屏退出：解除挂起，暂停期间发生过事件的目录在静默期后各补发一次。
+    /** 宿主回焦：解除挂起，暂停期间发生过事件的目录在静默期后各补发一次。
      *  正被同步抑制（beginSuppress）接管、或已被同步结束的目录不在恢复范围 */
     resume() {
       if (!paused) {

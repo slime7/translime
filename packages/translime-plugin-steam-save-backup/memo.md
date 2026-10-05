@@ -27,9 +27,10 @@ packages/translime-plugin-steam-save-backup/
 │   │   └── preview-mocks.mjs # preview 模式声明式 IPC mock
 │   └── utils/              # 逻辑与辅助工具 (Logic & Helpers)
 │       ├── backup.js       # 备份/还原核心逻辑
-│       ├── save-watcher.js # 存档目录文件监控（fs.watch recursive + 防抖合并 + 同步抑制窗口 + 全屏暂停）
+│       ├── save-watcher.js # 存档目录文件监控（fs.watch recursive + 防抖合并 + 同步抑制窗口 + 焦点暂停）
 │       ├── auto-backup.js  # 自动备份调度（防抖合并 + 每游戏冷却 + trailing 补跑）
-│       ├── fullscreen-watcher.js # 全屏程序检测（常驻 PowerShell，失败静默降级）
+│       ├── focus-watcher.js # 宿主窗口焦点监控（Electron 焦点事件驱动，跨平台）
+│       ├── focus-state.js  # 焦点状态防抖确认（纯逻辑）
 │       ├── custom-dirs.js  # 自定义存档目录枚举与去重
 │       ├── custom-dir-removal.js # 自定义目录移除的备份清理（本地删除+远端墓碑，可注入 IO）
 │       ├── fs-wrapper.js   # 文件系统命令封装
@@ -117,7 +118,7 @@ packages/translime-plugin-steam-save-backup/
     *   **删除传播（墓碑）**: 删除确认框提供「同时删除远程存档」开关（仅同步已启用时显示），文案标注游戏名与精确远端路径（远端目录名是 gameId + 时间戳，不便人工确认归属）；勾选后由本地删除动作携带执行 `engine.deleteRemoteBackup`——远端数据文件整体清理，但 info.json 保留并追加 `deleted / deletedAt / deletedBy` 标记（**墓碑**，参与摘要比对），并联动移除该目录的未处理冲突条目；远程删除失败不影响本地删除，以 warning 返回。对账时远端墓碑的语义：本地副本自动跟随删除（计入报告 `deletions` 并推送 `sync-notify` 通知）；本地备份的 `backupTime` 晚于 `deletedAt`（删除决定之后本机又重新备份过）→ 转**墓碑冲突**（`kind: 'tombstone'`），在同步设置中两选一：「恢复本备份」（以本地覆盖远端，墓碑被本地 info.json 覆盖，撤销删除）/「确认删除」（仅移除本地备份，墓碑保持）；本地没有该备份时不回补下载——已删备份不会在别的设备复活，也不允许仍持有它的端重新上传（`planSync` 对墓碑条目禁止 uploads/downloads）。墓碑永久保留（每份几 KB，不做 GC），防止后加入的设备复活备份。
     *   **完整性约定**: 上传先写 `data.zip.part` 再 `moveto` 改名（原子可见），info.json 收尾写入；下载先解包数据包、info.json 最后落盘——远端/本地目录缺 info.json 即传输中断残留，不进清单，下次对账自动补齐。`note` 备注是本地元数据，摘要比对时忽略。
     *   **引擎**: `rclone copy <target> <stage> --include /*/*/info.json` 一次拉取全部远端元数据（每份几 KB）构成清单（两端布局一致，同一 `buildManifest` 构建）；`rclone lsf <game> -R --files-only`（仅文件名，每游戏一次）识别数据包与散文件目录形态并收集散文件残留子目录；逐备份 `copyto <本地数据包> <dir>/data.zip.part` + `moveto` + `copyto info.json` 上传、`copyto <dir>/data.zip` + 解压 + `copyto info.json` 下载（`engine.uploadBackup` / `downloadBackup`）。目标支持 rclone remote（`mydrive:path`）与本地/UNC 路径（NAS、挂载盘）。
-    *   **触发**: 手动触发（游戏备份弹窗的「同步」按钮、同步设置对话框内的「立即同步」、冲突处理后的对账补跑）与**文件监控自动触发**并存：`save-watcher`（`fs.watch` recursive，每目录一个监听，事件按目录防抖合并）监控可见游戏的存档路径，变更经 `auto-backup` 调度（每游戏防抖 3s + 最小冷却 10 分钟，冷却期内变更合并为冷却结束后的 trailing 补跑，执行期间到达的变更在执行完成后按防抖补跑）自动执行 `backupSave` 并立即触发对账上传；直通条目目录的变更直接触发对账（对账运行中自动排队）。**全屏暂停**：`fullscreen-watcher`（仅 Windows）常驻一个 PowerShell 子进程按 1.5s 采样前台窗口是否铺满所在显示器（排除 translime 自身与桌面/任务栏外壳），连续 2 次采样一致才切换；检测到全屏程序即整体挂起监控（`saveWatcher.pause()`，事件只记标记），退出后恢复并按静默宽限补发一次（游戏结束后统一补一次备份/同步）。检测不到（非 Windows、PowerShell 缺失、进程反复崩溃）就静默停用该功能，监控行为与此前一致；独占全屏（D3D exclusive）识别覆盖不佳，无边框全屏可稳定识别。插件 manifest 声明 `onAppReady` 激活事件：随宿主启动后台预扫描建立监控集，自动备份/自动同步不依赖是否打开过插件页；`pluginWillUnload` 关闭全部监控、停止全屏检测并取消调度。同步由串行队列执行，同一时刻仅单次运行，进行中的再次触发自动排队；失败直接记录错误信息交由 UI 展示，不进行自动重试。自动备份完成与远端删除跟随应用经 `sync-notify@<id>` 推送 UI（UI 未打开时仅落状态）。
+    *   **触发**: 手动触发（游戏备份弹窗的「同步」按钮、同步设置对话框内的「立即同步」、冲突处理后的对账补跑）与**文件监控自动触发**并存：`save-watcher`（`fs.watch` recursive，每目录一个监听，事件按目录防抖合并）监控可见游戏的存档路径，变更经 `auto-backup` 调度（每游戏防抖 3s + 最小冷却 10 分钟，冷却期内变更合并为冷却结束后的 trailing 补跑，执行期间到达的变更在执行完成后按防抖补跑）自动执行 `backupSave` 并立即触发对账上传；直通条目目录的变更直接触发对账（对账运行中自动排队）。**焦点暂停**：`focus-watcher`（跨平台）监听宿主窗口焦点，任一宿主窗口持有焦点即维持监控，无焦点窗口（失焦/最小化/托盘/全部关闭）整体挂起监控（`saveWatcher.pause()`，事件只记标记），回到宿主后恢复并按静默宽限补发一次（游戏结束后统一补一次备份/同步）；焦点抖动（alt-tab 掠过）经 2s 防抖确认后才切换（`focus-state` 纯逻辑），启动即无焦点窗口（开机自启/托盘常驻）直接进入挂起。插件 manifest 声明 `onAppReady` 激活事件：随宿主启动后台预扫描建立监控集，自动备份/自动同步不依赖是否打开过插件页；`pluginWillUnload` 关闭全部监控、停止焦点监控并取消调度。同步由串行队列执行，同一时刻仅单次运行，进行中的再次触发自动排队；失败直接记录错误信息交由 UI 展示，不进行自动重试。自动备份完成与远端删除跟随应用经 `sync-notify@<id>` 推送 UI（UI 未打开时仅落状态）。
     *   **状态**: `sync-get-status` 返回 phase（running/idle）、pending、配置、rclone 探测结果、脏游戏列表、未处理冲突清单、上次报告与错误信息；UI 轮询驱动（运行期 1.5s，空闲自停），游戏卡片显示「同步冲突 / 同步中 / 待上传 / 已同步」chip。
     *   **远程管理**: 同步设置对话框内可创建、修改、删除远程，无需手动执行 `rclone config`。
         *   `sync-backend-types` 返回内置后端元数据（`src/utils/sync/rclone-config.js` 的 `BACKEND_TYPES`）：Google Drive / OneDrive / Dropbox 走 OAuth（`rclone authorize <type>` 本地回调，rclone 自动打开浏览器，授权链接经 `sync-authorize-url@<id>` 推送给 UI 作备用入口，`sync-cancel-authorize` 可中断）；WebDAV / SMB / SFTP / S3 兼容走表单凭据。

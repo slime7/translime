@@ -36,7 +36,7 @@ import createSyncService from './utils/sync/sync-service';
 import createPassthroughService from './utils/passthrough/service';
 import createSaveWatcher from './utils/save-watcher';
 import createAutoBackupScheduler from './utils/auto-backup';
-import createFullscreenWatcher from './utils/fullscreen-watcher';
+import createFocusWatcher from './utils/focus-watcher';
 import { discoverSmbHostName } from './utils/sync/netbios';
 import { createExec } from './utils/sync/rclone';
 import {
@@ -305,18 +305,17 @@ const saveWatcher = createSaveWatcher({
   onError: (dir, e) => logger.warn(`存档目录监控失效：${dir}`, e?.message || e),
 });
 
-// 全屏程序（游戏）运行期间存档高频变动且用户无感知：整体挂起监控，
-// 退出后由补发机制统一触发一次备份/同步。检测不可用时静默放弃该功能
-const fullscreenWatcher = createFullscreenWatcher({
-  onFullscreenChange: (fullscreen) => {
-    logger.info(fullscreen ? '检测到全屏程序，暂停存档监控' : '全屏程序退出，恢复存档监控');
-    if (fullscreen) {
-      saveWatcher.pause();
-    } else {
+// 宿主无焦点窗口期间（游戏/其他应用占用前台）存档变动用户无感知：整体挂起监控，
+// 回到宿主后由补发机制统一触发一次备份/同步。焦点抖动经防抖确认后才切换
+const focusWatcher = createFocusWatcher({
+  onFocusChange: (focused) => {
+    logger.info(focused ? '宿主窗口获得焦点，恢复存档监控' : '宿主窗口失去焦点，暂停存档监控');
+    if (focused) {
       saveWatcher.resume();
+    } else {
+      saveWatcher.pause();
     }
   },
-  onUnavailable: (e) => logger.warn('全屏检测不可用，游戏运行时暂停监控功能停用：', e?.message || e),
 });
 
 const refreshWatchTargets = () => {
@@ -531,7 +530,7 @@ export const pluginDidLoad = async () => {
   }
 
   backgroundScan();
-  fullscreenWatcher.start();
+  focusWatcher.start();
   registerTitleBarActions();
 };
 
@@ -539,7 +538,7 @@ export const pluginDidLoad = async () => {
 export const pluginWillUnload = () => {
   logger.info(`${pluginId} unloaded`);
   unloadGeneration += 1;
-  fullscreenWatcher.stop();
+  focusWatcher.stop();
   saveWatcher.close();
   autoBackup.cancel();
   syncService.dispose();
