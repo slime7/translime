@@ -369,20 +369,6 @@ describe('ipcHandler', () => {
     });
   });
 
-  describe('Plugin Development Actions', () => {
-    it('REFRESH_DEV_PLUGINS 应转发到 pluginLoader.refreshDevPlugins', async () => {
-      const loader = {
-        refreshDevPlugins: vi.fn(() => [{ packageName: 'translime-plugin-dev' }]),
-      };
-      appManager.getPluginLoader.mockReturnValue(loader);
-
-      const result = await ipcHandler[ipcType.REFRESH_DEV_PLUGINS]();
-
-      expect(loader.refreshDevPlugins).toHaveBeenCalled();
-      expect(result).toBe(true);
-    });
-  });
-
   describe('System Preferences & Colors', () => {
     it('GET_SYSTEM_COLOR 在 Windows 下正常获取颜色并截取前 6 位十六进制', () => {
       const origPlatform = process.platform;

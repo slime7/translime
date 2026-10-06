@@ -218,4 +218,54 @@ describe('plugin-loader/metadata', () => {
     expect(plugin.manifestWarnings[0]).toContain('onHalloween');
     expect(plugin.manifestWarnings[1]).toContain('1 项缺少 id');
   });
+
+  it('构建产物缺失时应标记 build-missing 但保留用户配置的启用状态', async () => {
+    const { readPluginSafe } = await import('@main/core/plugin-loader/metadata');
+
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({
+      name: 'translime-plugin-unbuilt',
+      version: '1.0.0',
+      main: 'dist/index.cjs.js',
+      plugin: { title: 'Unbuilt' },
+    }));
+    mockFs.accessSync.mockImplementation((targetPath) => {
+      const normalizedPath = String(targetPath).replace(/\\/g, '/');
+      if (!normalizedPath.endsWith('/package.json')) {
+        throw new Error('not found');
+      }
+    });
+
+    const plugin = readPluginSafe('/mock/plugins/translime-plugin-unbuilt');
+
+    expect(plugin.status).toBe('build-missing');
+    expect(plugin.available).toBe(false);
+    // 关键回归：产物缺失不得翻转启用标记，否则 dev 插件的 dist 监听、
+    // 右键重启等自愈路径全部失效，重建产物后也无法自动恢复
+    expect(plugin.enabled).toBe(true);
+  });
+
+  it('配置为停用的插件产物缺失时应保持停用（启用状态始终跟随用户配置）', async () => {
+    const { readPluginSafe } = await import('@main/core/plugin-loader/metadata');
+
+    mockMainStore.config.get.mockImplementationOnce((key, defaultValue) => (
+      key === 'plugin.translime-plugin-unbuilt.enabled' ? false : defaultValue
+    ));
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({
+      name: 'translime-plugin-unbuilt',
+      version: '1.0.0',
+      main: 'dist/index.cjs.js',
+      plugin: { title: 'Unbuilt' },
+    }));
+    mockFs.accessSync.mockImplementation((targetPath) => {
+      const normalizedPath = String(targetPath).replace(/\\/g, '/');
+      if (!normalizedPath.endsWith('/package.json')) {
+        throw new Error('not found');
+      }
+    });
+
+    const plugin = readPluginSafe('/mock/plugins/translime-plugin-unbuilt');
+
+    expect(plugin.status).toBe('build-missing');
+    expect(plugin.enabled).toBe(false);
+  });
 });

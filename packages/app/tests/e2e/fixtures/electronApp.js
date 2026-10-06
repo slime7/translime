@@ -3,16 +3,21 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { injectAllMocks } from '../../mocks/injectMockData';
+import { injectAllMocks, injectDevPlugin } from '../../mocks/injectMockData';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRootDir = path.resolve(dirname, '../../..');
 
 export const test = base.extend({
-  // eslint-disable-next-line no-empty-pattern
-  electronContext: async ({}, use) => {
+  /** 开发插件生命周期场景：注入开发版 mock 插件并开启「显示开发中插件」 */
+  devPluginScenario: [false, { option: true }],
+
+  electronContext: async ({ devPluginScenario }, use) => {
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'translime-e2e-'));
     injectAllMocks(userDataDir);
+    if (devPluginScenario) {
+      injectDevPlugin(userDataDir);
+    }
 
     const app = await electron.launch({
       args: ['.', `--user-data-dir=${userDataDir}`],

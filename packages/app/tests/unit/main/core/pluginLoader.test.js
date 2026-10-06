@@ -552,33 +552,77 @@ describe('pluginLoader', () => {
     });
   });
 
-  describe('reloadPlugin/refreshDevPlugins', () => {
-    it('应能从已链接目录重新扫描开发插件', async () => {
-      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
-        dependencies: {},
-      }));
-      mockFs.readdirSync.mockReturnValue(['translime-plugin-dev-refresh']);
-      mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
-        name: 'translime-plugin-dev-refresh',
-        plugin: {
-          title: 'Refresh Test',
-        },
-      }));
-      mockFs.accessSync.mockImplementation(() => undefined);
+  describe('restartPlugin', () => {
+    it('重启应从磁盘重读清单与产物：产物修复后无需整表刷新即可恢复', () => {
+      // 内存快照停留在产物缺失时：build-missing 且不可用
+      pluginLoader.plugins = [{
+        packageName: 'translime-plugin-stale',
+        pluginPath: '/mock/user/data/plugins_dev/node_modules/translime-plugin-stale',
+        dev: true,
+        source: 'dev',
+        exports: 'dist/index.cjs.js',
+        enabled: true,
+        active: false,
+        dependencies: [],
+        optionalDependencies: [],
+        blockedBy: [],
+        missingDependencies: [],
+        dependents: [],
+        entryIssues: ['主进程入口产物'],
+        status: 'build-missing',
+        statusText: '缺少主进程入口产物，请先构建插件后再在 Translime 中加载。',
+        available: false,
+      }];
 
-      mainStore.config.get.mockImplementation((key, defaultValue) => {
-        if (key === 'setting.showDevPlugin') {
-          return true;
+      // 磁盘现状：产物已补齐
+      mockFs.readFileSync.mockReturnValue(JSON.stringify({
+        name: 'translime-plugin-stale',
+        main: 'dist/index.cjs.js',
+        plugin: { title: 'Stale' },
+      }));
+      mockFs.accessSync.mockImplementation((targetPath) => {
+        const normalizedPath = String(targetPath).replace(/\\/g, '/');
+        if (!normalizedPath.endsWith('/package.json') && !normalizedPath.endsWith('/dist/index.cjs.js')) {
+          throw new Error('not found');
         }
-        return defaultValue;
       });
+      mockRequire.mockReturnValue({ pluginDidLoad: vi.fn() });
 
-      const plugins = pluginLoader.refreshDevPlugins();
+      const plugin = pluginLoader.restartPlugin('translime-plugin-stale');
 
-      expect(Array.isArray(plugins)).toBe(true);
-      expect(
-        plugins.some((plugin) => plugin.packageName === 'translime-plugin-dev-refresh'),
-      ).toBe(true);
+      expect(plugin.status).toBe('active');
+      expect(plugin.available).toBe(true);
+      expect(plugin.entryIssues).toEqual([]);
+    });
+
+    it('依赖不可用时即使其 enabled 为 true 也应阻塞启用（可用性不依赖 enabled 标记）', () => {
+      pluginLoader.plugins = [
+        {
+          packageName: 'translime-plugin-dep-broken',
+          pluginPath: '/mock/dep',
+          exports: 'index.js',
+          enabled: true,
+          available: false,
+          status: 'build-missing',
+          statusText: '缺少主进程入口产物，请先构建插件后再在 Translime 中加载。',
+          dependencies: [],
+        },
+        {
+          packageName: 'translime-plugin-dependent',
+          pluginPath: '/mock/app',
+          exports: 'index.js',
+          enabled: true,
+          active: false,
+          dependencies: ['translime-plugin-dep-broken'],
+        },
+      ];
+
+      const plugin = pluginLoader.enablePlugin('translime-plugin-dependent');
+
+      expect(plugin.status).toBe('blocked');
+      expect(plugin.available).toBe(false);
+      expect(plugin.statusText).toContain('缺少前置插件');
+      expect(plugin.enabled).toBe(false);
     });
   });
 

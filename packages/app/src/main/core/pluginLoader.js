@@ -31,7 +31,6 @@ import {
   doInstallFromTarball,
   installLocalPlugin,
   installPlugin,
-  refreshDevPlugins,
   uninstallPlugin,
 } from './plugin-loader/installer';
 import buildPluginMenu from './plugin-loader/menu';
@@ -295,15 +294,6 @@ class PluginLoader extends EventEmitter {
    */
   ensurePluginMetadata(packageName) {
     return ensurePluginMetadata(this, packageName);
-  }
-
-  /**
-   * 重新扫描开发插件目录。
-   *
-   * @returns {Array<object>} 刷新后的插件列表。
-   */
-  refreshDevPlugins() {
-    return refreshDevPlugins(this);
   }
 
   /**

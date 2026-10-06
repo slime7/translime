@@ -42,14 +42,6 @@
         :disabled="!!loading.install"
         @click="installLocalPluginDialog.open()"
       />
-
-      <mat-btn
-        icon="refresh"
-        label="刷新开发中插件"
-        data-test="plugin-refresh-btn"
-        :disabled="loading.refresh"
-        @click="refreshDevPlugins"
-      />
     </div>
 
     <!-- 工具栏分页：已安装 / 市场 页签，带数量徽标 -->
@@ -336,7 +328,6 @@ const router = useRouter();
 const loading = reactive({
   install: false,
   uninstall: false,
-  refresh: false,
 });
 
 const { plugins } = storeToRefs(store);
@@ -501,21 +492,6 @@ const disablePlugin = async (packageName) => {
     getPlugins();
   }
 };
-const refreshDevPlugins = async () => {
-  if (loading.refresh) {
-    return;
-  }
-  loading.refresh = true;
-  try {
-    await ipc.invoke(ipcType.REFRESH_DEV_PLUGINS);
-  } catch (err) {
-    alert.show(err.message, 'error');
-  } finally {
-    loading.refresh = false;
-    getPlugins();
-  }
-};
-
 const pluginCardRefs = ref([]);
 const devPluginWizardRef = ref(null);
 

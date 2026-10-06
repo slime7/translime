@@ -339,6 +339,11 @@ const enablePlugin = (loader, packageName, init = false) => {
     if (!dependency) {
       return true;
     }
+    // 不可用的依赖（产物缺失/不兼容/加载失败）同样阻塞启用，
+    // 不能只看 enabled 标记——扫描不再因产物缺失改写启用状态
+    if (dependency.available === false) {
+      return true;
+    }
     return !dependency.enabled;
   });
 
@@ -658,6 +663,10 @@ const disablePlugin = (loader, packageName, options = {}) => {
 /**
  * 以“先禁用再启用”的方式重启插件。
  *
+ * 重启会从磁盘重读该插件的清单与构建产物（等效于单插件重扫），
+ * 构建产物修复后无需刷新整表或重启宿主即可恢复；重读失败时
+ * 回退为复用既有插件对象启用。
+ *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} packageName - 插件包名。
  * @returns {object} 重启后的插件对象。
@@ -671,6 +680,22 @@ const restartPlugin = (loader, packageName) => {
     keepDisabledRecord: false,
     persistState: false,
   });
+  const reloaded = readPluginSafe(resolvePluginPath(packageName, plugin.dev === true), {
+    source: plugin.dev ? PLUGIN_SOURCE_DEV : PLUGIN_SOURCE_RELEASE,
+    devPlugins: loader.getPlugins().filter(
+      (item) => item.dev && item.packageName !== packageName,
+    ),
+  });
+  if (reloaded) {
+    const staleIndex = loader.plugins.findIndex(
+      (item) => item.packageName === packageName,
+    );
+    if (staleIndex >= 0) {
+      loader.plugins.splice(staleIndex, 1, reloaded);
+    }
+    loader.buildDependencyGraph();
+    loader.rebuildActivationIndexes();
+  }
   return loader.enablePlugin(packageName);
 };
 

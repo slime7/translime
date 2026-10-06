@@ -24,7 +24,6 @@ export const ACTIVATE_PLUGIN = 'activate-plugin';
 export const CREATE_DEV_PLUGIN = 'create-dev-plugin';
 export const LINK_DEV_PLUGIN = 'link-dev-plugin';
 export const EXECUTE_PLUGIN_COMMAND = 'execute-plugin-command';
-export const REFRESH_DEV_PLUGINS = 'refresh-dev-plugins';
 export const GET_PLUGIN_SETTING = 'get-plugin-setting';
 export const SET_PLUGIN_SETTING = 'set-plugin-setting';
 export const OPEN_PLUGIN_CONTEXT_MENU = 'open-plugin-context-menu';
@@ -97,7 +96,6 @@ export default {
   CREATE_DEV_PLUGIN,
   LINK_DEV_PLUGIN,
   EXECUTE_PLUGIN_COMMAND,
-  REFRESH_DEV_PLUGINS,
   GET_PLUGIN_SETTING,
   SET_PLUGIN_SETTING,
   OPEN_PLUGIN_CONTEXT_MENU,

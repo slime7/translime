@@ -1,4 +1,3 @@
-/* eslint-disable no-param-reassign */
 import path from 'node:path';
 import fsp from 'node:fs/promises';
 import mainStore from '../../utils/useMainStore';
@@ -168,33 +167,9 @@ const uninstallPlugin = async (loader, packageName) => {
   }
 };
 
-/**
- * 重新扫描开发插件目录。
- *
- * 会先关闭所有当前启用的插件，再重新走一次完整扫描流程，
- * 用于开发调试时刷新最新构建结果。
- *
- * @param {object} loader - `PluginLoader` 实例。
- * @returns {Array<object>} 刷新后的插件列表。
- */
-const refreshDevPlugins = (loader) => {
-  const previousPlugins = [...loader.plugins];
-  previousPlugins.forEach((plugin) => {
-    if (plugin.enabled) {
-      loader.disablePlugin(plugin.packageName, {
-        keepDisabledRecord: false,
-        persistState: false,
-      });
-    }
-  });
-  loader.plugins = [];
-  return loader.resolvePlugins();
-};
-
 export {
   doInstallFromTarball,
   installLocalPlugin,
   installPlugin,
-  refreshDevPlugins,
   uninstallPlugin,
 };

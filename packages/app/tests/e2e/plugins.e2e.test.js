@@ -45,20 +45,16 @@ test.describe('插件生态与管理交互 (Plugins E2E)', () => {
 
     const searchBox = page.locator('[data-test="plugin-search-input"]').first();
     const installLocalBtn = page.locator('[data-test="plugin-install-local-btn"]').first();
-    const refreshBtn = page.locator('[data-test="plugin-refresh-btn"]').first();
     await expect(searchBox).toBeVisible();
     await expect(installLocalBtn).toBeVisible();
-    await expect(refreshBtn).toBeVisible();
 
     const searchRect = await searchBox.boundingBox();
     const installRect = await installLocalBtn.boundingBox();
-    const refreshRect = await refreshBtn.boundingBox();
 
     // 防止的回归：搜索行使用 flex-wrap + spacer，窄窗口下按钮换行并在行中留出大空档。
-    // 搜索框与两个操作按钮必须仍在同一行
+    // 搜索框与操作按钮必须仍在同一行
     expect(Math.abs(searchRect.y - installRect.y)).toBeLessThan(16);
-    expect(Math.abs(searchRect.y - refreshRect.y)).toBeLessThan(16);
-    // 搜索框右缘与第一个按钮左缘之间不允许出现大空档。
+    // 搜索框右缘与按钮左缘之间不允许出现大空档。
     // 阈值需覆盖 mat-search 输入框元素盒右侧的内边距（元素盒宽于视觉胶囊），
     // “按钮换行/行中出现大片空白”由上方 y 轴同行断言保证
     expect(installRect.x - (searchRect.x + searchRect.width)).toBeLessThan(96);

@@ -605,7 +605,9 @@ const readPlugin = (pluginPath, {
       PLUGIN_STATUS_BUILD_MISSING,
       buildEntryIssueText(plugin.entryIssues),
     );
-    plugin.enabled = false;
+    // 启用状态跟随用户配置：产物缺失只代表当前不可用（available=false），
+    // 不得改写启用意图——dist 监听、右键重启等自愈路径都依赖该标记
+    plugin.enabled = shouldEnable;
   } else if (plugin.hostRequirement && plugin.hostCompatible === false) {
     plugin = applyPluginStatus(
       plugin,

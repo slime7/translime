@@ -67,6 +67,34 @@ export const injectMockPlugins = (userDataDir) => {
 };
 
 /**
+ * 注入一个开发版 mock 插件到 plugins_dev 模块目录，并开启「显示开发中插件」。
+ *
+ * 插件内容复制自 release mock 插件但使用独立包名，避免开发插件覆盖
+ * release 注入的同名插件；用于开发插件生命周期相关 E2E 场景。
+ * @param {string} userDataDir - 目标应用的临时 userData 绝对路径
+ * @returns {void}
+ */
+export const injectDevPlugin = (userDataDir) => {
+  const devModulesDir = path.join(userDataDir, 'plugins_dev', 'node_modules');
+  const targetPluginDir = path.join(devModulesDir, 'translime-plugin-dev-e2e');
+  fs.mkdirSync(devModulesDir, { recursive: true });
+  fs.cpSync(path.join(dirname, 'plugins', 'translime-plugin-mock-test'), targetPluginDir, {
+    recursive: true,
+  });
+
+  const manifestPath = path.join(targetPluginDir, 'package.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.name = 'translime-plugin-dev-e2e';
+  manifest.description = 'Dev mock plugin for build lifecycle E2E';
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+
+  const configPath = path.join(userDataDir, 'config.json');
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  config.setting = { ...config.setting, showDevPlugin: true };
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+};
+
+/**
  * 注入自定义应用配置（写入 config.json）
  * @param {string} userDataDir - 目标应用的临时 userData 绝对路径
  * @param {object} [initialConfig={}] - 初始配置对象

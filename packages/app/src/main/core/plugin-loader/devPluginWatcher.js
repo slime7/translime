@@ -4,6 +4,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../../utils/useMainStore';
 import appManager from '../../utils/useAppManager';
 import logger from '../../utils/logger';
+import createDistChangeDetector from './distChangeDetector';
 
 /**
  * 开发插件构建产物监听。
@@ -11,6 +12,9 @@ import logger from '../../utils/logger';
  * 「显示开发中插件」开启时，监听各已启用开发插件的 `dist` 目录，
  * 构建产物变化后防抖自动重启对应插件，免去每次构建后手动
  * 右键「重启插件」。只作用于 dev 插件，发布插件不受影响。
+ *
+ * 事件到达后先与产物快照对比：读取产物（如打开插件 UI 时加载
+ * `dist/ui.esm.js`）只改变访问属性、不改 mtime，不得触发重启。
  *
  * 监听器在每次 `resolvePlugins` 后与插件列表重新对齐：
  * 新启用/出现的 dev 插件补充监听，不再启用或消失的移除监听。
@@ -92,8 +96,11 @@ const watchPluginDist = (loader, plugin) => {
   }
 
   try {
-    const watcher = fs.watch(distPath, { recursive: true }, () => {
-      scheduleRestart(loader, plugin.packageName);
+    const detector = createDistChangeDetector({ distPath });
+    const watcher = fs.watch(distPath, { recursive: true }, (_eventType, filename) => {
+      if (detector.handleWatchEvent(filename)) {
+        scheduleRestart(loader, plugin.packageName);
+      }
     });
     watcher.on('error', (err) => {
       logger.warn(`[plugin] 监听插件 "${plugin.packageName}" 构建产物失败`, {

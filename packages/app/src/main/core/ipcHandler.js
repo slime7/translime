@@ -443,12 +443,6 @@ const ipcHandler = {
       '插件命令执行出错',
     );
   },
-  async [ipcType.REFRESH_DEV_PLUGINS]() {
-    return withPluginLoader((loader) => {
-      loader.refreshDevPlugins();
-      return true;
-    }, '开发插件刷新失败');
-  },
   async [ipcType.GET_PLUGIN_SETTING](packageName) {
     ensurePluginSettingAccess(packageName);
     const settings = mainStore.config.get(`plugin.${packageName}.settings`, {});
