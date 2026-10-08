@@ -21,7 +21,7 @@
               <strong>version: </strong> {{ versions.app }}
             </div>
             <div>
-              <strong>github</strong>: <a href="javascript:;" @click="githubLink">https://github.com/slime7/translime <mat-icon class="text-[16px]">open_in_new</mat-icon></a>
+              <strong>github</strong>: <a href="javascript:;" @click="githubLink">https://github.com/slime7/translime <mat-icon size="1em" aria-hidden="true">open_in_new</mat-icon></a>
             </div>
 
             <div class="mt-4">

@@ -142,31 +142,18 @@ export default function usePluginCenterSearch() {
     }
     searchLoading.value = true;
     try {
-      const searchText = `text=${q ? `translime-plugin-${q}+` : ''}keywords:translime%20plugin`;
-      // doc: https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md#get-v1search
-      const searchUrl = (registryBase) => `${registryBase}/-/v1/search?${searchText}`;
-      let data;
-      try {
-        data = await useHttp(searchUrl(getRegistryBase()), {
-          params: {
-            size: SEARCH_PAGE_SIZE,
-            from: page * SEARCH_PAGE_SIZE,
-            x: Math.random(),
-          },
-        }).get();
-      } catch (registryErr) {
-        if (getRegistryBase() === 'https://registry.npmjs.org') {
-          throw registryErr;
-        }
-        // 镜像源搜索失败时回退 npm 官方源
-        data = await useHttp(searchUrl('https://registry.npmjs.org'), {
-          params: {
-            size: SEARCH_PAGE_SIZE,
-            from: page * SEARCH_PAGE_SIZE,
-            x: Math.random(),
-          },
-        }).get();
-      }
+      // 搜索固定走 npm 官方源。官方源中 keywords: 限定词负责过滤（多关键词
+      // + 为 AND、, 为 OR），普通搜索词只影响相关度排序：
+      // https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md#get-v1search
+      // 带连字符的 "translime-plugin-xxx" 排序词几乎无效，须拆成裸关键词
+      const searchUrl = `https://registry.npmjs.org/-/v1/search?text=${q ? `${q}+` : ''}keywords:translime-plugin`;
+      const data = await useHttp(searchUrl, {
+        params: {
+          size: SEARCH_PAGE_SIZE,
+          from: page * SEARCH_PAGE_SIZE,
+          x: Math.random(),
+        },
+      }).get();
       const filterData = data.objects.filter((item) => item.package.name.includes('translime-plugin'));
       const packages = await Promise.all(filterData.map((p) => getPluginDetail(p.package.name, p.package.version)));
       searchResult.list.push(...packages.map((item) => parseSearchResult(item)));

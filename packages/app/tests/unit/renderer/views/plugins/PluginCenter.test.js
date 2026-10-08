@@ -157,14 +157,15 @@ describe('usePluginCenterSearch', () => {
     await flushPromises();
     expect(ctrl.activeTab.value).toBe('search');
     expect(httpGetMock).toHaveBeenCalledTimes(1);
-    // 空关键词请求：text 只有通用 keywords 过滤，列出市场全部插件
-    expect(httpUrls[0]).toContain('text=keywords:');
+    // 空关键词请求：text 只有官方源 keywords 限定词过滤，列出市场全部插件
+    expect(httpUrls[0]).toContain('text=keywords:translime-plugin');
 
     ctrl.search.value = 'static';
     ctrl.searchAction();
     await flushPromises();
     expect(ctrl.activeTab.value).toBe('search');
-    expect(httpUrls[1]).toContain('text=translime-plugin-static+');
+    // 限定词负责过滤，裸搜索词只影响官方源的相关度排序
+    expect(httpUrls[1]).toContain('text=static+keywords:translime-plugin');
     wrapper.unmount();
   });
 
