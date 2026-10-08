@@ -13,6 +13,11 @@ import waitForCriticalFonts from './utils/fonts';
 
 installPluginStyleIsolation();
 
+// dev 实例任务栏标题标记，便于与安装版共存时区分
+if (import.meta.env.DEV) {
+  document.title = 'translime (dev)';
+}
+
 // 渲染进程启动时预载首屏图标字体
 waitForCriticalFonts();
 

@@ -23,6 +23,8 @@ pnpm dev
 
 等价于 `pnpm -C packages/app run dev`，启动 Electron 宿主开发模式。
 
+dev 实例使用独立的用户数据目录 `%APPDATA%/translime-dev`（Linux 为 `~/.config/translime-dev`），与安装版的数据完全隔离，两个进程可以同时运行互不干扰；托盘与任务栏标题带 `(dev)` 标记。dev 实例首次启动数据为空，需要重新开启「显示开发中插件」并链接或创建开发插件。
+
 如需通过 CDP 调试实际 Electron 页面，运行：
 
 ```text
@@ -135,6 +137,7 @@ node .agents/plugin-scaffold/create-plugin.mjs --name translime-plugin-your-name
 
 | 现象 | 处理 |
 | --- | --- |
+| dev 实例里看不到之前链接的开发插件或旧设置 | dev 使用独立数据目录 `translime-dev`，首次启动为空；在 dev 实例中重新执行「创建开发插件」向导或手动 link |
 | 插件卡片显示 `build-missing` | 插件未构建或产物缺失，运行该插件的 build 脚本 |
 | 插件卡片显示 `incompatible` | 插件 `engines.translime` 声明的宿主版本范围与当前宿主不匹配，升级宿主或联系插件作者调整范围 |
 | 插件卡片显示 `blocked` | 插件声明的依赖插件未启用，先启用依赖 |

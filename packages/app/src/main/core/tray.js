@@ -14,9 +14,12 @@ const createTray = () => {
     const trayInstance = new Tray(nativeImage.createFromDataURL(icon));
     appManager.setTray(trayInstance);
 
+    // dev 实例在托盘上显式标记，便于与安装版共存时区分
+    const displayName = import.meta.env.DEV ? 'translime (dev)' : 'translime';
+
     const items = [
       {
-        label: 'translime',
+        label: displayName,
         enabled: false,
       },
       {
@@ -43,7 +46,7 @@ const createTray = () => {
     ];
     const menu = Menu.buildFromTemplate(items);
 
-    trayInstance.setToolTip(`translime ${mainStore.APP_VERSION}`);
+    trayInstance.setToolTip(`${displayName} ${mainStore.APP_VERSION}`);
     trayInstance.setContextMenu(menu);
     trayInstance.on('click', () => {
       if (appManager.getWin()) {

@@ -24,6 +24,13 @@ describe('parseAppArgv', () => {
     expect(result.url).toBe('translime://open?foo=bar');
   });
 
+  it('应正确解析开发模式深链 translime-dev: URL', () => {
+    // dev 实例注册的是 translime-dev:// scheme，
+    // 解析失败会导致 dev 深链不进入 linkHandler 转发
+    const result = parseAppArgv(['electron.exe', 'translime-dev://open?foo=bar']);
+    expect(result.url).toBe('translime-dev://open?foo=bar');
+  });
+
   it('应正确解析 --key=value 格式参数', () => {
     const result = parseAppArgv(['app.exe', '--port=3000', '--host=localhost']);
     expect(result.port).toBe('3000');
@@ -85,6 +92,12 @@ describe('parseDeepLink', () => {
   it('应正确解析 hostname 为 main', () => {
     const result = parseDeepLink('translime://open');
     expect(result.main).toBe('open');
+  });
+
+  it('应正确解析开发模式深链 scheme 的 hostname 与参数', () => {
+    const result = parseDeepLink('translime-dev://open?foo=bar');
+    expect(result.main).toBe('open');
+    expect(result.params.foo).toBe('bar');
   });
 
   it('应保留原始 URL 在 origin 字段', () => {

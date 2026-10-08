@@ -4,6 +4,7 @@ import { build, createLogger, createServer } from 'vite';
 import electronPath from 'electron';
 import { spawn } from 'node:child_process';
 import waitOn from 'wait-on';
+import os from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +18,24 @@ const dir = dirname(filename);
 // eslint-disable-next-line no-multi-assign
 const mode = (process.env.MODE = process.env.MODE || 'development');
 const DEFAULT_CDP_PORT = 9222;
+
+/**
+ * 开发实例专用 userData 目录名，与安装版数据目录隔离，
+ * 使 dev 与 release 进程可以共存（单实例锁跟随 userData）。
+ * @type {string}
+ */
+const DEV_USER_DATA_DIR_NAME = 'translime-dev';
+
+/**
+ * 计算开发实例的 userData 目录，与 Electron 默认 appData 约定保持一致。
+ * @returns {string} 开发实例 userData 目录绝对路径。
+ */
+const getDevUserDataDir = () => {
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    return join(process.env.APPDATA, DEV_USER_DATA_DIR_NAME);
+  }
+  return join(os.homedir(), '.config', DEV_USER_DATA_DIR_NAME);
+};
 
 const getCdpPort = () => {
   const cdpArgument = process.argv.find((argument) => (
@@ -82,6 +101,9 @@ const startElectronProcess = (logger) => {
     electronArguments.push(`--remote-debugging-port=${CDP_PORT}`);
     logger.info(`Electron CDP enabled at http://127.0.0.1:${CDP_PORT}`);
   }
+  const devUserDataDir = getDevUserDataDir();
+  electronArguments.push(`--user-data-dir=${devUserDataDir}`);
+  logger.info(`Electron dev userData: ${devUserDataDir}`);
   electronArguments.push('.');
 
   electronProcess = spawn(String(electronPath), electronArguments);

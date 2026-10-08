@@ -11,7 +11,8 @@ export const parseAppArgv = (argv) => {
       args.app = arg;
     } else {
       const lowArg = arg.toLowerCase();
-      if (lowArg.startsWith('translime:')) {
+      const isDeepLink = lowArg.startsWith('translime:') || lowArg.startsWith('translime-dev:');
+      if (isDeepLink) {
         args.url = arg;
       } else if (arg.startsWith('--')) {
         const argSplit = arg.substring(2).split('=');
