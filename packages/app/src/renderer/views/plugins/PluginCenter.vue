@@ -153,10 +153,9 @@
           v-if="searchLoading"
           class="mt-4 flex justify-center"
         >
-          <mat-progress
-            variant="circular"
-            indeterminate
-            color="primary"
+          <mat-loading
+            containment
+            aria-label="正在搜索插件"
           />
         </div>
 

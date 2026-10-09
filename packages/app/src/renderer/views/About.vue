@@ -46,7 +46,7 @@
 
               <div v-else-if="updateStatus === 'not-available'">
                 <div>
-                  <mat-btn data-test="about-check-update-btn" @click="checkForUpdate">
+                  <mat-btn data-test="about-check-update-btn" :disabled="isDev" @click="checkForUpdate">
                     检查更新
                   </mat-btn>
                 </div>
@@ -59,6 +59,8 @@
                 正在下载: {{ downloadProgress.percent.toFixed(1) }}%
                 <mat-progress
                   variant="linear"
+                  shape="wavy"
+                  wave-motion
                   :value="downloadProgress.percent / 100"
                   color="primary"
                   class="mt-2"
@@ -82,7 +84,7 @@
 
               <div v-else-if="updateStatus === 'error'">
                 <div>
-                  <mat-btn data-test="about-check-update-btn" @click="checkForUpdate">
+                  <mat-btn data-test="about-check-update-btn" :disabled="isDev" @click="checkForUpdate">
                     检查更新
                   </mat-btn>
                 </div>
@@ -92,7 +94,7 @@
               </div>
 
               <div v-else>
-                <mat-btn data-test="about-check-update-btn" @click="checkForUpdate">
+                <mat-btn data-test="about-check-update-btn" :disabled="isDev" @click="checkForUpdate">
                   检查更新
                 </mat-btn>
               </div>
