@@ -273,7 +273,8 @@ export function createMockElectron(mockHandlers = {}) {
     dialog: createMockDialog(),
     shell: createMockShell(),
     clipboard: createMockClipboard(),
-    openLink: async (url) => {
+    openLink: async (urlOrOptions) => {
+      const url = typeof urlOrOptions === 'string' ? urlOrOptions : urlOrOptions?.url;
       console.log('[Preview Mock] openLink:', url);
       window.open(url, '_blank');
     },

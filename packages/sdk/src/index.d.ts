@@ -387,7 +387,7 @@ export function useClipboard(): ClipboardClient | null;
 /**
  * 在系统默认浏览器中打开链接（渲染进程；宿主仅放行 http/https）
  */
-export function openLink(url: string): Promise<void>;
+export function openLink(url: string | { url: string }): Promise<void>;
 
 // ----------------------------------------------------------------------
 // 主进程 API

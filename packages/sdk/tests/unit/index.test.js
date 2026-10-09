@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   defineIpcHandlers,
+  openLink,
   useIpc,
 } from '../../src/index';
 import {
@@ -74,6 +75,34 @@ describe('useIpc(pluginId) 事件名自动补全', () => {
     useIpc('translime-plugin-x').invoke('get-data@translime-plugin-x');
 
     expect(baseIpc.invoke).toHaveBeenCalledWith('get-data@translime-plugin-x');
+  });
+});
+
+describe('openLink 参数归一化', () => {
+  it('字符串入参包装为 { url } 传给宿主桥，匹配 OPEN_LINK 通道的对象签名', () => {
+    // 防止的回归：按文档签名传裸字符串时参数被原样透传，
+    // 宿主 handler 从字符串解构 url 得到 undefined，链接点击后浏览器不打开且无报错
+    const openLinkSpy = vi.fn(async () => undefined);
+    vi.stubGlobal('window', { electron: { openLink: openLinkSpy } });
+
+    openLink('https://rclone.org/downloads/');
+
+    expect(openLinkSpy).toHaveBeenCalledWith({ url: 'https://rclone.org/downloads/' });
+  });
+
+  it('{ url } 对象入参原样透传，兼容存量插件写法', () => {
+    const openLinkSpy = vi.fn(async () => undefined);
+    vi.stubGlobal('window', { electron: { openLink: openLinkSpy } });
+
+    openLink({ url: 'https://github.com/' });
+
+    expect(openLinkSpy).toHaveBeenCalledWith({ url: 'https://github.com/' });
+  });
+
+  it('无 window.electron 环境返回 null', async () => {
+    vi.stubGlobal('window', {});
+
+    await expect(openLink('https://github.com/')).resolves.toBeNull();
   });
 });
 

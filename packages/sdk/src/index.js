@@ -410,12 +410,14 @@ export function useClipboard() {
 
 /**
  * 在默认浏览器中打开链接
- * @param {string} url 要打开的链接
+ * @param {string|{url: string}} urlOrOptions 要打开的链接；也兼容 `{ url }` 对象形式的存量用法
  * @returns {Promise<void>}
  */
-export async function openLink(...args) {
+export async function openLink(urlOrOptions) {
   if (typeof window !== 'undefined' && window.electron?.openLink) {
-    return window.electron.openLink(...args);
+    // 宿主 OPEN_LINK 通道的入参是 { url } 对象；字符串按文档签名归一化，对象原样透传
+    const payload = typeof urlOrOptions === 'string' ? { url: urlOrOptions } : urlOrOptions;
+    return window.electron.openLink(payload);
   }
   return null;
 }

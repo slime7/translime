@@ -204,7 +204,7 @@ ipc.on('data-changed', (data) => { ... }); // 接收主进程 sendToClient 推�
 - `setPluginSetting(...args)`: 设置插件设置。
 - `useWindowControl()`: 获取窗口控制工具。
 - `useClipboard()`: 获取剪贴板工具。
-- `openLink(...args)`: 在浏览器中打开链接。
+- `openLink(url)`: 在浏览器中打开链接；传字符串即可，也兼容 `{ url }` 对象形式（宿主仅放行 http/https）。
 - `isPreviewMode()`: 检查当前是否为 preview 模式。
 - `electronNetAdapter(config)`: 基于 `window.ts.net` 的 axios adapter。
 
