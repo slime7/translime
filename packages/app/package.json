@@ -16,6 +16,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/watch.js",
+    "dev:isolate": "node scripts/watch.js --isolate --cdp-port=9222",
     "dev:cdp": "node scripts/watch.js --cdp-port=9222",
     "serve": "node scripts/watch.js",
     "build": "rimraf dist && node scripts/build.js",

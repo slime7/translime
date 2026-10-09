@@ -37,12 +37,15 @@ const getDevUserDataDir = () => {
   return join(os.homedir(), '.config', DEV_USER_DATA_DIR_NAME);
 };
 
+const isIsolated = process.argv.includes('--isolate');
+
 const getCdpPort = () => {
-  const cdpArgument = process.argv.find((argument) => (
-    argument === '--cdp' || argument.startsWith('--cdp-port=')
-  ));
+  const cdpArgument = process.argv.find((argument) => argument === '--cdp' || argument.startsWith('--cdp-port='));
 
   if (!cdpArgument) {
+    if (isIsolated) {
+      return DEFAULT_CDP_PORT;
+    }
     return null;
   }
 
@@ -101,9 +104,14 @@ const startElectronProcess = (logger) => {
     electronArguments.push(`--remote-debugging-port=${CDP_PORT}`);
     logger.info(`Electron CDP enabled at http://127.0.0.1:${CDP_PORT}`);
   }
-  const devUserDataDir = getDevUserDataDir();
-  electronArguments.push(`--user-data-dir=${devUserDataDir}`);
-  logger.info(`Electron dev userData: ${devUserDataDir}`);
+  if (isIsolated) {
+    const devUserDataDir = getDevUserDataDir();
+    electronArguments.push(`--user-data-dir=${devUserDataDir}`);
+    electronArguments.push('--isolate');
+    logger.info(`Electron dev userData (isolated): ${devUserDataDir}`);
+  } else {
+    logger.info('Electron dev userData: default (shared with build)');
+  }
   electronArguments.push('.');
 
   electronProcess = spawn(String(electronPath), electronArguments);
@@ -111,16 +119,22 @@ const startElectronProcess = (logger) => {
   // 处理标准输出
   electronProcess.stdout.on('data', (data) => {
     const output = data.toString().trim();
-    if (output) logger.warn(output, { timestamp: true });
+    if (output) {
+      logger.warn(output, { timestamp: true });
+    }
   });
 
   // 处理标准错误输出
   electronProcess.stderr.on('data', (data) => {
     const error = data.toString().trim();
-    if (!error) return;
+    if (!error) {
+      return;
+    }
 
     const shouldIgnore = STDERR_FILTER_PATTERNS.some((pattern) => pattern.test(error));
-    if (!shouldIgnore) logger.error(error, { timestamp: true });
+    if (!shouldIgnore) {
+      logger.error(error, { timestamp: true });
+    }
   });
 
   // 处理进程退出
