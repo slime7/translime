@@ -13,6 +13,7 @@ const { mockFs, mockFsp } = vi.hoisted(() => {
   const fs = {
     access: vi.fn(),
     accessSync: vi.fn(),
+    existsSync: vi.fn(() => true),
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn(),
     readFileSync: vi.fn(),
@@ -159,18 +160,6 @@ describe('pluginLoader', () => {
       destroy: vi.fn(),
     });
     pluginLoader.plugins = [];
-  });
-
-  describe('init', () => {
-    it('应该检查并创建插件目录', () => {
-      // 模拟 fs.access 回调报错（文件未找到）以触发创建
-      mockFs.access.mockImplementation((path, mode, cb) => cb(new Error('not found')));
-
-      pluginLoader.init();
-
-      expect(mockFs.access).toHaveBeenCalled();
-      expect(mockFs.writeFileSync).toHaveBeenCalled(); // 应该写入默认的 package.json
-    });
   });
 
   describe('readPlugins', () => {

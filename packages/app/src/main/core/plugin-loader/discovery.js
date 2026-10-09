@@ -27,6 +27,39 @@ import {
  */
 
 /**
+ * 创建插件体系依赖的目录与默认清单。
+ *
+ * 首次启动时 userData 下还没有任何插件目录（dev 实例的独立 userData 尤其如此），
+ * 因此所有目录都按父目录到子目录的顺序同步创建，并允许自动补齐缺失的上级目录，
+ * 避免在父目录尚不存在时抛出 ENOENT。
+ *
+ * @param {object} loader - `PluginLoader` 实例。
+ * @returns {void}
+ */
+const ensurePluginDirs = (loader) => {
+  fs.mkdirSync(PLUGIN_DIR, { recursive: true });
+  fs.mkdirSync(loader.pluginPackageDir, { recursive: true });
+  fs.mkdirSync(PLUGIN_DIR_DEV, { recursive: true });
+  fs.mkdirSync(PLUGIN_MODULES_PATH_DEV, { recursive: true });
+
+  if (fs.existsSync(PLUGIN_JSON_PATH)) {
+    return;
+  }
+
+  const pkg = {
+    name: 'translime-plugins',
+    description: 'translime-plugins',
+    license: 'MIT',
+    dependencies: {},
+  };
+  fs.writeFileSync(
+    PLUGIN_JSON_PATH,
+    JSON.stringify(pkg, null, 2),
+    'utf8',
+  );
+};
+
+/**
  * 初始化插件目录、package.json 和开发插件目录。
  *
  * 同时会注册 `.node` 影子加载补丁，并在启动时清理历史临时文件。
@@ -37,38 +70,7 @@ import {
 const initPluginLoader = (loader) => {
   loader.cleanTempNodeFiles();
   loader.setupNodeLoaderHack();
-  fs.access(PLUGIN_JSON_PATH, fs.constants.F_OK, (err) => {
-    if (err) {
-      const pkg = {
-        name: 'translime-plugins',
-        description: 'translime-plugins',
-        license: 'MIT',
-        dependencies: {},
-      };
-      try {
-        fs.accessSync(PLUGIN_DIR);
-      } catch (accessError) {
-        fs.mkdirSync(PLUGIN_DIR);
-      }
-      fs.writeFileSync(
-        PLUGIN_JSON_PATH,
-        JSON.stringify(pkg, null, 2),
-        'utf8',
-      );
-    }
-  });
-
-  try {
-    fs.accessSync(loader.pluginPackageDir);
-  } catch (err) {
-    fs.mkdirSync(loader.pluginPackageDir);
-  }
-
-  try {
-    fs.accessSync(PLUGIN_DIR_DEV);
-  } catch (err) {
-    fs.mkdirSync(PLUGIN_DIR_DEV);
-  }
+  ensurePluginDirs(loader);
 };
 
 /**
@@ -227,11 +229,7 @@ const activateStartupPlugins = (loader) => {
  * @returns {Array<object>} 扫描后的插件列表。
  */
 const resolvePlugins = (loader, { activate = true } = {}) => {
-  try {
-    fs.accessSync(PLUGIN_MODULES_PATH_DEV);
-  } catch (err) {
-    fs.mkdirSync(PLUGIN_MODULES_PATH_DEV);
-  }
+  fs.mkdirSync(PLUGIN_MODULES_PATH_DEV, { recursive: true });
 
   const showDevPlugin = mainStore.config.get('setting.showDevPlugin', false);
   const json = JSON.parse(fs.readFileSync(PLUGIN_JSON_PATH, 'utf8'));
