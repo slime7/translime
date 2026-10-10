@@ -74,9 +74,9 @@ const onColorChange = (e) => {
   }
 };
 
-/** 透明度变化时触发 */
-const onAlphaChange = (e) => {
-  const newAlpha = parseInt(e.target.value, 10);
+/** 透明度滑块更新 */
+const onAlphaSliderUpdate = (val) => {
+  const newAlpha = parseInt(val, 10) || 0;
   emit('update:modelValue', buildRgba(parsed.value.hex, newAlpha));
 };
 
@@ -124,19 +124,21 @@ const previewStyle = computed(() => ({
 
     <!-- 透明度滑块（内联） -->
     <template v-if="enableAlpha">
-      <input
-        type="range"
-        :value="parsed.alpha"
-        min="0"
-        max="100"
-        step="1"
+      <mat-slider
+        :model-value="parsed.alpha"
+        :min="0"
+        :max="100"
+        :step="1"
+        size="small"
+        color="primary"
         class="color-picker__alpha-slider"
-        @input="onAlphaChange"
-        @mousedown.stop
+        @update:model-value="onAlphaSliderUpdate"
         @wheel.stop="onAlphaWheel"
       >
-
-      <span class="color-picker__alpha-value">{{ parsed.alpha }}%</span>
+        <template #append>
+          <span class="color-picker__alpha-value">{{ parsed.alpha }}%</span>
+        </template>
+      </mat-slider>
     </template>
   </div>
 </template>
@@ -145,24 +147,25 @@ const previewStyle = computed(() => ({
 .color-picker {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .color-picker__preview {
   position: relative;
-  width: 22px;
-  height: 22px;
-  border: 1px solid rgb(255 255 255 / 30%);
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--mat-sys-color-outline-variant, rgb(0 0 0 / 25%));
   border-radius: 4px;
   cursor: pointer;
   padding: 0;
   overflow: hidden;
   background: transparent;
   flex-shrink: 0;
+  transition: border-color .2s;
 }
 
 .color-picker__preview:hover {
-  border-color: rgb(255 255 255 / 60%);
+  border-color: var(--mat-sys-color-outline, rgb(0 0 0 / 50%));
 }
 
 /* 棋盘格背景：用于可视化半透明颜色 */
@@ -189,19 +192,16 @@ const previewStyle = computed(() => ({
 }
 
 .color-picker__alpha-slider {
-  height: 4px;
-  border-radius: 2px;
-  background: rgb(255 255 255 / 30%);
-  outline: none;
-  accent-color: #38bdf8;
-  width: 60px;
+  width: 130px;
 }
 
 .color-picker__alpha-value {
   font-size: 11px;
-  color: rgb(255 255 255 / 70%);
-  min-width: 28px;
+  color: var(--mat-sys-color-on-surface-variant, rgb(0 0 0 / 70%));
+  min-width: 32px;
   text-align: right;
   font-family: monospace;
+  font-weight: 500;
+  user-select: none;
 }
 </style>

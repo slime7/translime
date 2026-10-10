@@ -450,4 +450,11 @@ export function useLogger() {
   return console;
 }
 
+export {
+  setupMdeWindow,
+  getMdeRuntimeUrls,
+  getMdeImportMap,
+  getMdeHtmlSnippet,
+} from './windowRuntime';
+
 export { electronNetAdapter };

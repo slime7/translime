@@ -1,6 +1,6 @@
 import { protocol } from 'electron';
 import * as path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import logger from './logger';
 
@@ -16,8 +16,31 @@ export default (scheme) => {
       let pathName = new URL(request.url).pathname;
       pathName = decodeURI(pathName); // Needed in case URL contains spaces
 
+      // 开发模式下若 Dev Server 可用，优先代理 Dev Server 资源
+      const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+      if (devServerUrl) {
+        try {
+          const targetUrl = new URL(pathName, devServerUrl).href;
+          const devRes = await fetch(targetUrl);
+          if (devRes.ok) {
+            return new Response(await devRes.arrayBuffer(), {
+              headers: {
+                'content-type': devRes.headers.get('content-type') || 'application/javascript',
+                'access-control-allow-origin': '*',
+              },
+            });
+          }
+        } catch {
+          // Dev Server 失败时回退到本地静态文件
+        }
+      }
+
       try {
-        const data = await readFileSync(path.join(dir, '../renderer', pathName));
+        const filePath = path.join(dir, '../renderer', pathName);
+        if (!existsSync(filePath)) {
+          throw new Error(`File not found: ${filePath}`);
+        }
+        const data = await readFileSync(filePath);
         const extension = path.extname(pathName)
           .toLowerCase();
         let mimeType = '';
@@ -38,7 +61,12 @@ export default (scheme) => {
 
         return new Response(
           data,
-          { headers: { 'content-type': mimeType } },
+          {
+            headers: {
+              'content-type': mimeType,
+              'access-control-allow-origin': '*',
+            },
+          },
         );
       } catch (err) {
         logger.error(

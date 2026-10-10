@@ -1,4 +1,8 @@
 import { spawn } from 'node:child_process';
+import os from 'node:os';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { tailOutput } from './rclone';
 
 // 本插件创建的远程统一命名，便于在系统 rclone 配置中识别
@@ -483,10 +487,158 @@ export const deleteRemote = async (exec, name) => {
  * 传入带子路径的目标（如 `name:share`）才能验证凭据。
  * 连接失败不抛错，由调用方决定提示方式。
  */
-export const checkRemoteConnection = async (exec, target) => {
-  const result = await exec(['lsd', target], { timeoutMs: 30 * 1000 });
+export const checkRemoteConnection = async (exec, target, options = {}) => {
+  const args = ['lsd', target];
+  if (options?.configPath) {
+    args.push('--config', options.configPath);
+  }
+  if (Array.isArray(options?.extraArgs) && options.extraArgs.length > 0) {
+    args.push(...options.extraArgs);
+  }
+  const result = await exec(args, { timeoutMs: options?.timeoutMs ?? 30 * 1000 });
   if (result.code === 0) {
     return { ok: true, error: null };
   }
   return { ok: false, error: tailOutput(result.stderr, 300) || `退出码 ${result.code}` };
+};
+
+/**
+ * 连接测试按钮可用性检查（纯业务规则）
+ * 表单后端：基于当前会话表单输入，至少填写了核心地址信息（host 或 url 或 endpoint 等）
+ * OAuth 后端：仅当已保存该类型远程时可用
+ */
+export const canTestRemoteConnection = ({
+  backend,
+  values = {},
+  remotes = [],
+  type = '',
+} = {}) => {
+  if (!backend) {
+    return false;
+  }
+  if (backend.auth === 'oauth') {
+    return remotes.some((r) => r?.name === remoteNameFor(type));
+  }
+  const hostVal = String(values?.host || '').trim();
+  const urlVal = String(values?.url || '').trim();
+  const endpointVal = String(values?.endpoint || '').trim();
+  const keyVal = String(values?.access_key_id || '').trim();
+  return Boolean(hostVal || urlVal || endpointVal || keyVal);
+};
+
+/**
+ * 运行连接测试：支持基于临时配置文件对表单填写的凭据进行独立测试，
+ * 且支持外部取消（isCancelled）、SMB 域自动发现与临时文件安全清理。
+ */
+export const testRemoteConnection = async ({
+  exec,
+  type,
+  values,
+  name,
+  subPath = '',
+  isCancelled = () => false,
+  discoverHostName = null,
+} = {}) => {
+  let tempConf = null;
+  try {
+    if (isCancelled()) {
+      return { ok: false, error: '测试已取消', cancelled: true };
+    }
+
+    let target;
+    let testConfigPath = null;
+    const extraArgs = [];
+    const backend = type ? findBackendType(type) : null;
+    const hasPasswordInput = Boolean(String(values?.pass || ''));
+    let useExisting = false;
+
+    // 若系统已存在该远程且未填写新密码（密码留空），使用 --<type>-<key> 覆盖用户在表单里修改的最新字段，
+    // 原密码继续由系统远程配置提供，避免二次混淆损坏，同时确保表单中修改的最新用户名/主机等立即生效参与测试
+    if (name && backend && backend.auth === 'fields' && !hasPasswordInput) {
+      try {
+        const remotes = await listRemotes(exec);
+        if (remotes.includes(name)) {
+          useExisting = true;
+        }
+      } catch {
+        useExisting = false;
+      }
+    }
+
+    if (useExisting) {
+      target = `${name}:`;
+      (backend.fields || []).forEach((field) => {
+        if (field.type === 'password') {
+          return;
+        }
+        if (values && Object.hasOwn(values, field.key)) {
+          const rawVal = String(values[field.key] ?? '').trim();
+          extraArgs.push(`--${type}-${field.key}`, rawVal);
+        }
+      });
+    } else if (backend && backend.auth === 'fields' && values && typeof values === 'object') {
+      tempConf = path.join(os.tmpdir(), `translime-test-${randomUUID()}.conf`);
+      testConfigPath = tempConf;
+      const testValues = { ...values };
+
+      if (isCancelled()) {
+        return { ok: false, error: '测试已取消', cancelled: true };
+      }
+
+      const createArgs = buildCreateArgs(type, 'testremote', testValues);
+      createArgs.push('--config', tempConf);
+      const createResult = await exec(createArgs);
+      if (createResult.code !== 0) {
+        return { ok: false, error: createResult.stderr || '配置初始化失败' };
+      }
+      target = 'testremote:';
+    } else {
+      target = subPath ? `${name}:${subPath}` : `${name}:`;
+    }
+
+    if (isCancelled()) {
+      return { ok: false, error: '测试已取消', cancelled: true };
+    }
+
+    const connection = await checkRemoteConnection(exec, target, {
+      configPath: testConfigPath,
+      extraArgs,
+    });
+    if (isCancelled()) {
+      return { ok: false, error: '测试已取消', cancelled: true };
+    }
+
+    if (connection.ok === false && connection.error
+      && /logon is invalid|bad username|authentication/i.test(connection.error)
+      && discoverHostName) {
+      const userVal = String(values?.user || '');
+      const hostVal = String(values?.host || '');
+      if (userVal.includes('@') && !values?.domain && hostVal) {
+        const machineName = await discoverHostName(hostVal).catch(() => null);
+        if (machineName) {
+          if (testConfigPath) {
+            await exec(['config', 'update', 'testremote', `domain=${machineName}`, '--obscure', '--config', testConfigPath]);
+          } else if (name) {
+            await exec(['config', 'update', name, `domain=${machineName}`, '--obscure']);
+          }
+          const retry = await checkRemoteConnection(exec, target, { configPath: testConfigPath });
+          if (retry.ok) {
+            return {
+              ok: true,
+              error: null,
+              note: `已自动补上域 ${machineName}`,
+              domain: machineName,
+            };
+          }
+        }
+        connection.error += '；用户名含 @ 时按 UPN 登录，需要在「域」中填写目标机器名（可在目标设备上运行 hostname 查看），或改用目标设备的本地账户名';
+      }
+    }
+
+    return connection;
+  } finally {
+    if (tempConf) {
+      await fs.rm(tempConf, { force: true }).catch(() => {});
+    }
+  }
 };

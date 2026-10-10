@@ -7,7 +7,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import EventEmitter from 'node:events';
-import { useLogger, usePluginConfig } from 'translime-sdk';
+import { setupMdeWindow, useLogger, usePluginConfig } from 'translime-sdk';
 import * as capture from './capture';
 import { isIncompleteShortcut, normalizeShortcut } from './main/shortcut-state';
 
@@ -180,6 +180,14 @@ const createOverlayWindow = (isDebug = false, offscreen = false) => {
     y: initialY,
     width,
     height,
+  });
+
+  // 接入宿主统一 MDE 运行时与主题
+  setupMdeWindow(overlayWindow, {
+    injectCss: true,
+    injectTheme: true,
+    syncTheme: true,
+    bootstrap: true,
   });
 
   // 加载叠加层 HTML

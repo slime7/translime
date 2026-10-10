@@ -14,7 +14,7 @@
           直通云存档未启用
         </div>
         <div class="pt-hint-desc">
-          先在「同步」设置中配置远程目标，选定的存档目录将跳过本地备份，直接与远程镜像同步。
+          先在「同步」设置中配置远程目标。直通模式直接在本地存档目录与远程存储之间双向镜像同步，不保留历史备份包。
         </div>
       </div>
       <mat-btn
@@ -29,11 +29,29 @@
     <template v-else>
       <div class="pt-toolbar">
         <div class="pt-toolbar-text">
-          <div class="pt-title">
-            直通云存档
+          <div style="display: flex; align-items: center; gap: 6px">
+            <div class="pt-title">
+              直通云存档
+            </div>
+            <mat-tooltip
+              rich
+              subhead="何时使用直通存档同步："
+              location="bottom"
+            >
+              <template #activator>
+                <mat-icon
+                  icon="help"
+                  tabindex="0"
+                  size="small"
+                  color="on-surface-variant"
+                  aria-label="何时使用直通存档同步说明"
+                />
+              </template>
+              不需要多余备份，直接同步存档位置和远程存档
+            </mat-tooltip>
           </div>
           <div class="pt-desc">
-            存档目录变更自动同步到远程（较新者胜）。取消链接时可选删除远程存档。
+            本地存档目录与远程直接镜像同步（双向对账，较新者胜），不占用多余本地备份空间。取消链接时可选删除远程存档。
           </div>
         </div>
         <div class="pt-toolbar-actions">

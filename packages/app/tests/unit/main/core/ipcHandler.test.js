@@ -389,4 +389,11 @@ describe('ipcHandler', () => {
       expect(color).toBe('#20a6fc');
     });
   });
+
+  describe('Linux Shortcuts', () => {
+    it('CREATE_LINUX_SHORTCUTS 应该调用快捷方式创建逻辑并返回结果对象', async () => {
+      const result = await ipcHandler[ipcType.CREATE_LINUX_SHORTCUTS]();
+      expect(result).toHaveProperty('success');
+    });
+  });
 });

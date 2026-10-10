@@ -40,12 +40,25 @@ const createSyncService = ({
 
   const readSyncConfig = () => {
     const raw = getConfig(settingsKey);
-    if (!raw || typeof raw !== 'object') {
-      return { target: '', rclonePath: '' };
+    const topSettings = getConfig(`plugin.${pluginId}.settings`);
+    let topRclonePath = '';
+    if (topSettings && typeof topSettings === 'object') {
+      const val = topSettings.rclonePath;
+      if (Array.isArray(val)) {
+        topRclonePath = val[0] || '';
+      } else if (typeof val === 'string') {
+        topRclonePath = val.trim();
+      }
     }
+    const syncRclone = raw && typeof raw === 'object' && typeof raw.rclonePath === 'string'
+      ? raw.rclonePath.trim()
+      : '';
+    const target = raw && typeof raw === 'object' && typeof raw.target === 'string'
+      ? raw.target.trim()
+      : '';
     return {
-      target: typeof raw.target === 'string' ? raw.target.trim() : '',
-      rclonePath: typeof raw.rclonePath === 'string' ? raw.rclonePath.trim() : '',
+      target,
+      rclonePath: syncRclone || topRclonePath,
     };
   };
 
@@ -303,11 +316,19 @@ const createSyncService = ({
       return resolveBinary(readSyncConfig());
     },
 
-    setSyncConfig({ target, rclonePath }) {
+    setSyncConfig({ target, rclonePath } = {}) {
+      const current = readSyncConfig();
+      const nextTarget = typeof target === 'string'
+        ? target.trim()
+        : current.target;
+      const nextRclonePath = typeof rclonePath === 'string'
+        ? rclonePath.trim()
+        : current.rclonePath;
       setConfig(settingsKey, {
-        target: typeof target === 'string' ? target.trim() : '',
-        rclonePath: typeof rclonePath === 'string' ? rclonePath.trim() : '',
+        target: nextTarget,
+        rclonePath: nextRclonePath,
       });
+      setConfig(`plugin.${pluginId}.settings.rclonePath`, nextRclonePath);
       return getStatus();
     },
 

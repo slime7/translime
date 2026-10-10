@@ -516,7 +516,10 @@ const debugLine = computed(() => {
     >
       <div class="action-toolbar-shell">
         <!-- 主工具栏 -->
-        <div class="action-toolbar-main" :class="{ 'is-dragging': isDraggingToolbar }">
+        <mat-toolbar
+          class="action-toolbar-main"
+          :class="{ 'is-dragging': isDraggingToolbar }"
+        >
           <div v-if="state.isDebug" class="absolute -top-6 left-0 text-[10px] text-[#FF5252] font-mono whitespace-nowrap">
             Monitor: {{ Math.round(toolbarPos.left) }},{{ Math.round(toolbarPos.top) }}
           </div>
@@ -530,9 +533,11 @@ const debugLine = computed(() => {
 
           <div class="btn-group">
             <!-- 设置尺寸按钮 -->
-            <button
+            <mat-btn
               class="btn btn-settings"
+              variant="standard"
               :class="{ 'active': activePanel === 'size' }"
+              aria-label="设置尺寸"
               @mouseenter="hoveredTooltip = '设置尺寸'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="togglePanel('size')"
@@ -553,12 +558,14 @@ const debugLine = computed(() => {
                 <path d="M21 3l-7 7" />
                 <path d="M3 21l7-7" />
               </svg>
-            </button>
+            </mat-btn>
 
             <!-- 设置圆角按钮 -->
-            <button
+            <mat-btn
               class="btn btn-settings"
+              variant="standard"
               :class="{ 'active': activePanel === 'radius' }"
+              aria-label="设置圆角"
               @mouseenter="hoveredTooltip = '设置圆角'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="togglePanel('radius')"
@@ -576,12 +583,14 @@ const debugLine = computed(() => {
               >
                 <path d="M3 21v-9a9 9 0 0 1 9-9h9" />
               </svg>
-            </button>
+            </mat-btn>
 
             <!-- 矩形工具按钮 -->
-            <button
+            <mat-btn
               class="btn btn-settings"
+              variant="standard"
               :class="{ 'active': activePanel === 'rect' }"
+              aria-label="矩形工具"
               @mouseenter="hoveredTooltip = '矩形工具'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="togglePanel('rect')"
@@ -606,12 +615,14 @@ const debugLine = computed(() => {
                   ry="2"
                 />
               </svg>
-            </button>
+            </mat-btn>
 
             <!-- 马赛克工具按钮 -->
-            <button
+            <mat-btn
               class="btn btn-settings"
+              variant="standard"
               :class="{ 'active': activePanel === 'mosaic' }"
+              aria-label="马赛克/模糊"
               @mouseenter="hoveredTooltip = '马赛克/模糊'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="togglePanel('mosaic')"
@@ -634,12 +645,14 @@ const debugLine = computed(() => {
                 <rect x="9" y="16" width="5" height="5" opacity="0.6" />
                 <rect x="16" y="16" width="5" height="5" />
               </svg>
-            </button>
+            </mat-btn>
 
             <!-- 文本工具按钮 -->
-            <button
+            <mat-btn
               class="btn btn-settings"
+              variant="standard"
               :class="{ 'active': activePanel === 'text' }"
+              aria-label="文本标注"
               @mouseenter="hoveredTooltip = '文本标注'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="togglePanel('text')"
@@ -659,14 +672,16 @@ const debugLine = computed(() => {
                 <line x1="9" y1="20" x2="15" y2="20" />
                 <line x1="12" y1="4" x2="12" y2="20" />
               </svg>
-            </button>
+            </mat-btn>
 
             <div class="divider" />
 
             <!-- 撤销按钮 -->
-            <button
+            <mat-btn
               class="btn btn-settings"
+              variant="standard"
               :disabled="state.history.length === 0"
+              aria-label="撤销 (Ctrl+Z)"
               @mouseenter="hoveredTooltip = '撤销 (Ctrl+Z)'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="actions.undo()"
@@ -685,11 +700,13 @@ const debugLine = computed(() => {
                 <polyline points="1 4 1 10 7 10" />
                 <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
               </svg>
-            </button>
+            </mat-btn>
 
             <!-- 功能按钮 -->
-            <button
+            <mat-btn
               class="btn btn-save"
+              variant="standard"
+              aria-label="保存 (Ctrl+S)"
               @mouseenter="hoveredTooltip = '保存 (Ctrl+S)'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="actions.handleAction('save')"
@@ -709,10 +726,12 @@ const debugLine = computed(() => {
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
               </svg>
-            </button>
+            </mat-btn>
 
-            <button
+            <mat-btn
               class="btn btn-copy"
+              variant="standard"
+              aria-label="复制 (Ctrl+C)"
               @mouseenter="hoveredTooltip = '复制 (Ctrl+C)'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="actions.handleAction('copy')"
@@ -738,10 +757,12 @@ const debugLine = computed(() => {
                 />
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
-            </button>
+            </mat-btn>
 
-            <button
+            <mat-btn
               class="btn btn-cancel"
+              variant="standard"
+              aria-label="取消 (Esc)"
               @mouseenter="hoveredTooltip = '取消 (Esc)'"
               @mouseleave="hoveredTooltip = ''"
               @click.stop="actions.handleAction('cancel')"
@@ -760,12 +781,13 @@ const debugLine = computed(() => {
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
-            </button>
+            </mat-btn>
           </div>
 
           <button
             class="toolbar-drag-handle"
             title="拖动工具栏"
+            aria-label="拖动工具栏"
             @mouseenter="hoveredTooltip = '拖动工具栏'"
             @mouseleave="hoveredTooltip = ''"
             @mousedown.stop.prevent="startToolbarDrag"
@@ -774,7 +796,7 @@ const debugLine = computed(() => {
               <span v-for="dot in 6" :key="dot" class="drag-dot" />
             </span>
           </button>
-        </div>
+        </mat-toolbar>
       </div>
 
       <!-- 尺寸设置栏 -->
@@ -809,7 +831,7 @@ const debugLine = computed(() => {
       </div>
 
       <!-- 圆角设置栏 -->
-      <div v-if="activePanel === 'radius'" class="sub-panel">
+      <div v-if="activePanel === 'radius'" class="sub-panel sub-panel--slider">
         <div class="sub-panel__row">
           <span class="sub-panel__label">圆角:</span>
 
@@ -825,7 +847,7 @@ const debugLine = computed(() => {
       </div>
 
       <!-- 矩形工具设置栏（横向排列） -->
-      <div v-if="activePanel === 'rect'" class="sub-panel">
+      <div v-if="activePanel === 'rect'" class="sub-panel sub-panel--extended">
         <!-- 类型切换 -->
         <div class="rect-type-toggle">
           <button
@@ -903,7 +925,7 @@ const debugLine = computed(() => {
       </div>
 
       <!-- 马赛克工具设置栏 -->
-      <div v-if="activePanel === 'mosaic'" class="sub-panel">
+      <div v-if="activePanel === 'mosaic'" class="sub-panel sub-panel--slider">
         <!-- 模式切换 -->
         <div class="rect-type-toggle">
           <button
@@ -963,7 +985,7 @@ const debugLine = computed(() => {
       </div>
 
       <!-- 文本工具设置栏 -->
-      <div v-if="activePanel === 'text'" class="sub-panel">
+      <div v-if="activePanel === 'text'" class="sub-panel sub-panel--extended">
         <span class="sub-panel__label">字号:</span>
         <SliderControl
           v-model="textFontSize"
@@ -991,6 +1013,7 @@ const debugLine = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  gap: 14px;
   z-index: 100;
   pointer-events: none;
 }
@@ -1002,23 +1025,38 @@ const debugLine = computed(() => {
   gap: 14px;
 }
 
+:deep(.mat-toolbar.action-toolbar-main),
 .action-toolbar-main {
-  display: flex;
+  position: relative !important;
+  inset: auto !important;
+  translate: none !important;
+  inline-size: auto !important;
+  max-inline-size: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border: none !important;
+  z-index: 1;
+}
+
+:deep(.mat-toolbar.action-toolbar-main .mat-toolbar__surface) {
   position: relative;
+  display: flex;
   align-items: center;
   min-width: 444px;
   min-height: 68px;
   padding: 8px 10px 8px 18px;
-  background: rgb(28 27 31 / 88%);
+  background: var(--mat-sys-color-surface-container-high, rgb(28 27 31 / 88%));
   border-radius: 999px;
   box-shadow: 0 6px 20px rgb(0 0 0 / 28%);
   backdrop-filter: blur(18px) saturate(130%);
-  border: 1px solid rgb(255 255 255 / 7%);
+  border: 1px solid var(--mat-sys-color-outline-variant, rgb(255 255 255 / 7%));
   pointer-events: auto;
   transition: box-shadow .2s cubic-bezier(.2, 0, 0, 1), background .2s cubic-bezier(.2, 0, 0, 1), border-color .2s cubic-bezier(.2, 0, 0, 1);
+  box-sizing: border-box;
 }
 
-.action-toolbar-main.is-dragging {
+:deep(.mat-toolbar.action-toolbar-main.is-dragging .mat-toolbar__surface) {
   cursor: grabbing;
   box-shadow: 0 10px 28px rgb(0 0 0 / 34%);
 }
@@ -1042,10 +1080,17 @@ const debugLine = computed(() => {
 
 .toolbar-tooltip-text {
   font-size: 12px;
-  color: rgb(232 224 233 / 82%);
+  color: var(--mat-sys-color-on-surface-variant, rgb(232 224 233 / 82%));
   padding: 0 12px 0 0;
   font-weight: 500;
   letter-spacing: .01em;
+}
+
+:deep(.mat-toolbar.action-toolbar-main .mat-toolbar__content) {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
 }
 
 .btn-group {
@@ -1054,60 +1099,72 @@ const debugLine = computed(() => {
   gap: 2px;
 }
 
+:deep(.mat-btn.btn),
 .btn {
   width: 38px;
   height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  max-width: 38px;
+  max-height: 38px;
+  padding: 0 !important;
   border: none;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgb(232 224 233 / 86%);
+  color: var(--mat-sys-color-on-surface, rgb(232 224 233 / 86%));
   transition: background-color .2s cubic-bezier(.2, 0, 0, 1), color .2s cubic-bezier(.2, 0, 0, 1), opacity .2s cubic-bezier(.2, 0, 0, 1);
   background: transparent;
   border-radius: 999px;
+  flex-shrink: 0;
 }
 
+:deep(.mat-btn.btn:hover),
 .btn:hover {
-  background: rgb(232 224 233 / 8%);
-  color: rgb(255 251 254 / 96%);
+  background: var(--mat-sys-color-surface-container-highest, rgb(232 224 233 / 8%));
+  color: var(--mat-sys-color-on-surface, rgb(255 251 254 / 96%));
 }
 
+:deep(.mat-btn.btn:active),
 .btn:active {
-  background: rgb(232 224 233 / 12%);
+  background: var(--mat-sys-color-surface-container-highest, rgb(232 224 233 / 12%));
 }
 
+:deep(.mat-btn.btn.active),
 .btn.active {
-  background: rgb(79 55 139 / 28%);
-  color: rgb(210 194 255 / 98%);
+  background: var(--mat-sys-color-primary-container, rgb(79 55 139 / 28%));
+  color: var(--mat-sys-color-on-primary-container, rgb(210 194 255 / 98%));
 }
 
+:deep(.mat-btn.btn:disabled),
 .btn:disabled {
-  opacity: .35;
-  cursor: default;
+  opacity: .38;
+  cursor: not-allowed;
+  color: var(--mat-sys-color-on-surface);
 }
 
 .divider {
   width: 1px;
   height: 24px;
-  background: rgb(202 196 208 / 22%);
+  background: var(--mat-sys-color-outline-variant, rgb(202 196 208 / 22%));
   margin: 0 6px;
 }
 
 .sub-divider {
   width: 1px;
   height: 18px;
-  background: rgb(255 255 255 / 15%);
+  background: var(--mat-sys-color-outline-variant, rgb(255 255 255 / 15%));
   flex-shrink: 0;
 }
 
-.btn-save:hover { background: rgb(103 80 164 / 18%); }
+:deep(.mat-btn.btn-save:hover) { background: color-mix(in srgb, var(--mat-sys-color-primary, rgb(103 80 164)) 22%, transparent); }
 
-.btn-copy:hover { background: rgb(103 80 164 / 18%); }
+:deep(.mat-btn.btn-copy:hover) { background: color-mix(in srgb, var(--mat-sys-color-primary, rgb(103 80 164)) 22%, transparent); }
 
-.btn-cancel:hover {
-  background: rgb(140 29 24 / 22%);
-  color: rgb(255 180 171 / 96%);
+:deep(.mat-btn.btn-cancel:hover) {
+  background: color-mix(in srgb, var(--mat-sys-color-error, rgb(140 29 24)) 25%, transparent);
+  color: var(--mat-sys-color-error, rgb(255 180 171 / 96%));
 }
 
 .toolbar-drag-handle {
@@ -1121,19 +1178,19 @@ const debugLine = computed(() => {
   align-items: center;
   justify-content: center;
   cursor: grab;
-  color: rgb(232 224 233 / 74%);
+  color: var(--mat-sys-color-on-surface-variant);
   transition: background-color .2s cubic-bezier(.2, 0, 0, 1), color .2s cubic-bezier(.2, 0, 0, 1), border-color .2s cubic-bezier(.2, 0, 0, 1);
 }
 
 .toolbar-drag-handle:hover {
-  color: rgb(255 251 254 / 96%);
-  background: transparent;
+  color: var(--mat-sys-color-on-surface);
+  background: var(--mat-sys-color-surface-container-highest);
 }
 
 .toolbar-drag-handle:active {
   cursor: grabbing;
-  background: transparent;
-  color: rgb(255 251 254 / 90%);
+  background: var(--mat-sys-color-surface-container-highest);
+  color: var(--mat-sys-color-on-surface);
 }
 
 .drag-dots {
@@ -1148,36 +1205,51 @@ const debugLine = computed(() => {
   height: 4px;
   border-radius: 50%;
   background: currentcolor;
-  opacity: .8;
+  opacity: 1;
 }
 
 /* 通用子面板 */
 .sub-panel {
-  padding: 10px 14px;
-  background: rgb(28 27 31 / 88%);
+  padding: 10px 16px;
+  background: var(--mat-sys-color-surface-container-high, rgb(28 27 31 / 88%));
   border-radius: 999px;
   box-shadow: 0 6px 20px rgb(0 0 0 / 28%);
   backdrop-filter: blur(18px) saturate(130%);
-  border: 1px solid rgb(255 255 255 / 7%);
+  border: 1px solid var(--mat-sys-color-outline-variant, rgb(255 255 255 / 7%));
   pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 56px;
   box-sizing: border-box;
-  max-width: 100%;
+  max-width: 444px;
+}
+
+.sub-panel--slider {
+  min-width: 320px;
+}
+
+.sub-panel--extended {
+  min-width: 390px;
 }
 
 .sub-panel__row {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.sub-panel__row .slider-control,
+.sub-panel > .slider-control {
+  flex: 1;
+  min-width: 0;
 }
 
 .sub-panel__label {
-  font-size: 12px;
-  color: rgb(232 224 233 / 78%);
+  font-size: 13px;
+  color: var(--mat-sys-color-on-surface);
   white-space: nowrap;
   font-weight: 500;
 }
@@ -1188,27 +1260,29 @@ const debugLine = computed(() => {
   gap: 4px;
   font-family: monospace;
   font-size: 13px;
-  color: #eee;
 }
 
 .size-input {
-  background: rgb(17 16 20 / 56%);
-  border: 1px solid rgb(255 255 255 / 10%);
+  background: var(--mat-sys-color-surface-container-highest);
+  border: 1px solid var(--mat-sys-color-outline-variant);
   border-radius: 999px;
-  color: rgb(255 251 254 / 96%);
+  color: var(--mat-sys-color-on-surface);
   padding: 2px 8px;
   text-align: center;
   outline: none;
   font-family: inherit;
   font-size: inherit;
+  font-weight: 500;
   min-width: 4ch;
-  height: 22px;
+  height: 24px;
   box-sizing: border-box;
+  transition: border-color .2s, background-color .2s;
 }
 
 .size-input:focus {
-  border-color: #2196f3;
-  background: rgb(0 0 0 / 50%);
+  border-color: var(--mat-sys-color-primary, #2196f3);
+  background: var(--mat-sys-color-surface, #fff);
+  box-shadow: 0 0 0 1px var(--mat-sys-color-primary, #2196f3);
 }
 
 .size-input::-webkit-outer-spin-button,
@@ -1218,20 +1292,22 @@ const debugLine = computed(() => {
 }
 
 .size-separator {
-  color: rgb(255 255 255 / 50%);
+  color: var(--mat-sys-color-on-surface-variant);
   font-size: 12px;
+  font-weight: 500;
 }
 
 .size-unit {
-  color: rgb(255 255 255 / 50%);
+  color: var(--mat-sys-color-on-surface-variant);
   font-size: 12px;
+  font-weight: 500;
   margin-left: 2px;
 }
 
 .btn-confirm {
   border: 1px solid transparent;
-  background: rgb(103 80 164 / 92%);
-  color: rgb(255 251 254 / 96%);
+  background: var(--mat-sys-color-primary, rgb(103 80 164 / 92%));
+  color: var(--mat-sys-color-on-primary, rgb(255 251 254 / 96%));
   border-radius: 999px;
   padding: 2px 14px;
   font-size: 13px;
@@ -1244,16 +1320,17 @@ const debugLine = computed(() => {
 }
 
 .btn-confirm:hover {
-  background: rgb(117 92 184 / 96%);
+  background: color-mix(in srgb, var(--mat-sys-color-primary, rgb(117 92 184)) 85%, white);
 }
 
-.btn-confirm:active { background: rgb(90 69 145 / 96%); }
+.btn-confirm:active { background: color-mix(in srgb, var(--mat-sys-color-primary, rgb(90 69 145)) 85%, black); }
 
 /* 矩形类型切换 */
 .rect-type-toggle {
   display: flex;
   gap: 2px;
-  background: rgb(232 224 233 / 7%);
+  background: var(--mat-sys-color-surface-container-highest);
+  border: 1px solid var(--mat-sys-color-outline-variant);
   border-radius: 999px;
   padding: 2px;
   flex-shrink: 0;
@@ -1267,19 +1344,20 @@ const debugLine = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgb(232 224 233 / 72%);
+  color: var(--mat-sys-color-on-surface-variant);
   background: transparent;
   border-radius: 999px;
   transition: background-color .2s cubic-bezier(.2, 0, 0, 1), color .2s cubic-bezier(.2, 0, 0, 1);
 }
 
 .rect-type-btn:hover {
-  color: rgb(255 251 254 / 96%);
-  background: rgb(232 224 233 / 8%);
+  color: var(--mat-sys-color-on-surface);
+  background: var(--mat-sys-color-surface-container);
 }
 
 .rect-type-btn--active {
-  color: rgb(210 194 255 / 98%);
-  background: rgb(79 55 139 / 28%);
+  color: var(--mat-sys-color-on-primary-container);
+  background: var(--mat-sys-color-primary-container);
 }
 </style>
+

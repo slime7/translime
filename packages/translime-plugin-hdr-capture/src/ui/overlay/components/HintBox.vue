@@ -128,14 +128,17 @@ watchEffect(() => {
 
 <template>
   <div
-    class="absolute z-50 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
+    class="hint-box-container"
     :style="hintStyle"
   >
-    <div class="bg-[#121214]/75 text-white/90 px-4 py-3 rounded-xl text-[13px] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] font-medium tracking-wide">
-      <p class="mb-1 flex border-b border-white/10 pb-1">
+    <mat-card
+      class="hint-card bg-mat-surface-container-high/85 text-mat-on-surface border-mat-outline-variant/20 shadow-mat-level2"
+      variant="elevated"
+    >
+      <p class="hint-title text-mat-on-surface border-b border-mat-outline-variant/20">
         {{ state.captureMode === 'element' ? '界面元素模式' : '窗口模式' }}
       </p>
-      <ul class="space-y-1.5 mt-2 opacity-80 text-xs">
+      <ul class="hint-list text-mat-on-surface-variant">
         <li>• Tab 切换窗口和界面元素模式</li>
         <li>• 滚轮切换同一位置的不同层级</li>
         <li>
@@ -145,9 +148,56 @@ watchEffect(() => {
           • 正在更新界面元素候选
         </li>
         <li>
-          • <kbd class="px-1 py-0.5 bg-white/10 rounded">ESC</kbd> 取消
+          • <kbd class="hint-kbd bg-mat-surface-container-highest/60 text-mat-on-surface">ESC</kbd> 取消
         </li>
       </ul>
-    </div>
+    </mat-card>
   </div>
 </template>
+
+<style scoped>
+.hint-box-container {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.hint-card {
+  width: max-content;
+  max-width: 320px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--mat-sys-color-surface-container-high, rgba(18, 18, 20, 0.85));
+  backdrop-filter: blur(18px) saturate(130%);
+  border: 1px solid var(--mat-sys-color-outline-variant, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
+}
+
+.hint-title {
+  margin-bottom: 4px;
+  display: flex;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--mat-sys-color-outline-variant, rgba(255, 255, 255, 0.1));
+  color: var(--mat-sys-color-on-surface, rgba(255, 255, 255, 0.9));
+}
+
+.hint-list {
+  margin-top: 8px;
+  opacity: 0.85;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--mat-sys-color-on-surface-variant, rgba(255, 255, 255, 0.8));
+}
+
+.hint-kbd {
+  padding: 2px 4px;
+  background: var(--mat-sys-color-surface-container-highest, rgba(255, 255, 255, 0.1));
+  border-radius: 4px;
+}
+</style>

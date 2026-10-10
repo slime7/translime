@@ -15,6 +15,7 @@ import titleBarRegistry from './core/titleBarRegistry';
 import setupDeepLink, { linkHandler } from './core/deepLink';
 import * as autoUpdate from './core/autoUpdate';
 import { setupLinuxDesktopIntegration } from './utils/linuxDesktopIntegration';
+import createProtocol from './utils/createProtocol';
 
 /**
  * 插件状态变化推送给渲染端的防抖间隔（毫秒）。
@@ -83,6 +84,8 @@ class CreateElectronApp extends EventEmitter {
       privileges: {
         secure: true,
         standard: true,
+        corsEnabled: true,
+        supportFetchAPI: true,
       },
     }]);
 
@@ -153,6 +156,7 @@ class CreateElectronApp extends EventEmitter {
 
     app.whenReady()
       .then(async () => {
+        createProtocol('app');
         if (this.isDevelopment) {
           try {
             const { installExtension, VUEJS_DEVTOOLS } = await import('electron-devtools-installer');

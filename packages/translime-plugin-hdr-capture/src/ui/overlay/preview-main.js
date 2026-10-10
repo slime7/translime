@@ -3,6 +3,8 @@
  * 在浏览器中预览 Overlay UI，不需要 Electron 环境
  */
 import { createApp } from 'vue';
+import { createMatUi } from 'mde-vue';
+import 'mde-vue/styles.css';
 import { initOverlayPreviewMock } from './preview-mock';
 import App from './App.vue';
 import './index.css';
@@ -12,6 +14,7 @@ await initOverlayPreviewMock();
 
 // 挂载应用
 const app = createApp(App);
+app.use(createMatUi());
 app.mount('#app');
 
 // eslint-disable-next-line no-console
