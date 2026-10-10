@@ -72,6 +72,7 @@ export const GET_MDE_THEME_TOKENS = 'get-mde-theme-tokens';
 export const GET_MDE_THEME_CSS = 'get-mde-theme-css';
 export const MDE_THEME_UPDATED = 'mde-theme-updated';
 export const GET_PRELOAD_PATH = 'get-preload-path';
+export const CREATE_LINUX_SHORTCUTS = 'create-linux-shortcuts';
 
 export default {
   DEVTOOLS,
@@ -144,4 +145,5 @@ export default {
   GET_MDE_THEME_CSS,
   MDE_THEME_UPDATED,
   GET_PRELOAD_PATH,
+  CREATE_LINUX_SHORTCUTS,
 };

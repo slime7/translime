@@ -52,7 +52,7 @@ flowchart LR
 ### 宿主主进程（packages/app/src/main）
 
 - `index.js` / `launch.js` / `createElectronApp.js`：应用入口与启动编排。
-- `utils/linuxDesktopIntegration.js`：Linux 桌面环境（Wayland / X11）XDG 图标与 .desktop 启动项自动注册。
+- `utils/linuxDesktopIntegration.js`：Linux 桌面环境（Wayland / X11）XDG 图标与 .desktop 启动项初始化，以及桌面与开始菜单快捷方式的手动创建与更新。
 - `core/pluginLoader.js`：插件系统门面，维护插件列表、命令注册表与激活索引，把具体实现委托给 `plugin-loader/` 子模块：
   - `plugin-loader/constants.js`：路径、状态与激活常量
   - `plugin-loader/discovery.js`：目录扫描、manifest 解析、依赖图与激活索引
