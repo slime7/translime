@@ -69,6 +69,10 @@ export default defineConfig(({ mode }) => {
         input: {
           overlay: path.resolve(dirname, 'src/ui/overlay/overlay.html'),
         },
+        external: [
+          'vue',
+          'mde-vue',
+        ],
         output: {
           format: 'esm',
           entryFileNames: '[name].js',

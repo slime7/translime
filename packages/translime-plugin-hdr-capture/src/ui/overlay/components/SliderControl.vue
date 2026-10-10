@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 const props = defineProps({
   /** 当前值 (v-model) */
@@ -41,8 +41,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
-const sliderRef = ref(null);
-
 /** 安全钳制数值到 [min, max] 范围 */
 const clamp = (val) => Math.max(props.min, Math.min(props.max, val));
 
@@ -52,7 +50,8 @@ const internalValue = computed({
     if (props.disabled) {
       return;
     }
-    const clamped = clamp(parseInt(val, 10) || 0);
+    const num = Number(val);
+    const clamped = clamp(Number.isNaN(num) ? props.min : Math.round(num / props.step) * props.step);
     emit('update:modelValue', clamped);
   },
 });
@@ -76,35 +75,40 @@ const onWheel = (e) => {
 
 <template>
   <div
-    ref="sliderRef"
     class="slider-control"
     :class="{ 'slider-control--disabled': disabled }"
     @wheel.stop="onWheel"
   >
-    <input
+    <mat-slider
       v-model="internalValue"
-      type="range"
       :min="min"
       :max="max"
       :step="step"
       :disabled="disabled"
-      class="slider-control__range"
-      @mousedown.stop
+      size="small"
+      color="primary"
+      class="slider-control__slider"
     >
-
-    <input
-      v-model="internalValue"
-      type="number"
-      :min="min"
-      :max="max"
-      :step="step"
-      :disabled="disabled"
-      class="slider-control__input"
-      :style="{ width: inputWidth }"
-      @mousedown.stop
-    >
-
-    <span v-if="unit" class="slider-control__unit">{{ unit }}</span>
+      <template #append>
+        <div class="slider-control__append">
+          <input
+            v-model.number="internalValue"
+            type="number"
+            :min="min"
+            :max="max"
+            :step="step"
+            :disabled="disabled"
+            class="slider-control__input"
+            :style="{ width: inputWidth }"
+            @mousedown.stop
+          >
+          <span
+            v-if="unit"
+            class="slider-control__unit"
+          >{{ unit }}</span>
+        </div>
+      </template>
+    </mat-slider>
   </div>
 </template>
 
@@ -112,44 +116,48 @@ const onWheel = (e) => {
 .slider-control {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #eee;
-  font-size: 13px;
+  flex: 1;
+  width: 100%;
+  min-width: 140px;
 }
 
 .slider-control--disabled {
-  opacity: .4;
+  opacity: .38;
   pointer-events: none;
 }
 
-.slider-control__range {
+.slider-control__slider {
   flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: rgb(255 255 255 / 30%);
-  outline: none;
-  accent-color: #38bdf8;
-  width: 100px;
+  min-width: 130px;
+}
+
+.slider-control__append {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .slider-control__input {
-  background: rgb(0 0 0 / 30%);
-  border: 1px solid rgb(255 255 255 / 20%);
+  background: var(--mat-sys-color-surface-container-highest, rgb(0 0 0 / 20%));
+  border: 1px solid var(--mat-sys-color-outline-variant, rgb(0 0 0 / 20%));
   border-radius: 4px;
-  color: white;
+  color: var(--mat-sys-color-on-surface, #1c1b1f);
   padding: 2px 4px;
   text-align: center;
   outline: none;
   font-family: inherit;
-  font-size: inherit;
-  min-width: 4ch;
-  height: 22px;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 3ch;
+  height: 24px;
   box-sizing: border-box;
+  transition: border-color .2s, background-color .2s;
 }
 
 .slider-control__input:focus {
-  border-color: #38bdf8;
-  background: rgb(0 0 0 / 50%);
+  border-color: var(--mat-sys-color-primary, #38bdf8);
+  background: var(--mat-sys-color-surface, #fff);
+  box-shadow: 0 0 0 1px var(--mat-sys-color-primary, #38bdf8);
 }
 
 /* 移除数字输入框的箭头 */
@@ -160,8 +168,10 @@ const onWheel = (e) => {
 }
 
 .slider-control__unit {
-  color: rgb(255 255 255 / 50%);
+  color: var(--mat-sys-color-on-surface-variant, rgb(0 0 0 / 60%));
   font-size: 12px;
+  font-weight: 500;
   margin-left: 2px;
+  user-select: none;
 }
 </style>

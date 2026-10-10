@@ -513,3 +513,63 @@ export interface ElectronNetResponse {
  * preview 模式自动回退 mock net，适合基础联调）
  */
 export function electronNetAdapter(config: Record<string, any>): Promise<ElectronNetResponse>;
+
+// ----------------------------------------------------------------------
+// 统一 MDE 运行时 / 窗口辅助（主进程）
+// ----------------------------------------------------------------------
+
+export interface MdeRuntimeUrls {
+  vue: string;
+  mdeJs: string;
+  mdeCss: string;
+  mdeTailwindCss: string;
+  bootstrapJs: string;
+}
+
+export interface SetupMdeWindowOptions {
+  /** 自定义基础 URL，未指定时按环境自动推断 */
+  baseUrl?: string;
+  /** 是否为开发环境 */
+  isDev?: boolean;
+  /** 是否自动在 DOM 就绪后注入 mde.css 基础样式，默认 true */
+  injectCss?: boolean;
+  /** 是否自动注入当前宿主 M3 主题 CSS 变量，默认 true */
+  injectTheme?: boolean;
+  /** 是否监听宿主主题变更并实时同步至窗口，默认 true */
+  syncTheme?: boolean;
+  /** 是否在 DOM 就绪后自动执行 bootstrap.js 脚本挂载 window.mde$，默认 false */
+  bootstrap?: boolean;
+}
+
+export interface SetupMdeWindowHandle {
+  /** 移除监听器与钩子 */
+  remove(): void;
+  /** 手动触发一次当前主题刷新 */
+  updateTheme(): Promise<void>;
+}
+
+/**
+ * 获取 MDE 统一运行时的资源 URL（主进程）
+ */
+export function getMdeRuntimeUrls(options?: { baseUrl?: string; isDev?: boolean }): MdeRuntimeUrls;
+
+/**
+ * 获取可用于 <script type="importmap"> 的 JSON 对象（主进程）
+ */
+export function getMdeImportMap(options?: { baseUrl?: string; isDev?: boolean }): {
+  imports: { vue: string; 'mde-vue': string };
+};
+
+/**
+ * 获取可直接内联到 HTML <head> 中的统一运行时代码片段（包含 importmap、css 链接与 bootstrap 引导）
+ */
+export function getMdeHtmlSnippet(options?: { baseUrl?: string; isDev?: boolean }): string;
+
+/**
+ * 为任意 BrowserWindow / BrowserView / WebContentsView 注入 MDE 运行时与动态主题（仅主进程；隔离模式下抛错）
+ */
+export function setupMdeWindow(
+  winOrWebContents: any,
+  options?: SetupMdeWindowOptions,
+): SetupMdeWindowHandle;
+

@@ -11,7 +11,7 @@
 | 激活 | 宿主加载插件主进程入口并执行 `pluginDidLoad` 的过程 |
 | 命令 | manifest `contributes.commands` 声明的静态命令，宿主可在插件未激活时反向激活 |
 | preview 模式 | SDK 提供的浏览器调试模式，mock 宿主 API，仅用于 UI 辅助调试 |
-| 深链 | `translime://` 协议，用于从外部启动宿主并携带参数；开发模式注册独立的 `translime-dev://`，避免覆盖安装版的 `translime://` 注册 |
+| 深链 | `translime://` 协议，用于从外部启动宿主并携带参数；开发隔离模式（`dev:isolate`）注册独立的 `translime-dev://`，避免覆盖安装版的 `translime://` 注册 |
 
 ## 插件 manifest（package.json.plugin）
 

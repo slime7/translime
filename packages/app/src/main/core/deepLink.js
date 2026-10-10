@@ -34,9 +34,11 @@ const setupDeepLink = () => {
     linkHandler(appArgs.url);
   }
   if (process.defaultApp) {
-    if (process.argv.length >= 2) {
-      app.setAsDefaultProtocolClient(DEV_PROTOCOL, process.execPath, [path.resolve(process.argv[2])]);
-    }
+    const entryArg = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve('.');
+    const isIsolated = process.argv.includes('--isolate')
+      || (typeof app.getPath === 'function' && app.getPath('userData').endsWith('translime-dev'));
+    const protocol = isIsolated ? DEV_PROTOCOL : PROTOCOL;
+    app.setAsDefaultProtocolClient(protocol, process.execPath, [entryArg]);
   } else {
     app.setAsDefaultProtocolClient(PROTOCOL);
   }

@@ -38,6 +38,7 @@ import buildTextEditMenu from './textEditMenu';
 import { dispatchMenuAction } from './menuRegistry';
 import titleBarRegistry from './titleBarRegistry';
 import { getIpcSender } from './ipcContext';
+import { getMatThemeCss, getMatThemeTokens } from '../utils/mdeThemeHelper';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 
@@ -556,6 +557,16 @@ const ipcHandler = {
   },
   [ipcType.THEME_COLOR_UPDATED]() {
     appManager.getIpc().sendToAllWindows(ipcType.THEME_COLOR_UPDATED);
+    appManager.getIpc().sendToAllWindows(ipcType.MDE_THEME_UPDATED, {
+      tokens: getMatThemeTokens(),
+      css: getMatThemeCss(),
+    });
+  },
+  [ipcType.GET_MDE_THEME_TOKENS](options = {}) {
+    return getMatThemeTokens(options);
+  },
+  [ipcType.GET_MDE_THEME_CSS](options = {}) {
+    return getMatThemeCss(options);
   },
   [ipcType.GET_LAUNCH_ARGV]() {
     return process.argv;

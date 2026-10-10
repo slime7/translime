@@ -797,20 +797,20 @@ const renderMosaicCanvas = (el, ann) => {
 
   if (ann.mode === 'blur') {
     // 模糊模式：全尺寸绘制，通过 CSS filter 模糊
-    /* eslint-disable no-param-reassign */
+
     el.width = Math.round(ann.w);
     el.height = Math.round(ann.h);
-    /* eslint-enable no-param-reassign */
+
     ctx.drawImage(screen.img, sx, sy, sw, sh, 0, 0, ann.w, ann.h);
   } else {
     // 像素化模式：缩小绘制，通过 CSS image-rendering: pixelated 放大
     const blockSize = ann.blockSize || 10;
     const smallW = Math.max(1, Math.ceil(ann.w / blockSize));
     const smallH = Math.max(1, Math.ceil(ann.h / blockSize));
-    /* eslint-disable no-param-reassign */
+
     el.width = smallW;
     el.height = smallH;
-    /* eslint-enable no-param-reassign */
+
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(screen.img, sx, sy, sw, sh, 0, 0, smallW, smallH);
   }

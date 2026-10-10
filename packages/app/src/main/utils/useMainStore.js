@@ -3,6 +3,7 @@ import { app } from 'electron';
 import * as path from 'node:path';
 import pkg from '@pkg/../package.json' with { type: 'json' };
 import appConfigStore from './appConfigStore';
+import { getMatThemeCss, getMatThemeTokens } from './mdeThemeHelper';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,8 @@ const useMainStore = () => {
     APPDATA_PATH,
     TEMP_DIR,
     config,
+    getMatThemeTokens,
+    getMatThemeCss,
   };
 };
 

@@ -68,6 +68,9 @@ export const CHECK_FOR_UPDATE = 'check-for-update';
 export const GET_SYSTEM_COLOR = 'get-system-color';
 export const SYSTEM_COLOR_CHANGED = 'system-color-changed';
 export const THEME_COLOR_UPDATED = 'theme-color-updated';
+export const GET_MDE_THEME_TOKENS = 'get-mde-theme-tokens';
+export const GET_MDE_THEME_CSS = 'get-mde-theme-css';
+export const MDE_THEME_UPDATED = 'mde-theme-updated';
 export const GET_PRELOAD_PATH = 'get-preload-path';
 
 export default {
@@ -107,16 +110,13 @@ export default {
   DIALOG_SHOW_CERTIFICATE_TRUST_DIALOG,
   DIALOG_SHOW_ERROR_BOX,
   DIALOG_SHOW_MESSAGE_BOX,
-  DIALOG_SHOW_OPEN_DIALOG,
-  DIALOG_SHOW_SAVE_DIALOG,
   SHOW_NOTIFICATION,
   IS_NOTIFICATION_SUPPORTED,
   OPEN_AT_LOGIN,
+  SHOW_DEV_PLUGIN,
   SHOW_TEXT_EDIT_CONTEXT,
-  THEME_UPDATED,
   GET_NATIVE_THEME,
   SET_NATIVE_THEME,
-  SHOW_DEV_PLUGIN,
   GET_LAUNCH_ARGV,
   GET_LOG_DATES,
   GET_LOG_RECORDS,
@@ -128,17 +128,20 @@ export default {
   LOAD_PLUGIN_UI,
   NET_REQUEST,
   NET_ABORT,
-  UPDATE_CHECKING: 'update-checking',
-  UPDATE_AVAILABLE: 'update-available',
-  UPDATE_NOT_AVAILABLE: 'update-not-available',
-  UPDATE_ERROR: 'update-error',
-  UPDATE_DOWNLOAD_PROGRESS: 'update-download-progress',
-  UPDATE_DOWNLOADED: 'update-downloaded',
-  START_DOWNLOAD_UPDATE: 'start-download-update',
-  QUIT_AND_INSTALL: 'quit-and-install',
-  CHECK_FOR_UPDATE: 'check-for-update',
-  GET_SYSTEM_COLOR: 'get-system-color',
-  SYSTEM_COLOR_CHANGED: 'system-color-changed',
-  THEME_COLOR_UPDATED: 'theme-color-updated',
-  GET_PRELOAD_PATH: 'get-preload-path',
+  UPDATE_CHECKING,
+  UPDATE_AVAILABLE,
+  UPDATE_NOT_AVAILABLE,
+  UPDATE_ERROR,
+  UPDATE_DOWNLOAD_PROGRESS,
+  UPDATE_DOWNLOADED,
+  START_DOWNLOAD_UPDATE,
+  QUIT_AND_INSTALL,
+  CHECK_FOR_UPDATE,
+  GET_SYSTEM_COLOR,
+  SYSTEM_COLOR_CHANGED,
+  THEME_COLOR_UPDATED,
+  GET_MDE_THEME_TOKENS,
+  GET_MDE_THEME_CSS,
+  MDE_THEME_UPDATED,
+  GET_PRELOAD_PATH,
 };
