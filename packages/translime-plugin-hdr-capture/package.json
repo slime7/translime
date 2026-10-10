@@ -1,7 +1,7 @@
 {
   "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
   "name": "translime-plugin-hdr-capture",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "轻松获取 HDR 截图",
   "license": "MIT",
   "repository": {
