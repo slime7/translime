@@ -173,13 +173,23 @@
           @click="pickRclone"
         >
           <template #trailing>
-            <mat-btn
-              icon="folder_open"
-              variant="standard"
-              size="small"
-              aria-label="选择 rclone 可执行文件"
-              @click.stop="pickRclone"
-            />
+            <div style="display: flex; align-items: center; gap: 4px">
+              <mat-btn
+                v-if="form.rclonePath"
+                icon="close"
+                variant="standard"
+                size="small"
+                aria-label="清除 rclone 路径"
+                @click.stop="clearRclone"
+              />
+              <mat-btn
+                icon="folder_open"
+                variant="standard"
+                size="small"
+                aria-label="选择 rclone 可执行文件"
+                @click.stop="pickRclone"
+              />
+            </div>
           </template>
         </mat-text-field>
 
@@ -327,7 +337,7 @@
         v-if="view === 'remote'"
         variant="text"
         prefix="cloud_done"
-        :disabled="!selectedTypeRemoteExists || authorizeWaiting"
+        :disabled="!canTestConnection || authorizeWaiting"
         :loading="testing"
         @click="testRemoteConnection"
       >
@@ -520,9 +530,24 @@ const remoteSubmitText = computed(() => {
   }
   return currentBackend.value?.auth === 'oauth' ? '授权并创建' : '创建远程';
 });
-// 连接测试针对已保存的远程（命名规则为 translime-<类型>），类型对应的远程不存在时不可用
-const selectedTypeRemoteExists = computed(() => Boolean(selectedType.value)
-  && remotes.value.some((remote) => remote.name === `translime-${selectedType.value}`));
+// 连接测试可用性基于当前表单填写情况：表单后端至少填写了主机地址或服务地址
+const canTestConnection = computed(() => {
+  if (!selectedType.value || testing.value || authorizeWaiting.value) {
+    return false;
+  }
+  const backend = currentBackend.value;
+  if (!backend) {
+    return false;
+  }
+  if (backend.auth === 'oauth') {
+    return remotes.value.some((remote) => remote.name === `translime-${selectedType.value}`);
+  }
+  const hostVal = String(fieldValues.host || '').trim();
+  const urlVal = String(fieldValues.url || '').trim();
+  const endpointVal = String(fieldValues.endpoint || '').trim();
+  const keyVal = String(fieldValues.access_key_id || '').trim();
+  return Boolean(hostVal || urlVal || endpointVal || keyVal);
+});
 const testResultText = computed(() => {
   if (!testResult.value) {
     return '';
@@ -549,6 +574,7 @@ const resetFormError = () => {
 // 保存的同步配置仍是唯一事实源，记忆只用于对话框内的切换连续性
 const targetByRemote = reactive({});
 let lastRemoteKey = null;
+let lastSavedRclonePath = '';
 watch(selectedRemote, (value) => {
   if (lastRemoteKey !== null) {
     targetByRemote[lastRemoteKey] = form.target;
@@ -558,28 +584,32 @@ watch(selectedRemote, (value) => {
 });
 
 watch(visible, async (open) => {
-  if (open) {
-    resetFormError();
-    probeResult.value = null;
-    testResult.value = null;
-    view.value = 'main';
-    // webview 实例会被缓存复用：打开时先取最新状态再填表单，
-    // 避免旧状态里的空配置在保存时覆盖刚写入的设置
-    await refreshSyncStatus();
-    const config = syncStatus.value?.config;
-    form.rclonePath = config?.rclonePath || '';
-    // 后端类型表驱动「修改」按钮的可用性（OAuth 远程不可编辑）；列表加载后再按已保存目标选中远程，
-    // 目标含子路径（如 translime-smb:share）时也挂到所属远程名下，切换下拉不会丢
-    await Promise.all([loadBackends(), loadRemotes()]);
-    form.target = config?.target || '';
-    lastRemoteKey = null;
-    const matchedRemote = remotes.value.find((remote) => form.target.startsWith(`${remote.name}:`));
-    targetByRemote[matchedRemote ? `${matchedRemote.name}:` : ''] = form.target;
-    selectedRemote.value = matchedRemote ? `${matchedRemote.name}:` : '';
+  if (!open) {
+    stopCurrentTest();
+    return;
   }
+  resetFormError();
+  probeResult.value = null;
+  testResult.value = null;
+  view.value = 'main';
+  // webview 实例会被缓存复用：打开时先取最新状态再填表单，
+  // 避免旧状态里的空配置在保存时覆盖刚写入的设置
+  await refreshSyncStatus();
+  const config = syncStatus.value?.config;
+  form.rclonePath = config?.rclonePath || '';
+  lastSavedRclonePath = form.rclonePath;
+  // 后端类型表驱动「修改」按钮的可用性（OAuth 远程不可编辑）；列表加载后再按已保存目标选中远程，
+  // 目标含子路径（如 translime-smb:share）时也挂到所属远程名下，切换下拉不会丢
+  await Promise.all([loadBackends(), loadRemotes()]);
+  form.target = config?.target || '';
+  lastRemoteKey = null;
+  const matchedRemote = remotes.value.find((remote) => form.target.startsWith(`${remote.name}:`));
+  targetByRemote[matchedRemote ? `${matchedRemote.name}:` : ''] = form.target;
+  selectedRemote.value = matchedRemote ? `${matchedRemote.name}:` : '';
 });
 
 watch(selectedType, () => {
+  stopCurrentTest();
   resetFormError();
   testResult.value = null;
   Object.keys(fieldValues).forEach((key) => {
@@ -602,6 +632,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  stopCurrentTest();
   ipc?.detach('sync-authorize-url');
 });
 
@@ -644,10 +675,20 @@ const openRemoteSetup = async () => {
   loadRemotes();
 };
 
+let testToken = 0;
+const stopCurrentTest = () => {
+  if (testing.value) {
+    testing.value = false;
+    testToken += 1;
+    ipc?.invoke(`sync-cancel-test-remote@${PLUGIN_ID}`).catch(() => {});
+  }
+};
+
 const backToMain = () => {
   if (authorizeWaiting.value) {
     return;
   }
+  stopCurrentTest();
   resetFormError();
   testResult.value = null;
   editingName.value = '';
@@ -734,6 +775,26 @@ const removeRemote = async () => {
   }
 };
 
+const onRclonePathChanged = async (newPath) => {
+  if (newPath === lastSavedRclonePath) {
+    return;
+  }
+  try {
+    const res = await setSyncConfig({ rclonePath: newPath });
+    if (res?.success) {
+      lastSavedRclonePath = newPath;
+      await probe();
+      if (remotes.value.length === 0) {
+        await loadRemotes();
+      }
+    } else {
+      formError.value = res?.message || '保存 rclone 路径失败';
+    }
+  } catch (err) {
+    formError.value = err.message || '保存 rclone 路径失败';
+  }
+};
+
 const pickRclone = async () => {
   const dialog = useDialog();
   if (!dialog) {
@@ -743,8 +804,20 @@ const pickRclone = async () => {
     properties: ['openFile', 'dontAddToRecent'],
   });
   if (!result.canceled && result.filePaths.length > 0) {
-    [form.rclonePath] = result.filePaths;
+    const [selectedPath] = result.filePaths;
+    if (selectedPath !== form.rclonePath) {
+      form.rclonePath = selectedPath;
+      resetFormError();
+      await onRclonePathChanged(selectedPath);
+    }
+  }
+};
+
+const clearRclone = async () => {
+  if (form.rclonePath !== '') {
+    form.rclonePath = '';
     resetFormError();
+    await onRclonePathChanged('');
   }
 };
 
@@ -830,6 +903,7 @@ const createRemoteFromForm = async () => {
     return;
   }
 
+  stopCurrentTest();
   creating.value = true;
   if (currentBackend.value?.auth === 'oauth') {
     authorizeWaiting.value = true;
@@ -841,6 +915,7 @@ const createRemoteFromForm = async () => {
       type: selectedType.value,
       values: { ...fieldValues },
       editName: isEditing.value ? editingName.value : undefined,
+      rclonePath: form.rclonePath || undefined,
     });
     if (res?.success) {
       formError.value = '';
@@ -859,24 +934,25 @@ const createRemoteFromForm = async () => {
 };
 
 /**
- * 连接测试：独立动作，测试已保存的远程与其目标子路径（如 SMB 的共享名，
- * 根路径列举在部分服务器上不校验凭据），结果展示在当前表单页底部
+ * 连接测试：独立动作，支持基于当前表单填写内容进行即时测试，结果展示在当前表单页底部
  */
 const testRemoteConnection = async () => {
-  if (!selectedType.value || testing.value) {
+  if (!canTestConnection.value || testing.value) {
     return;
   }
   testing.value = true;
   testResult.value = null;
+  const currentToken = ++testToken;
   try {
-    const prefix = `translime-${selectedType.value}:`;
-    const subPath = form.target.startsWith(prefix)
-      ? form.target.slice(prefix.length).replace(/^\/+|\/+$/g, '')
-      : '';
     const res = await ipc.invoke(`sync-test-remote@${PLUGIN_ID}`, {
-      name: `translime-${selectedType.value}`,
-      subPath,
+      type: selectedType.value,
+      values: { ...fieldValues },
+      name: isEditing.value ? editingName.value : `translime-${selectedType.value}`,
+      rclonePath: form.rclonePath || undefined,
     });
+    if (testToken !== currentToken) {
+      return;
+    }
     testResult.value = res?.success
       ? (res.connection || { ok: false, error: '测试失败' })
       : { ok: false, error: res?.message || '测试失败' };
@@ -886,9 +962,14 @@ const testRemoteConnection = async () => {
       fieldValues.domain = discoveredDomain;
     }
   } catch (err) {
+    if (testToken !== currentToken) {
+      return;
+    }
     testResult.value = { ok: false, error: err.message || '测试失败' };
   } finally {
-    testing.value = false;
+    if (testToken === currentToken) {
+      testing.value = false;
+    }
   }
 };
 
@@ -909,7 +990,9 @@ const save = async () => {
   resetFormError();
   try {
     const res = await setSyncConfig({ ...form });
-    if (!res?.success) {
+    if (res?.success) {
+      lastSavedRclonePath = form.rclonePath;
+    } else {
       formError.value = res?.message || '保存失败';
     }
   } catch (err) {

@@ -41,7 +41,6 @@ import { discoverSmbHostName } from './utils/sync/netbios';
 import { createExec } from './utils/sync/rclone';
 import {
   BACKEND_TYPES,
-  checkRemoteConnection,
   createRemote,
   deleteRemote,
   findBackendType,
@@ -49,6 +48,7 @@ import {
   listRemotes,
   remoteNameFor,
   runAuthorize,
+  testRemoteConnection,
   updateRemote,
 } from './utils/sync/rclone-config';
 
@@ -59,6 +59,19 @@ const logger = useLogger();
 let steamPath = null;
 // 进行中的 OAuth 授权进程（sync-cancel-authorize 取消用）
 let currentAuthorize = null;
+// 进行中的连接测试进程（sync-cancel-test-remote 取消用）
+let currentTest = null;
+
+const cancelCurrentTest = () => {
+  if (currentTest) {
+    try {
+      currentTest.cancel();
+    } catch {
+      // 忽略终止进程时的异常
+    }
+    currentTest = null;
+  }
+};
 
 // 表单值填充后端默认值，只保留非空项；密码不 trim（密码本身可能包含空格）
 const mergeFieldValues = (backend, rawValues = {}) => {
@@ -516,7 +529,33 @@ export const settingMenu = [
     name: '排除列表 (AppID, 逗号分隔)',
     placeholder: '例如: 730, 570',
   },
+  {
+    key: 'rclonePath',
+    type: 'file',
+    name: 'rclone 可执行文件路径',
+    required: false,
+    valueType: 'string',
+    placeholder: '留空则使用系统 PATH 中的 rclone',
+    dialogOptions: {
+      properties: ['openFile', 'dontAddToRecent'],
+    },
+  },
 ];
+
+// 插件设置保存后的回调
+export const pluginSettingSaved = () => {
+  const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
+  const customSteamPath = getPathSetting(settings, 'customSteamPath');
+  if (customSteamPath && customSteamPath !== steamPath) {
+    steamPath = customSteamPath;
+    logger.info('设置已更新，使用自定义 Steam 路径：', steamPath);
+    backgroundScan();
+  }
+  const rclonePathSetting = getPathSetting(settings, 'rclonePath');
+  if (typeof rclonePathSetting === 'string') {
+    syncService.setSyncConfig({ rclonePath: rclonePathSetting });
+  }
+};
 
 // 加载时执行（onAppReady 常驻激活：应用启动即建立监控，自动备份/直通同步不依赖插件页）
 export const pluginDidLoad = async () => {
@@ -529,6 +568,11 @@ export const pluginDidLoad = async () => {
     logger.info('使用自定义 Steam 路径：', steamPath);
   }
 
+  const rclonePathSetting = getPathSetting(settings, 'rclonePath');
+  if (rclonePathSetting) {
+    syncService.setSyncConfig({ rclonePath: rclonePathSetting });
+  }
+
   backgroundScan();
   focusWatcher.start();
   registerTitleBarActions();
@@ -538,6 +582,7 @@ export const pluginDidLoad = async () => {
 export const pluginWillUnload = () => {
   logger.info(`${pluginId} unloaded`);
   unloadGeneration += 1;
+  cancelCurrentTest();
   focusWatcher.stop();
   saveWatcher.close();
   autoBackup.cancel();
@@ -905,6 +950,9 @@ export const ipcHandlers = [
         }));
         return { success: true, remotes };
       } catch (e) {
+        if (/ENOENT|无法启动 rclone/i.test(e?.message || '')) {
+          return { success: true, remotes: [], rcloneMissing: true };
+        }
         return { success: false, message: e.message };
       }
     },
@@ -915,7 +963,10 @@ export const ipcHandlers = [
   },
   {
     type: 'sync-create-remote',
-    handler: ({ sendToClient }) => async ({ type, values, editName } = {}) => {
+    handler: ({ sendToClient }) => async ({
+      type, values, editName, rclonePath,
+    } = {}) => {
+      cancelCurrentTest();
       try {
         const backend = findBackendType(type);
         if (!backend) {
@@ -926,6 +977,10 @@ export const ipcHandlers = [
           .map((field) => field.label);
         if (missing.length > 0) {
           return { success: false, message: `请填写：${missing.join('、')}` };
+        }
+
+        if (typeof rclonePath === 'string' && rclonePath.trim()) {
+          syncService.setSyncConfig({ rclonePath: rclonePath.trim() });
         }
 
         const binary = syncService.resolveBinaryPath();
@@ -965,52 +1020,78 @@ export const ipcHandlers = [
         }
         return { success: true, remote: `${name}:` };
       } catch (e) {
+        if (/ENOENT|无法启动 rclone/i.test(e?.message || '')) {
+          const binary = syncService.resolveBinaryPath();
+          return {
+            success: false,
+            message: `未找到可用的 rclone（路径：${binary}）。请在同步设置中指定有效的 rclone 可执行文件。`,
+          };
+        }
         return { success: false, message: e.message };
       }
     },
   },
   {
+    type: 'sync-cancel-test-remote',
+    handler: () => async () => {
+      cancelCurrentTest();
+      return { success: true };
+    },
+  },
+  {
     type: 'sync-test-remote',
-    handler: () => async ({ name, subPath } = {}) => {
+    handler: () => async ({
+      name, subPath, type, values, rclonePath,
+    } = {}) => {
+      cancelCurrentTest();
+      if (!name && !type) {
+        return { success: false, message: '参数不完整' };
+      }
+      if (typeof rclonePath === 'string' && rclonePath.trim()) {
+        syncService.setSyncConfig({ rclonePath: rclonePath.trim() });
+      }
+      const binary = syncService.resolveBinaryPath();
+      const exec = createExec(async () => binary);
+
+      let cancelled = false;
+      currentTest = {
+        cancel: () => {
+          cancelled = true;
+          exec.killAll();
+        },
+      };
+
       try {
-        if (!name) {
-          return { success: false, message: '参数不完整' };
-        }
-        const binary = syncService.resolveBinaryPath();
-        const exec = createExec(async () => binary);
-        // 连接测试是独立动作：目标带子路径（如 SMB 的共享名）才会触发真实认证，
-        // 根路径列举在部分服务器上不校验凭据，结果不代表连接可用
-        const target = subPath ? `${name}:${subPath}` : `${name}:`;
-        const connection = await checkRemoteConnection(exec, target);
-        if (connection.ok === false && connection.error
-          && /logon is invalid|bad username|authentication/i.test(connection.error)) {
-          const remoteConfig = await getRemoteConfig(exec, name).catch(() => null);
-          if (remoteConfig && String(remoteConfig.user || '').includes('@') && !remoteConfig.domain) {
-            // rclone 不拆分 user@domain；用户名含 @ 且未指定域时，获取目标 NetBIOS 机器名作为域重试认证
-            const machineName = await discoverSmbHostName(String(remoteConfig.host || ''));
-            if (machineName) {
-              const updateResult = await exec(['config', 'update', name, `domain=${machineName}`, '--obscure']);
-              if (updateResult.code === 0) {
-                const retry = await checkRemoteConnection(exec, target);
-                if (retry.ok) {
-                  // 发现的域写入配置，并返回给渲染端回填输入框
-                  return {
-                    success: true,
-                    connection: {
-                      ok: true, error: null, note: `已自动补上域 ${machineName}`, domain: machineName,
-                    },
-                  };
-                }
-                // 重试仍失败：还原刚写入的域，按普通失败提示
-                await exec(['config', 'unset', name, 'domain']);
-              }
-            }
-            connection.error += '；用户名含 @ 时按 UPN 登录，需要在「域」中填写目标机器名（可在目标设备上运行 hostname 查看），或改用目标设备的本地账户名';
-          }
+        const backend = type ? findBackendType(type) : null;
+        const testValues = backend && values ? mergeFieldValues(backend, values) : values;
+        const connection = await testRemoteConnection({
+          exec,
+          type,
+          values: testValues,
+          name,
+          subPath,
+          isCancelled: () => cancelled,
+          discoverHostName: discoverSmbHostName,
+        });
+        if (connection.cancelled) {
+          return { success: false, message: '测试已取消' };
         }
         return { success: true, connection };
       } catch (e) {
+        if (cancelled) {
+          return { success: false, message: '测试已取消' };
+        }
+        if (/ENOENT|无法启动 rclone/i.test(e?.message || '')) {
+          return {
+            success: false,
+            message: `未找到可用的 rclone（路径：${binary}）。请在同步设置中指定有效的 rclone 路径。`,
+          };
+        }
         return { success: false, message: e.message };
+      } finally {
+        if (currentTest?.cancel) {
+          currentTest = null;
+        }
       }
     },
   },
@@ -1223,6 +1304,7 @@ export const ipcHandlers = [
 export default {
   pluginDidLoad,
   pluginWillUnload,
+  pluginSettingSaved,
   ipcHandlers,
   settingMenu,
 };

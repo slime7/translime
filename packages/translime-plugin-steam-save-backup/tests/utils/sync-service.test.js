@@ -129,6 +129,29 @@ describe('sync-service 手动同步', () => {
     const { config } = service.getStatus();
     expect(config).toEqual({ target: 'GDrive:saves', rclonePath: 'rclone.exe' });
   });
+
+  it('setSyncConfig 支持单独更新 rclone 路径，保持既有 target 不变并同步顶层设置', () => {
+    // 防止回归：单独修改 rclonePath 时若冲掉 target，用户在重新指定 rclone 后已有远程目标会丢失
+    const service = createService();
+    service.setSyncConfig({ target: 'smb:share', rclonePath: 'rclone' });
+
+    service.setSyncConfig({ rclonePath: '/custom/bin/rclone' });
+
+    const { config } = service.getStatus();
+    expect(config).toEqual({ target: 'smb:share', rclonePath: '/custom/bin/rclone' });
+    expect(configStore.get(`plugin.${PLUGIN_ID}.settings.rclonePath`)).toBe('/custom/bin/rclone');
+  });
+
+  it('readSyncConfig 兼容回退读取宿主顶层 settingMenu 保存的 rclonePath', () => {
+    // 防止回归：用户在宿主插件设置面板配置了 rclonePath，但同步配置中未显式设置时，应正确继承
+    configStore.set(`plugin.${PLUGIN_ID}.settings`, {
+      rclonePath: ['/usr/bin/rclone'],
+    });
+
+    const service = createService();
+    const { config } = service.getStatus();
+    expect(config.rclonePath).toBe('/usr/bin/rclone');
+  });
 });
 
 describe('sync-service 远端删除墓碑', () => {

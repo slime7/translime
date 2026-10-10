@@ -91,7 +91,8 @@
   >
     <mat-icon
       icon="inventory_2"
-      style="font-size: 64px; color: var(--mat-sys-color-outline-variant)"
+      size="64px"
+      color="outline-variant"
     />
 
     <div style="margin-top: 8px">

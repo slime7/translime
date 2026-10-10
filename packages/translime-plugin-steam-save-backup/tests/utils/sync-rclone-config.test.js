@@ -7,6 +7,7 @@ import {
   BACKEND_TYPES,
   buildCreateArgs,
   buildUpdateArgs,
+  canTestRemoteConnection,
   checkRemoteConnection,
   deleteRemote,
   findBackendType,
@@ -16,6 +17,7 @@ import {
   parseConfigShow,
   parseListRemotes,
   remoteNameFor,
+  testRemoteConnection,
   updateRemote,
 } from '../../src/utils/sync/rclone-config';
 
@@ -374,5 +376,153 @@ describe('checkRemoteConnection', () => {
     const result = await checkRemoteConnection(exec, 'translime-smb:share');
     expect(result.ok).toBe(false);
     expect(result.error).toContain('The attempted logon is invalid');
+  });
+
+  it('支持传入 options.configPath 追加 --config 参数隔离临时配置测试', async () => {
+    // 防止回归：使用临时配置文件测试连接时若未传递 --config，会误测系统正式配置甚至报错
+    const exec = async (args) => {
+      expect(args).toEqual(['lsd', 'testremote:share', '--config', '/tmp/test.conf']);
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    const result = await checkRemoteConnection(exec, 'testremote:share', { configPath: '/tmp/test.conf' });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('canTestRemoteConnection（测试连接按钮可用性）', () => {
+  const smbBackend = findBackendType('smb');
+  const webdavBackend = findBackendType('webdav');
+  const driveBackend = findBackendType('drive');
+
+  it('首次添加：表单后端只要填写了主机/服务地址即可用，不依赖系统已有远程', () => {
+    // 防止回归：首次添加远程时若依赖历史远程存在性，测试按钮会被错误置灰
+    const smbResult = canTestRemoteConnection({
+      backend: smbBackend,
+      type: 'smb',
+      values: { host: '192.168.1.10', user: '', pass: '' },
+      remotes: [],
+    });
+    expect(smbResult).toBe(true);
+
+    const webdavResult = canTestRemoteConnection({
+      backend: webdavBackend,
+      type: 'webdav',
+      values: { url: 'https://dav.example.com', user: '', pass: '' },
+      remotes: [],
+    });
+    expect(webdavResult).toBe(true);
+  });
+
+  it('清空主机：即使系统已存在历史远程，只要当前表单清空了核心地址即不可用', () => {
+    // 防止回归：仅凭已有远程激活按钮会让用户在修改/清空时误触发对空表单或过时远程的测试
+    const result = canTestRemoteConnection({
+      backend: smbBackend,
+      type: 'smb',
+      values: { host: '   ', user: 'admin', pass: '123' },
+      remotes: [{ name: 'translime-smb', type: 'smb' }],
+    });
+    expect(result).toBe(false);
+  });
+
+  it('OAuth 后端：仅当系统已存在已授权远程时才可用，未授权前不可用', () => {
+    // 防止回归：OAuth 后端无表单地址输入，未授权前无 token 不可测试
+    expect(canTestRemoteConnection({
+      backend: driveBackend,
+      type: 'drive',
+      values: {},
+      remotes: [],
+    })).toBe(false);
+
+    expect(canTestRemoteConnection({
+      backend: driveBackend,
+      type: 'drive',
+      values: {},
+      remotes: [{ name: 'translime-drive', type: 'drive' }],
+    })).toBe(true);
+  });
+});
+
+describe('testRemoteConnection（临时表单测试与中断机制）', () => {
+  it('首次添加表单测试：使用临时配置文件创建测试远程并执行根路径 lsd，完成后自动清理', async () => {
+    // 防止回归：未保存远程测试如果直接查正式配置会因 section not found 失败；不依赖外部子目录
+    const calls = [];
+    const fakeExec = async (args) => {
+      calls.push(args);
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    const result = await testRemoteConnection({
+      exec: fakeExec,
+      type: 'smb',
+      values: { host: '192.168.1.50', user: 'guest', pass: '' },
+      name: 'translime-smb',
+    });
+
+    expect(result.ok).toBe(true);
+    // 第一步：以 --config <tempConf> 创建 testremote 临时配置
+    const createCall = calls.find((c) => c[0] === 'config' && c[1] === 'create' && c[2] === 'testremote');
+    expect(createCall).toBeTruthy();
+    expect(createCall).toContain('--config');
+    // 第二步：以 --config <tempConf> 直接对根路径 testremote: 执行 lsd（不依赖子目录）
+    const lsdCall = calls.find((c) => c[0] === 'lsd' && c[1] === 'testremote:');
+    expect(lsdCall).toBeTruthy();
+    expect(lsdCall).toContain('--config');
+  });
+
+  it('测试中止：当 isCancelled 为 true 时立即停止后续执行，返回已取消状态', async () => {
+    // 防止回归：用户点击返回或确定时，若未立即中止测试，底层子进程会继续空跑阻塞
+    const calls = [];
+    let cancelled = false;
+    const fakeExec = async (args) => {
+      calls.push(args);
+      // 在创建临时配置后模拟外部取消（如用户点击返回）
+      cancelled = true;
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    const result = await testRemoteConnection({
+      exec: fakeExec,
+      type: 'smb',
+      values: { host: '192.168.1.50', user: 'guest' },
+      isCancelled: () => cancelled,
+    });
+
+    expect(result.cancelled).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('已取消');
+    // lsd 不应该被执行
+    const lsdCall = calls.find((c) => c[0] === 'lsd');
+    expect(lsdCall).toBeUndefined();
+  });
+
+  it('编辑既有远程且未输入新密码时，直接复用系统已保存远程并附带覆盖参数进行测试', async () => {
+    // 防止回归：已有远程若二次抽取已混淆密码重写临时配置，会导致密码被二次 obscure 损坏并报认证失败；
+    // 同时必须附带表单修改的最新参数（如用户名覆盖）
+    const calls = [];
+    const fakeExec = async (args) => {
+      calls.push(args);
+      if (args[0] === 'listremotes') {
+        return { code: 0, stdout: 'translime-smb:\n', stderr: '' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    const result = await testRemoteConnection({
+      exec: fakeExec,
+      type: 'smb',
+      name: 'translime-smb',
+      values: { host: '192.168.1.50', user: 'guest', pass: '' },
+    });
+
+    expect(result.ok).toBe(true);
+    // 不应该生成临时配置 config create
+    const createCall = calls.find((c) => c[0] === 'config' && c[1] === 'create');
+    expect(createCall).toBeUndefined();
+    // 应该直接以系统已有的 translime-smb: 执行 lsd，并附带修改后的 --smb-user 覆盖标志
+    const lsdCall = calls.find((c) => c[0] === 'lsd' && c[1] === 'translime-smb:');
+    expect(lsdCall).toBeTruthy();
+    expect(lsdCall).toContain('--smb-user');
+    expect(lsdCall).not.toContain('--config');
   });
 });

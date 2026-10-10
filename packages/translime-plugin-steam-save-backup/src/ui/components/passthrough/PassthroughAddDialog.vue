@@ -7,10 +7,6 @@
     title="添加直通存档"
   >
     <div style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px">
-      <div style="font-size: .8125rem; color: var(--mat-sys-color-on-surface-variant)">
-        直通不产生本地备份，存档目录与远程保持镜像同步。存档名称需与其他设备保持一致。
-      </div>
-
       <mat-text-field
         v-model="saveName"
         style="width: 100%"

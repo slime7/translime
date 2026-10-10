@@ -33,7 +33,9 @@
         >
           <mat-icon
             icon="description"
-            style="margin-right: 4px; font-size: 14px; color: var(--mat-sys-color-outline)"
+            size="14px"
+            color="outline"
+            class="mr-1"
           />
           {{ file }}
         </div>
