@@ -8,6 +8,8 @@ import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import vuetify from 'vite-plugin-vuetify';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+// eslint-disable-next-line import-x/extensions
+import { buildStandaloneMdeBundle } from './main/utils/mdeBundleHelper.js';
 
 const RENDERER_ROOT = join(import.meta.dirname, 'renderer');
 const MODULES_ROOT = join(import.meta.dirname, '../node_modules');
@@ -16,19 +18,11 @@ const SHARED_VUE_DEV_URL = '/libs/vue/vue.esm-browser.js';
 const DEFAULT_VITE_ORIGIN = 'http://localhost:5173/';
 const SHARED_VUE_IMPORT_PATH = './libs/vue/vue.esm-browser.js';
 
-const SHARED_MDE_JS_SOURCE = normalizePath(resolve(MODULES_ROOT, './mde-vue/dist/mde-vue.js'));
 const SHARED_MDE_CSS_SOURCE = normalizePath(resolve(MODULES_ROOT, './mde-vue/dist/styles.css'));
 const SHARED_MDE_TAILWIND_SOURCE = normalizePath(resolve(MODULES_ROOT, './mde-vue/dist/tailwind.css'));
 const SHARED_MDE_BOOTSTRAP_SOURCE = normalizePath(resolve(RENDERER_ROOT, './libs/mde/bootstrap.js'));
 
-const MDE_DEV_ROUTES = {
-  '/libs/mde/mde.esm.js': { source: SHARED_MDE_JS_SOURCE, type: 'text/javascript; charset=utf-8' },
-  '/libs/mde/mde.css': { source: SHARED_MDE_CSS_SOURCE, type: 'text/css; charset=utf-8' },
-  '/libs/mde/mde-tailwind.css': { source: SHARED_MDE_TAILWIND_SOURCE, type: 'text/css; charset=utf-8' },
-  '/libs/mde/bootstrap.js': { source: SHARED_MDE_BOOTSTRAP_SOURCE, type: 'text/javascript; charset=utf-8' },
-};
-
-const createSharedVueImportMapPlugin = (isDev) => {
+const createSharedVueImportMapPlugin = (isDev, mdeStandaloneSource) => {
   let sharedVueDevUrl = new URL(SHARED_VUE_DEV_URL, DEFAULT_VITE_ORIGIN).href;
 
   const updateSharedDevUrls = (server) => {
@@ -37,6 +31,13 @@ const createSharedVueImportMapPlugin = (isDev) => {
     const fallbackHost = host === true || host === '0.0.0.0' ? 'localhost' : host || 'localhost';
     const baseUrl = resolvedUrl || `http://${fallbackHost}:${port || 5173}/`;
     sharedVueDevUrl = new URL(SHARED_VUE_DEV_URL, baseUrl).href;
+  };
+
+  const devRoutes = {
+    '/libs/mde/mde.esm.js': { source: mdeStandaloneSource, type: 'text/javascript; charset=utf-8' },
+    '/libs/mde/mde.css': { source: SHARED_MDE_CSS_SOURCE, type: 'text/css; charset=utf-8' },
+    '/libs/mde/mde-tailwind.css': { source: SHARED_MDE_TAILWIND_SOURCE, type: 'text/css; charset=utf-8' },
+    '/libs/mde/bootstrap.js': { source: SHARED_MDE_BOOTSTRAP_SOURCE, type: 'text/javascript; charset=utf-8' },
   };
 
   return {
@@ -71,7 +72,7 @@ const createSharedVueImportMapPlugin = (isDev) => {
           return;
         }
 
-        const mdeRoute = MDE_DEV_ROUTES[requestPath];
+        const mdeRoute = devRoutes[requestPath];
         if (mdeRoute) {
           response.writeHead(200, { 'Content-Type': mdeRoute.type });
           response.end(readFileSync(mdeRoute.source));
@@ -94,9 +95,10 @@ const createSharedVueImportMapPlugin = (isDev) => {
 /**
  * @see https://vitejs.dev/config/
  */
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const isDev = mode === 'development';
   const isProd = mode === 'production';
+  const sharedMdeStandaloneSource = normalizePath(await buildStandaloneMdeBundle());
   return {
     mode,
     root: RENDERER_ROOT,
@@ -126,7 +128,7 @@ export default defineConfig(({ mode }) => {
             rename: 'vue.esm-browser.js',
           },
           {
-            src: SHARED_MDE_JS_SOURCE,
+            src: sharedMdeStandaloneSource,
             dest: 'libs/mde',
             rename: 'mde.esm.js',
           },
@@ -147,7 +149,7 @@ export default defineConfig(({ mode }) => {
           },
         ],
       }),
-      createSharedVueImportMapPlugin(isDev),
+      createSharedVueImportMapPlugin(isDev, sharedMdeStandaloneSource),
       vue({
         template: {
           compilerOptions: {
