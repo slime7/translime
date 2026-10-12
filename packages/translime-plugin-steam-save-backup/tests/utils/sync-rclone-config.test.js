@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  afterAll,
   describe,
   expect,
   it,
@@ -20,17 +21,50 @@ import {
   findFreeRemoteName,
   getRemoteConfig,
   getRemoteRawConfig,
+  isMaskedValue,
   normalizeRootDir,
   parseAliasRemoteValue,
   parseAuthorizeToken,
   parseAuthorizeUrl,
+  parseConfigFileSection,
   parseConfigShow,
   parseInlineRemoteValue,
   parseListRemotes,
+  readStoredPasswords,
   remoteNameFor,
   testRemoteConnection,
   updateRemote,
 } from '../../src/utils/sync/rclone-config';
+
+// 把远程节段渲染为 INI 形态写入临时 rclone.conf：getRemoteRawConfig 依赖
+// `config file` 指向的文件原文（v1.68+ 的 config show/dump 均掩码密码，无法 mock）
+const writeConfFile = async (sections) => {
+  const file = path.join(os.tmpdir(), `translime-rclone-conf-${Date.now()}-${Math.random().toString(36).slice(2)}.conf`);
+  const body = Object.keys(sections).map((name) => {
+    const pairs = Object.keys(sections[name]).map((key) => `${key} = ${sections[name][key]}`);
+    return `[${name}]\n${pairs.join('\n')}`;
+  }).join('\n\n');
+  await fs.writeFile(file, `${body}\n`, 'utf8');
+  return file;
+};
+
+const tempFiles = [];
+afterAll(async () => {
+  await Promise.all(tempFiles.map((file) => fs.rm(file, { force: true })));
+});
+
+const trackedConfFile = async (sections) => {
+  const file = await writeConfFile(sections);
+  tempFiles.push(file);
+  return file;
+};
+
+const confFileExec = (file) => async (args) => {
+  if (args[0] === 'config' && args[1] === 'file') {
+    return { code: 0, stdout: `Configuration file is stored at:\n${file}\n`, stderr: '' };
+  }
+  throw new Error(`unexpected rclone call: ${args.join(' ')}`);
+};
 
 describe('remoteNameFor', () => {
   it('按统一前缀生成远程名，便于在系统 rclone 配置中识别本插件创建的远程', () => {
@@ -215,6 +249,83 @@ describe('parseConfigShow', () => {
   });
 });
 
+describe('parseConfigFileSection（rclone.conf 原文解析）', () => {
+  it('提取指定节段的键值，其他节段不混入', () => {
+    const content = [
+      '[translime-smb]',
+      'type = smb',
+      'host = 192.168.1.10',
+      '',
+      '[other]',
+      'type = ftp',
+      'host = 10.0.0.1',
+    ].join('\n');
+
+    expect(parseConfigFileSection(content, 'other')).toEqual({ type: 'ftp', host: '10.0.0.1' });
+  });
+
+  it('节段不存在返回 null（远程不存在与残缺节段据此区分报错）', () => {
+    expect(parseConfigFileSection('[a]\ntype = smb\n', 'b')).toBeNull();
+  });
+
+  it('值中含等号保留完整值（混淆密码 base64 形态可能含 =）', () => {
+    expect(parseConfigFileSection('[a]\npass = YQ==\n', 'a').pass).toBe('YQ==');
+  });
+});
+
+describe('isMaskedValue（掩码占位识别）', () => {
+  it('*** 开头视为掩码占位，混淆密码不受影响', () => {
+    // 防止回归：掩码值复用进连接字符串会导致 rclone base64 解码失败（SMB 连不上）
+    expect(isMaskedValue('*** ENCRYPTED ***')).toBe(true);
+    expect(isMaskedValue('  *** ENCRYPTED *** ')).toBe(true);
+    expect(isMaskedValue('obSCURED')).toBe(false);
+    expect(isMaskedValue(undefined)).toBe(false);
+    expect(isMaskedValue('')).toBe(false);
+  });
+});
+
+describe('readStoredPasswords（编辑沿用旧凭据的数据源）', () => {
+  it('返回配置文件中的真实混淆密码（编辑留空时沿用）', async () => {
+    const file = await trackedConfFile({
+      'translime-smb': { type: 'smb', host: '192.168.1.10', pass: 'obSCURED' },
+    });
+
+    const stored = await readStoredPasswords(confFileExec(file), 'translime-smb', findBackendType('smb'));
+    expect(stored.passwords).toEqual({ pass: 'obSCURED' });
+  });
+
+  it('掩码占位密码不返回：复用会把垃圾写进新配置，导致连接时 base64 解码失败', async () => {
+    // 防止回归：旧版把 config show 的掩码输出当混淆值写回配置，SMB 远程因此全部连不上
+    const file = await trackedConfFile({
+      'translime-smb': { type: 'smb', host: '192.168.1.10', pass: '*** ENCRYPTED ***' },
+    });
+
+    const stored = await readStoredPasswords(confFileExec(file), 'translime-smb', findBackendType('smb'));
+    expect(stored.passwords).toEqual({});
+  });
+
+  it('alias 内联结构：从连接字符串取混淆密码且掩码值被过滤', async () => {
+    const file = await trackedConfFile({
+      'translime-smb': {
+        type: 'alias',
+        remote: ':smb,host=192.168.1.10,pass=*** ENCRYPTED ***,domain=DOM:share/saves',
+      },
+    });
+
+    const stored = await readStoredPasswords(confFileExec(file), 'translime-smb', findBackendType('smb'));
+    expect(stored.passwords).toEqual({});
+  });
+
+  it('OAuth token 为掩码占位时不返回（沿用坏 token 会让授权远程全部失效）', async () => {
+    const file = await trackedConfFile({
+      'translime-drive': { type: 'drive', config_token: '*** ENCRYPTED ***' },
+    });
+
+    const stored = await readStoredPasswords(confFileExec(file), 'translime-drive', findBackendType('drive'));
+    expect(stored.token).toBeNull();
+  });
+});
+
 describe('normalizeRootDir（存档目录归一化）', () => {
   it('反斜杠转正斜杠、去首尾分隔符与首尾空白', () => {
     // 防止回归：Windows 反斜杠或首尾斜杠会让 alias 锚点出现空路径段或路径错位
@@ -363,26 +474,12 @@ describe('baseNameFor / findFreeRemoteName / buildAliasCreateArgs', () => {
 });
 
 describe('getRemoteConfig（统一视图）', () => {
-  const execWith = (sections) => async (args) => {
-    expect(args[0]).toBe('config');
-    expect(args[1]).toBe('show');
-    const section = sections[args[2]];
-    if (!section) {
-      return { code: 3, stdout: '', stderr: 'section not found' };
-    }
-    return {
-      code: 0,
-      stdout: Object.keys(section).map((key) => `${key} = ${section[key]}`).join('\n'),
-      stderr: '',
-    };
-  };
-
   it('直连远程：mode=direct，rootDir 为空（未启用限制的旧形态）', async () => {
-    const exec = execWith({
+    const file = await trackedConfFile({
       'translime-smb': { type: 'smb', host: '192.168.1.10', pass: 'obSCURED' },
     });
 
-    const config = await getRemoteConfig(exec, 'translime-smb');
+    const config = await getRemoteConfig(confFileExec(file), 'translime-smb');
     expect(config).toEqual({
       mode: 'direct',
       type: 'smb',
@@ -393,14 +490,14 @@ describe('getRemoteConfig（统一视图）', () => {
   });
 
   it('alias 内联结构：解析连接字符串得到类型、混淆密码与存档目录', async () => {
-    const exec = execWith({
+    const file = await trackedConfFile({
       'translime-smb': {
         type: 'alias',
         remote: ':smb,host=192.168.1.10,pass=obSCURED:steam/saves',
       },
     });
 
-    const config = await getRemoteConfig(exec, 'translime-smb');
+    const config = await getRemoteConfig(confFileExec(file), 'translime-smb');
     expect(config.mode).toBe('inline');
     expect(config.type).toBe('smb');
     expect(config.values.pass).toBe('obSCURED');
@@ -408,12 +505,12 @@ describe('getRemoteConfig（统一视图）', () => {
   });
 
   it('alias 两段式：读取底层凭据远程的类型与配置', async () => {
-    const exec = execWith({
+    const file = await trackedConfFile({
       'translime-drive': { type: 'alias', remote: 'translime-drive-base:backup' },
       'translime-drive-base': { type: 'drive', config_token: '{"access_token":"t"}' },
     });
 
-    const config = await getRemoteConfig(exec, 'translime-drive');
+    const config = await getRemoteConfig(confFileExec(file), 'translime-drive');
     expect(config.mode).toBe('base');
     expect(config.type).toBe('drive');
     expect(config.baseName).toBe('translime-drive-base');
@@ -421,22 +518,33 @@ describe('getRemoteConfig（统一视图）', () => {
   });
 
   it('远程缺少后端类型时报错（外部手工配置的残缺条目不进编辑流程）', async () => {
-    const exec = async () => ({ code: 0, stdout: '[broken]\nhost = x\n', stderr: '' });
+    const file = await trackedConfFile({ broken: { host: 'x' } });
 
-    await expect(getRemoteRawConfig(exec, 'broken')).rejects.toThrow('缺少后端类型');
+    await expect(getRemoteRawConfig(confFileExec(file), 'broken')).rejects.toThrow('缺少后端类型');
   });
 
-  it('config show 失败时携带 rclone 错误信息', async () => {
-    const exec = async () => ({ code: 3, stdout: '', stderr: 'remote not found' });
+  it('远程不存在于配置文件时报读取失败（config file 命令失败同样携带错误信息）', async () => {
+    const file = await trackedConfFile({ 'translime-smb': { type: 'smb' } });
+    const exec = async (args) => {
+      if (args[0] === 'config' && args[1] === 'file') {
+        return { code: 1, stdout: '', stderr: 'config file error' };
+      }
+      throw new Error('unexpected');
+    };
 
     await expect(getRemoteRawConfig(exec, 'gone')).rejects.toThrow('读取远程配置失败');
+    await expect(getRemoteRawConfig(confFileExec(file), 'gone')).rejects.toThrow('远程「gone」不存在');
   });
 });
 
 describe('createRemote（重建语义 + 存档目录结构）', () => {
-  const fakeExec = ({ existing = [], stored = {} } = {}) => {
+  const fakeExec = async ({ existing = [], stored = {} } = {}) => {
     const remotes = new Set(existing);
     const calls = [];
+    // stored 节段写入临时配置文件（getRemoteRawConfig 读文件原文）；无 stored 时指向不存在的路径
+    const confFile = Object.keys(stored).length > 0
+      ? await trackedConfFile(stored)
+      : path.join(os.tmpdir(), `translime-rclone-absent-${Date.now()}-${Math.random().toString(36).slice(2)}.conf`);
     return {
       calls,
       exec: async (args) => {
@@ -444,16 +552,8 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
         if (args[0] === 'listremotes') {
           return { code: 0, stdout: [...remotes].map((name) => `${name}:`).join('\n'), stderr: '' };
         }
-        if (args[0] === 'config' && args[1] === 'show') {
-          const section = stored[args[2]];
-          if (!section) {
-            return { code: 3, stdout: '', stderr: 'section not found' };
-          }
-          return {
-            code: 0,
-            stdout: Object.keys(section).map((key) => `${key} = ${section[key]}`).join('\n'),
-            stderr: '',
-          };
+        if (args[0] === 'config' && args[1] === 'file') {
+          return { code: 0, stdout: `Configuration file is stored at:\n${confFile}\n`, stderr: '' };
         }
         if (args[0] === 'config' && args[1] === 'delete') {
           remotes.delete(args[2]);
@@ -473,7 +573,7 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
   };
 
   it('rootDir 为空：删除旧远程后按直连结构创建（密码先混淆，关闭 --obscure 原样存储）', async () => {
-    const probe = fakeExec({ existing: ['translime-smb'] });
+    const probe = await fakeExec({ existing: ['translime-smb'] });
 
     await createRemote(probe.exec, {
       type: 'smb',
@@ -492,7 +592,7 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
 
   it('表单后端 + rootDir：先混淆密码，再以 alias 内联凭据创建（凭据不出现在远程列表）', async () => {
     // 防止回归：绑定存档目录后必须写成 alias 结构，否则远程仍暴露整个远端
-    const probe = fakeExec({ existing: [] });
+    const probe = await fakeExec({ existing: [] });
 
     await createRemote(probe.exec, {
       type: 'smb',
@@ -509,7 +609,7 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
   });
 
   it('OAuth + rootDir：令牌写入 translime-<type>-base，别名锚定存档目录', async () => {
-    const probe = fakeExec({ existing: [] });
+    const probe = await fakeExec({ existing: [] });
 
     await createRemote(probe.exec, {
       type: 'drive',
@@ -532,7 +632,7 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
   });
 
   it('OAuth + rootDir 但缺少令牌：直接报错且不删除既有远程', async () => {
-    const probe = fakeExec({ existing: ['translime-drive'] });
+    const probe = await fakeExec({ existing: ['translime-drive'] });
 
     await expect(createRemote(probe.exec, {
       type: 'drive',
@@ -545,7 +645,7 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
 
   it('编辑重建（密码留空沿用旧值）：从旧内联结构取混淆密码，不二次输入', async () => {
     // 防止回归：重建语义下若不搬运旧混淆密码，编辑远程会被迫重输密码且留空会丢失凭据
-    const probe = fakeExec({
+    const probe = await fakeExec({
       existing: ['translime-smb'],
       stored: {
         'translime-smb': { type: 'alias', remote: ':smb,host=192.168.1.10,pass=obSCURED(old):steam/saves' },
@@ -567,7 +667,7 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
 
   it('编辑重建（直连旧结构 + 密码留空）：搬运旧混淆密码且不再加 --obscure（防二次混淆损坏）', async () => {
     // 防止回归：已混淆密码再走 --obscure 会二次混淆，认证必然失败
-    const probe = fakeExec({
+    const probe = await fakeExec({
       existing: ['translime-smb'],
       stored: {
         'translime-smb': { type: 'smb', host: '192.168.1.10', pass: 'obSCURED(old)' },
@@ -586,8 +686,29 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
     expect(createCall).not.toContain('--obscure');
   });
 
+  it('编辑重建（密码留空）+ 旧存储是掩码垃圾：不复用掩码值，创建参数不携带密码', async () => {
+    // 防止回归：掩码占位复用会写出必然连接失败的配置（宁可要求重输密码）
+    const probe = await fakeExec({
+      existing: ['translime-smb'],
+      stored: {
+        'translime-smb': { type: 'smb', host: '192.168.1.10', pass: '*** ENCRYPTED ***' },
+      },
+    });
+
+    await updateRemote(probe.exec, {
+      name: 'translime-smb',
+      type: 'smb',
+      values: { host: '192.168.1.20', user: 'admin', pass: '' },
+      rootDir: '',
+    });
+
+    const createCall = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-smb');
+    expect(createCall.some((arg) => String(arg).startsWith('pass='))).toBe(false);
+    expect(probe.calls.some((args) => args[0] === 'obscure')).toBe(false);
+  });
+
   it('清空的可选字段不进入重建参数（如 SMB 域清空后不再携带）', async () => {
-    const probe = fakeExec({ existing: [] });
+    const probe = await fakeExec({ existing: [] });
 
     await updateRemote(probe.exec, {
       name: 'translime-smb',
@@ -606,13 +727,14 @@ describe('createRemote（重建语义 + 存档目录结构）', () => {
 describe('deleteRemote（级联删除）', () => {
   it('远程存在时执行 config delete', async () => {
     const calls = [];
+    const file = await trackedConfFile({ 'translime-smb': { type: 'smb', host: 'x' } });
     const exec = async (args) => {
       calls.push(args);
       if (args[0] === 'listremotes') {
         return { code: 0, stdout: 'translime-smb:\n', stderr: '' };
       }
-      if (args[0] === 'config' && args[1] === 'show') {
-        return { code: 0, stdout: 'type = smb\nhost = x\n', stderr: '' };
+      if (args[0] === 'config' && args[1] === 'file') {
+        return { code: 0, stdout: `Configuration file is stored at:\n${file}\n`, stderr: '' };
       }
       return { code: 0, stdout: '', stderr: '' };
     };
@@ -635,20 +757,17 @@ describe('deleteRemote（级联删除）', () => {
   it('两段式 alias 连带删除底层凭据远程，不留全盘入口', async () => {
     // 防止回归：只删别名会残留 translime-<type>-base 全盘凭据远程
     const calls = [];
+    const file = await trackedConfFile({
+      'translime-drive': { type: 'alias', remote: 'translime-drive-base:backup' },
+      'translime-drive-base': { type: 'drive' },
+    });
     const exec = async (args) => {
       calls.push(args);
       if (args[0] === 'listremotes') {
         return { code: 0, stdout: 'translime-drive:\ntranslime-drive-base:\n', stderr: '' };
       }
-      if (args[0] === 'config' && args[1] === 'show') {
-        const section = args[2] === 'translime-drive'
-          ? { type: 'alias', remote: 'translime-drive-base:backup' }
-          : { type: 'drive' };
-        return {
-          code: 0,
-          stdout: Object.keys(section).map((key) => `${key} = ${section[key]}`).join('\n'),
-          stderr: '',
-        };
+      if (args[0] === 'config' && args[1] === 'file') {
+        return { code: 0, stdout: `Configuration file is stored at:\n${file}\n`, stderr: '' };
       }
       return { code: 0, stdout: '', stderr: '' };
     };
@@ -660,13 +779,14 @@ describe('deleteRemote（级联删除）', () => {
 
   it('内联 alias 只删除本体（凭据就在别名定义里，无需级联）', async () => {
     const calls = [];
+    const file = await trackedConfFile({ 'translime-smb': { type: 'alias', remote: ':smb,host=x:dir' } });
     const exec = async (args) => {
       calls.push(args);
       if (args[0] === 'listremotes') {
         return { code: 0, stdout: 'translime-smb:\n', stderr: '' };
       }
-      if (args[0] === 'config' && args[1] === 'show') {
-        return { code: 0, stdout: 'type = alias\nremote = :smb,host=x:dir\n', stderr: '' };
+      if (args[0] === 'config' && args[1] === 'file') {
+        return { code: 0, stdout: `Configuration file is stored at:\n${file}\n`, stderr: '' };
       }
       return { code: 0, stdout: '', stderr: '' };
     };
@@ -904,13 +1024,16 @@ describe('testRemoteConnection（临时表单测试与中断机制）', () => {
   it('编辑远程（密码留空）+ 存档目录：沿用旧远程存储的混淆密码重建测试别名', async () => {
     // 防止回归：alias 结构不认识 --smb-* 覆盖参数，密码留空时必须取旧混淆值进临时配置重建
     const calls = [];
+    const file = await trackedConfFile({
+      'translime-smb': { type: 'smb', host: '192.168.1.50', pass: 'obSCURED(old)' },
+    });
     const fakeExec = async (args) => {
       calls.push(args);
       if (args[0] === 'listremotes') {
         return { code: 0, stdout: 'translime-smb:\n', stderr: '' };
       }
-      if (args[0] === 'config' && args[1] === 'show') {
-        return { code: 0, stdout: 'type = smb\nhost = 192.168.1.50\npass = obSCURED(old)\n', stderr: '' };
+      if (args[0] === 'config' && args[1] === 'file') {
+        return { code: 0, stdout: `Configuration file is stored at:\n${file}\n`, stderr: '' };
       }
       return { code: 0, stdout: '', stderr: '' };
     };

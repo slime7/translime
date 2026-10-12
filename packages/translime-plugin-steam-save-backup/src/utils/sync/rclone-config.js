@@ -578,7 +578,7 @@ export const runAuthorize = (bin, type, options = {}) => {
 };
 
 /**
- * 解析 `rclone config show <name>` 输出为键值对象（密码保持混淆态）
+ * 解析键值行文本为对象（值中含等号时保留完整值，密码可能含 =）
  */
 export const parseConfigShow = (stdout) => {
   const config = {};
@@ -597,14 +597,71 @@ export const parseConfigShow = (stdout) => {
 };
 
 /**
- * 读取单个远程的原始配置（config show 原样键值，类型缺失时抛错）
+ * 从 rclone 配置文件内容中提取指定远程节段的键值对象；
+ * 节段不存在返回 null（配置文件为整体加密等非 INI 形态时同样视为不存在）
  */
-export const getRemoteRawConfig = async (exec, name) => {
-  const result = await exec(['config', 'show', name]);
-  if (result.code !== 0) {
-    throw new Error(`读取远程配置失败：${tailOutput(result.stderr)}`);
+export const parseConfigFileSection = (content, name) => {
+  const sectionLines = [];
+  let matched = false;
+  let inSection = false;
+  (content || '').split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      inSection = trimmed.slice(1, -1).trim() === name;
+      if (inSection) {
+        matched = true;
+      }
+      return;
+    }
+    if (inSection) {
+      sectionLines.push(trimmed);
+    }
+  });
+  if (!matched) {
+    return null;
   }
-  const config = parseConfigShow(result.stdout);
+  return parseConfigShow(sectionLines.join('\n'));
+};
+
+// rclone 掩码哨兵（config show / dump 输出与误写入的配置都会出现）：
+// 真实混淆值只含字母数字，绝不会以 *** 开头
+const MASKED_VALUE_PREFIX = '***';
+
+/**
+ * 判断值是否为 rclone 的掩码占位（掩码值不能当混淆密码复用，否则连接时报 base64 解码错误）
+ */
+export const isMaskedValue = (value) => typeof value === 'string' && value.trim().startsWith(MASKED_VALUE_PREFIX);
+
+// 默认读取器：读取 rclone 配置文件原文（密码保持真实混淆态）
+const readConfigFileDefault = (configPath) => fs.readFile(configPath, 'utf8');
+
+/**
+ * 读取单个远程的原始配置（rclone.conf 原文键值，密码保持真实混淆态，类型缺失时抛错）。
+ * rclone 1.68+ 的 config show / config dump 会把密码字段掩码为 "*** ENCRYPTED ***"
+ * 且无任何标志可还原真实值，只有配置文件原文里存着混淆值，因此改为读文件解析节段。
+ * @param {function} [readFile] 配置文件读取器，仅测试注入用
+ */
+export const getRemoteRawConfig = async (exec, name, readFile = readConfigFileDefault) => {
+  const listResult = await exec(['config', 'file']);
+  if (listResult.code !== 0) {
+    throw new Error(`读取远程配置失败：${tailOutput(listResult.stderr)}`);
+  }
+  // 输出末行为配置文件路径（兼容 "stored at" 与 "will be created at" 两种文案）
+  const lines = (listResult.stdout || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const configPath = lines.at(-1);
+  if (!configPath) {
+    throw new Error('读取远程配置失败：无法确定 rclone 配置文件路径');
+  }
+  let content;
+  try {
+    content = await readFile(configPath);
+  } catch (e) {
+    throw new Error(`读取远程配置失败：无法读取 rclone 配置文件（${e.message}）`);
+  }
+  const config = parseConfigFileSection(content, name);
+  if (!config) {
+    throw new Error(`读取远程配置失败：远程「${name}」不存在`);
+  }
   if (!config.type) {
     throw new Error(`远程「${name}」缺少后端类型，请直接编辑 rclone 配置文件`);
   }
@@ -651,6 +708,8 @@ export const getRemoteConfig = async (exec, name) => {
  * 读取远程当前存储的密码类字段（混淆态）与 OAuth token，跨越三种结构取值：
  * 直连 / alias 内联 / alias 两段式（读底层远程）。远程不存在时返回空值。
  * 用于编辑时「密码留空 = 保持不变」的重建。
+ * 掩码占位值（*** 开头）一律不返回：复用掩码值会把垃圾写进新配置，导致连接时
+ * base64 解码失败（旧版曾把 config show 的掩码输出写回配置引发该故障）。
  */
 export const readStoredPasswords = async (exec, name, backend) => {
   const raw = await getRemoteRawConfig(exec, name).catch(() => null);
@@ -661,12 +720,13 @@ export const readStoredPasswords = async (exec, name, backend) => {
   const pick = (config) => {
     const passwords = {};
     passwordKeys.forEach((key) => {
-      if (config[key]) {
+      if (config[key] && !isMaskedValue(config[key])) {
         passwords[key] = config[key];
       }
     });
     return passwords;
   };
+  const usableToken = (token) => (token && !isMaskedValue(token) ? token : null);
   if (raw.type === 'alias') {
     const parsed = parseAliasRemoteValue(raw.remote);
     if (parsed?.mode === 'inline') {
@@ -675,12 +735,12 @@ export const readStoredPasswords = async (exec, name, backend) => {
     if (parsed?.mode === 'base') {
       const baseRaw = await getRemoteRawConfig(exec, parsed.baseName).catch(() => null);
       if (baseRaw) {
-        return { passwords: pick(baseRaw), token: baseRaw.config_token || null };
+        return { passwords: pick(baseRaw), token: usableToken(baseRaw.config_token) };
       }
     }
     return { passwords: {}, token: null };
   }
-  return { passwords: pick(raw), token: raw.config_token || null };
+  return { passwords: pick(raw), token: usableToken(raw.config_token) };
 };
 
 /**
