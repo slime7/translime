@@ -124,21 +124,23 @@ describe('sync-service 手动同步', () => {
   it('setSyncConfig 只持久化目标与 rclone 路径，状态不再携带 enabled', async () => {
     const service = createService();
 
-    service.setSyncConfig({ target: '  GDrive:saves  ', rclonePath: 'rclone.exe' });
+    await service.setSyncConfig({ target: '  GDrive:saves  ', rclonePath: 'rclone.exe' });
 
     const { config } = service.getStatus();
-    expect(config).toEqual({ target: 'GDrive:saves', rclonePath: 'rclone.exe' });
+    expect(config).toEqual({ target: 'GDrive:saves', rclonePath: 'rclone.exe', localTargets: [] });
   });
 
-  it('setSyncConfig 支持单独更新 rclone 路径，保持既有 target 不变并同步顶层设置', () => {
+  it('setSyncConfig 支持单独更新 rclone 路径，保持既有 target 不变并同步顶层设置', async () => {
     // 防止回归：单独修改 rclonePath 时若冲掉 target，用户在重新指定 rclone 后已有远程目标会丢失
     const service = createService();
-    service.setSyncConfig({ target: 'smb:share', rclonePath: 'rclone' });
+    await service.setSyncConfig({ target: 'smb:share', rclonePath: 'rclone' });
 
-    service.setSyncConfig({ rclonePath: '/custom/bin/rclone' });
+    await service.setSyncConfig({ rclonePath: '/custom/bin/rclone' });
 
     const { config } = service.getStatus();
-    expect(config).toEqual({ target: 'smb:share', rclonePath: '/custom/bin/rclone' });
+    expect(config).toEqual({
+      target: 'smb:share', rclonePath: '/custom/bin/rclone', localTargets: [],
+    });
     expect(configStore.get(`plugin.${PLUGIN_ID}.settings.rclonePath`)).toBe('/custom/bin/rclone');
   });
 

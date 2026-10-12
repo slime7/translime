@@ -23,7 +23,7 @@
           v-if="isEditing"
           style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant); margin-top: -8px"
         >
-          正在修改远程「{{ editingName }}」的凭据；更换后端类型请改用「新建 / 授权远程」。
+          正在修改「{{ editingName }}」；更换后端类型请改用「添加存档位置」。
         </div>
 
         <div
@@ -78,6 +78,38 @@
           </mat-text-field>
         </template>
 
+        <!-- 存档目录：与远程绑定，作为该远程同步的根目录 -->
+        <mat-text-field
+          v-if="selectedType !== 'local'"
+          v-model="rootDir"
+          style="width: 100%"
+          label="存档目录（可选）"
+          placeholder="留空为远程根目录；例如：SteamBackups 或 share/saves"
+          variant="outlined"
+          color="primary"
+        >
+          <template #trailing>
+            <mat-tooltip>
+              <template #activator>
+                <mat-icon
+                  icon="info"
+                  size="small"
+                  color="on-surface-variant"
+                  tabindex="0"
+                  aria-label="查看存档目录说明"
+                />
+              </template>
+              <template #subhead>
+                远程内的存档子目录
+              </template>
+              <div style="display: flex; flex-direction: column; gap: 6px; font-size: .75rem; line-height: 1.5">
+                <div>填写远程设备上的相对路径，例如 SteamBackups 或 share/sync/saves。</div>
+                <div>留空则直接使用远程的根目录。</div>
+              </div>
+            </mat-tooltip>
+          </template>
+        </mat-text-field>
+
         <div
           v-if="authorizeWaiting"
           style="display: flex; flex-direction: column; gap: 8px; font-size: .875rem"
@@ -112,8 +144,15 @@
         </div>
 
         <div style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
-          远程以「translime-后端名」写入系统 rclone 配置，重复创建会覆盖旧凭据；
-          令牌与密码只保存在本机 rclone 配置文件中。
+          令牌与密码仅保存在本机；同一类型可添加多个存档位置并随时切换。
+        </div>
+
+        <div
+          v-if="remoteNotice"
+          role="status"
+          style="font-size: .875rem; color: var(--mat-sys-color-primary); word-break: break-all"
+        >
+          {{ remoteNotice }}
         </div>
 
         <div
@@ -136,18 +175,19 @@
         <div style="display: flex; align-items: center; gap: 8px">
           <mat-select
             v-model="selectedRemote"
-            label="远程位置"
+            label="存档位置"
             :items="remoteItems"
             variant="outlined"
             color="primary"
-            supporting-text="选择已有远程自动填入目标；本地或 NAS 路径选第一项直接填写"
+            placeholder="选择存档位置"
+            supporting-text="选中即作为同步目标；本地路径、SMB、网盘均可添加多个随时切换"
             style="flex: 1; min-width: 0"
           />
           <mat-btn
             icon="edit"
             variant="standard"
             size="small"
-            aria-label="修改远程"
+            aria-label="修改存档位置"
             :disabled="!canEditSelectedRemote"
             @click="openEditRemote"
           />
@@ -156,21 +196,11 @@
             variant="standard"
             size="small"
             color="error"
-            aria-label="删除远程"
+            aria-label="删除存档位置"
             :disabled="!selectedRemoteInfo"
             @click="askDeleteRemote"
           />
         </div>
-
-        <mat-text-field
-          v-model="form.target"
-          style="width: 100%"
-          label="远程目标"
-          placeholder="例如：mydrive:SteamBackups 或 D:\Backups\Steam"
-          variant="outlined"
-          color="primary"
-          :max-length="300"
-        />
 
         <div style="display: flex; align-items: center; gap: 12px; margin-top: -8px">
           <mat-btn
@@ -178,10 +208,10 @@
             prefix="add"
             @click="openRemoteSetup"
           >
-            新建 / 授权远程
+            添加存档位置
           </mat-btn>
           <span style="font-size: .75rem; color: var(--mat-sys-color-on-surface-variant)">
-            在目标后追加子目录即可，例如 mydrive:SteamBackups
+            实际存档目录由所选条目决定，编辑可调整范围
           </span>
         </div>
 
@@ -337,11 +367,11 @@
           <span v-else>尚未同步过</span>
           <span v-if="reportSummary">{{ reportSummary }}</span>
           <span
-            v-if="lastError"
+            v-if="lastError && Boolean(selectedRemote)"
             role="alert"
             style="color: var(--mat-sys-color-error); word-break: break-all"
           >
-            {{ lastError }}
+            上次同步失败：{{ lastError }}
           </span>
         </div>
 
@@ -492,7 +522,7 @@ const view = ref('main');
 const backends = ref([]);
 const remotes = ref([]);
 const loadingRemotes = ref(false);
-const selectedRemote = ref('');
+const selectedRemote = ref(null);
 const selectedType = ref(null);
 const fieldValues = reactive({});
 const creating = ref(false);
@@ -504,6 +534,10 @@ const editingName = ref('');
 const deleteConfirm = ref({ show: false });
 const testing = ref(false);
 const testResult = ref(null);
+// 存档目录限制（与远程绑定，随新建/编辑一起提交）
+const rootDir = ref('');
+// 远程保存成功后的提示（如目标已自动重置为远程根）
+const remoteNotice = ref('');
 
 const phase = computed(() => syncStatus.value?.phase || 'idle');
 const conflicts = computed(() => syncStatus.value?.conflicts || []);
@@ -533,13 +567,36 @@ const backendItems = computed(() => backends.value.map((item) => ({
   value: item.id,
   subtitle: item.hint,
 })));
+// 本地 / 网络路径条目：保存在插件配置中，与 rclone 远程并列
+const localTargets = computed(() => syncStatus.value?.config?.localTargets || []);
+// Windows 路径大小写不敏感，匹配当前目标时归一比较
+const sameLocalPath = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+const selectedIsLocalTarget = computed(() => Boolean(
+  selectedRemote.value && localTargets.value.some((dir) => sameLocalPath(dir, selectedRemote.value)),
+));
 const remoteItems = computed(() => [
-  { title: '本地 / 网络路径（直接填写）', value: '' },
-  ...remotes.value.map((remote) => ({ title: `${remote.name}:`, value: `${remote.name}:` })),
+  ...localTargets.value.map((dir) => ({
+    title: dir,
+    value: dir,
+    subtitle: '本地 / 网络路径',
+  })),
+  ...remotes.value.map((remote) => ({
+    title: `${remote.name}:`,
+    value: `${remote.name}:`,
+    subtitle: remote.rootDir ? `/${remote.rootDir}` : undefined,
+  })),
 ]);
-const selectedRemoteInfo = computed(() => remotes.value.find((remote) => `${remote.name}:` === selectedRemote.value) || null);
+const selectedRemoteInfo = computed(() => {
+  if (selectedIsLocalTarget.value) {
+    return { name: selectedRemote.value, type: 'local' };
+  }
+  return remotes.value.find((remote) => `${remote.name}:` === selectedRemote.value) || null;
+});
 // OAuth 远程不可直接编辑凭据
 const canEditSelectedRemote = computed(() => {
+  if (selectedIsLocalTarget.value) {
+    return true;
+  }
   const info = selectedRemoteInfo.value;
   if (!info) {
     return false;
@@ -550,6 +607,9 @@ const canEditSelectedRemote = computed(() => {
 const remoteSubmitText = computed(() => {
   if (isEditing.value) {
     return '保存修改';
+  }
+  if (selectedType.value === 'local') {
+    return '添加路径';
   }
   return currentBackend.value?.auth === 'oauth' ? '授权并创建' : '创建远程';
 });
@@ -563,13 +623,15 @@ const canTestConnection = computed(() => {
     return false;
   }
   if (backend.auth === 'oauth') {
-    return remotes.value.some((remote) => remote.name === `translime-${selectedType.value}`);
+    return remotes.value.some((remote) => remote.type === selectedType.value
+      && /^translime-/.test(remote.name));
   }
   const hostVal = String(fieldValues.host || '').trim();
   const urlVal = String(fieldValues.url || '').trim();
   const endpointVal = String(fieldValues.endpoint || '').trim();
   const keyVal = String(fieldValues.access_key_id || '').trim();
-  return Boolean(hostVal || urlVal || endpointVal || keyVal);
+  const dirVal = String(fieldValues.dir || '').trim();
+  return Boolean(hostVal || urlVal || endpointVal || keyVal || dirVal);
 });
 const testResultText = computed(() => {
   if (!testResult.value) {
@@ -593,16 +655,21 @@ const resetFormError = () => {
   formError.value = '';
 };
 
-// 缓存各远程位置的输入值
-const targetByRemote = reactive({});
-let lastRemoteKey = null;
+// 受管远程（translime-*）的目录由远程绑定的「存档目录」定义，目标固定为远程根
+const isManagedRemoteName = (name) => /^translime-/.test(String(name || ''));
+
 let lastSavedRclonePath = '';
-watch(selectedRemote, (value) => {
-  if (lastRemoteKey !== null) {
-    targetByRemote[lastRemoteKey] = form.target;
+
+// 目标完全由选中的存档位置条目决定，选择后自动保存生效
+watch(selectedRemote, async (value) => {
+  form.target = value || '';
+  if (value && syncStatus.value?.config?.target !== value) {
+    try {
+      await setSyncConfig({ ...form, target: value });
+    } catch {
+      // 忽略自动保存异常，允许手动点击保存
+    }
   }
-  lastRemoteKey = value;
-  form.target = targetByRemote[value] ?? (value || '');
 });
 
 watch(visible, async (open) => {
@@ -613,25 +680,38 @@ watch(visible, async (open) => {
   resetFormError();
   probeResult.value = null;
   testResult.value = null;
+  remoteNotice.value = '';
+  rootDir.value = '';
   view.value = 'main';
   // 获取最新配置并回填表单
   await refreshSyncStatus();
   const config = syncStatus.value?.config;
   form.rclonePath = config?.rclonePath || '';
   lastSavedRclonePath = form.rclonePath;
-  // 匹配已保存的目标对应的远程配置
+  // 匹配已保存的目标对应的存档位置（本地条目优先，其次受管远程收敛到根、外部远程精确匹配；
+  // 均未命中则视为未选择，由用户重新挑选或添加）
   await Promise.all([loadBackends(), loadRemotes()]);
-  form.target = config?.target || '';
-  lastRemoteKey = null;
-  const matchedRemote = remotes.value.find((remote) => form.target.startsWith(`${remote.name}:`));
-  targetByRemote[matchedRemote ? `${matchedRemote.name}:` : ''] = form.target;
-  selectedRemote.value = matchedRemote ? `${matchedRemote.name}:` : '';
+  const savedTarget = String(config?.target || '');
+  const matchedLocal = localTargets.value.find((dir) => sameLocalPath(dir, savedTarget));
+  let matchedRemote = null;
+  if (!matchedLocal && savedTarget) {
+    matchedRemote = remotes.value.find((remote) => (isManagedRemoteName(remote.name)
+      ? savedTarget.startsWith(`${remote.name}:`)
+      : savedTarget === `${remote.name}:`)) || null;
+  }
+  // 先复位再选中：目标派生统一由 watch(selectedRemote) 处理
+  selectedRemote.value = null;
+  selectedRemote.value = matchedLocal
+    || (matchedRemote ? `${matchedRemote.name}:` : null);
+  form.target = selectedRemote.value || '';
 });
 
 watch(selectedType, () => {
   stopCurrentTest();
   resetFormError();
   testResult.value = null;
+  remoteNotice.value = '';
+  rootDir.value = '';
   Object.keys(fieldValues).forEach((key) => {
     delete fieldValues[key];
   });
@@ -687,9 +767,16 @@ const loadBackends = async () => {
 };
 
 const openRemoteSetup = async () => {
+  stopCurrentTest();
   resetFormError();
   testResult.value = null;
+  remoteNotice.value = '';
   editingName.value = '';
+  selectedType.value = null;
+  rootDir.value = '';
+  Object.keys(fieldValues).forEach((key) => {
+    delete fieldValues[key];
+  });
   view.value = 'remote';
   loadBackends();
   loadRemotes();
@@ -711,7 +798,13 @@ const backToMain = () => {
   stopCurrentTest();
   resetFormError();
   testResult.value = null;
+  remoteNotice.value = '';
+  rootDir.value = '';
   editingName.value = '';
+  selectedType.value = null;
+  Object.keys(fieldValues).forEach((key) => {
+    delete fieldValues[key];
+  });
   view.value = 'main';
 };
 
@@ -726,8 +819,18 @@ const openEditRemote = async () => {
   }
   resetFormError();
   testResult.value = null;
+  remoteNotice.value = '';
   view.value = 'remote';
   await loadBackends();
+  // 本地 / 网络路径条目：路径即存档根，直接回填，无 rclone 配置可读
+  if (info.type === 'local') {
+    editingName.value = info.name;
+    selectedType.value = 'local';
+    await nextTick();
+    fieldValues.dir = info.name;
+    rootDir.value = '';
+    return;
+  }
   try {
     const res = await ipc.invoke(`sync-get-remote@${PLUGIN_ID}`, { name: info.name });
     if (!res?.success) {
@@ -748,6 +851,8 @@ const openEditRemote = async () => {
     Object.entries(res.remote.values || {}).forEach(([key, value]) => {
       fieldValues[key] = value;
     });
+    // 存档目录在字段回填之后设置（selectedType 的 watch 会先重置它）
+    rootDir.value = String(res.remote.rootDir || '');
   } catch (err) {
     formError.value = err.message || '读取远程配置失败';
   }
@@ -758,14 +863,19 @@ const askDeleteRemote = () => {
   if (!info) {
     return;
   }
+  const isLocal = info.type === 'local';
   deleteConfirm.value = {
     show: true,
-    title: '删除远程',
+    title: isLocal ? '移除本地路径' : '删除远程',
     icon: 'delete',
     color: 'error',
-    message: `确定要删除远程「${info.name}」吗？`,
-    detail: '只删除本机 rclone 配置中的连接凭据，不会删除已同步到远端的存档数据。',
-    confirmText: '确认删除',
+    message: isLocal
+      ? `确定要移除本地路径「${info.name}」吗？`
+      : `确定要删除远程「${info.name}」吗？`,
+    detail: isLocal
+      ? '仅从存档位置列表移除，不会删除目录内的任何文件。'
+      : '只删除本机 rclone 配置中的连接凭据，不会删除已同步到远端的存档数据。',
+    confirmText: isLocal ? '确认移除' : '确认删除',
   };
 };
 
@@ -776,14 +886,15 @@ const removeRemote = async () => {
   }
   deleteConfirm.value = { ...deleteConfirm.value, loading: true };
   try {
-    const res = await ipc.invoke(`sync-delete-remote@${PLUGIN_ID}`, { name: info.name });
+    const res = await ipc.invoke(`sync-delete-remote@${PLUGIN_ID}`, {
+      name: info.name,
+      local: info.type === 'local' || undefined,
+    });
     deleteConfirm.value = { ...deleteConfirm.value, show: false, loading: false };
     if (res?.success) {
-      if (res.targetCleared) {
-        form.target = '';
-        selectedRemote.value = '';
-      }
-      delete targetByRemote[`${info.name}:`];
+      // 成功删除当前所选条目：立即清空选中项与目标，避免残留失效目标
+      form.target = '';
+      selectedRemote.value = null;
       formError.value = '';
       await Promise.all([refreshSyncStatus(), loadRemotes()]);
     } else {
@@ -900,11 +1011,14 @@ const cancelAuthorize = async () => {
   }
 };
 
-const applyCreatedRemote = (remote) => {
-  targetByRemote[remote] = remote;
+const applyCreatedRemote = async (remote) => {
   form.target = remote;
-  lastRemoteKey = remote;
   selectedRemote.value = remote;
+  try {
+    await setSyncConfig({ ...form, target: remote });
+  } catch {
+    // 忽略自动保存异常，返回主视图后仍可手动点击保存
+  }
   view.value = 'main';
 };
 
@@ -936,11 +1050,22 @@ const createRemoteFromForm = async () => {
       values: { ...fieldValues },
       editName: isEditing.value ? editingName.value : undefined,
       rclonePath: form.rclonePath || undefined,
+      rootDir: String(rootDir.value || '').trim() || undefined,
     });
     if (res?.success) {
       formError.value = '';
       editingName.value = '';
+      // 刷新配置：本地条目列表需最新值，选中态与目标锁定才能正确生效
+      await refreshSyncStatus();
       applyCreatedRemote(res.remote);
+      if (res.targetAdjusted) {
+        // 主进程已把带子路径的旧目标收敛，回填并提示
+        remoteNotice.value = selectedType.value === 'local'
+          ? '原目标已更新为新的本地路径'
+          : `已设为存档位置「${res.remote}」`;
+      } else {
+        remoteNotice.value = '';
+      }
       loadRemotes();
     } else {
       formError.value = res?.message || '创建远程失败';
@@ -969,6 +1094,7 @@ const testRemoteConnection = async () => {
       values: { ...fieldValues },
       name: isEditing.value ? editingName.value : `translime-${selectedType.value}`,
       rclonePath: form.rclonePath || undefined,
+      rootDir: String(rootDir.value || '').trim() || undefined,
     });
     if (testToken !== currentToken) {
       return;
@@ -994,7 +1120,24 @@ const testRemoteConnection = async () => {
 };
 
 const syncNow = async () => {
+  if (!form.target) {
+    return;
+  }
   resetFormError();
+  // 若当前选中的目标尚未保存，先自动保存生效再执行同步
+  if (syncStatus.value?.config?.target !== form.target) {
+    try {
+      const saveRes = await setSyncConfig({ ...form });
+      if (!saveRes?.success) {
+        formError.value = saveRes?.message || '保存设置失败';
+        return;
+      }
+      lastSavedRclonePath = form.rclonePath;
+    } catch (e) {
+      formError.value = e.message || '保存设置失败';
+      return;
+    }
+  }
   const res = await triggerSyncNow();
   if (!res?.success) {
     formError.value = res?.message || '触发同步失败';

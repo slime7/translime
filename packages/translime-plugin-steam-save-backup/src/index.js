@@ -48,9 +48,10 @@ import {
   createRemote,
   deleteRemote,
   findBackendType,
+  findFreeRemoteName,
   getRemoteConfig,
   listRemotes,
-  remoteNameFor,
+  normalizeRootDir,
   runAuthorize,
   testRemoteConnection,
   updateRemote,
@@ -907,11 +908,11 @@ export const ipcHandlers = [
       try {
         const status = syncService.getStatus();
         if (!status.config.target) {
-          return { success: false, message: '请先在同步设置中配置远程目标' };
+          return { success: false, message: '请先在同步设置中配置存档位置' };
         }
         const result = syncService.trigger();
         if (result === 'ignored') {
-          return { success: false, message: '请先在同步设置中配置远程目标' };
+          return { success: false, message: '请先在同步设置中配置存档位置' };
         }
         return { success: true, result };
       } catch (e) {
@@ -933,15 +934,22 @@ export const ipcHandlers = [
         const binary = syncService.resolveBinaryPath();
         const exec = createExec(async () => binary);
         const names = await listRemotes(exec);
-        // 附带后端类型：主视图据此决定「修改」是否可用（OAuth 远程无可编辑表单字段）
-        const remotes = await Promise.all(names.map(async (name) => {
-          try {
-            const remoteConfig = await getRemoteConfig(exec, name);
-            return { name, type: remoteConfig.type };
-          } catch {
-            return { name, type: null };
-          }
-        }));
+        // 附带后端类型与绑定的存档目录：主视图据此决定「修改」是否可用、显示限制范围；
+        // 两段式凭据远程（translime-<type>-base）是别名结构的底层存储，不出现在列表
+        const remotes = await Promise.all(names
+          .filter((name) => !/^translime-.*-base$/.test(name))
+          .map(async (name) => {
+            try {
+              const remoteConfig = await getRemoteConfig(exec, name);
+              return {
+                name,
+                type: remoteConfig.type,
+                rootDir: remoteConfig.rootDir || '',
+              };
+            } catch {
+              return { name, type: null, rootDir: '' };
+            }
+          }));
         return { success: true, remotes };
       } catch (e) {
         if (/ENOENT|无法启动 rclone/i.test(e?.message || '')) {
@@ -958,7 +966,7 @@ export const ipcHandlers = [
   {
     type: 'sync-create-remote',
     handler: ({ sendToClient }) => async ({
-      type, values, editName, rclonePath,
+      type, values, editName, rclonePath, rootDir,
     } = {}) => {
       cancelCurrentTest();
       try {
@@ -973,6 +981,31 @@ export const ipcHandlers = [
           return { success: false, message: `请填写：${missing.join('、')}` };
         }
 
+        // 本地 / 网络路径：不写 rclone 配置，作为可添加的存档位置条目保存在插件配置中
+        if (type === 'local') {
+          const dir = String(values?.dir ?? '').trim();
+          if (editName) {
+            syncService.renameLocalTarget(editName, dir);
+            // 当前目标正引用旧路径时跟随更新，避免指向已移除的条目
+            const syncConfig = syncService.getSyncConfig();
+            let targetAdjusted = false;
+            if (syncConfig.target === editName) {
+              syncService.setSyncConfig({ ...syncConfig, target: dir });
+              targetAdjusted = true;
+            }
+            return {
+              success: true, remote: dir, rootDir: '', targetAdjusted,
+            };
+          }
+          return { success: true, remote: syncService.addLocalTarget(dir), rootDir: '' };
+        }
+
+        // 存档目录限制：归一化后写入远程定义（alias 结构），限制插件与 rclone GUI 的可见范围
+        const normalizedRoot = normalizeRootDir(rootDir);
+        if (!normalizedRoot.ok) {
+          return { success: false, message: normalizedRoot.error };
+        }
+
         if (typeof rclonePath === 'string' && rclonePath.trim()) {
           syncService.setSyncConfig({ rclonePath: rclonePath.trim() });
         }
@@ -982,11 +1015,12 @@ export const ipcHandlers = [
 
         let name;
         if (editName && backend.auth === 'fields') {
-          // 编辑既有远程：只更新表单提交的字段，未填写的密码保持原值
+          // 编辑既有远程：按传入参数整体重建，未填写的密码保持原值
           name = await updateRemote(exec, {
             name: editName,
             type,
             values: mergeFieldValues(backend, values),
+            rootDir: normalizedRoot.value,
           });
         } else {
           let token = null;
@@ -1005,14 +1039,35 @@ export const ipcHandlers = [
             }
           }
 
+          // 同一后端可添加多个远程：规范名被占用时自动取空闲序号（删除后复用）
           name = await createRemote(exec, {
             type,
-            name: remoteNameFor(type),
+            name: await findFreeRemoteName(exec, type),
             values: mergeFieldValues(backend, values),
             token,
+            rootDir: normalizedRoot.value,
           });
         }
-        return { success: true, remote: `${name}:` };
+
+        // 绑定存档目录后，旧目标的子路径会拼接到限制目录之后；
+        // 目标正引用该远程且带子路径时自动收敛为远程根
+        let targetAdjusted = false;
+        if (normalizedRoot.value) {
+          const syncConfig = syncService.getSyncConfig();
+          const prefix = `${name}:`;
+          if (typeof syncConfig.target === 'string'
+            && syncConfig.target.startsWith(prefix)
+            && syncConfig.target.length > prefix.length) {
+            syncService.setSyncConfig({ ...syncConfig, target: prefix });
+            targetAdjusted = true;
+          }
+        }
+        return {
+          success: true,
+          remote: `${name}:`,
+          rootDir: normalizedRoot.value,
+          targetAdjusted,
+        };
       } catch (e) {
         if (/ENOENT|无法启动 rclone/i.test(e?.message || '')) {
           const binary = syncService.resolveBinaryPath();
@@ -1035,7 +1090,7 @@ export const ipcHandlers = [
   {
     type: 'sync-test-remote',
     handler: () => async ({
-      name, subPath, type, values, rclonePath,
+      name, subPath, type, values, rclonePath, rootDir,
     } = {}) => {
       cancelCurrentTest();
       if (!name && !type) {
@@ -1064,6 +1119,7 @@ export const ipcHandlers = [
           values: testValues,
           name,
           subPath,
+          rootDir,
           isCancelled: () => cancelled,
           discoverHostName: discoverSmbHostName,
         });
@@ -1098,6 +1154,7 @@ export const ipcHandlers = [
         }
         const binary = syncService.resolveBinaryPath();
         const exec = createExec(async () => binary);
+        // 统一视图：直连 / alias 内联 / alias 两段式都解出类型、非密码配置与存档目录
         const remoteConfig = await getRemoteConfig(exec, name);
         const backend = findBackendType(remoteConfig.type);
         if (!backend) {
@@ -1109,12 +1166,20 @@ export const ipcHandlers = [
           if (field.type === 'password') {
             return;
           }
-          const stored = remoteConfig[field.key];
+          const stored = remoteConfig.values[field.key];
           if (stored != null) {
             values[field.key] = stored;
           }
         });
-        return { success: true, remote: { name, type: remoteConfig.type, values } };
+        return {
+          success: true,
+          remote: {
+            name,
+            type: remoteConfig.type,
+            values,
+            rootDir: remoteConfig.rootDir || '',
+          },
+        };
       } catch (e) {
         return { success: false, message: e.message };
       }
@@ -1122,18 +1187,28 @@ export const ipcHandlers = [
   },
   {
     type: 'sync-delete-remote',
-    handler: () => async ({ name } = {}) => {
+    handler: () => async ({ name, local } = {}) => {
       try {
         if (!name) {
           return { success: false, message: '参数不完整' };
         }
-        const binary = syncService.resolveBinaryPath();
-        const exec = createExec(async () => binary);
-        await deleteRemote(exec, name);
-        // 删除的只是连接配置；远程目标正引用它时一并清空，避免同步指向已删除的远程
+        if (local) {
+          // 本地 / 网络路径条目：仅从插件配置移除，不涉及 rclone 配置
+          syncService.removeLocalTarget(name);
+        } else {
+          const binary = syncService.resolveBinaryPath();
+          const exec = createExec(async () => binary);
+          await deleteRemote(exec, name);
+        }
+        // 删除的只是位置条目；远程目标正引用它（包含历史带子路径的目标）时一并清空，避免同步指向已删除的远程
         const syncConfig = syncService.getSyncConfig();
         let targetCleared = false;
-        if (syncConfig.target === `${name}:`) {
+        const currentTarget = String(syncConfig.target || '');
+        const referenced = local
+          ? (currentTarget.toLowerCase() === String(name).toLowerCase()
+            || currentTarget.toLowerCase().replace(/[\\/]+$/, '') === String(name).toLowerCase().replace(/[\\/]+$/, ''))
+          : (currentTarget === `${name}:` || currentTarget.startsWith(`${name}:`));
+        if (referenced) {
           syncService.setSyncConfig({ ...syncConfig, target: '' });
           targetCleared = true;
         }

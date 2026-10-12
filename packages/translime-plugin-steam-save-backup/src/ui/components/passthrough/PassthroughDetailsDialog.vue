@@ -198,6 +198,7 @@
         variant="text"
         prefix="cloud_sync"
         :loading="syncing"
+        :disabled="!target"
         @click="$emit('sync')"
       >
         立即同步

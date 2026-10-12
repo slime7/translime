@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {
   describe,
   expect,
@@ -5,16 +8,24 @@ import {
 } from 'vitest';
 import {
   BACKEND_TYPES,
+  baseNameFor,
+  buildAliasCreateArgs,
   buildCreateArgs,
-  buildUpdateArgs,
+  buildInlineRemoteValue,
   canTestRemoteConnection,
   checkRemoteConnection,
+  createRemote,
   deleteRemote,
   findBackendType,
+  findFreeRemoteName,
   getRemoteConfig,
+  getRemoteRawConfig,
+  normalizeRootDir,
+  parseAliasRemoteValue,
   parseAuthorizeToken,
   parseAuthorizeUrl,
   parseConfigShow,
+  parseInlineRemoteValue,
   parseListRemotes,
   remoteNameFor,
   testRemoteConnection,
@@ -33,8 +44,15 @@ describe('BACKEND_TYPES 元数据', () => {
     const ids = BACKEND_TYPES.map((backend) => backend.id);
     expect(new Set(ids).size).toBe(ids.length);
     BACKEND_TYPES.forEach((backend) => {
-      expect(['oauth', 'fields']).toContain(backend.auth);
+      expect(['oauth', 'fields', 'local']).toContain(backend.auth);
     });
+  });
+
+  it('本地路径后端只要求填写路径（不写 rclone 配置，路径即存档根）', () => {
+    const local = findBackendType('local');
+    expect(local.auth).toBe('local');
+    const required = (local.fields || []).filter((field) => field.required);
+    expect(required.map((field) => field.key)).toEqual(['dir']);
   });
 
   it('表单后端的字段定义完整：key 唯一、type 合法、select 带选项与默认值', () => {
@@ -197,144 +215,404 @@ describe('parseConfigShow', () => {
   });
 });
 
-describe('getRemoteConfig', () => {
-  it('读取远程配置：解析类型与配置字段（编辑回填非密码字段的来源）', async () => {
+describe('normalizeRootDir（存档目录归一化）', () => {
+  it('反斜杠转正斜杠、去首尾分隔符与首尾空白', () => {
+    // 防止回归：Windows 反斜杠或首尾斜杠会让 alias 锚点出现空路径段或路径错位
+    expect(normalizeRootDir(' \\SteamBackups\\ ')).toEqual({ ok: true, value: 'SteamBackups', error: null });
+    expect(normalizeRootDir('/nas/saves/')).toEqual({ ok: true, value: 'nas/saves', error: null });
+  });
+
+  it('空输入视为不限制', () => {
+    expect(normalizeRootDir('')).toEqual({ ok: true, value: '', error: null });
+    expect(normalizeRootDir('   ')).toEqual({ ok: true, value: '', error: null });
+    expect(normalizeRootDir('/')).toEqual({ ok: true, value: '', error: null });
+  });
+
+  it('拒绝「..」路径段：别名锚点不允许逃出存档范围', () => {
+    // 防止回归：限制目录含 .. 时用户可以越过锚点浏览整个远端
+    expect(normalizeRootDir('saves/../secret').ok).toBe(false);
+    expect(normalizeRootDir('..').ok).toBe(false);
+  });
+
+  it('拒绝冒号与引号：会破坏连接字符串/引号语法', () => {
+    expect(normalizeRootDir('a:b').ok).toBe(false);
+    expect(normalizeRootDir('a"b').ok).toBe(false);
+  });
+});
+
+describe('buildInlineRemoteValue / parseInlineRemoteValue（内联凭据连接字符串）', () => {
+  it('构建 `:type,k=v,...:rootDir`：密码字段取预混淆值，空值字段跳过', () => {
+    const value = buildInlineRemoteValue('smb', {
+      host: '192.168.1.10',
+      user: 'admin',
+      pass: '明文不应出现',
+      domain: '',
+    }, 'steam/saves', { pass: 'obSCURED' });
+
+    expect(value).toBe(':smb,host=192.168.1.10,user=admin,pass=obSCURED:steam/saves');
+  });
+
+  it('含冒号或逗号的参数值用双引号包裹（rclone 连接字符串语法）', () => {
+    // 防止回归：webdav/s3 的 url 含 ://，不转义会被当成路径分隔冒号截断参数段
+    const value = buildInlineRemoteValue('webdav', {
+      url: 'https://dav.example.com:5006/dav/',
+      vendor: 'other',
+      user: 'a,b',
+    }, 'dir', {});
+
+    expect(value).toBe(':webdav,url="https://dav.example.com:5006/dav/",vendor=other,user="a,b":dir');
+  });
+
+  it('参数值包含引号时抛错（连接字符串无法无损表达）', () => {
+    expect(() => buildInlineRemoteValue('smb', { user: 'a"b' }, 'dir', {})).toThrow('引号');
+  });
+
+  it('parse 与 build 往返一致：还原类型、去引号的参数值与存档目录', () => {
+    const built = buildInlineRemoteValue('webdav', {
+      url: 'https://dav.example.com:5006/dav/',
+      vendor: 'other',
+      user: 'me',
+      pass: '',
+    }, 'sub dir', { pass: '' });
+    const parsed = parseInlineRemoteValue(built);
+
+    expect(parsed).toEqual({
+      type: 'webdav',
+      values: { url: 'https://dav.example.com:5006/dav/', vendor: 'other', user: 'me' },
+      rootDir: 'sub dir',
+    });
+  });
+
+  it('解析 rclone 实测形态：路径段含空格、密码为混淆值', () => {
+    // 来自 rclone v1.75.2 实测存储格式：路径段第一个冒号前是参数段
+    const parsed = parseInlineRemoteValue(
+      ':smb,host=192.168.1.99,user=spike,pass=xolng2So,domain=WORKGROUP:share/steam saves',
+    );
+    expect(parsed.type).toBe('smb');
+    expect(parsed.values).toEqual({
+      host: '192.168.1.99',
+      user: 'spike',
+      pass: 'xolng2So',
+      domain: 'WORKGROUP',
+    });
+    expect(parsed.rootDir).toBe('share/steam saves');
+  });
+
+  it('非内联格式返回 null（直连 remote: 路径不是连接字符串）', () => {
+    expect(parseInlineRemoteValue('translime-smb-base:dir')).toBeNull();
+    expect(parseInlineRemoteValue('')).toBeNull();
+  });
+});
+
+describe('parseAliasRemoteValue（alias 远程结构分派）', () => {
+  it('以 : 开头识别为内联凭据结构', () => {
+    const parsed = parseAliasRemoteValue(':smb,host=x:dir');
+    expect(parsed).toEqual({
+      mode: 'inline', type: 'smb', values: { host: 'x' }, rootDir: 'dir',
+    });
+  });
+
+  it('name:dir 形态识别为两段式结构并拆出底层远程名', () => {
+    expect(parseAliasRemoteValue('translime-drive-base:backup/root')).toEqual({
+      mode: 'base',
+      baseName: 'translime-drive-base',
+      rootDir: 'backup/root',
+    });
+  });
+
+  it('其他形态返回 null（手工编辑的未知 alias 不进本插件管理流程）', () => {
+    expect(parseAliasRemoteValue('no-colon')).toBeNull();
+    expect(parseAliasRemoteValue(':bad')).toEqual({
+      mode: 'inline', type: 'bad', values: {}, rootDir: '',
+    });
+  });
+});
+
+describe('baseNameFor / findFreeRemoteName / buildAliasCreateArgs', () => {
+  it('两段式凭据远程跟随具体远程名命名，便于列表过滤与级联删除', () => {
+    expect(baseNameFor('translime-drive')).toBe('translime-drive-base');
+    expect(baseNameFor('translime-smb-2')).toBe('translime-smb-2-base');
+    expect(buildAliasCreateArgs('translime-drive', 'translime-drive-base:dir')).toEqual([
+      'config',
+      'create',
+      'translime-drive',
+      'alias',
+      'remote=translime-drive-base:dir',
+    ]);
+  });
+
+  it('findFreeRemoteName：规范名空闲时直接使用（首个远程保持 translime-<type>）', async () => {
     const exec = async (args) => {
-      expect(args).toEqual(['config', 'show', 'translime-smb']);
-      return {
-        code: 0,
-        stdout: '[translime-smb]\ntype = smb\nhost = 192.168.1.10\nuser = admin\npass = obSCURED\n',
-        stderr: '',
-      };
+      expect(args).toEqual(['listremotes']);
+      return { code: 0, stdout: 'translime-webdav:\n', stderr: '' };
     };
 
+    await expect(findFreeRemoteName(exec, 'smb')).resolves.toBe('translime-smb');
+  });
+
+  it('findFreeRemoteName：规范名被占用时依次取空闲序号，同一后端可添加多个', async () => {
+    // 防止回归：命名固定会让第二个 SMB 覆盖第一个的凭据，无法并存快速切换
+    const exec = async () => ({
+      code: 0,
+      stdout: 'translime-smb:\ntranslime-smb-2:\ntranslime-webdav:\n',
+      stderr: '',
+    });
+
+    await expect(findFreeRemoteName(exec, 'smb')).resolves.toBe('translime-smb-3');
+  });
+});
+
+describe('getRemoteConfig（统一视图）', () => {
+  const execWith = (sections) => async (args) => {
+    expect(args[0]).toBe('config');
+    expect(args[1]).toBe('show');
+    const section = sections[args[2]];
+    if (!section) {
+      return { code: 3, stdout: '', stderr: 'section not found' };
+    }
+    return {
+      code: 0,
+      stdout: Object.keys(section).map((key) => `${key} = ${section[key]}`).join('\n'),
+      stderr: '',
+    };
+  };
+
+  it('直连远程：mode=direct，rootDir 为空（未启用限制的旧形态）', async () => {
+    const exec = execWith({
+      'translime-smb': { type: 'smb', host: '192.168.1.10', pass: 'obSCURED' },
+    });
+
     const config = await getRemoteConfig(exec, 'translime-smb');
+    expect(config).toEqual({
+      mode: 'direct',
+      type: 'smb',
+      values: { type: 'smb', host: '192.168.1.10', pass: 'obSCURED' },
+      rootDir: '',
+      baseName: null,
+    });
+  });
+
+  it('alias 内联结构：解析连接字符串得到类型、混淆密码与存档目录', async () => {
+    const exec = execWith({
+      'translime-smb': {
+        type: 'alias',
+        remote: ':smb,host=192.168.1.10,pass=obSCURED:steam/saves',
+      },
+    });
+
+    const config = await getRemoteConfig(exec, 'translime-smb');
+    expect(config.mode).toBe('inline');
     expect(config.type).toBe('smb');
-    expect(config.host).toBe('192.168.1.10');
-    expect(config.pass).toBe('obSCURED');
+    expect(config.values.pass).toBe('obSCURED');
+    expect(config.rootDir).toBe('steam/saves');
+  });
+
+  it('alias 两段式：读取底层凭据远程的类型与配置', async () => {
+    const exec = execWith({
+      'translime-drive': { type: 'alias', remote: 'translime-drive-base:backup' },
+      'translime-drive-base': { type: 'drive', config_token: '{"access_token":"t"}' },
+    });
+
+    const config = await getRemoteConfig(exec, 'translime-drive');
+    expect(config.mode).toBe('base');
+    expect(config.type).toBe('drive');
+    expect(config.baseName).toBe('translime-drive-base');
+    expect(config.rootDir).toBe('backup');
   });
 
   it('远程缺少后端类型时报错（外部手工配置的残缺条目不进编辑流程）', async () => {
     const exec = async () => ({ code: 0, stdout: '[broken]\nhost = x\n', stderr: '' });
 
-    await expect(getRemoteConfig(exec, 'broken')).rejects.toThrow('缺少后端类型');
+    await expect(getRemoteRawConfig(exec, 'broken')).rejects.toThrow('缺少后端类型');
   });
 
   it('config show 失败时携带 rclone 错误信息', async () => {
     const exec = async () => ({ code: 3, stdout: '', stderr: 'remote not found' });
 
-    await expect(getRemoteConfig(exec, 'gone')).rejects.toThrow('读取远程配置失败');
+    await expect(getRemoteRawConfig(exec, 'gone')).rejects.toThrow('读取远程配置失败');
   });
 });
 
-describe('buildUpdateArgs', () => {
-  it('只携带非空字段：密码留空不携带（保持原密码），空值字段不写空串', () => {
-    const args = buildUpdateArgs('smb', 'translime-smb', {
-      host: '192.168.1.20',
-      user: 'admin',
-      pass: '',
-      domain: '',
-    });
-
-    expect(args).toEqual([
-      'config',
-      'update',
-      'translime-smb',
-      'host=192.168.1.20',
-      'user=admin',
-      '--obscure',
-    ]);
-  });
-
-  it('填写了密码则携带更新，且密码不做 trim（密码本身可能包含空格）', () => {
-    const args = buildUpdateArgs('webdav', 'translime-webdav', {
-      url: 'https://dav.jianguoyun.com/dav/',
-      vendor: 'other',
-      user: 'me@example.com',
-      pass: ' new app password ',
-    });
-
-    expect(args).toContain('pass= new app password ');
-    expect(args.at(-1)).toBe('--obscure');
-  });
-});
-
-describe('updateRemote', () => {
-  const fakeExec = ({ current = {}, allowUnset = true } = {}) => {
-    const stored = { ...current };
+describe('createRemote（重建语义 + 存档目录结构）', () => {
+  const fakeExec = ({ existing = [], stored = {} } = {}) => {
+    const remotes = new Set(existing);
     const calls = [];
     return {
       calls,
       exec: async (args) => {
         calls.push(args);
+        if (args[0] === 'listremotes') {
+          return { code: 0, stdout: [...remotes].map((name) => `${name}:`).join('\n'), stderr: '' };
+        }
         if (args[0] === 'config' && args[1] === 'show') {
+          const section = stored[args[2]];
+          if (!section) {
+            return { code: 3, stdout: '', stderr: 'section not found' };
+          }
           return {
             code: 0,
-            stdout: Object.keys(stored).map((key) => `${key} = ${stored[key]}`).join('\n'),
+            stdout: Object.keys(section).map((key) => `${key} = ${section[key]}`).join('\n'),
             stderr: '',
           };
         }
-        if (args[0] === 'config' && args[1] === 'update') {
-          args.slice(3).forEach((pair) => {
-            const eq = pair.indexOf('=');
-            const key = pair.slice(0, eq);
-            if (key === 'pass' || key === 'secret_access_key') {
-              return;
-            }
-            stored[key] = pair.slice(eq + 1);
-          });
+        if (args[0] === 'config' && args[1] === 'delete') {
+          remotes.delete(args[2]);
           return { code: 0, stdout: '', stderr: '' };
         }
-        if (args[0] === 'config' && args[1] === 'unset') {
-          if (allowUnset) {
-            delete stored[args[3]];
-          }
+        if (args[0] === 'config' && args[1] === 'create') {
+          remotes.add(args[2]);
           return { code: 0, stdout: '', stderr: '' };
+        }
+        if (args[0] === 'obscure') {
+          return { code: 0, stdout: `obSCURED(${args[1]})`, stderr: '' };
         }
         return { code: 0, stdout: '', stderr: '' };
       },
-      stored,
+      remotes,
     };
   };
 
-  it('清空的字段以 config unset 移除（写空串会让后端拿到空选项）', async () => {
-    const probe = fakeExec({ current: { type: 'smb', host: '192.168.2.11', domain: '' } });
+  it('rootDir 为空：删除旧远程后按直连结构创建（密码先混淆，关闭 --obscure 原样存储）', async () => {
+    const probe = fakeExec({ existing: ['translime-smb'] });
+
+    await createRemote(probe.exec, {
+      type: 'smb',
+      name: 'translime-smb',
+      values: { host: '192.168.1.10', pass: 'plain pass' },
+      rootDir: '',
+    });
+
+    expect(probe.calls.some((args) => args[0] === 'config' && args[1] === 'delete' && args[2] === 'translime-smb')).toBe(true);
+    const createCall = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-smb');
+    expect(createCall[3]).toBe('smb');
+    expect(createCall).toContain('pass=obSCURED(plain pass)');
+    expect(createCall).not.toContain('--obscure');
+    expect(probe.calls.some((args) => args[0] === 'obscure' && args[1] === 'plain pass')).toBe(true);
+  });
+
+  it('表单后端 + rootDir：先混淆密码，再以 alias 内联凭据创建（凭据不出现在远程列表）', async () => {
+    // 防止回归：绑定存档目录后必须写成 alias 结构，否则远程仍暴露整个远端
+    const probe = fakeExec({ existing: [] });
+
+    await createRemote(probe.exec, {
+      type: 'smb',
+      name: 'translime-smb',
+      values: { host: '192.168.1.10', user: 'admin', pass: 'plain pass' },
+      rootDir: 'steam/saves',
+    });
+
+    const createCall = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-smb');
+    expect(createCall[3]).toBe('alias');
+    expect(createCall[4]).toBe('remote=:smb,host=192.168.1.10,user=admin,pass=obSCURED(plain pass):steam/saves');
+    expect(probe.calls.some((args) => args[0] === 'obscure' && args[1] === 'plain pass')).toBe(true);
+    expect(probe.calls.some((args) => args.includes('pass=plain pass'))).toBe(false);
+  });
+
+  it('OAuth + rootDir：令牌写入 translime-<type>-base，别名锚定存档目录', async () => {
+    const probe = fakeExec({ existing: [] });
+
+    await createRemote(probe.exec, {
+      type: 'drive',
+      name: 'translime-drive',
+      values: {},
+      token: '{"access_token":"t"}',
+      rootDir: 'SteamBackups',
+    });
+
+    const baseCreate = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-drive-base');
+    expect(baseCreate).toContain('config_token={"access_token":"t"}');
+    const aliasCreate = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-drive');
+    expect(aliasCreate).toEqual([
+      'config',
+      'create',
+      'translime-drive',
+      'alias',
+      'remote=translime-drive-base:SteamBackups',
+    ]);
+  });
+
+  it('OAuth + rootDir 但缺少令牌：直接报错且不删除既有远程', async () => {
+    const probe = fakeExec({ existing: ['translime-drive'] });
+
+    await expect(createRemote(probe.exec, {
+      type: 'drive',
+      name: 'translime-drive',
+      values: {},
+      rootDir: 'SteamBackups',
+    })).rejects.toThrow('缺少授权令牌');
+    expect(probe.remotes.has('translime-drive')).toBe(true);
+  });
+
+  it('编辑重建（密码留空沿用旧值）：从旧内联结构取混淆密码，不二次输入', async () => {
+    // 防止回归：重建语义下若不搬运旧混淆密码，编辑远程会被迫重输密码且留空会丢失凭据
+    const probe = fakeExec({
+      existing: ['translime-smb'],
+      stored: {
+        'translime-smb': { type: 'alias', remote: ':smb,host=192.168.1.10,pass=obSCURED(old):steam/saves' },
+      },
+    });
+
+    await updateRemote(probe.exec, {
+      name: 'translime-smb',
+      type: 'smb',
+      values: { host: '192.168.1.20', user: 'admin', pass: '' },
+      rootDir: 'steam/saves2',
+    });
+
+    const obscureCalls = probe.calls.filter((args) => args[0] === 'obscure');
+    expect(obscureCalls).toEqual([]);
+    const createCall = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-smb');
+    expect(createCall[4]).toBe('remote=:smb,host=192.168.1.20,user=admin,pass=obSCURED(old):steam/saves2');
+  });
+
+  it('编辑重建（直连旧结构 + 密码留空）：搬运旧混淆密码且不再加 --obscure（防二次混淆损坏）', async () => {
+    // 防止回归：已混淆密码再走 --obscure 会二次混淆，认证必然失败
+    const probe = fakeExec({
+      existing: ['translime-smb'],
+      stored: {
+        'translime-smb': { type: 'smb', host: '192.168.1.10', pass: 'obSCURED(old)' },
+      },
+    });
+
+    await updateRemote(probe.exec, {
+      name: 'translime-smb',
+      type: 'smb',
+      values: { host: '192.168.1.20', user: 'admin', pass: '' },
+      rootDir: '',
+    });
+
+    const createCall = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-smb');
+    expect(createCall).toContain('pass=obSCURED(old)');
+    expect(createCall).not.toContain('--obscure');
+  });
+
+  it('清空的可选字段不进入重建参数（如 SMB 域清空后不再携带）', async () => {
+    const probe = fakeExec({ existing: [] });
 
     await updateRemote(probe.exec, {
       name: 'translime-smb',
       type: 'smb',
       values: {
-        host: '192.168.2.11', user: 'slime', pass: '', domain: '',
+        host: '192.168.1.20', user: 'admin', pass: 'new', domain: '',
       },
+      rootDir: 'saves',
     });
 
-    expect(probe.calls.some((args) => args[1] === 'unset' && args[3] === 'domain')).toBe(true);
-    expect(probe.stored.domain).toBeUndefined();
-    expect(probe.stored.user).toBe('slime');
-  });
-
-  it('密码留空 = 保持不变：既不更新也不移除', async () => {
-    const probe = fakeExec({ current: { type: 'webdav', url: 'https://dav.x/', pass: 'obSCURED' } });
-
-    await updateRemote(probe.exec, {
-      name: 'translime-webdav',
-      type: 'webdav',
-      values: { url: 'https://dav.x/', user: 'me', pass: '' },
-    });
-
-    expect(probe.calls.some((args) => args[1] === 'unset' && args[3] === 'pass')).toBe(false);
-    expect(probe.calls.some((args) => args.includes('pass='))).toBe(false);
-    expect(probe.stored.pass).toBe('obSCURED');
+    const createCall = probe.calls.find((args) => args[0] === 'config' && args[1] === 'create' && args[2] === 'translime-smb');
+    expect(createCall[4]).toBe('remote=:smb,host=192.168.1.20,user=admin,pass=obSCURED(new):saves');
   });
 });
 
-describe('deleteRemote', () => {
+describe('deleteRemote（级联删除）', () => {
   it('远程存在时执行 config delete', async () => {
     const calls = [];
     const exec = async (args) => {
       calls.push(args);
       if (args[0] === 'listremotes') {
         return { code: 0, stdout: 'translime-smb:\n', stderr: '' };
+      }
+      if (args[0] === 'config' && args[1] === 'show') {
+        return { code: 0, stdout: 'type = smb\nhost = x\n', stderr: '' };
       }
       return { code: 0, stdout: '', stderr: '' };
     };
@@ -352,6 +630,50 @@ describe('deleteRemote', () => {
 
     await deleteRemote(exec, 'translime-smb');
     expect(calls.every((args) => args[0] === 'listremotes')).toBe(true);
+  });
+
+  it('两段式 alias 连带删除底层凭据远程，不留全盘入口', async () => {
+    // 防止回归：只删别名会残留 translime-<type>-base 全盘凭据远程
+    const calls = [];
+    const exec = async (args) => {
+      calls.push(args);
+      if (args[0] === 'listremotes') {
+        return { code: 0, stdout: 'translime-drive:\ntranslime-drive-base:\n', stderr: '' };
+      }
+      if (args[0] === 'config' && args[1] === 'show') {
+        const section = args[2] === 'translime-drive'
+          ? { type: 'alias', remote: 'translime-drive-base:backup' }
+          : { type: 'drive' };
+        return {
+          code: 0,
+          stdout: Object.keys(section).map((key) => `${key} = ${section[key]}`).join('\n'),
+          stderr: '',
+        };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    await deleteRemote(exec, 'translime-drive');
+    const deleted = calls.filter((args) => args[0] === 'config' && args[1] === 'delete').map((args) => args[2]);
+    expect(deleted).toEqual(['translime-drive', 'translime-drive-base']);
+  });
+
+  it('内联 alias 只删除本体（凭据就在别名定义里，无需级联）', async () => {
+    const calls = [];
+    const exec = async (args) => {
+      calls.push(args);
+      if (args[0] === 'listremotes') {
+        return { code: 0, stdout: 'translime-smb:\n', stderr: '' };
+      }
+      if (args[0] === 'config' && args[1] === 'show') {
+        return { code: 0, stdout: 'type = alias\nremote = :smb,host=x:dir\n', stderr: '' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    await deleteRemote(exec, 'translime-smb');
+    const deleted = calls.filter((args) => args[0] === 'config' && args[1] === 'delete').map((args) => args[2]);
+    expect(deleted).toEqual(['translime-smb']);
   });
 });
 
@@ -425,8 +747,8 @@ describe('canTestRemoteConnection（测试连接按钮可用性）', () => {
     expect(result).toBe(false);
   });
 
-  it('OAuth 后端：仅当系统已存在已授权远程时才可用，未授权前不可用', () => {
-    // 防止回归：OAuth 后端无表单地址输入，未授权前无 token 不可测试
+  it('OAuth 后端：仅当系统已存在该类型的受管远程时可用（同类型多个序号远程均计）', () => {
+    // 防止回归：远程命名带空闲序号后，仍按类型匹配测试按钮可用性
     expect(canTestRemoteConnection({
       backend: driveBackend,
       type: 'drive',
@@ -438,8 +760,35 @@ describe('canTestRemoteConnection（测试连接按钮可用性）', () => {
       backend: driveBackend,
       type: 'drive',
       values: {},
-      remotes: [{ name: 'translime-drive', type: 'drive' }],
+      remotes: [{ name: 'translime-drive-2', type: 'drive' }],
     })).toBe(true);
+
+    // 类型不匹配或非本插件管理的远程不启用测试
+    expect(canTestRemoteConnection({
+      backend: driveBackend,
+      type: 'drive',
+      values: {},
+      remotes: [
+        { name: 'translime-smb', type: 'smb' },
+        { name: 'mydrive', type: 'drive' },
+      ],
+    })).toBe(false);
+  });
+
+  it('本地路径后端：填写了路径即可测试', () => {
+    const localBackend = findBackendType('local');
+    expect(canTestRemoteConnection({
+      backend: localBackend,
+      type: 'local',
+      values: { dir: 'D:\\Backups' },
+      remotes: [],
+    })).toBe(true);
+    expect(canTestRemoteConnection({
+      backend: localBackend,
+      type: 'local',
+      values: { dir: '   ' },
+      remotes: [],
+    })).toBe(false);
   });
 });
 
@@ -524,5 +873,133 @@ describe('testRemoteConnection（临时表单测试与中断机制）', () => {
     expect(lsdCall).toBeTruthy();
     expect(lsdCall).toContain('--smb-user');
     expect(lsdCall).not.toContain('--config');
+  });
+
+  it('绑定存档目录：在临时配置中构建 alias 测试远程（新密码现混淆），对别名根执行 lsd', async () => {
+    // 防止回归：绑定存档目录后连接测试必须按 alias 结构验证，否则测试通过但真实远程不可用
+    const calls = [];
+    const fakeExec = async (args) => {
+      calls.push(args);
+      if (args[0] === 'obscure') {
+        return { code: 0, stdout: 'obSCURED(new)', stderr: '' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    const result = await testRemoteConnection({
+      exec: fakeExec,
+      type: 'smb',
+      values: { host: '192.168.1.50', user: 'guest', pass: 'new pass' },
+      name: 'translime-smb',
+      rootDir: 'steam/saves',
+    });
+
+    expect(result.ok).toBe(true);
+    const createCall = calls.find((c) => c[0] === 'config' && c[1] === 'create' && c[2] === 'testremote');
+    expect(createCall).toContain('remote=:smb,host=192.168.1.50,user=guest,pass=obSCURED(new):steam/saves');
+    const lsdCall = calls.find((c) => c[0] === 'lsd' && c[1] === 'testremote:');
+    expect(lsdCall).toBeTruthy();
+  });
+
+  it('编辑远程（密码留空）+ 存档目录：沿用旧远程存储的混淆密码重建测试别名', async () => {
+    // 防止回归：alias 结构不认识 --smb-* 覆盖参数，密码留空时必须取旧混淆值进临时配置重建
+    const calls = [];
+    const fakeExec = async (args) => {
+      calls.push(args);
+      if (args[0] === 'listremotes') {
+        return { code: 0, stdout: 'translime-smb:\n', stderr: '' };
+      }
+      if (args[0] === 'config' && args[1] === 'show') {
+        return { code: 0, stdout: 'type = smb\nhost = 192.168.1.50\npass = obSCURED(old)\n', stderr: '' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    const result = await testRemoteConnection({
+      exec: fakeExec,
+      type: 'smb',
+      values: { host: '192.168.1.60', user: 'guest', pass: '' },
+      name: 'translime-smb',
+      rootDir: 'steam/saves',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls.some((args) => args[0] === 'obscure')).toBe(false);
+    const createCall = calls.find((c) => c[0] === 'config' && c[1] === 'create' && c[2] === 'testremote');
+    expect(createCall).toContain('remote=:smb,host=192.168.1.60,user=guest,pass=obSCURED(old):steam/saves');
+    // 不应直接对旧远程执行 lsd（旧远程可能是 alias，覆盖参数不生效）
+    expect(calls.some((c) => c[0] === 'lsd' && c[1] === 'translime-smb:')).toBe(false);
+  });
+
+  it('存档目录尚不存在（directory not found）：视为连接成功并提示首次同步自动创建', async () => {
+    // 防止回归：限制目录通常在首次同步时才创建，目录不存在不应被判为连接失败
+    const fakeExec = async (args) => {
+      if (args[0] === 'obscure') {
+        return { code: 0, stdout: 'obSCURED(new)', stderr: '' };
+      }
+      if (args[0] === 'lsd') {
+        return { code: 3, stdout: '', stderr: 'ERROR : error listing: directory not found' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+    const result = await testRemoteConnection({
+      exec: fakeExec,
+      type: 'smb',
+      values: { host: '192.168.1.50', user: 'guest', pass: 'new' },
+      name: 'translime-smb',
+      rootDir: 'steam/saves',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.note).toContain('自动创建');
+  });
+
+  it('本地 / 网络路径：目录存在时直接通过，全程不调用 rclone', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'translime-local-test-'));
+    try {
+      const result = await testRemoteConnection({
+        exec: async () => {
+          throw new Error('local 测试不应调用 rclone');
+        },
+        type: 'local',
+        values: { dir },
+      });
+      expect(result.ok).toBe(true);
+      expect(result.note).toBeUndefined();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('本地 / 网络路径：目录不存在视为可用并提示首次备份/同步时自动创建', async () => {
+    // 防止回归：新设备登记尚未落盘的存档目录不应被测试按钮阻断
+    const result = await testRemoteConnection({
+      exec: async () => {
+        throw new Error('local 测试不应调用 rclone');
+      },
+      type: 'local',
+      values: { dir: path.join(os.tmpdir(), `not-exist-${Date.now()}`) },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.note).toContain('自动创建');
+  });
+
+  it('本地 / 网络路径：路径是文件而非目录时报错', async () => {
+    const file = path.join(os.tmpdir(), `translime-local-file-${Date.now()}.txt`);
+    await fs.writeFile(file, 'x');
+    try {
+      const result = await testRemoteConnection({
+        exec: async () => {
+          throw new Error('local 测试不应调用 rclone');
+        },
+        type: 'local',
+        values: { dir: file },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('不是目录');
+    } finally {
+      await fs.rm(file, { force: true });
+    }
   });
 });

@@ -42,7 +42,11 @@ const mockGames = [
 const mockStatus = {
   phase: 'idle',
   pending: false,
-  config: { target: 'mydrive:SteamBackups', rclonePath: '' },
+  config: {
+    target: 'translime-webdav:',
+    rclonePath: '',
+    localTargets: ['D:\\Backups\\Steam', '\\\\NAS\\share\\saves'],
+  },
   rclone: {
     ok: true, version: '1.75.1', path: 'rclone', error: null,
   },
@@ -154,8 +158,9 @@ export default {
   'sync-list-remotes': async () => ({
     success: true,
     remotes: [
-      { name: 'mydrive', type: 'drive' },
-      { name: 'translime-webdav', type: 'webdav' },
+      { name: 'mydrive', type: 'drive', rootDir: '' },
+      { name: 'translime-webdav', type: 'webdav', rootDir: 'SteamBackups' },
+      { name: 'translime-smb-2', type: 'smb', rootDir: 'saves/nas2' },
     ],
   }),
   'sync-backend-types': async () => ({
@@ -243,19 +248,28 @@ export default {
       },
     ],
   }),
-  'sync-create-remote': async () => ({ success: true, remote: 'translime-drive:' }),
-  'sync-test-remote': async ({ name } = {}) => ({
+  'sync-create-remote': async ({ type, values, editName } = {}) => ({
     success: true,
-    // 测试连接 mock
-    connection: name === 'translime-webdav'
-      ? { ok: false, error: 'mock：连接被拒绝' }
-      : { ok: true, error: null },
+    remote: type === 'local' ? String(values?.dir || 'D:\\mock\\path') : 'translime-drive:',
+    targetAdjusted: Boolean(editName),
   }),
+  'sync-test-remote': async ({ name, type } = {}) => {
+    let connection;
+    if (type === 'local') {
+      connection = { ok: true, error: null };
+    } else if (name === 'translime-webdav') {
+      connection = { ok: false, error: 'mock：连接被拒绝' };
+    } else {
+      connection = { ok: true, error: null };
+    }
+    return { success: true, connection };
+  },
   'sync-get-remote': async ({ name }) => ({
     success: true,
     remote: {
       name,
       type: 'webdav',
+      rootDir: 'SteamBackups',
       // 密码字段不回填
       values: {
         url: 'https://dav.example.com/dav/', vendor: 'nextcloud', user: 'mock-user',

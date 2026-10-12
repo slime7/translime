@@ -59,6 +59,7 @@
             variant="filled-tonal"
             prefix="cloud_sync"
             :loading="syncing"
+            :disabled="!configured"
             @click="syncNow"
           >
             立即同步
@@ -328,6 +329,10 @@ const onRestore = async () => {
 };
 
 const syncNow = async () => {
+  if (!configured.value) {
+    showMessage('请先在同步设置中配置存档位置', 'error');
+    return;
+  }
   const res = await triggerSyncNow();
   if (!res?.success) {
     showMessage(res?.message || '触发同步失败', 'error');

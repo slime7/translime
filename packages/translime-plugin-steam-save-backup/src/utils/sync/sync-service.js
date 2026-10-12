@@ -32,6 +32,7 @@ const createSyncService = ({
   // 直通服务在入口处组合（其 machineId 依赖本服务），经 setter 回接，避免循环构造
   let passthroughService = passthrough;
   const settingsKey = `plugin.${pluginId}.settings.sync`;
+  const localTargetsKey = `plugin.${pluginId}.settings.syncLocalTargets`;
   const stateKey = `plugin.${pluginId}.syncState`;
 
   let cancelled = false;
@@ -39,6 +40,78 @@ const createSyncService = ({
   let rcloneProbe = emptyProbe();
   // 远程目标变化监听
   let targetChangeListener = null;
+
+  // Windows 路径大小写不敏感，比较时归一
+  const sameLocalPath = (a, b) => {
+    const normalize = (value) => (process.platform === 'win32'
+      ? String(value).toLowerCase()
+      : String(value));
+    return normalize(a) === normalize(b);
+  };
+
+  // 判断字符串是否为本地磁盘或网络共享 UNC 路径（非 remote: 格式）
+  const isLocalTargetStr = (str) => {
+    if (!str || typeof str !== 'string') {
+      return false;
+    }
+    const trimmed = str.trim();
+    return /^[a-zA-Z]:[\\/]/.test(trimmed) || /^\\\\/.test(trimmed) || /^\//.test(trimmed);
+  };
+
+  // 本地 / 网络路径条目：与 rclone 远程并列的可添加存档位置（路径本身即存档根）
+  const readLocalTargets = () => {
+    const raw = getConfig(localTargetsKey);
+    let list = [];
+    if (Array.isArray(raw)) {
+      list = raw.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim());
+    }
+    // 历史 target 若是本地路径且尚未登记为 localTarget，自动收录进去平滑升级，
+    // 确保旧的手填路径在下拉中拥有正式条目，且可被编辑与删除
+    const rawSync = getConfig(settingsKey);
+    const existingTarget = rawSync && typeof rawSync === 'object' && typeof rawSync.target === 'string'
+      ? rawSync.target.trim()
+      : '';
+    if (isLocalTargetStr(existingTarget) && !list.some((item) => sameLocalPath(item, existingTarget))) {
+      list = [...list, existingTarget];
+      setConfig(localTargetsKey, list);
+    }
+    return list;
+  };
+
+  const addLocalTarget = async (dir) => {
+    const value = String(dir ?? '').trim();
+    if (!value) {
+      throw new Error('请填写路径');
+    }
+    const list = readLocalTargets();
+    if (list.some((item) => sameLocalPath(item, value))) {
+      throw new Error('该路径已添加');
+    }
+    setConfig(localTargetsKey, [...list, value]);
+    return value;
+  };
+
+  const removeLocalTarget = async (dir) => {
+    const value = String(dir ?? '').trim();
+    const list = readLocalTargets();
+    setConfig(localTargetsKey, list.filter((item) => !sameLocalPath(item, value)));
+  };
+
+  const renameLocalTarget = async (oldDir, newDir) => {
+    const from = String(oldDir ?? '').trim();
+    const to = String(newDir ?? '').trim();
+    if (!to) {
+      throw new Error('请填写路径');
+    }
+    const list = readLocalTargets();
+    if (!list.some((item) => sameLocalPath(item, from))) {
+      throw new Error('本地路径条目不存在');
+    }
+    if (list.some((item) => sameLocalPath(item, to))) {
+      throw new Error('该路径已添加');
+    }
+    setConfig(localTargetsKey, list.map((item) => (sameLocalPath(item, from) ? to : item)));
+  };
 
   const readSyncConfig = () => {
     const raw = getConfig(settingsKey);
@@ -61,6 +134,7 @@ const createSyncService = ({
     return {
       target,
       rclonePath: syncRclone || topRclonePath,
+      localTargets: readLocalTargets(),
     };
   };
 
@@ -309,6 +383,15 @@ const createSyncService = ({
   return {
     getSyncConfig: readSyncConfig,
 
+    /** 添加本地 / 网络路径存档位置（重复路径拒绝，Windows 大小写不敏感） */
+    addLocalTarget,
+
+    /** 移除本地 / 网络路径存档位置 */
+    removeLocalTarget,
+
+    /** 重命名本地 / 网络路径存档位置 */
+    renameLocalTarget,
+
     /** 注入直通云存档服务（入口处在两个服务都构造完成后回接） */
     setPassthrough(service) {
       passthroughService = service;
@@ -332,6 +415,7 @@ const createSyncService = ({
       });
       setConfig(`plugin.${pluginId}.settings.rclonePath`, nextRclonePath);
       if (nextTarget !== current.target) {
+        writePersistedState({ lastError: null });
         targetChangeListener?.();
       }
       return getStatus();

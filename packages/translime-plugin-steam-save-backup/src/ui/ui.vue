@@ -199,6 +199,10 @@ const syncAvailable = computed(() => Boolean(syncStatus.value?.config?.target));
 
 // 触发同步对账
 const syncNow = async () => {
+  if (!syncAvailable.value) {
+    showSyncSnackbar('请先在同步设置中配置存档位置', 'error');
+    return;
+  }
   const res = await triggerSyncNow();
   if (!res?.success) {
     showSyncSnackbar(res?.message || '触发同步失败', 'error');

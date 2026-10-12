@@ -68,6 +68,9 @@ export async function refreshSyncStatus() {
 }
 
 export const triggerSyncNow = async () => {
+  if (!syncStatus.value?.config?.target) {
+    return { success: false, message: '请先在同步设置中配置存档位置' };
+  }
   const res = await getIpc().invoke(`sync-now@${PLUGIN_ID}`);
   await refreshSyncStatus();
   return res;

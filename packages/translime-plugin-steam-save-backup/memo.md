@@ -122,7 +122,13 @@ packages/translime-plugin-steam-save-backup/
     *   **引擎**: `rclone copy <target> <stage> --include /*/*/info.json` 批量拉取远端元数据构建清单；逐备份上传 `copyto data.zip.part` + `moveto` + `copyto info.json`，下载 `copyto data.zip` + 解压 + `copyto info.json`。支持 rclone remote 与本地/UNC 路径。
     *   **触发**: 手动触发与文件监控自动触发并存。`save-watcher` 监控存档目录，变更经 `auto-backup` 防抖与冷却调度后自动备份并触发同步；直通条目变更直接触发对账。`focus-watcher` 在宿主窗口无焦点时挂起监控，重获焦点后恢复。
     *   **状态**: `sync-get-status` 返回运行状态、配置、脏游戏列表、冲突清单与上次报告；UI 轮询展示同步状态芯片。
-    *   **远程管理**: 同步设置对话框内可创建、修改、删除远程配置与测试连接。OAuth 后端通过本地回调授权，表单后端填写凭据创建。
+    *   **远程管理**: 同步设置对话框内可添加、修改、删除存档位置并测试连接，**同一后端可添加多个**（多个 SMB / 网盘账号），选中即切换。远程命名：规范名 `translime-<type>` 被占用时自动取空闲序号（`translime-smb-2`…，`findFreeRemoteName`，删除后复用），两段式凭据远程跟随具体名（`<name>-base`）。OAuth 后端通过本地回调授权，表单后端填写凭据创建。创建/编辑为**重建语义**：先删除旧远程（含两段式凭据远程）再按参数创建，密码留空沿用旧存储的混淆值。
+    *   **本地 / 网络路径条目**: 本地磁盘目录与 UNC 路径作为「本地 / 网络路径」后端从对话框添加（BACKEND_TYPES 中 `auth: 'local'`，只填路径）。条目存于 `plugin.<id>.settings.syncLocalTargets`（`sync-service.addLocalTarget/removeLocalTarget/renameLocalTarget`，重复添加拒绝且 Windows 大小写不敏感），**不写入 rclone 配置**，路径本身即存档根（引擎对本地/UNC target 原生支持，连接测试仅做 fs 目录检查，允许目录尚不存在）。主视图把本地条目与 rclone 远程合并渲染为统一的存档位置列表。
+    *   **存档目录限制（alias 根目录绑定）**: 新建/编辑远程时可填写「存档目录」（`normalizeRootDir` 归一化，拒绝 `..` 与冒号引号），设置后远程改为 `alias` 结构、根目录即该目录——插件同步与 rclone GUI 浏览都被限制在存档目录内，无法误操作全盘。三种结构（`getRemoteConfig` 统一视图 `mode`）：
+        *   `direct`（rootDir 为空）：直连远程，保持原有形态。
+        *   `inline`（表单后端 + rootDir）：`translime-<type>` 为 alias，凭据内联进连接字符串 `:smb,host=...,pass=<obscured>:存档目录`（`buildInlineRemoteValue`/`parseInlineRemoteValue`；含 `:` 或 `,` 的值用双引号包裹，密码先经 `rclone obscure` 混淆，rclone 读取时自动解混淆）。远程列表只出现受限远程，全盘入口完全不可见。
+        *   `base`（OAuth + rootDir）：token 无法内联，写入 `translime-<type>-base` 凭据远程，`translime-<type>` 为 alias 指向 `base:存档目录`；删除远程时级联删 base，列表中过滤 base。
+        *   目标完全由所选存档位置条目决定，主视图无需再额外填写目标路径；连接测试按对应结构在临时配置中构建 alias 验证，存档目录不存在（rclone 退出码 3）视为可连接并提示首次同步自动创建。
     *   **远程数据发现**: 查看远端已有数据并按需登记。入口为顶栏按钮「发现远程数据」。支持备份按游戏登记为本地自定义存档，直通条目按目录登记并拉取。
     *   **边界**: 本地删除未勾选删除远程时下次对账将从远端回补；rclone 优先探测系统 PATH 或使用自定义路径。
 
