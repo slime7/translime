@@ -3,6 +3,7 @@ import {
   defineIpcHandlers,
   openLink,
   useIpc,
+  useLogger,
 } from '../../src/index';
 import {
   createMockIpc,
@@ -144,5 +145,61 @@ describe('preview 声明式 IPC mock', () => {
     const fresh = await import('../../src/preview-mock');
 
     expect(() => fresh.setPreviewIpcMocks({ 'get-data': () => 1 })).not.toThrow();
+  });
+});
+
+describe('useLogger child 透传', () => {
+  const createWinstonSpy = () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  });
+
+  it('child({ plugin_id }) 委托 winston child，返回对象保持 console 兼容接口', () => {
+    // 防止的回归：插件经 child({ plugin_id }) 附加元数据失效时，
+    // 日志查看器无法按插件归属展示（hdr-capture 等插件的既有约定）
+    const childLogger = createWinstonSpy();
+    const mainLogger = { ...createWinstonSpy(), child: vi.fn(() => childLogger) };
+    vi.stubGlobal('mainStore', { logger: mainLogger });
+
+    const logger = useLogger().child({ plugin_id: 'translime-plugin-x', context: 'rclone' });
+    logger.debug('[rclone] 执行：copy');
+    logger.info('done');
+
+    expect(mainLogger.child).toHaveBeenCalledWith({ plugin_id: 'translime-plugin-x', context: 'rclone' });
+    expect(childLogger.debug).toHaveBeenCalledWith('[rclone] 执行：copy');
+    expect(childLogger.info).toHaveBeenCalledWith('done');
+  });
+
+  it('log 别名按 info 级别输出，warn / error 原级透传', () => {
+    const childLogger = createWinstonSpy();
+    vi.stubGlobal('mainStore', { logger: { ...createWinstonSpy(), child: () => childLogger } });
+
+    const logger = useLogger().child({ plugin_id: 'translime-plugin-x' });
+    logger.log('via log');
+    logger.warn('warning');
+    logger.error('failed');
+
+    expect(childLogger.info).toHaveBeenCalledWith('via log');
+    expect(childLogger.warn).toHaveBeenCalledWith('warning');
+    expect(childLogger.error).toHaveBeenCalledWith('failed');
+  });
+
+  it('宿主 logger 不支持 child 时退回基础 logger，不抛错', () => {
+    // 防止的回归：旧版宿主 logger（无 child 方法）下插件日志完全丢失
+    const mainLogger = createWinstonSpy();
+    vi.stubGlobal('mainStore', { logger: mainLogger });
+
+    const logger = useLogger().child({ plugin_id: 'translime-plugin-x' });
+    logger.warn('msg');
+
+    expect(mainLogger.warn).toHaveBeenCalledWith('msg');
+  });
+
+  it('宿主未注入 logger 时返回 console 回退（渲染端 / 测试环境）', () => {
+    vi.stubGlobal('mainStore', {});
+
+    expect(useLogger()).toBe(console);
   });
 });

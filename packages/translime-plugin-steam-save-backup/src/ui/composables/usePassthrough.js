@@ -31,10 +31,13 @@ export default function usePassthrough() {
   const lastError = computed(() => state.value?.lastError || null);
   const notifications = computed(() => state.value?.notifications || []);
 
-  // 条目状态：删除冲突 > 本地缺失 > 同步中 > 已接入
+  // 计算条目展示状态
   const entryStatus = (entry) => {
-    if (conflicts.value.some((item) => item.entryId === entry.entryId)) {
-      return { key: 'conflict', label: '删除冲突', icon: 'sync_problem' };
+    const conflict = conflicts.value.find((item) => item.entryId === entry.entryId);
+    if (conflict) {
+      return conflict.kind === 'content'
+        ? { key: 'conflict', label: '同步冲突', icon: 'sync_problem' }
+        : { key: 'conflict', label: '删除冲突', icon: 'sync_problem' };
     }
     if (!entry.localExists) {
       return { key: 'missing', label: '本地缺失', icon: 'cloud_off' };
@@ -92,7 +95,7 @@ export default function usePassthrough() {
     return res;
   };
 
-  // 直通详情弹窗的路径面板数据：枚举本地目录内的具体文件
+  // 列举本地存档文件
   const listFiles = async (name) => {
     const res = await ipc.invoke(`passthrough-list-files@${PLUGIN_ID}`, { name });
     return res;

@@ -37,6 +37,8 @@ const createSyncService = ({
   let cancelled = false;
   let exec = null;
   let rcloneProbe = emptyProbe();
+  // 远程目标变化监听
+  let targetChangeListener = null;
 
   const readSyncConfig = () => {
     const raw = getConfig(settingsKey);
@@ -329,7 +331,15 @@ const createSyncService = ({
         rclonePath: nextRclonePath,
       });
       setConfig(`plugin.${pluginId}.settings.rclonePath`, nextRclonePath);
+      if (nextTarget !== current.target) {
+        targetChangeListener?.();
+      }
       return getStatus();
+    },
+
+    /** 设置远程目标变化监听器 */
+    setTargetChangeListener(listener) {
+      targetChangeListener = typeof listener === 'function' ? listener : null;
     },
 
     getStatus,

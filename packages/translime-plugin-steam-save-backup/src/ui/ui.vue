@@ -12,7 +12,7 @@
 
       <template #trailing>
         <div class="bar-trailing">
-          <!-- 备份区工具栏在前、视图切换贴最右：切换视图时工具栏增减不会引起切换按钮位置跳动 -->
+          <!-- 备份区工具栏 -->
           <SteamBackupToolbar
             v-if="activeView === 'backup'"
             :collapsed="collapsed"
@@ -21,7 +21,7 @@
             @scan-games="scanGames"
           />
 
-          <!-- 顶部整页切换：备份区与直通云存档区完全隔离，避免与 Steam 云存档混淆 -->
+          <!-- 视图切换：存档备份 / 直通云存档 -->
           <mat-btn-group
             variant="connected"
             selection="single"
@@ -103,6 +103,11 @@
       @changed="scanGames"
     />
 
+    <DiscoverRemoteBackupsDialog
+      v-model="discoverDialogOpen"
+      @changed="scanGames"
+    />
+
     <SyncSettingsDialog v-model="syncDialogOpen" />
 
     <mat-snackbar
@@ -110,7 +115,7 @@
       :duration="3000"
       closable
     >
-      <!-- snackbar 同样被 Teleport 到 @scope 隔离范围之外，样式必须内联 -->
+      <!-- 提示条内容需使用内联样式 -->
       <span :style="snackbar.color === 'error' ? 'color: var(--mat-sys-color-inverse-primary)' : undefined">
         {{ snackbar.text }}
       </span>
@@ -152,6 +157,7 @@ import {
 import { isPreviewMode, useIpc } from 'translime-sdk';
 import ConfirmDialog from './components/ConfirmDialog.vue';
 import CustomSaveDirsDialog from './components/CustomSaveDirsDialog.vue';
+import DiscoverRemoteBackupsDialog from './components/DiscoverRemoteBackupsDialog.vue';
 import EmptyGamesState from './components/EmptyGamesState.vue';
 import GameDetailsDialog from './components/GameDetailsDialog.vue';
 import GameGrid from './components/GameGrid.vue';
@@ -178,6 +184,7 @@ const PLUGIN_ID = 'translime-plugin-steam-save-backup';
 const layoutRef = ref(null);
 const collapsed = ref(false);
 const customDirOpen = ref(false);
+const discoverDialogOpen = ref(false);
 const syncDialogOpen = ref(false);
 const activeView = ref('backup');
 const previewMode = isPreviewMode();
@@ -190,7 +197,7 @@ const showSyncSnackbar = (text, color = 'success') => {
 const syncRunning = computed(() => syncStatus.value?.phase === 'running');
 const syncAvailable = computed(() => Boolean(syncStatus.value?.config?.target));
 
-// 手动触发一次对账；失败信息经 snackbar 提示（lastError 也会进入同步设置页）
+// 触发同步对账
 const syncNow = async () => {
   const res = await triggerSyncNow();
   if (!res?.success) {
@@ -198,7 +205,7 @@ const syncNow = async () => {
   }
 };
 
-// 新检出同步冲突时提醒用户到同步设置中处理（对账跳过冲突目录，不会覆盖任一端）
+// 检测到新冲突时提示
 const knownConflictKeys = ref(new Set());
 watch(syncStatus, (status) => {
   const conflicts = status?.conflicts || [];
@@ -213,13 +220,17 @@ watch(syncStatus, (status) => {
   knownConflictKeys.value = new Set(conflicts.map((item) => `${item.gameId}:${item.dir}`));
 }, { deep: true });
 
-// 主进程后台事件（文件监控自动备份 / 远端删除跟随应用 / 顶栏打开同步设置）：提示并刷新状态
-// on/detach 需要自动补 @插件ID 后缀，useIpc 必须传入插件 ID（无参调用不补后缀，监听永远匹配不上）
+// 监听主进程后台通知事件
 const ipc = useIpc(PLUGIN_ID);
 const onSyncNotify = (payload) => {
-  // 宿主顶栏「同步设置」按钮：任意视图都能弹出同步配置对话框
+  // 响应打开同步设置
   if (payload?.kind === 'open-sync-settings') {
     syncDialogOpen.value = true;
+    return;
+  }
+  // 响应打开远程发现
+  if (payload?.kind === 'open-remote-discovery') {
+    discoverDialogOpen.value = true;
     return;
   }
   refreshSyncStatus();
@@ -239,7 +250,7 @@ const onSyncNotify = (payload) => {
 let resizeObserver;
 
 onMounted(() => {
-  // 按插件页面实际宽度收缩工具栏为图标按钮，兼容内嵌 webview 与独立窗口两种宿主形态
+  // 响应式调整工具栏模式
   resizeObserver = new ResizeObserver((entries) => {
     collapsed.value = entries[0].contentRect.width < 640;
   });
@@ -280,7 +291,7 @@ const {
   saveNote,
 } = useSteamSaveBackup();
 
-// 同步可能从远端下载新备份：结束后刷新弹窗内备份列表，并重扫卡片上的备份数
+// 同步结束后刷新备份列表
 watch(syncRunning, (running, wasRunning) => {
   if (wasRunning && !running) {
     if (dialog.value.show && selectedGame.value) {
@@ -301,18 +312,13 @@ watch(syncRunning, (running, wasRunning) => {
 
 <style scoped>
 .save-backup-page {
-  /* 插件文档即整个视口（内嵌 webview / 独立窗口）：高度锚定 dvh，
-     不依赖宿主 #app 高度链，任何一环失效都不会退化成文档+内层双层滚动。
-     首行 100% 作为不支持 dvh 引擎的回退 */
   height: 100%;
   height: 100dvh;
   box-sizing: border-box;
-  /* 滚动容器是 layout 根本身：滚动条贴边，避免出现在内容 padding 内 */
   overflow: auto;
   overscroll-behavior: contain;
 }
 
-/* preview shell 中插件位于 v-main 内容区，不是全视口，回退为跟随容器 */
 .save-backup-page.preview-mode {
   height: 100%;
 }

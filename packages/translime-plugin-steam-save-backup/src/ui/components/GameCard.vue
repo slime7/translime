@@ -170,7 +170,7 @@ const syncChipColor = computed(() => {
   return undefined;
 });
 
-// 直通条目状态芯片配色（冲突红 / 本地缺失警示 / 正常跟随主题）
+// 直通条目状态芯片配色
 const ptChipColor = computed(() => {
   if (props.game.ptStatus?.key === 'conflict') {
     return 'error';
@@ -187,7 +187,6 @@ const ptChipColor = computed(() => {
 
 <style scoped>
 .game-card {
-  cursor: pointer;
   transition: box-shadow .2s ease;
 }
 
@@ -207,7 +206,7 @@ const ptChipColor = computed(() => {
   color: var(--mat-sys-color-outline);
 }
 
-/* 同步进行中的图标旋转；名称带插件前缀避免污染全局命名空间 */
+/* 同步图标旋转动画 */
 @keyframes steam-save-sync-spin {
   to {
     transform: rotate(360deg);

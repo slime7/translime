@@ -32,8 +32,12 @@ import {
 } from './utils/custom-dirs';
 import { listGhostGames, upsertKnownGames } from './utils/known-games';
 import cleanupCustomDirBackups from './utils/custom-dir-removal';
+import createExcludeListStore from './utils/exclude-list';
 import createSyncService from './utils/sync/sync-service';
+import { discoverRemoteGames, isRemoteGameAddedLocally } from './utils/sync/discover';
 import createPassthroughService from './utils/passthrough/service';
+import discoverRemoteEntries from './utils/passthrough/discover';
+import { buildEntryId } from './utils/passthrough/meta';
 import createSaveWatcher from './utils/save-watcher';
 import createAutoBackupScheduler from './utils/auto-backup';
 import createFocusWatcher from './utils/focus-watcher';
@@ -98,29 +102,8 @@ const getPathSetting = (settings, key) => {
   return '';
 };
 
-// 从设置中获取排除列表
-const getExcludeList = () => {
-  if (!config) {
-    return [];
-  }
-  const val = config.get(`plugin.${pluginId}.settings.excludeList`, []);
-  if (Array.isArray(val)) {
-    return val.map((v) => String(v));
-  }
-  if (typeof val === 'string') {
-    return val.split(',').map((v) => v.trim()).filter(Boolean);
-  }
-  return [];
-};
-
-// 保存排除列表
-const saveExcludeList = (list) => {
-  if (!config) {
-    return;
-  }
-  // 保持为数组存储，但在设置界面可能显示为逗号分隔字符串（取决于 Translime 实现）
-  config.set(`plugin.${pluginId}.settings.excludeList`, list);
-};
+// 排除列表设置存储管理
+const excludeListStore = createExcludeListStore(config, pluginId);
 
 // 读取手动添加的自定义存档目录列表 [{ gameName, dir }]
 const getCustomSaveDirs = () => {
@@ -355,21 +338,20 @@ const refreshWatchTargets = () => {
   saveWatcher.setDirs([...targets.keys()]);
 };
 
-// 全量构建游戏列表（Steam 扫描 + 自定义目录合并 + 幽灵游戏），scan-games IPC 与后台预扫描共用。
-// 返回 null 表示未找到 Steam；另返回 steamPath 供调用方复用
+// 全量构建游戏列表（Steam 扫描 + 自定义目录合并 + 幽灵游戏），若未找到 Steam 则仅跳过 Steam 扫描
 const buildGameList = async () => {
   const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
   const currentSteamPath = getPathSetting(settings, 'customSteamPath') || await getSteamPath();
   const backupRoot = getPathSetting(settings, 'customBackupRoot');
 
   if (!currentSteamPath) {
-    return null;
+    logger.info('未找到 Steam 安装目录，跳过 Steam 游戏扫描（自定义目录与既有备份仍可用）');
   }
 
-  const games = await scanInstalledGames(currentSteamPath);
+  const games = currentSteamPath ? await scanInstalledGames(currentSteamPath) : [];
 
   // 获取排除列表并标记
-  const excludeList = getExcludeList();
+  const excludeList = excludeListStore.get();
   games.forEach((g) => {
     // eslint-disable-next-line no-param-reassign
     g.excluded = excludeList.includes(String(g.appid));
@@ -441,7 +423,7 @@ const backgroundScan = () => {
   (async () => {
     try {
       const result = await buildGameList();
-      if (!result || generation !== unloadGeneration) {
+      if (generation !== unloadGeneration) {
         return;
       }
       scannedGames = result.games;
@@ -473,8 +455,7 @@ const openBackupRoot = async () => {
   }
 };
 
-// 宿主插件页顶栏（inspect 旁）按钮区：备份区与直通区共用的公共操作。
-// 同步设置对话框在插件 UI 内打开（webview 常驻，任意视图都能弹出）
+// 宿主插件页顶栏按钮区：注册公共操作
 const registerTitleBarActions = () => {
   const registered = setTitleBarActions(pluginId, [
     {
@@ -493,11 +474,24 @@ const registerTitleBarActions = () => {
         notifyClient({ kind: 'open-sync-settings' });
       },
     },
+    {
+      // 远程目标未配置时置灰
+      label: '发现远程数据',
+      icon: 'travel_explore',
+      iconOnly: true,
+      enabled: Boolean(syncService.getSyncConfig().target),
+      click: () => {
+        notifyClient({ kind: 'open-remote-discovery' });
+      },
+    },
   ]);
   if (!registered) {
     logger.warn('顶栏按钮区注册失败：宿主不支持（需 translime >= 0.8.1，重启宿主开发进程）');
   }
 };
+
+// 远程目标配置变化时更新顶栏按钮状态
+syncService.setTargetChangeListener(registerTitleBarActions);
 
 // 插件设置菜单
 export const settingMenu = [
@@ -560,6 +554,7 @@ export const pluginSettingSaved = () => {
 // 加载时执行（onAppReady 常驻激活：应用启动即建立监控，自动备份/直通同步不依赖插件页）
 export const pluginDidLoad = async () => {
   logger.info(`${pluginId} loaded`);
+  excludeListStore.migrate();
   const settings = config?.get(`plugin.${pluginId}.settings`, {}) || {};
   const customSteamPath = getPathSetting(settings, 'customSteamPath');
 
@@ -598,15 +593,13 @@ export const ipcHandlers = [
       captureClient(sendToClient);
       try {
         const result = await buildGameList();
-        if (!result) {
-          return { success: false, message: '未找到 Steam' };
-        }
 
         // 记录扫描结果并重建文件监控集（自动备份与直通自动同步的数据源）
         scannedGames = result.games;
         refreshWatchTargets();
 
-        const userIds = await getSteamUserIds(result.steamPath);
+        // 未检测到 Steam 时用户 ID 列表为空
+        const userIds = result.steamPath ? await getSteamUserIds(result.steamPath) : [];
         return {
           success: true, games: result.games, userIds, steamPath: result.steamPath,
         };
@@ -719,11 +712,11 @@ export const ipcHandlers = [
     type: 'exclude-game',
     handler: () => async (appid) => {
       try {
-        const excludeList = getExcludeList();
+        const excludeList = excludeListStore.get();
         const appidStr = String(appid);
         if (!excludeList.includes(appidStr)) {
           excludeList.push(appidStr);
-          saveExcludeList(excludeList);
+          excludeListStore.save(excludeList);
         }
         // 排除的游戏不再监控自动备份
         refreshWatchTargets();
@@ -737,11 +730,11 @@ export const ipcHandlers = [
     type: 'include-game',
     handler: () => async (appid) => {
       try {
-        let excludeList = getExcludeList();
+        let excludeList = excludeListStore.get();
         const appidStr = String(appid);
         if (excludeList.includes(appidStr)) {
           excludeList = excludeList.filter((id) => id !== appidStr);
-          saveExcludeList(excludeList);
+          excludeListStore.save(excludeList);
         }
         // 恢复显示的游戏重新纳入自动备份监控
         refreshWatchTargets();
@@ -764,7 +757,7 @@ export const ipcHandlers = [
   },
   {
     type: 'add-custom-save-dir',
-    handler: () => async ({ gameName, dir }) => {
+    handler: () => async ({ gameName, dir, allowEmptyDir } = {}) => {
       try {
         const normalizedGameName = typeof gameName === 'string' ? gameName.trim() : '';
         const normalizedDir = typeof dir === 'string' ? dir.trim() : '';
@@ -786,8 +779,9 @@ export const ipcHandlers = [
           return { success: false, message: '目录不存在或不可访问' };
         }
 
+        // allowEmptyDir 允许登记空目录
         const { files } = await listDirFiles(normalizedDir);
-        if (files.length === 0) {
+        if (files.length === 0 && !allowEmptyDir) {
           return { success: false, message: '该目录下没有文件，无法作为存档目录' };
         }
 
@@ -1157,6 +1151,52 @@ export const ipcHandlers = [
         currentAuthorize = null;
       }
       return { success: true };
+    },
+  },
+  {
+    // 发现远端现有数据概览并标注本地登记状态
+    type: 'sync-discover-remote',
+    handler: () => async () => {
+      const syncConfig = syncService.getSyncConfig();
+      if (!syncConfig.target) {
+        return { success: false, message: '请先在同步设置中配置远程目标' };
+      }
+      let exec = null;
+      try {
+        const probe = await syncService.checkRclone();
+        if (!probe.ok) {
+          return {
+            success: false,
+            message: `未找到可用的 rclone（${probe.path}）：${probe.error}。请安装 rclone 或在同步设置中填写可执行文件路径。`,
+          };
+        }
+        exec = createExec(async () => probe.path);
+        const games = await discoverRemoteGames({ exec, target: syncConfig.target });
+        const ptEntries = await discoverRemoteEntries({ exec, target: syncConfig.target });
+        const localState = {
+          knownGames: getKnownGames(),
+          customSaveDirs: getCustomSaveDirs(),
+        };
+        // 直通条目 ID 由名称生成，比对已配置集合
+        const configuredEntryIds = new Set(
+          passthroughService.getConfiguredEntries().map((entry) => buildEntryId(entry.name)),
+        );
+        return {
+          success: true,
+          games: games.map((game) => ({
+            ...game,
+            added: isRemoteGameAddedLocally(game, localState),
+          })),
+          passthrough: ptEntries.map((entry) => ({
+            ...entry,
+            added: configuredEntryIds.has(entry.entryId),
+          })),
+        };
+      } catch (e) {
+        return { success: false, message: e.message };
+      } finally {
+        exec?.killAll();
+      }
     },
   },
   {

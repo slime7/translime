@@ -142,6 +142,27 @@ describe('sync-service 手动同步', () => {
     expect(configStore.get(`plugin.${PLUGIN_ID}.settings.rclonePath`)).toBe('/custom/bin/rclone');
   });
 
+  it('远程目标变化时通知监听，同值保存与仅改 rclonePath 不通知', () => {
+    // 防止回归：目标变化不通知会让顶栏「发现远程备份」按钮的可用状态与实际配置脱节
+    const service = createService();
+    const targetChanges = [];
+    service.setTargetChangeListener(() => targetChanges.push(service.getSyncConfig().target));
+
+    service.setSyncConfig({ target: 'GDrive:saves' });
+    service.setSyncConfig({ rclonePath: 'rclone.exe' });
+    service.setSyncConfig({ target: 'GDrive:saves' });
+
+    expect(targetChanges).toEqual(['GDrive:saves']);
+  });
+
+  it('未绑定目标变化监听时 setSyncConfig 正常工作', () => {
+    const service = createService();
+
+    service.setSyncConfig({ target: 'GDrive:saves' });
+
+    expect(service.getSyncConfig().target).toBe('GDrive:saves');
+  });
+
   it('readSyncConfig 兼容回退读取宿主顶层 settingMenu 保存的 rclonePath', () => {
     // 防止回归：用户在宿主插件设置面板配置了 rclonePath，但同步配置中未显式设置时，应正确继承
     configStore.set(`plugin.${PLUGIN_ID}.settings`, {

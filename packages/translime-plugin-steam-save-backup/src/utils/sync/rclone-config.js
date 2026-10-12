@@ -3,7 +3,13 @@ import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { useLogger } from 'translime-sdk';
 import { tailOutput } from './rclone';
+
+const PLUGIN_ID = 'translime-plugin-steam-save-backup';
+const baseLogger = useLogger();
+// 附加 plugin_id 与 context 元数据
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'rclone' }) : baseLogger;
 
 // 本插件创建的远程统一命名，便于在系统 rclone 配置中识别
 export const remoteNameFor = (type) => `translime-${type}`;
@@ -100,6 +106,18 @@ export const BACKEND_TYPES = [
         label: '用户名',
         type: 'text',
         placeholder: '目标设备的账户名（如 Windows / NAS 登录名）',
+        // 用户名与域的填写提示
+        tooltip: {
+          subhead: '用户名与「域」的填写方式',
+          lines: [
+            { title: 'NAS / Samba 账户', text: '直接填登录账户名，「域」留空。' },
+            { title: 'Windows 本地账户', text: '填本地账户名，「域」留空；登录失败时改填目标机器名。' },
+            { title: 'Windows 微软账户（邮箱登录）', text: '填完整邮箱，「域」必须填目标机器名，否则会登录失败。' },
+            { title: 'Windows AD 域账户', text: '填域内账户名，「域」填 AD 域名（NetBIOS 名，如 CORP）。' },
+            { title: '域\\用户名 写法', text: '不会被自动拆分，请分开两栏填写。' },
+            { title: '留空', text: '使用本机当前登录的用户名。' },
+          ],
+        },
       },
       {
         key: 'pass',
@@ -110,7 +128,7 @@ export const BACKEND_TYPES = [
         key: 'domain',
         label: '域（可选）',
         type: 'text',
-        placeholder: '用邮箱（UPN）登录 Windows 目标时填目标机器名',
+        placeholder: 'WORKGROUP',
       },
     ],
   },
@@ -279,11 +297,14 @@ export const runAuthorize = (bin, type, options = {}) => {
   try {
     child = spawn(bin, ['authorize', type], { windowsHide: true });
   } catch (e) {
+    logger.debug(`[rclone] authorize ${type} 启动失败（${bin}）：${e.message}`);
     return {
       promise: Promise.reject(new Error(`无法启动 rclone（${bin}）：${e.message}`)),
       cancel: () => {},
     };
   }
+
+  logger.debug(`[rclone] authorize ${type}：已启动，等待浏览器授权`);
 
   let settled = false;
   let stdout = '';
@@ -291,6 +312,7 @@ export const runAuthorize = (bin, type, options = {}) => {
   let urlSent = false;
 
   const timer = setTimeout(() => {
+    logger.debug(`[rclone] authorize ${type}：授权超时（${timeoutMs}ms），终止进程`);
     child.kill();
   }, timeoutMs);
 
@@ -309,6 +331,7 @@ export const runAuthorize = (bin, type, options = {}) => {
         settled = true;
         clearTimeout(timer);
         child.kill();
+        logger.debug(`[rclone] authorize ${type}：授权完成`);
         resolve(token);
       }
     });
@@ -321,6 +344,7 @@ export const runAuthorize = (bin, type, options = {}) => {
       }
       settled = true;
       clearTimeout(timer);
+      logger.debug(`[rclone] authorize ${type} 启动失败：${e.message}`);
       reject(new Error(`无法启动 rclone（${bin}）：${e.message}`));
     });
     child.on('close', () => {
@@ -329,7 +353,9 @@ export const runAuthorize = (bin, type, options = {}) => {
       }
       settled = true;
       clearTimeout(timer);
-      reject(new Error(`授权未完成：${tailOutput(stderr, 200) || '已取消或超时'}`));
+      const reason = tailOutput(stderr, 200) || '已取消或超时';
+      logger.debug(`[rclone] authorize ${type}：授权未完成（${reason}）`);
+      reject(new Error(`授权未完成：${reason}`));
     });
   });
 
@@ -337,6 +363,7 @@ export const runAuthorize = (bin, type, options = {}) => {
     promise,
     cancel: () => {
       if (!settled) {
+        logger.debug(`[rclone] authorize ${type}：用户取消授权`);
         child.kill();
       }
     },

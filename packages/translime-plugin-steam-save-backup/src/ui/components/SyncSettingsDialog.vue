@@ -1,12 +1,12 @@
 <template>
-  <!-- mat-dialog 内容被 Teleport 到宿主 @scope 隔离范围之外，样式必须内联 -->
+  <!-- 对话框内容需使用内联样式 -->
   <mat-dialog
     v-model="visible"
     width="560px"
     close-on-back
     title="远程同步"
   >
-    <!-- 远程管理视图：选择后端类型 → 填凭据 / OAuth 授权 → 创建远程 -->
+    <!-- 远程管理视图 -->
     <template v-if="view === 'remote'">
       <div style="display: flex; flex-direction: column; gap: 16px; padding-bottom: 4px">
         <mat-select
@@ -52,7 +52,30 @@
             variant="outlined"
             color="primary"
             style="width: 100%"
-          />
+          >
+            <!-- 字段提示 -->
+            <template v-if="field.tooltip" #trailing>
+              <mat-tooltip>
+                <template #activator>
+                  <mat-icon
+                    icon="info"
+                    size="small"
+                    color="on-surface-variant"
+                    tabindex="0"
+                    aria-label="查看填写说明"
+                  />
+                </template>
+                <template #subhead>
+                  {{ field.tooltip.subhead }}
+                </template>
+                <div style="display: flex; flex-direction: column; gap: 6px; font-size: .75rem; line-height: 1.5">
+                  <div v-for="line in field.tooltip.lines" :key="line.title">
+                    <span style="font-weight: 600">{{ line.title }}</span>：{{ line.text }}
+                  </div>
+                </div>
+              </mat-tooltip>
+            </template>
+          </mat-text-field>
         </template>
 
         <div
@@ -221,7 +244,7 @@
 
         <mat-divider style="margin-block: 4px" />
 
-        <!-- 同步冲突：同名备份在两端内容分叉，需用户选择处理方式 -->
+        <!-- 同步冲突处理 -->
         <div
           v-if="conflicts.length > 0"
           style="display: flex; flex-direction: column; gap: 12px"
@@ -242,7 +265,7 @@
               备份目录：{{ conflict.dir }}
             </div>
 
-            <!-- 墓碑冲突：远端已删除，本机在删除时间点之后仍存在更新的备份，等用户确认去向 -->
+            <!-- 墓碑冲突处理 -->
             <template v-if="conflict.kind === 'tombstone'">
               <div style="display: flex; flex-direction: column; gap: 2px; font-size: .75rem; color: var(--mat-sys-color-error)">
                 <span>远端已删除{{ conflict.remote?.deletedAt ? `（删除时间：${formatTime(conflict.remote.deletedAt)}）` : '' }}，本机这份备份较新，未自动删除</span>
@@ -450,7 +473,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
-// on 监听 sync-authorize-url 推送需要自动补 @插件ID 后缀；invoke 已显式带后缀不受影响
+// 监听授权链接事件
 const ipc = useIpc(PLUGIN_ID);
 
 const visible = computed({
@@ -476,7 +499,7 @@ const creating = ref(false);
 const authorizeWaiting = ref(false);
 const authorizeUrl = ref('');
 const resolvingKey = ref('');
-// 远程编辑 / 删除 / 连接测试反馈
+// 远程编辑 / 删除 / 连接测试状态
 const editingName = ref('');
 const deleteConfirm = ref({ show: false });
 const testing = ref(false);
@@ -515,7 +538,7 @@ const remoteItems = computed(() => [
   ...remotes.value.map((remote) => ({ title: `${remote.name}:`, value: `${remote.name}:` })),
 ]);
 const selectedRemoteInfo = computed(() => remotes.value.find((remote) => `${remote.name}:` === selectedRemote.value) || null);
-// OAuth 远程没有可编辑的表单字段，修改凭据等于重新授权，引导走「新建 / 授权远程」
+// OAuth 远程不可直接编辑凭据
 const canEditSelectedRemote = computed(() => {
   const info = selectedRemoteInfo.value;
   if (!info) {
@@ -530,7 +553,7 @@ const remoteSubmitText = computed(() => {
   }
   return currentBackend.value?.auth === 'oauth' ? '授权并创建' : '创建远程';
 });
-// 连接测试可用性基于当前表单填写情况：表单后端至少填写了主机地址或服务地址
+// 校验测试连接所需基础字段
 const canTestConnection = computed(() => {
   if (!selectedType.value || testing.value || authorizeWaiting.value) {
     return false;
@@ -570,8 +593,7 @@ const resetFormError = () => {
   formError.value = '';
 };
 
-// 每个远程位置记住各自的目标（含手填子路径），切换下拉互不覆盖；
-// 保存的同步配置仍是唯一事实源，记忆只用于对话框内的切换连续性
+// 缓存各远程位置的输入值
 const targetByRemote = reactive({});
 let lastRemoteKey = null;
 let lastSavedRclonePath = '';
@@ -592,14 +614,12 @@ watch(visible, async (open) => {
   probeResult.value = null;
   testResult.value = null;
   view.value = 'main';
-  // webview 实例会被缓存复用：打开时先取最新状态再填表单，
-  // 避免旧状态里的空配置在保存时覆盖刚写入的设置
+  // 获取最新配置并回填表单
   await refreshSyncStatus();
   const config = syncStatus.value?.config;
   form.rclonePath = config?.rclonePath || '';
   lastSavedRclonePath = form.rclonePath;
-  // 后端类型表驱动「修改」按钮的可用性（OAuth 远程不可编辑）；列表加载后再按已保存目标选中远程，
-  // 目标含子路径（如 translime-smb:share）时也挂到所属远程名下，切换下拉不会丢
+  // 匹配已保存的目标对应的远程配置
   await Promise.all([loadBackends(), loadRemotes()]);
   form.target = config?.target || '';
   lastRemoteKey = null;
@@ -620,7 +640,7 @@ watch(selectedType, () => {
   });
 });
 
-// 主进程在 rclone authorize 启动后推送本地回调授权链接
+// 接收 OAuth 授权链接
 const onAuthorizeUrl = (payload) => {
   if (payload?.url) {
     authorizeUrl.value = payload.url;
@@ -711,13 +731,13 @@ const openEditRemote = async () => {
   try {
     const res = await ipc.invoke(`sync-get-remote@${PLUGIN_ID}`, { name: info.name });
     if (!res?.success) {
-      // 留在远程视图展示错误，避免界面闪现后立即回退
+      // 保持在当前视图展示错误
       formError.value = res?.message || '读取远程配置失败';
       return;
     }
     editingName.value = info.name;
     selectedType.value = res.remote.type;
-    // selectedType 的 watch 会用默认值重置表单，等它执行完再回填远程读到的配置
+    // 回填远程配置到表单
     await nextTick();
     Object.keys(fieldValues).forEach((key) => {
       delete fieldValues[key];
@@ -844,7 +864,7 @@ const openDownloads = () => {
   openLink('https://rclone.org/downloads/');
 };
 
-// 冲突两侧的展示信息：备份时间 + 来源机器标识前 8 位
+// 格式化冲突展示信息
 const conflictMetaText = (meta) => {
   if (!meta || (!meta.backupTime && !meta.createdBy)) {
     return '未知';
@@ -892,7 +912,7 @@ const createRemoteFromForm = async () => {
   if (!selectedType.value || creating.value || authorizeWaiting.value) {
     return;
   }
-  // 编辑时密码留空表示保持不变，必填校验跳过密码字段
+  // 编辑时密码留空表示保持不变
   const missing = currentFields.value
     .filter((field) => field.required
       && !(isEditing.value && field.type === 'password')
@@ -956,7 +976,7 @@ const testRemoteConnection = async () => {
     testResult.value = res?.success
       ? (res.connection || { ok: false, error: '测试失败' })
       : { ok: false, error: res?.message || '测试失败' };
-    // 自动发现的域回填表单输入框（仅当后端定义了 domain 字段），用户可见可改
+    // 回填自动检测到的域
     const discoveredDomain = res?.connection?.domain;
     if (discoveredDomain && (currentFields.value || []).some((field) => field.key === 'domain')) {
       fieldValues.domain = discoveredDomain;

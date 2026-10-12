@@ -425,7 +425,7 @@ export async function openLink(urlOrOptions) {
 /**
  * 获取日志工具
  * @description 自动适配 Node.js 环境 (Main) 或浏览器环境 (Renderer)
- * @returns {Record<'log'|'info'|'warn'|'error'|'debug', Function>} Console-like logger
+ * @returns {Record<'log'|'info'|'warn'|'error'|'debug'|'child', Function>} Console-like logger
  */
 export function useLogger() {
   if (typeof global !== 'undefined' && global.mainStore) {
@@ -433,15 +433,20 @@ export function useLogger() {
     if (!mainLogger) {
       return console;
     }
-    // 宿主主进程 logger 是 winston 实例，log(level, message) 签名与 console 语义不同
-    // （logger.log('msg') 会在 winston 内部抛 TypeError 且异步上下文中被静默吞掉），
-    // 统一包装为 console 兼容接口：log 按 info 级别输出
+    // 宿主 winston logger 包装为 console 兼容接口，log 按 info 级别输出
+    const wrap = (logger) => ({
+      log: (...args) => logger.info(...args),
+      info: (...args) => logger.info(...args),
+      warn: (...args) => logger.warn(...args),
+      error: (...args) => logger.error(...args),
+      debug: (...args) => logger.debug(...args),
+    });
     return {
-      log: (...args) => mainLogger.info(...args),
-      info: (...args) => mainLogger.info(...args),
-      warn: (...args) => mainLogger.warn(...args),
-      error: (...args) => mainLogger.error(...args),
-      debug: (...args) => mainLogger.debug(...args),
+      ...wrap(mainLogger),
+      // 透传 child logger 以附加 plugin_id 等元数据
+      child: (meta) => wrap(
+        typeof mainLogger.child === 'function' ? mainLogger.child(meta) : mainLogger,
+      ),
     };
   }
   if (typeof window !== 'undefined') {

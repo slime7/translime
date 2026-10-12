@@ -53,7 +53,7 @@ const writeRemotePair = async (gameId, timestamp, info) => {
   const { createArchive } = await import('../../src/utils/sync/archive');
   const remoteDir = path.join(remoteRoot, gameId, timestamp);
   await fs.mkdir(remoteDir, { recursive: true });
-  await createArchive(srcDir, path.join(remoteDir, 'data.zip'), { excludeInfo: true });
+  await createArchive(srcDir, path.join(remoteDir, 'data.zip'), { exclude: (rel) => rel === 'info.json' });
   await fs.copyFile(path.join(srcDir, 'info.json'), path.join(remoteDir, 'info.json'));
   await fs.rm(path.join(tmpRoot, 'pair-src'), { recursive: true, force: true });
 };

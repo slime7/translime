@@ -1,12 +1,12 @@
 <template>
-  <!-- mat-dialog 内容被 Teleport 到宿主 @scope 隔离范围之外，样式必须内联 -->
+  <!-- 对话框内容需使用内联样式 -->
   <mat-dialog
     v-model="visible"
     width="800px"
     close-on-back
     :title="dialogTitle"
   >
-    <!-- 路径信息：枚举本地目录内的具体文件（与备份弹窗的存档路径面板同构） -->
+    <!-- 路径信息 -->
     <div
       v-if="filesLoading"
       role="status"
@@ -18,7 +18,7 @@
       v-else-if="sources.length > 0"
       :game="{ saveSources: sources }"
     >
-      <!-- 远端位置属于存档路径详情，跟随本地路径与文件列表放在同一折叠内容内 -->
+      <!-- 远端位置 -->
       <template #append>
         <div style="display: flex; align-items: center; margin: 8px 0 4px; font-size: .875rem; word-break: break-all">
           <mat-chip
@@ -52,9 +52,9 @@
       </div>
     </template>
 
-    <!-- 删除冲突：远端已删除但本机在删除后仍有更新 -->
+    <!-- 删除冲突 -->
     <div
-      v-if="conflict"
+      v-if="conflict && isDeletionConflict"
       role="alert"
       style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-error-container); color: var(--mat-sys-color-on-error-container)"
     >
@@ -90,7 +90,46 @@
       </div>
     </div>
 
-    <!-- 本地缺失 -->
+    <!-- 内容冲突 -->
+    <div
+      v-else-if="conflict"
+      role="alert"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-error-container); color: var(--mat-sys-color-on-error-container)"
+    >
+      <mat-icon icon="sync_problem" />
+      <div style="flex: 1">
+        <div style="font-weight: 600">
+          同步冲突：本机与远端都有更新
+        </div>
+        <div style="margin: 4px 0 8px; font-size: .8125rem">
+          本机最后更新：{{ formatTime(conflict.localUpdatedAt) || '未知' }}；远端最后更新：{{ formatTime(conflict.remoteUpdatedAt) || '未知' }}<template v-if="conflict.remoteUpdatedBy">
+            （{{ conflict.remoteUpdatedBy }}）
+          </template>。保留本机会把本机快照上传覆盖远端；采用远端会用远端快照替换本机目录，未被保留一侧的新文件会丢失。
+        </div>
+        <div style="display: flex; gap: 8px">
+          <mat-btn
+            variant="filled-tonal"
+            prefix="cloud_upload"
+            :disabled="resolveDisabled"
+            :loading="resolveLoading"
+            @click="$emit('resolve', 'keep-local')"
+          >
+            保留本机存档
+          </mat-btn>
+          <mat-btn
+            variant="text"
+            prefix="cloud_download"
+            :disabled="resolveDisabled"
+            :loading="resolveLoading"
+            @click="$emit('resolve', 'use-remote')"
+          >
+            采用远端存档
+          </mat-btn>
+        </div>
+      </div>
+    </div>
+
+    <!-- 本地目录缺失 -->
     <div
       v-else-if="!entry.localExists"
       role="status"
@@ -116,7 +155,7 @@
       </div>
     </div>
 
-    <!-- 正常状态 -->
+    <!-- 状态与最近对账 -->
     <div
       v-else
       role="status"
@@ -125,7 +164,7 @@
       <mat-icon icon="cloud_done" />
       <div style="flex: 1">
         <div style="font-weight: 600">
-          {{ status.label }} · 本地与远程镜像同步（较新者胜）
+          {{ status.label }} · 本地与远程镜像同步
         </div>
         <div style="margin-top: 4px; font-size: .8125rem">
           {{ lastSyncText }}
@@ -203,17 +242,17 @@ const props = defineProps({
     type: Object,
     required: true,
   },
-  // entryStatus(entry) 的结果：{ key, label, icon }
+  // 条目状态对象
   status: {
     type: Object,
     default: null,
   },
-  // 删除冲突条目（来自直通状态 conflicts），无冲突时为 null
+  // 冲突条目对象
   conflict: {
     type: Object,
     default: null,
   },
-  // 直通最近对账报告（用于展示最近同步时间）
+  // 最近对账报告
   lastReport: {
     type: Object,
     default: null,
@@ -222,7 +261,7 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  // 本地目录文件枚举结果（saveSources 形态，passthrough-list-files 返回）
+  // 本地文件列表
   sources: {
     type: Array,
     default: () => [],
@@ -278,7 +317,10 @@ const remoteLocation = computed(() => {
 
 const resolveDisabled = computed(() => !props.conflict || props.resolveLoading);
 
-// 取消链接的“同时删除远程”开关：本地缺失时默认勾选（本机已无可保留的内容）
+// 判断冲突类型
+const isDeletionConflict = computed(() => Boolean(props.conflict) && props.conflict.kind !== 'content');
+
+// 本地缺失时默认勾选删除远程
 const deleteRemoteChecked = ref(false);
 watch(() => props.modelValue, (open) => {
   if (open) {

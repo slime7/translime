@@ -58,9 +58,9 @@ describe('createArchive / extractArchive 往返', () => {
     expect(info.gameId).toBe('123');
   });
 
-  it('excludeInfo 打包远端数据包：不含 info.json 但保留全部数据文件（元数据外置，远端可不解包读元数据）', async () => {
+  it('exclude 谓词打包远端数据包：不含 info.json 但保留全部数据文件（元数据外置，远端可不解包读元数据）', async () => {
     const dataZip = path.join(tmpRoot, 'data.zip');
-    await createArchive(backupDir, dataZip, { excludeInfo: true });
+    await createArchive(backupDir, dataZip, { exclude: (rel) => rel === 'info.json' });
 
     const AdmZip = (await import('adm-zip')).default;
     const zip = new AdmZip(dataZip);
@@ -84,5 +84,38 @@ describe('createArchive / extractArchive 往返', () => {
     const entries = await fs.readdir(dest);
     expect(entries).toContain('info.json');
     expect(entries).toContain('data_0');
+  });
+
+  it('skip 谓词解压时跳过指定条目（直通数据包不含 .translime 元数据落盘）', async () => {
+    // 构造含 .translime/meta.json 的压缩包（模拟手工放置或旧数据）
+    const mixedZip = path.join(tmpRoot, 'mixed.zip');
+    const mixedDir = path.join(tmpRoot, 'mixed');
+    await fs.mkdir(path.join(mixedDir, '.translime'), { recursive: true });
+    await fs.writeFile(path.join(mixedDir, 'save.dat'), 'save-data');
+    await fs.writeFile(path.join(mixedDir, '.translime', 'meta.json'), '{"entryId":"x"}', 'utf8');
+    await createArchive(mixedDir, mixedZip);
+
+    const dest = path.join(tmpRoot, 'restored-skip');
+    await extractArchive(mixedZip, dest, { skip: (rel) => rel === '.translime/meta.json' });
+
+    expect(await fs.readFile(path.join(dest, 'save.dat'), 'utf8')).toBe('save-data');
+    expect(await fs.stat(path.join(dest, '.translime')).catch(() => null)).toBe(null);
+  });
+
+  it('stampMtime 让解压文件统一盖水位时间（跨时区拉取后对账不误判本地有更新）', async () => {
+    await createArchive(backupDir, zipPath);
+
+    const stamp = new Date('2026-10-05T12:00:00.000Z');
+    const dest = path.join(tmpRoot, 'restored-stamp');
+    await extractArchive(zipPath, dest, { stampMtime: stamp });
+
+    const stats = await Promise.all([
+      fs.stat(path.join(dest, 'data_0', 'save.dat')),
+      fs.stat(path.join(dest, 'data_0', 'nested', 'deep.sav')),
+      fs.stat(path.join(dest, 'info.json')),
+    ]);
+    stats.forEach((entry) => {
+      expect(entry.mtimeMs).toBe(stamp.getTime());
+    });
   });
 });

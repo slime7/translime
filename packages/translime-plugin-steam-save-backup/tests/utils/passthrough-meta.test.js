@@ -16,11 +16,11 @@ describe('passthrough meta', () => {
     expect(buildEntryId('A')).toMatch(/^custom-/);
   });
 
-  it('远端路径统一挂在 passthrough 子树下，meta 位于 .translime 目录（与备份数据隔离）', () => {
+  it('远端路径统一挂在 passthrough 子树下，meta 位于条目根（与游戏备份 data.zip + info.json 同构）', () => {
     expect(joinRemotePassthroughRoot('GDrive:saves/')).toBe('GDrive:saves/passthrough');
     expect(joinRemoteEntry('GDrive:saves', 'custom-abc')).toBe('GDrive:saves/passthrough/custom-abc');
     expect(joinRemoteMeta('GDrive:saves', 'custom-abc')).toBe(
-      'GDrive:saves/passthrough/custom-abc/.translime/meta.json',
+      'GDrive:saves/passthrough/custom-abc/meta.json',
     );
   });
 

@@ -1,6 +1,6 @@
 <template>
   <div class="passthrough-view">
-    <!-- 与备份区隔离的直通云存档区块：仅支持自定义目录，不产生本地备份 -->
+    <!-- 直通云存档视图 -->
     <div
       v-if="!configured"
       class="pt-hint-card"
@@ -51,7 +51,7 @@
             </mat-tooltip>
           </div>
           <div class="pt-desc">
-            本地存档目录与远程直接镜像同步（双向对账，较新者胜），不占用多余本地备份空间。取消链接时可选删除远程存档。
+            本地存档目录与远程直接镜像同步（双向对账，双端都有更新时会询问保留哪边），不占用多余本地备份空间。取消链接时可选删除远程存档。
           </div>
         </div>
         <div class="pt-toolbar-actions">
@@ -74,7 +74,7 @@
         </div>
       </div>
 
-      <!-- 条目卡片：与备份区相同的卡片形态（无备份概念，展示直通状态） -->
+      <!-- 条目卡片 -->
       <div
         v-if="entries.length > 0"
         class="pt-grid"
@@ -157,7 +157,7 @@ import {
 } from '../../composables/useSyncStatus';
 
 const props = defineProps({
-  // 轻量反馈走宿主页面的 snackbar（由 ui.vue 注入）
+  // 提示通知方法
   notify: {
     type: Function,
     required: true,
@@ -191,7 +191,7 @@ const selectedEntry = ref(null);
 
 const showMessage = (text, color = 'success') => props.notify(text, color);
 
-// 直通条目映射为与备份区一致的游戏卡片形态（kind 驱动 GameCard 的直通分支）
+// 转换为卡片展示数据
 const ptCards = computed(() => entries.value.map((entry) => ({
   appid: entry.entryId,
   name: entry.name,
@@ -206,7 +206,7 @@ const selectedConflict = computed(() => {
   return conflicts.value.find((item) => item.entryId === selectedEntry.value.entryId) || null;
 });
 
-// 远端位置复用备份同步的远程目标
+// 远程目标
 const target = computed(() => syncStatus.value?.config?.target || '');
 
 onMounted(() => {
@@ -214,7 +214,7 @@ onMounted(() => {
   refreshSyncStatus();
 });
 
-// 对账结束（可能应用了远端删除）后刷新条目存在性
+// 对账结束后刷新条目列表
 watch(syncing, (running, wasRunning) => {
   if (wasRunning && !running) {
     load();
@@ -249,7 +249,7 @@ const openDetails = (card) => {
   detailsOpen.value = true;
 };
 
-// 详情弹窗打开时枚举本地目录文件（路径面板展示具体内容）
+// 详情弹窗打开时获取本地文件列表
 const detailsSources = ref([]);
 const filesLoading = ref(false);
 watch([detailsOpen, selectedEntry], async ([open, entry]) => {
@@ -291,9 +291,13 @@ const onResolve = async (mode) => {
   }
   const res = await resolveConflict({ entryId: entry.entryId, mode });
   if (res.success) {
-    showMessage(mode === 'keep-local'
-      ? `已保留本机存档「${entry.name}」并撤销远端删除`
-      : `已确认删除存档「${entry.name}」`);
+    // 冲突处置后刷新同步状态
+    refreshSyncStatus();
+    showMessage({
+      'keep-local': `已保留本机存档「${entry.name}」并上传覆盖远端`,
+      'use-remote': `存档「${entry.name}」已采用远端版本替换本机`,
+      'confirm-deletion': `已确认删除存档「${entry.name}」`,
+    }[mode] || `已处理存档「${entry.name}」的冲突`);
   } else {
     showMessage(res.message || '处理失败', 'error');
   }

@@ -6,11 +6,11 @@
     />
 
     <div class="empty-title mt-4 text-xl">
-      未发现 Steam 游戏
+      未发现可备份的游戏
     </div>
 
     <div class="empty-hint mt-1 text-sm">
-      请尝试在插件设置中手动配置 Steam 路径
+      可通过工具栏手动添加存档目录，或在插件设置中配置 Steam 路径
     </div>
 
     <mat-btn

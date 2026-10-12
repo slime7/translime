@@ -1,6 +1,43 @@
 import { spawn } from 'node:child_process';
+import { useLogger } from 'translime-sdk';
+
+const PLUGIN_ID = 'translime-plugin-steam-save-backup';
+const baseLogger = useLogger();
+// 附加 plugin_id 与 context 元数据
+const logger = baseLogger.child ? baseLogger.child({ plugin_id: PLUGIN_ID, context: 'rclone' }) : baseLogger;
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+
+// 匹配敏感参数键名
+const SENSITIVE_KEY_RE = /pass|secret|token|key/i;
+
+/**
+ * 脱敏命令行参数中的敏感凭据。
+ */
+export const redactArgs = (args) => {
+  let maskNext = false;
+  return args.map((arg) => {
+    if (maskNext) {
+      maskNext = false;
+      return '***';
+    }
+    if (arg.startsWith('--')) {
+      const eq = arg.indexOf('=');
+      if (eq > 0) {
+        return SENSITIVE_KEY_RE.test(arg.slice(2, eq)) ? `${arg.slice(0, eq + 1)}***` : arg;
+      }
+      if (SENSITIVE_KEY_RE.test(arg.slice(2))) {
+        maskNext = true;
+      }
+      return arg;
+    }
+    const eq = arg.indexOf('=');
+    if (eq > 0 && SENSITIVE_KEY_RE.test(arg.slice(0, eq))) {
+      return `${arg.slice(0, eq)}=***`;
+    }
+    return arg;
+  });
+};
 
 export class RcloneError extends Error {
   constructor(message, { code = null, stderr = '' } = {}) {
@@ -29,14 +66,19 @@ export const tailOutput = (text, max = 500) => {
  */
 export const runRclone = (bin, args, options = {}) => new Promise((resolve, reject) => {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, onSpawn } = options;
+  const printable = redactArgs(args).join(' ');
+  const startedAt = Date.now();
 
   let child;
   try {
     child = spawn(bin, args, { windowsHide: true });
   } catch (e) {
+    logger.debug(`[rclone] 启动失败：${bin} ${printable}（${e.message}）`);
     reject(new RcloneError(`无法启动 rclone（${bin}）：${e.message}`));
     return;
   }
+
+  logger.debug(`[rclone] 执行：${bin} ${printable}`);
 
   onSpawn?.(child);
 
@@ -45,6 +87,7 @@ export const runRclone = (bin, args, options = {}) => new Promise((resolve, reje
   let settled = false;
 
   const timer = setTimeout(() => {
+    logger.debug(`[rclone] 超时（${timeoutMs}ms）终止：${args[0] || ''}`);
     child.kill();
   }, timeoutMs);
 
@@ -60,6 +103,7 @@ export const runRclone = (bin, args, options = {}) => new Promise((resolve, reje
     }
     settled = true;
     clearTimeout(timer);
+    logger.debug(`[rclone] 启动失败：${bin} ${printable}（${e.message}）`);
     reject(new RcloneError(`无法启动 rclone（${bin}）：${e.message}`));
   });
   child.on('close', (code) => {
@@ -68,6 +112,9 @@ export const runRclone = (bin, args, options = {}) => new Promise((resolve, reje
     }
     settled = true;
     clearTimeout(timer);
+    const costMs = Date.now() - startedAt;
+    const detail = tailOutput(stderr, 300);
+    logger.debug(`[rclone] 退出码 ${code}：${args[0] || ''}（${costMs}ms）${detail ? ` ${detail}` : ''}`);
     resolve({ code, stdout, stderr });
   });
 });
@@ -130,6 +177,9 @@ export const createExec = (resolveBin) => {
   };
 
   exec.killAll = () => {
+    if (children.size > 0) {
+      logger.debug(`[rclone] 终止进行中的 rclone 进程（${children.size} 个）`);
+    }
     children.forEach((child) => {
       child.kill();
     });

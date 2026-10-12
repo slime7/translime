@@ -14,17 +14,15 @@ import {
 const NOTIFICATION_LIMIT = 50;
 
 /**
- * 直通云存档编排层：条目配置管理、持久状态维护与独立的 rclone 操作。
- * 常规对账复用 sync-service 的串行队列（runSync 由其在每次对账末尾调用）；
- * 取消链接 / 恢复 / 冲突处置是用户即时动作，自建 exec 执行（与 removeRemoteBackup 同模式）。
+ * 直通云存档编排层：条目配置管理、持久状态维护与 rclone 操作。
  *
  * @param {object} options
  * @param {string} options.pluginId 插件 ID
  * @param {(key: string, defaultValue?: any) => any} options.getConfig 读取宿主配置
  * @param {(key: string, value: any) => void} options.setConfig 写入宿主配置
- * @param {() => string} options.getMachineId 本机标识（sync-service 持有）
+ * @param {() => string} options.getMachineId 本机标识
  * @param {() => string} options.resolveBinary rclone 可执行文件路径
- * @param {(payload: object) => void} [options.onNotify] 后台事件通知（推送 UI）
+ * @param {(payload: object) => void} [options.onNotify] 后台事件通知
  */
 const createPassthroughService = ({
   pluginId,
@@ -56,7 +54,7 @@ const createPassthroughService = ({
     const raw = getConfig(stateKey, {});
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return {
-        conflicts: [], notifications: [], lastReport: null, lastError: null,
+        conflicts: [], notifications: [], lastReport: null, lastError: null, watermarks: {}, manifests: {},
       };
     }
     return {
@@ -64,6 +62,14 @@ const createPassthroughService = ({
       notifications: Array.isArray(raw.notifications) ? raw.notifications : [],
       lastReport: raw.lastReport || null,
       lastError: typeof raw.lastError === 'string' ? raw.lastError : null,
+      // 各条目上次完成同步的水位（entryId → ISO 时间）
+      watermarks: raw.watermarks && typeof raw.watermarks === 'object' && !Array.isArray(raw.watermarks)
+        ? raw.watermarks
+        : {},
+      // 各条目上次同步的文件清单（entryId → relPath → mtimeMs:size）
+      manifests: raw.manifests && typeof raw.manifests === 'object' && !Array.isArray(raw.manifests)
+        ? raw.manifests
+        : {},
     };
   };
 
@@ -103,7 +109,7 @@ const createPassthroughService = ({
       })));
     },
 
-    /** 添加直通条目：目录必须存在但允许为空（新设备先建空目录拉取的场景） */
+    /** 添加直通条目（允许登记空目录） */
     addEntry: async ({ name, dir }) => {
       const trimmedName = typeof name === 'string' ? name.trim() : '';
       const trimmedDir = typeof dir === 'string' ? dir.trim() : '';
@@ -139,9 +145,7 @@ const createPassthroughService = ({
     },
 
     /**
-     * 取消链接：仅解除绑定，本机存档目录不受影响；勾选「同时删除远程」时
-     * 远端数据整体清理并写入删除墓碑，其他端对账时自动跟随删除各自的本地副本
-     * （本地在删除后有更新的端转冲突待确认）。远程删除失败时不解除绑定，可重试。
+     * 取消链接：解除本地条目绑定；勾选 deleteRemote 时同步清理远端并写入删除墓碑。
      */
     removeEntry: async ({ name, deleteRemote }) => {
       const entry = findEntry(typeof name === 'string' ? name : '');
@@ -163,7 +167,7 @@ const createPassthroughService = ({
           });
           remoteDeleted = true;
         } catch (e) {
-          // 远端仍留有数据且未写墓碑：保持绑定让用户重试，避免留下无人管理的孤儿数据
+          // 远程删除失败时保留本地绑定以便重试
           return { success: false, message: `远程删除失败，已保留链接可重试：${e.message}` };
         } finally {
           exec.killAll();
@@ -173,13 +177,16 @@ const createPassthroughService = ({
       const list = readEntries();
       const next = list.filter((item) => normalizeGameNameKey(item.name) !== normalizeGameNameKey(entry.name));
       saveEntries(next);
+      const manifests = { ...readState().manifests };
+      delete manifests[entryId];
       writeState({
         conflicts: readState().conflicts.filter((item) => item.entryId !== entryId),
+        manifests,
       });
       return { success: true, remoteDeleted };
     },
 
-    /** 本地目录缺失时的整目录回补 */
+    /** 本地目录缺失时恢复下载 */
     restoreEntry: async ({ name }) => {
       const entry = findEntry(name);
       if (!entry) {
@@ -191,17 +198,24 @@ const createPassthroughService = ({
       }
       const exec = prepareExec();
       try {
-        await restorePassthroughEntry(exec, target, {
+        const result = await restorePassthroughEntry(exec, target, {
           entryId: buildEntryId(entry.name),
           dir: entry.dir,
         });
+        // 恢复完成后记录水位与本地清单
+        if (result.updatedAt) {
+          writeState({
+            watermarks: { ...readState().watermarks, [buildEntryId(entry.name)]: result.updatedAt },
+            manifests: { ...readState().manifests, [buildEntryId(entry.name)]: result.manifest },
+          });
+        }
         return { success: true };
       } finally {
         exec.killAll();
       }
     },
 
-    /** 直通删除墓碑冲突处置：keep-local 撤销远端删除 / confirm-deletion 确认删除本地 */
+    /** 直通冲突处置：keep-local 保留本地 / confirm-deletion 确认删除本地 / use-remote 采用远端 */
     resolveConflict: async ({ entryId, mode }) => {
       if (!entryId || !mode) {
         return { success: false, message: '参数不完整' };
@@ -221,8 +235,9 @@ const createPassthroughService = ({
       }
 
       const exec = prepareExec();
+      let resolution;
       try {
-        await resolvePassthroughConflict(exec, target, {
+        resolution = await resolvePassthroughConflict(exec, target, {
           entryId,
           name: entry.name,
           dir: entry.dir,
@@ -233,6 +248,17 @@ const createPassthroughService = ({
         exec.killAll();
       }
 
+      // 更新对应条目的水位与本地清单
+      if (resolution.updatedAt) {
+        writeState({
+          watermarks: { ...readState().watermarks, [entryId]: resolution.updatedAt },
+          manifests: { ...readState().manifests, [entryId]: resolution.manifest },
+        });
+      } else if (mode === 'confirm-deletion') {
+        const manifests = { ...readState().manifests };
+        delete manifests[entryId];
+        writeState({ manifests });
+      }
       writeState({
         conflicts: state.conflicts.filter((item) => item.entryId !== entryId),
       });
@@ -240,8 +266,7 @@ const createPassthroughService = ({
     },
 
     /**
-     * 直通对账（由 sync-service 在每次对账末尾调用，共用 exec 与队列槽位）。
-     * 除取消外不对外抛错：失败记录到直通自身状态，不影响备份对账结果。
+     * 执行直通对账
      */
     runSync: async ({ exec, target, isCancelled = () => false }) => {
       const entries = readEntries().map((entry) => ({
@@ -253,11 +278,14 @@ const createPassthroughService = ({
         return null;
       }
       try {
+        const state = readState();
         const report = await runPassthroughSync({
           exec,
           target,
           entries,
           machineId: getMachineId(),
+          watermarks: state.watermarks,
+          manifests: state.manifests,
           isCancelled,
         });
         const notifications = report.appliedDeletions.map((item) => ({
@@ -267,11 +295,17 @@ const createPassthroughService = ({
           at: report.finishedAt,
         }));
         notifications.forEach(onNotify);
-        const state = readState();
+        // 保存本轮更新的水位与本地清单，移除已删除条目的清单
+        const manifests = { ...state.manifests, ...(report.manifests || {}) };
+        report.appliedDeletions.forEach((item) => {
+          delete manifests[item.entryId];
+        });
         writeState({
           lastReport: report,
           lastError: null,
           conflicts: report.conflicts,
+          watermarks: { ...state.watermarks, ...(report.watermarks || {}) },
+          manifests,
           notifications: [...notifications, ...state.notifications].slice(0, NOTIFICATION_LIMIT),
         });
         return report;

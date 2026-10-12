@@ -24,7 +24,7 @@ const machineSuffix = (machineId) => String(machineId || '').slice(0, 8) || 'loc
 // 数据包先传（.part → moveto 原子可见），info.json 收尾写入；完整备份以包含 info.json 为准
 const uploadBackup = async (exec, localDir, remoteDir, tempDir) => {
   const tempZip = path.join(tempDir, `${path.basename(remoteDir)}.uploading`);
-  await createArchive(localDir, tempZip, { excludeInfo: true });
+  await createArchive(localDir, tempZip, { exclude: (rel) => rel === 'info.json' });
   const partRemote = `${remoteDir}/data.zip.part`;
   const partResult = await exec(['copyto', tempZip, partRemote]);
   if (partResult.code !== 0) {
