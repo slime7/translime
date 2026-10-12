@@ -113,7 +113,7 @@ const mockStatus = {
       skipped: [],
       errors: [],
     },
-    entryCount: 2,
+    entryCount: 4,
   },
 };
 
@@ -123,6 +123,48 @@ const mockPassthroughEntries = [
   },
   {
     entryId: 'custom-9zzz88', name: '星露谷物语', dir: 'D:/Games/Stardew/Saves', localExists: false,
+  },
+  {
+    entryId: 'custom-3def456', name: '博德之门 3', dir: 'D:/Games/BG3/Saves', localExists: true,
+  },
+  {
+    entryId: 'custom-4ghi789', name: '吸血鬼幸存者', dir: 'C:/mock/Saved Games/Vampire Survivors', localExists: true,
+  },
+];
+
+// 直通探测 mock：覆盖冲突 / 本地缺失 / 云端更新 / 已同步四种卡片状态
+const mockPassthroughProbe = [
+  {
+    entryId: 'custom-1abcd23',
+    name: '空洞骑士',
+    action: 'content-conflict',
+    localExists: true,
+    remoteUpdatedAt: '2026-10-01T11:05:00.000Z',
+    remoteDeletedAt: null,
+  },
+  {
+    entryId: 'custom-9zzz88',
+    name: '星露谷物语',
+    action: 'local-missing',
+    localExists: false,
+    remoteUpdatedAt: '2026-10-01T09:00:00.000Z',
+    remoteDeletedAt: null,
+  },
+  {
+    entryId: 'custom-3def456',
+    name: '博德之门 3',
+    action: 'sync-download',
+    localExists: true,
+    remoteUpdatedAt: '2026-10-02T08:30:00.000Z',
+    remoteDeletedAt: null,
+  },
+  {
+    entryId: 'custom-4ghi789',
+    name: '吸血鬼幸存者',
+    action: 'noop',
+    localExists: true,
+    remoteUpdatedAt: '2026-10-01T10:00:09.000Z',
+    remoteDeletedAt: null,
   },
 ];
 
@@ -336,6 +378,10 @@ export default {
     success: true,
     entries: mockPassthroughEntries,
     status: mockStatus.passthrough,
+  }),
+  'passthrough-probe': async () => ({
+    success: true,
+    entries: mockPassthroughProbe,
   }),
   'passthrough-add': async ({ name, dir }) => ({
     success: true,

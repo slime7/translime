@@ -31,7 +31,29 @@ export default function usePassthrough() {
   const lastError = computed(() => state.value?.lastError || null);
   const notifications = computed(() => state.value?.notifications || []);
 
-  // 计算条目展示状态
+  // 只读探测结果：entryId → { action, remoteUpdatedAt, remoteDeletedAt }
+  const probeEntries = ref({});
+  const probeLoading = ref(false);
+
+  // 同步进行中结果马上会被对账刷新，跳过探测避免读到中间态
+  const probe = async () => {
+    if (syncing.value || probeLoading.value) {
+      return;
+    }
+    probeLoading.value = true;
+    try {
+      const res = await ipc.invoke(`passthrough-probe@${PLUGIN_ID}`);
+      if (res.success) {
+        probeEntries.value = Object.fromEntries(
+          (res.entries || []).map((item) => [item.entryId, item]),
+        );
+      }
+    } finally {
+      probeLoading.value = false;
+    }
+  };
+
+  // 计算条目展示状态：已登记冲突优先（可处置），其余取探测得到的待同步状态
   const entryStatus = (entry) => {
     const conflict = conflicts.value.find((item) => item.entryId === entry.entryId);
     if (conflict) {
@@ -45,7 +67,55 @@ export default function usePassthrough() {
     if (syncing.value) {
       return { key: 'syncing', label: '同步中', icon: 'sync' };
     }
-    return { key: 'ready', label: '直通已启用', icon: 'cloud_done' };
+    const probeData = probeEntries.value[entry.entryId];
+    switch (probeData?.action) {
+    case 'content-conflict':
+      return {
+        key: 'conflict',
+        label: '同步冲突',
+        icon: 'sync_problem',
+        detail: '本机与远端都有更新，需选择保留哪一边',
+      };
+    case 'deletion-conflict':
+      return {
+        key: 'conflict',
+        label: '删除冲突',
+        icon: 'sync_problem',
+        detail: '远端存档已删除，但本机在其后仍有更新，需确认保留哪一边',
+      };
+    case 'sync-download':
+      return {
+        key: 'remote-update',
+        label: '云端更新',
+        icon: 'cloud_download',
+        detail: '远端存档有新版本，立即同步后下载到本机',
+        remoteUpdatedAt: probeData.remoteUpdatedAt || null,
+      };
+    case 'sync-upload':
+      return {
+        key: 'pending-upload',
+        label: '待上传',
+        icon: 'cloud_upload',
+        detail: '本机存档有变更，立即同步后上传覆盖远端',
+      };
+    case 'apply-deletion':
+      return {
+        key: 'remote-deleted',
+        label: '云端已删除',
+        icon: 'cloud_off',
+        detail: '远端存档已被删除，下次同步将移除本机目录',
+      };
+    case 'noop':
+      return {
+        key: 'synced',
+        label: '已同步',
+        icon: 'cloud_done',
+        detail: '本机与远端存档一致',
+      };
+    default:
+      // 探测不可用（未完成或失败）时的兜底展示
+      return { key: 'ready', label: '直通已启用', icon: 'cloud_done' };
+    }
   };
 
   const load = async () => {
@@ -133,7 +203,10 @@ export default function usePassthrough() {
     lastReport,
     lastError,
     notifications,
+    probeEntries,
+    probeLoading,
     entryStatus,
+    probe,
     load,
     addEntry,
     removeEntry,

@@ -176,6 +176,7 @@ const {
   lastReport,
   lastError,
   entryStatus,
+  probe,
   load,
   addEntry,
   removeEntry,
@@ -213,12 +214,14 @@ const target = computed(() => syncStatus.value?.config?.target || '');
 onMounted(() => {
   load();
   refreshSyncStatus();
+  probe();
 });
 
-// 对账结束后刷新条目列表
+// 对账结束后刷新条目列表并重新探测同步状态
 watch(syncing, (running, wasRunning) => {
   if (wasRunning && !running) {
     load();
+    probe();
   }
 });
 
@@ -292,8 +295,9 @@ const onResolve = async (mode) => {
   }
   const res = await resolveConflict({ entryId: entry.entryId, mode });
   if (res.success) {
-    // 冲突处置后刷新同步状态
+    // 冲突处置后刷新同步状态与探测结果
     refreshSyncStatus();
+    probe();
     showMessage({
       'keep-local': `已保留本机存档「${entry.name}」并上传覆盖远端`,
       'use-remote': `存档「${entry.name}」已采用远端版本替换本机`,
@@ -322,6 +326,7 @@ const onRestore = async () => {
   }
   const res = await restoreEntry(entry.name);
   if (res.success) {
+    probe();
     showMessage(`存档「${entry.name}」已从远程回补`);
   } else {
     showMessage(res.message || '回补失败', 'error');

@@ -1301,6 +1301,17 @@ export const ipcHandlers = [
     },
   },
   {
+    // 卡片与详情的同步状态探测：只读对比本地与远端，不触发传输
+    type: 'passthrough-probe',
+    handler: () => async () => {
+      try {
+        return await passthroughService.probeStatus();
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
     type: 'passthrough-add',
     handler: () => async ({ name, dir } = {}) => {
       try {

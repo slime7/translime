@@ -4,138 +4,128 @@
     variant="elevated"
     @click="$emit('open', game)"
   >
-    <div class="flex flex-row items-center p-4">
-      <mat-avatar
-        :size="56"
-        color="primary"
-      >
-        <span class="text-2xl font-bold">{{ game.name.charAt(0).toUpperCase() }}</span>
-      </mat-avatar>
+    <div class="flex flex-col gap-3 p-4">
+      <div class="flex items-center gap-2">
+        <div class="min-w-0 grow">
+          <mat-tooltip
+            :content="game.name"
+            location="top"
+          >
+            <template #activator>
+              <div class="game-title truncate text-xl font-medium">
+                {{ game.name }}
+              </div>
+            </template>
+          </mat-tooltip>
 
-      <div class="ml-4 truncate grow">
+          <div
+            v-if="game.kind === 'passthrough'"
+            class="game-subtitle"
+          >
+            直通云存档
+          </div>
+          <div
+            v-else-if="game.uninstalled"
+            class="game-subtitle"
+          >
+            未安装 · 仅存档管理
+          </div>
+          <div
+            v-else-if="game.isCustom"
+            class="game-subtitle"
+          >
+            自定义游戏
+          </div>
+          <div
+            v-else
+            class="game-subtitle"
+          >
+            APP ID: {{ game.appid }}
+          </div>
+        </div>
+
         <mat-tooltip
-          :content="game.name"
+          v-if="game.kind !== 'passthrough'"
+          content="隐藏此游戏"
           location="top"
         >
           <template #activator>
-            <div class="game-title truncate text-xl font-medium">
-              {{ game.name }}
-            </div>
+            <mat-btn
+              icon="visibility_off"
+              variant="standard"
+              size="small"
+              class="shrink-0"
+              :loading="excludeLoading === game.appid"
+              :aria-label="`隐藏游戏 ${game.name}`"
+              @click.stop="$emit('exclude', game)"
+            />
           </template>
         </mat-tooltip>
-
-        <div
-          v-if="game.kind === 'passthrough'"
-          class="game-subtitle"
-        >
-          直通云存档
-        </div>
-        <div
-          v-else-if="game.uninstalled"
-          class="game-subtitle"
-        >
-          未安装 · 仅存档管理
-        </div>
-        <div
-          v-else-if="game.isCustom"
-          class="game-subtitle"
-        >
-          自定义游戏
-        </div>
-        <div
-          v-else
-          class="game-subtitle"
-        >
-          APP ID: {{ game.appid }}
-        </div>
       </div>
 
-      <mat-tooltip
-        v-if="game.kind !== 'passthrough'"
-        content="隐藏此游戏"
-        location="top"
-      >
-        <template #activator>
-          <mat-btn
-            icon="visibility_off"
-            variant="standard"
-            size="small"
-            :loading="excludeLoading === game.appid"
-            :aria-label="`隐藏游戏 ${game.name}`"
-            @click.stop="$emit('exclude', game)"
-          />
-        </template>
-      </mat-tooltip>
+      <div class="flex items-center gap-2">
+        <div class="flex min-w-0 grow items-center gap-2">
+          <template v-if="game.kind === 'passthrough'">
+            <mat-tooltip
+              :content="game.ptStatus.detail || game.ptStatus.label"
+              location="top"
+            >
+              <template #activator>
+                <mat-chip
+                  variant="assist"
+                  :color="ptChipColor"
+                >
+                  <template #leading>
+                    <mat-icon
+                      :icon="game.ptStatus.icon"
+                      size="18px"
+                      :class="{ 'sync-spinning': game.ptStatus.key === 'syncing' }"
+                    />
+                  </template>
+                  {{ game.ptStatus.label }}
+                </mat-chip>
+              </template>
+            </mat-tooltip>
+          </template>
+          <template v-else>
+            <mat-chip
+              variant="assist"
+              :color="game.backupCount > 0 ? 'tertiary' : undefined"
+              class="font-medium shrink-0"
+            >
+              {{ game.backupCount || 0 }} 个备份
+            </mat-chip>
+
+            <mat-tooltip
+              v-if="syncState"
+              :content="syncState.detail || syncState.label"
+              location="top"
+            >
+              <template #activator>
+                <mat-chip
+                  variant="assist"
+                  :color="syncChipColor"
+                >
+                  <template #leading>
+                    <mat-icon
+                      :icon="syncState.icon"
+                      size="18px"
+                      :class="{ 'sync-spinning': syncState.key === 'syncing' }"
+                    />
+                  </template>
+                  {{ syncState.label }}
+                </mat-chip>
+              </template>
+            </mat-tooltip>
+          </template>
+        </div>
+
+        <mat-icon
+          icon="chevron_right"
+          class="card-chevron shrink-0"
+        />
+      </div>
     </div>
-
-    <mat-divider />
-
-    <mat-card-content>
-      <div class="py-2">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-2">
-            <template v-if="game.kind === 'passthrough'">
-              <mat-tooltip
-                :content="game.ptStatus.detail || game.ptStatus.label"
-                location="top"
-              >
-                <template #activator>
-                  <mat-chip
-                    variant="assist"
-                    :color="ptChipColor"
-                  >
-                    <template #leading>
-                      <mat-icon
-                        :icon="game.ptStatus.icon"
-                        size="18px"
-                        :class="{ 'sync-spinning': game.ptStatus.key === 'syncing' }"
-                      />
-                    </template>
-                    {{ game.ptStatus.label }}
-                  </mat-chip>
-                </template>
-              </mat-tooltip>
-            </template>
-            <template v-else>
-              <mat-chip
-                variant="assist"
-                :color="game.backupCount > 0 ? 'tertiary' : undefined"
-                class="font-medium"
-              >
-                {{ game.backupCount || 0 }} 个备份
-              </mat-chip>
-
-              <mat-tooltip
-                v-if="syncState"
-                :content="syncState.detail || syncState.label"
-                location="top"
-              >
-                <template #activator>
-                  <mat-chip
-                    variant="assist"
-                    :color="syncChipColor"
-                  >
-                    <template #leading>
-                      <mat-icon
-                        :icon="syncState.icon"
-                        size="18px"
-                        :class="{ 'sync-spinning': syncState.key === 'syncing' }"
-                      />
-                    </template>
-                    {{ syncState.label }}
-                  </mat-chip>
-                </template>
-              </mat-tooltip>
-            </template>
-          </div>
-
-          <mat-icon
-            icon="chevron_right"
-            class="card-chevron"
-          />
-        </div>
-      </div>
-    </mat-card-content>
   </mat-card>
 </template>
 
@@ -170,15 +160,15 @@ const syncChipColor = computed(() => {
   return undefined;
 });
 
-// 直通条目状态芯片配色
+// 直通条目状态芯片配色：冲突红、云端更新主色、待处理次级色、已同步三级色
 const ptChipColor = computed(() => {
   if (props.game.ptStatus?.key === 'conflict') {
     return 'error';
   }
-  if (props.game.ptStatus?.key === 'missing') {
-    return 'secondary';
+  if (props.game.ptStatus?.key === 'remote-update') {
+    return 'primary';
   }
-  if (props.game.ptStatus?.key === 'ready') {
+  if (props.game.ptStatus?.key === 'synced' || props.game.ptStatus?.key === 'ready') {
     return 'tertiary';
   }
   return undefined;

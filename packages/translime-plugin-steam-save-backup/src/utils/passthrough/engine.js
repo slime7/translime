@@ -75,6 +75,51 @@ const manifestDiffers = (current, stored) => {
   return currentKeys.some((key) => current[key] !== stored[key]);
 };
 
+/**
+ * 判定本地自上次同步后是否有变更：同步水位基线未知时视为有变更。
+ */
+export const hasLocalChanges = (localManifest, watermark, storedManifest) => {
+  const baselineKnown = !Number.isNaN(Date.parse(watermark || ''));
+  return !baselineKnown || manifestDiffers(localManifest, storedManifest);
+};
+
+/**
+ * 批量拉取远端各条目 meta 并解析为 entryId → meta 映射（缺失或解析失败按 null 记）。
+ */
+export const fetchRemoteMetas = async (exec, target) => {
+  const stage = await fs.mkdtemp(path.join(os.tmpdir(), 'translime-pt-stage-'));
+  try {
+    const stageResult = await exec([
+      'copy',
+      joinRemotePassthroughRoot(target),
+      stage,
+      '--include',
+      `*/${META_NAME}`,
+      '--transfers',
+      '8',
+      '--contimeout',
+      '20s',
+    ]);
+    if (stageResult.code !== 0 && !isRemoteNotFound(stageResult)) {
+      throw new Error(`读取直通远端元数据失败：${tailOutput(stageResult.stderr)}`);
+    }
+    const children = await fs.readdir(stage, { withFileTypes: true }).catch(() => []);
+    const metas = await Promise.all(children.map(async (child) => {
+      if (!child.isDirectory()) {
+        return [child.name, null];
+      }
+      try {
+        return [child.name, parseMeta(await readJson(path.join(stage, child.name, META_NAME)))];
+      } catch {
+        return [child.name, null];
+      }
+    }));
+    return Object.fromEntries(metas);
+  } finally {
+    await fs.rm(stage, { recursive: true, force: true });
+  }
+};
+
 /** 将条目元数据写入远端 */
 const writeRemoteMeta = async (exec, target, {
   entryId, name, machineId, at,
@@ -221,6 +266,22 @@ const describeRemoteEntries = (files) => {
   return entries;
 };
 
+/**
+ * 只读检视远端：各条目的 meta 与数据包形态（供探测展示，不做任何写操作）。
+ */
+export const inspectRemoteEntries = async (exec, target) => {
+  const [metas, remoteFiles] = await Promise.all([
+    fetchRemoteMetas(exec, target),
+    listRemoteFiles(exec, joinRemotePassthroughRoot(target)),
+  ]);
+  const remoteEntries = describeRemoteEntries(remoteFiles);
+  const shapes = {};
+  Object.entries(remoteEntries).forEach(([entryId, value]) => {
+    shapes[entryId] = { hasZip: value.hasZip };
+  });
+  return { metas, shapes };
+};
+
 // 串行执行异步任务
 const runSequential = (items, step) => items.reduce(
   (chain, item) => chain.then(() => step(item)),
@@ -241,20 +302,13 @@ const purgeRemoteChildren = async (exec, target, entryId, children) => {
 
 // 执行单条目对账，返回需记录的新水位与清单
 const processEntry = async ({
-  exec, target, entry, stage, tempDir, machineId, report,
-  remoteShape, watermark, storedManifest, onEntry, beforeWrite, afterWrite,
+  exec, target, entry, tempDir, machineId, report,
+  remoteMeta, remoteShape, watermark, storedManifest, onEntry, beforeWrite, afterWrite,
 }) => {
   const { entryId, name, dir } = entry;
-  let remoteMeta = null;
-  try {
-    remoteMeta = parseMeta(await readJson(path.join(stage, entryId, META_NAME)));
-  } catch {
-    remoteMeta = null;
-  }
   const localState = await collectLocalState(dir);
   // 基线未知或清单有差异时视为本地有变更
-  const baselineKnown = !Number.isNaN(Date.parse(watermark || ''));
-  const localChanged = !baselineKnown || manifestDiffers(localState.manifest, storedManifest);
+  const localChanged = hasLocalChanges(localState.manifest, watermark, storedManifest);
   const plan = planPassthroughEntry({
     remoteMeta,
     localExists: localState.exists,
@@ -366,7 +420,6 @@ const processEntry = async ({
  * @param {Object<string, string>} [options.watermarks] 各条目本机上次完成同步的水位（entryId → ISO 时间）
  * @param {Object<string, Object<string, string>>} [options.manifests] 各条目上次同步的本地文件清单（entryId → relPath → `mtimeMs:size`）
  * @param {() => boolean} [options.isCancelled] 取消检查
- * @param {string} [options.stageDir] 远端 meta 暂存目录（测试注入用）
  * @param {(info: object) => void} [options.onEntry] 每条目动作回调（驱动通知与抑制窗口）
  * @param {(dir: string) => void} [options.beforeWrite] 条目开始回写本地前的钩子（监控抑制）
  * @param {(dir: string) => void} [options.afterWrite] 条目回写结束后的钩子（解除抑制）
@@ -380,7 +433,6 @@ export const runPassthroughSync = async ({
   watermarks = {},
   manifests = {},
   isCancelled = () => false,
-  stageDir,
   onEntry = () => {},
   beforeWrite = () => {},
   afterWrite = () => {},
@@ -391,8 +443,6 @@ export const runPassthroughSync = async ({
       throw new SyncCancelledError();
     }
   };
-  const ownsStage = !stageDir;
-  const stage = stageDir || await fs.mkdtemp(path.join(os.tmpdir(), 'translime-pt-stage-'));
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'translime-pt-meta-'));
   const report = {
     appliedDeletions: [],
@@ -405,28 +455,13 @@ export const runPassthroughSync = async ({
   };
   try {
     assertAlive();
-    // 批量拉取远端条目 meta
-    const stageResult = await exec([
-      'copy',
-      joinRemotePassthroughRoot(target),
-      stage,
-      '--include',
-      `*/${META_NAME}`,
-      '--transfers',
-      '8',
-      '--contimeout',
-      '20s',
-    ]);
-    if (stageResult.code !== 0 && !isRemoteNotFound(stageResult)) {
-      throw new Error(`读取直通远端元数据失败：${tailOutput(stageResult.stderr)}`);
-    }
-    assertAlive();
 
-    // 列举远端文件结构
+    // 列举远端文件结构与各条目 meta
     const remoteEntries = describeRemoteEntries(await listRemoteFiles(
       exec,
       joinRemotePassthroughRoot(target),
     ));
+    const remoteMetas = await fetchRemoteMetas(exec, target);
 
     const watermarkUpdates = report.watermarks;
     const manifestUpdates = report.manifests;
@@ -436,10 +471,10 @@ export const runPassthroughSync = async ({
         exec,
         target,
         entry,
-        stage,
         tempDir,
         machineId,
         report,
+        remoteMeta: remoteMetas[entry.entryId] || null,
         remoteShape: remoteEntries[entry.entryId] || { hasZip: false, children: new Map() },
         watermark: watermarks[entry.entryId] || null,
         storedManifest: manifests[entry.entryId] || null,
@@ -461,9 +496,6 @@ export const runPassthroughSync = async ({
     };
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
-    if (ownsStage) {
-      await fs.rm(stage, { recursive: true, force: true });
-    }
   }
 };
 

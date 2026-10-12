@@ -5,11 +5,15 @@ import { createExec } from '../sync/rclone';
 import { SyncCancelledError } from '../sync/engine';
 import { buildEntryId } from './meta';
 import {
+  collectLocalState,
   deletePassthroughRemote,
+  hasLocalChanges,
+  inspectRemoteEntries,
   resolvePassthroughConflict,
   restorePassthroughEntry,
   runPassthroughSync,
 } from './engine';
+import planPassthroughEntry from './plan';
 
 const NOTIFICATION_LIMIT = 50;
 
@@ -315,6 +319,56 @@ const createPassthroughService = ({
         }
         writeState({ lastError: e.message });
         return null;
+      }
+    },
+
+    /**
+     * 只读探测各条目与远端的待同步状态：不写持久状态、不传输存档，
+     * 供卡片与详情展示「云端更新 / 待上传 / 冲突 / 已同步」。
+     */
+    probeStatus: async () => {
+      const target = getTarget();
+      if (!target) {
+        return { success: false, message: '请先在同步设置中配置远程目标' };
+      }
+      const entries = readEntries().map((entry) => ({
+        entryId: buildEntryId(entry.name),
+        name: entry.name,
+        dir: entry.dir,
+      }));
+      if (entries.length === 0) {
+        return { success: true, entries: [] };
+      }
+      const exec = prepareExec();
+      try {
+        const state = readState();
+        const { metas, shapes } = await inspectRemoteEntries(exec, target);
+        const probes = await Promise.all(entries.map(async (entry) => {
+          const localState = await collectLocalState(entry.dir);
+          const watermark = state.watermarks[entry.entryId] || null;
+          const plan = planPassthroughEntry({
+            remoteMeta: metas[entry.entryId] || null,
+            localExists: localState.exists,
+            localChanged: hasLocalChanges(localState.manifest, watermark, state.manifests[entry.entryId] || null),
+            localNewestMtime: localState.newestMtime,
+            watermark,
+            remoteHasData: shapes[entry.entryId]?.hasZip || false,
+          });
+          const meta = metas[entry.entryId] || null;
+          return {
+            entryId: entry.entryId,
+            name: entry.name,
+            action: plan.action,
+            localExists: localState.exists,
+            remoteUpdatedAt: meta && !meta.deleted ? meta.updatedAt : null,
+            remoteDeletedAt: meta && meta.deleted ? meta.deletedAt : null,
+          };
+        }));
+        return { success: true, entries: probes };
+      } catch (e) {
+        return { success: false, message: e.message };
+      } finally {
+        exec.killAll();
       }
     },
 

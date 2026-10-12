@@ -129,6 +129,23 @@
       </div>
     </div>
 
+    <!-- 探测到冲突但尚未通过对账登记：提示先同步确认 -->
+    <div
+      v-else-if="status && status.key === 'conflict'"
+      role="alert"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-error-container); color: var(--mat-sys-color-on-error-container)"
+    >
+      <mat-icon icon="sync_problem" />
+      <div style="flex: 1">
+        <div style="font-weight: 600">
+          {{ status.label }}
+        </div>
+        <div style="margin-top: 4px; font-size: .8125rem">
+          {{ status.detail || '本机与远端都有更新' }}。执行「立即同步」确认后即可在此处置。
+        </div>
+      </div>
+    </div>
+
     <!-- 本地目录缺失 -->
     <div
       v-else-if="!entry.localExists"
@@ -155,6 +172,74 @@
       </div>
     </div>
 
+    <!-- 云端有更新 -->
+    <div
+      v-else-if="status && status.key === 'remote-update'"
+      role="status"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-secondary-container); color: var(--mat-sys-color-on-secondary-container)"
+    >
+      <mat-icon icon="cloud_download" />
+      <div style="flex: 1">
+        <div style="font-weight: 600">
+          云端有更新
+        </div>
+        <div style="margin-top: 4px; font-size: .8125rem">
+          远端存档更新于{{ formatTime(status.remoteUpdatedAt) || '未知时间' }}，执行「立即同步」后下载到本机。
+        </div>
+      </div>
+    </div>
+
+    <!-- 本机待上传 -->
+    <div
+      v-else-if="status && status.key === 'pending-upload'"
+      role="status"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-secondary-container); color: var(--mat-sys-color-on-secondary-container)"
+    >
+      <mat-icon icon="cloud_upload" />
+      <div style="flex: 1">
+        <div style="font-weight: 600">
+          本机有变更待上传
+        </div>
+        <div style="margin-top: 4px; font-size: .8125rem">
+          本机存档与上次同步相比有变化，执行「立即同步」后上传覆盖远端。
+        </div>
+      </div>
+    </div>
+
+    <!-- 远端已删除 -->
+    <div
+      v-else-if="status && status.key === 'remote-deleted'"
+      role="alert"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-secondary-container); color: var(--mat-sys-color-on-secondary-container)"
+    >
+      <mat-icon icon="cloud_off" />
+      <div style="flex: 1">
+        <div style="font-weight: 600">
+          远端存档已删除
+        </div>
+        <div style="margin-top: 4px; font-size: .8125rem">
+          远端存档已被删除且本机无新变更，下次同步将移除本机目录。
+        </div>
+      </div>
+    </div>
+
+    <!-- 同步中 -->
+    <div
+      v-else-if="status && status.key === 'syncing'"
+      role="status"
+      style="display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; padding: 12px 16px; border-radius: 12px; background-color: var(--mat-sys-color-tertiary-container); color: var(--mat-sys-color-on-tertiary-container)"
+    >
+      <mat-icon icon="sync" />
+      <div style="flex: 1">
+        <div style="font-weight: 600">
+          正在同步
+        </div>
+        <div style="margin-top: 4px; font-size: .8125rem">
+          完成后此处会显示最新同步状态。
+        </div>
+      </div>
+    </div>
+
     <!-- 状态与最近对账 -->
     <div
       v-else
@@ -164,7 +249,7 @@
       <mat-icon icon="cloud_done" />
       <div style="flex: 1">
         <div style="font-weight: 600">
-          {{ status.label }} · 本地与远程镜像同步
+          {{ status ? status.label : '直通已启用' }}
         </div>
         <div style="margin-top: 4px; font-size: .8125rem">
           {{ lastSyncText }}

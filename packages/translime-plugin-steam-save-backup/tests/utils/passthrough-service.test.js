@@ -212,3 +212,110 @@ describe('passthrough-service 水位持久化', () => {
     expect(readState().conflicts).toEqual([]);
   });
 });
+
+describe('passthrough-service probeStatus 只读探测', () => {
+  it('两端无变化 → noop；且探测不写持久状态、不传输存档', async () => {
+    // 防止回归：探测若触发上传/下载或改写水位，卡片状态刷新会造成成倍流量与状态漂移
+    await writeLocalSave('save.dat', 'stable');
+    const service = createService();
+    await service.runSync({ exec: fakeExec, target: TARGET });
+    const stateBefore = { ...readState() };
+    const localBefore = await fs.readFile(path.join(localDir, 'save.dat'), 'utf8');
+    const remoteMetaBefore = await readRemoteMeta();
+
+    const res = await service.probeStatus();
+
+    expect(res.success).toBe(true);
+    expect(res.entries).toEqual([{
+      entryId: ENTRY_ID,
+      name: ENTRY_NAME,
+      action: 'noop',
+      localExists: true,
+      remoteUpdatedAt: remoteMetaBefore.updatedAt,
+      remoteDeletedAt: null,
+    }]);
+    expect(readState()).toEqual(stateBefore);
+    expect(await fs.readFile(path.join(localDir, 'save.dat'), 'utf8')).toBe(localBefore);
+    expect(await readRemoteMeta()).toEqual(remoteMetaBefore);
+  });
+
+  it('仅远端有更新 → sync-download 并带回远端更新时间', async () => {
+    await writeLocalSave('save.dat', 'local');
+    const service = createService();
+    await service.runSync({ exec: fakeExec, target: TARGET });
+
+    const T2 = '2099-01-01T00:00:00.000Z';
+    await writeRemoteZip(path.join(remoteRoot, ENTRY_ID), { 'save.dat': 'remote-v2' });
+    await writeRemoteMeta(createMeta({
+      entryId: ENTRY_ID, name: ENTRY_NAME, machineId: 'other', at: T2,
+    }));
+
+    const res = await service.probeStatus();
+
+    expect(res.success).toBe(true);
+    expect(res.entries[0].action).toBe('sync-download');
+    expect(res.entries[0].remoteUpdatedAt).toBe(T2);
+    // 探测不拉取数据包：本地文件保持原样
+    expect(await fs.readFile(path.join(localDir, 'save.dat'), 'utf8')).toBe('local');
+  });
+
+  it('仅本地有变更 → sync-upload，远端保持原样', async () => {
+    await writeLocalSave('save.dat', 'local');
+    const service = createService();
+    await service.runSync({ exec: fakeExec, target: TARGET });
+    const remoteMetaBefore = await readRemoteMeta();
+
+    await fs.writeFile(path.join(localDir, 'save.dat'), 'local-v2', 'utf8');
+
+    const res = await service.probeStatus();
+
+    expect(res.success).toBe(true);
+    expect(res.entries[0].action).toBe('sync-upload');
+    expect(await readRemoteMeta()).toEqual(remoteMetaBefore);
+  });
+
+  it('双端都有更新 → content-conflict（卡片无需等同步跑完即可提示冲突）', async () => {
+    await writeLocalSave('save.dat', 'local');
+    const service = createService();
+    await service.runSync({ exec: fakeExec, target: TARGET });
+
+    await fs.writeFile(path.join(localDir, 'save.dat'), 'local-v2', 'utf8');
+    const T2 = '2099-01-01T00:00:00.000Z';
+    await writeRemoteZip(path.join(remoteRoot, ENTRY_ID), { 'save.dat': 'remote-v2' });
+    await writeRemoteMeta(createMeta({
+      entryId: ENTRY_ID, name: ENTRY_NAME, machineId: 'other', at: T2,
+    }));
+
+    const res = await service.probeStatus();
+
+    expect(res.success).toBe(true);
+    expect(res.entries[0].action).toBe('content-conflict');
+  });
+
+  it('远端墓碑晚于本地最新修改 → apply-deletion 并带回删除时间', async () => {
+    await writeLocalSave('save.dat', 'local');
+    const service = createService();
+    await service.runSync({ exec: fakeExec, target: TARGET });
+
+    const deletedAt = '2099-01-01T00:00:00.000Z';
+    await writeRemoteMeta(markMetaDeleted(createMeta({
+      entryId: ENTRY_ID, name: ENTRY_NAME, machineId: 'other', at: T0,
+    }), { machineId: 'other', at: deletedAt }));
+
+    const res = await service.probeStatus();
+
+    expect(res.success).toBe(true);
+    expect(res.entries[0].action).toBe('apply-deletion');
+    expect(res.entries[0].remoteDeletedAt).toBe(deletedAt);
+    expect(res.entries[0].remoteUpdatedAt).toBe(null);
+  });
+
+  it('未配置远程目标 → 探测失败并给出提示', async () => {
+    configStore.set(`plugin.${PLUGIN_ID}.settings.sync`, { target: '', rclonePath: 'fake-rclone' });
+
+    const res = await createService().probeStatus();
+
+    expect(res.success).toBe(false);
+    expect(res.message).toContain('远程目标');
+  });
+});
