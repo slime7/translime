@@ -1,5 +1,3 @@
-import path from 'node:path';
-import { createRequire } from 'node:module';
 import mainStore from '../../utils/useMainStore';
 import appManager from '../../utils/useAppManager';
 import logger from '../../utils/logger';
@@ -20,14 +18,16 @@ import {
   refreshPluginStatus,
   uniqueStrings,
 } from './metadata';
+import { clearEntryCache, loadPluginEntry } from './entryLoader';
 import { activateIsolatedPlugin, deactivateIsolatedPlugin, notifySettingSaved } from './isolatedRuntime';
 
 /**
  * 插件运行期启停、命令执行与跨插件访问逻辑。
  *
- * 这一层会真正触发插件入口代码执行，并维护运行期注册表。
+ * 这一层会真正触发插件入口代码执行，并维护运行期注册。
+ * 入口加载（CJS require / ESM import）委托给 entryLoader，
+ * 激活流程为异步：并发触发同一插件时共享同一份激活 Promise。
  */
-const requireFresh = createRequire(path.join(process.cwd(), 'package.json'));
 
 /**
  * 激活耗时超过该值（毫秒）时输出慢激活告警。
@@ -144,7 +144,7 @@ const processPlugin = (plugin) => {
  * 不注册 IPC / 命令 / libs，也不执行 pluginDidLoad。pluginMenu 的点击
  * 语义伴随激活，仍在激活时合并。
  *
- * 入口模块经由 require 缓存与激活共享，预读不会导致顶层代码重复执行；
+ * 入口模块经加载缓存与激活共享，预读不会导致顶层代码重复执行；
  * 停用/卸载时的按插件缓存清理同样保证 dev 重建后能读到最新产物。
  *
  * 隔离插件（plugin.isolated）的入口运行在 utilityProcess，主进程不做预读，
@@ -152,9 +152,9 @@ const processPlugin = (plugin) => {
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} packageName - 插件包名。
- * @returns {object} 插件对象（加载成功时带 settingMenu 与 metadataLoaded 标记）。
+ * @returns {Promise<object>} 插件对象（加载成功时带 settingMenu 与 metadataLoaded 标记）。
  */
-const ensurePluginMetadata = (loader, packageName) => {
+const ensurePluginMetadata = async (loader, packageName) => {
   const plugin = loader.getPlugin(packageName);
   if (!plugin || plugin.active || plugin.metadataLoaded) {
     return plugin;
@@ -163,8 +163,7 @@ const ensurePluginMetadata = (loader, packageName) => {
     return plugin;
   }
   try {
-    const pluginExports = path.join(plugin.pluginPath, plugin.exports);
-    const pluginImport = requireFresh(`${pluginExports}`);
+    const pluginImport = await loadPluginEntry(plugin);
     plugin.settingMenu = pluginImport.settingMenu;
     plugin.metadataLoaded = true;
   } catch (err) {
@@ -182,15 +181,17 @@ const ensurePluginMetadata = (loader, packageName) => {
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} eventName - 激活事件名。
- * @returns {Array<object>} 被匹配并尝试激活的插件列表。
+ * @returns {Promise<Array<object>>} 被匹配并尝试激活的插件列表。
  */
-const triggerActivation = (loader, eventName) => {
+const triggerActivation = async (loader, eventName) => {
   const targets = loader.plugins.filter((plugin) => (
     plugin.enabled && plugin.activationEvents.includes(eventName)
   ));
-  targets.forEach((plugin) => {
-    loader.enablePlugin(plugin.packageName, true);
-  });
+  // 顺序激活，保持与插件列表一致的确定性次序
+  await targets.reduce(async (chain, plugin) => {
+    await chain;
+    await loader.enablePlugin(plugin.packageName, true);
+  }, Promise.resolve());
   return targets;
 };
 
@@ -202,9 +203,9 @@ const triggerActivation = (loader, eventName) => {
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} packageName - 插件包名。
- * @returns {object} 已激活或已存在的插件对象。
+ * @returns {Promise<object>} 已激活或已存在的插件对象。
  */
-const triggerViewActivation = (loader, packageName) => {
+const triggerViewActivation = async (loader, packageName) => {
   const plugin = loader.getPlugin(packageName);
   if (!plugin) {
     throw new Error(`插件 "${packageName}" 不存在`);
@@ -226,14 +227,14 @@ const triggerViewActivation = (loader, packageName) => {
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} commandId - 命令 ID。
  * @param {...any} args - 命令参数。
- * @returns {any} 运行期命令处理器的返回值。
+ * @returns {Promise<any>} 运行期命令处理器的返回值。
  */
-const executeCommand = (loader, commandId, ...args) => {
+const executeCommand = async (loader, commandId, ...args) => {
   const commandMeta = loader.commandRegistry.get(commandId);
   if (!commandMeta) {
     throw new Error(`命令 "${commandId}" 未注册`);
   }
-  loader.enablePlugin(commandMeta.pluginId);
+  await loader.enablePlugin(commandMeta.pluginId);
   const runtimeCommand = loader.runtimeCommandHandlers.get(commandId);
   if (!runtimeCommand) {
     throw new Error(`命令 "${commandId}" 没有可执行的处理函数`);
@@ -246,14 +247,14 @@ const executeCommand = (loader, commandId, ...args) => {
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} channelType - IPC 通道类型。
- * @returns {boolean} 是否找到了对应插件并触发了准备流程。
+ * @returns {Promise<boolean>} 是否找到了对应插件并触发了准备流程。
  */
-const ensurePluginIpcReady = (loader, channelType) => {
+const ensurePluginIpcReady = async (loader, channelType) => {
   const pluginId = loader.ipcActivationRegistry.get(channelType);
   if (!pluginId) {
     return false;
   }
-  loader.enablePlugin(pluginId);
+  await loader.enablePlugin(pluginId);
   return true;
 };
 
@@ -274,249 +275,266 @@ const getDependents = (loader, packageName) => loader.plugins.filter(
  * 这个流程会完成：
  * - 插件缺失时的即时回读
  * - 依赖校验与前置插件启用
- * - 入口模块加载
+ * - 入口模块加载（CJS require / ESM import，见 entryLoader）
  * - IPC / 命令 / libs 注册
  * - 生命周期调用与状态刷新
+ *
+ * 激活是异步流程：同一插件的并发启用共享同一份激活 Promise，
+ * 后到的调用等待首次激活完成后返回最新插件状态。
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} packageName - 插件包名。
  * @param {boolean} [init=false] - 是否由初始化阶段触发。
- * @returns {object} 启用后的插件对象。
+ * @returns {Promise<object>} 启用后的插件对象。
  */
-const enablePlugin = (loader, packageName, init = false) => {
-  let plugin = loader.getPlugin(packageName);
-  if (!plugin) {
-    const pluginPath = resolvePluginPath(packageName);
-    plugin = readPluginSafe(pluginPath, {
-      source: PLUGIN_SOURCE_RELEASE,
-      devPlugins: loader.getPlugins().filter((item) => item.dev),
-    });
-    logger.debug('[plugin] reload plugin: ', { plugin });
-    if (plugin) {
-      loader.plugins.push(plugin);
-      loader.buildDependencyGraph();
-      loader.rebuildActivationIndexes();
-    }
+const enablePlugin = async (loader, packageName, init = false) => {
+  const pendingActivation = loader.activatingPromises.get(packageName);
+  if (pendingActivation) {
+    await pendingActivation;
+    return loader.getPlugin(packageName);
   }
 
-  // readPluginSafe 在开发插件覆盖同名正式插件等场景会返回 false，
-  // 此时若列表中能找到该插件则复用，否则直接中止，避免对 false 做 Object.assign
-  if (!plugin) {
-    const fallbackPlugin = loader.getPlugin(packageName);
-    if (!fallbackPlugin) {
-      logger.warn(`[plugin] enable aborted, plugin not readable: ${packageName}`);
-      return undefined;
-    }
-    plugin = fallbackPlugin;
-  }
-
-  Object.assign(plugin, {
-    dependencies: plugin.dependencies || [],
-    optionalDependencies: plugin.optionalDependencies || [],
-    contributes: plugin.contributes || { commands: [] },
-    blockedBy: plugin.blockedBy || [],
-    missingDependencies: plugin.missingDependencies || [],
-    commands: plugin.commands || [],
-  });
-
-  if (plugin.active || loader.activatingPlugins.has(packageName)) {
-    return plugin;
-  }
-
-  Object.assign(plugin, refreshPluginStatus(plugin));
-  if (plugin.available === false) {
-    loader.emit('plugin:error', {
-      plugin,
-      pluginId: packageName,
-      error: new Error(plugin.statusText),
-      operation: 'enable',
-    });
-    return plugin;
-  }
-
-  const disabledDependencies = plugin.dependencies.filter((dependencyId) => {
-    const dependency = loader.getPlugin(dependencyId);
-    if (!dependency) {
-      return true;
-    }
-    // 不可用的依赖（产物缺失/不兼容/加载失败）同样阻塞启用，
-    // 不能只看 enabled 标记——扫描不再因产物缺失改写启用状态
-    if (dependency.available === false) {
-      return true;
-    }
-    return !dependency.enabled;
-  });
-
-  if (disabledDependencies.length) {
-    plugin.missingDependencies = uniqueStrings([
-      ...plugin.missingDependencies,
-      ...disabledDependencies,
-    ]);
-    Object.assign(plugin, refreshPluginStatus(plugin), {
-      enabled: false,
-    });
-    loader.emit('plugin:error', {
-      plugin,
-      pluginId: packageName,
-      error: new Error(plugin.statusText),
-      operation: 'enable',
-    });
-    return plugin;
-  }
-
-  loader.activatingPlugins.add(packageName);
-  Object.assign(plugin, applyPluginStatus(plugin, PLUGIN_STATUS_ACTIVATING));
-  // 无论激活以何种方式退出（成功、异常、隔离进程超时），
-  // 都必须清理“激活中”标记，否则插件会被永久卡在无法再次激活的状态
-  try {
-    plugin.dependencies.forEach((dependencyId) => {
-      loader.enablePlugin(dependencyId, true);
-    });
-
-    if (plugin.isolated) {
-      return activateIsolatedPlugin(loader, plugin, {
-        init,
-        cleanup: (target) => cleanupRuntimeRegistrations(loader, target),
+  const activation = (async () => {
+    let plugin = loader.getPlugin(packageName);
+    if (!plugin) {
+      const pluginPath = resolvePluginPath(packageName);
+      plugin = readPluginSafe(pluginPath, {
+        source: PLUGIN_SOURCE_RELEASE,
+        devPlugins: loader.getPlugins().filter((item) => item.dev),
       });
-    }
-
-    const activatedAt = Date.now();
-    let pluginMain = {};
-    if (plugin.exports) {
-      try {
-        const pluginExports = path.join(plugin.pluginPath, plugin.exports);
-        const pluginImport = requireFresh(`${pluginExports}`);
-        pluginMain = {
-          pluginDidLoad: pluginImport.pluginDidLoad,
-          pluginWillUnload: pluginImport.pluginWillUnload,
-          pluginSettingSaved: pluginImport.pluginSettingSaved,
-          settingMenu: pluginImport.settingMenu,
-          pluginMenu: pluginImport.pluginMenu,
-          ipcHandlers: pluginImport.ipcHandlers,
-          libs: pluginImport.libs,
-          windowOptions: pluginImport.windowOptions,
-          commands: normalizeRuntimeCommands(pluginImport.commands),
-        };
-      } catch (err) {
-        logger.error('[plugin] enable error: ', err);
-        Object.assign(
-          plugin,
-          applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, err.message),
-          { enabled: false },
-        );
-        loader.emit('plugin:error', {
-          plugin: plugin || null,
-          pluginId: packageName,
-          error: err,
-          operation: 'enable',
-        });
-        return plugin;
+      logger.debug('[plugin] reload plugin: ', { plugin });
+      if (plugin) {
+        loader.plugins.push(plugin);
+        loader.buildDependencyGraph();
+        loader.rebuildActivationIndexes();
       }
     }
 
-    if (plugin.exports && !hasRuntimeExports(pluginMain)) {
-      const message = '插件入口未导出任何插件 API（pluginDidLoad / ipcHandlers / commands 等），请检查入口构建产物';
-      logger.error(`[plugin] ${packageName}: ${message}`);
-      Object.assign(
-        plugin,
-        applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, message),
-        { enabled: false },
-      );
+    // readPluginSafe 在开发插件覆盖同名正式插件等场景会返回 false，
+    // 此时若列表中能找到该插件则复用，否则直接中止，避免对 false 做 Object.assign
+    if (!plugin) {
+      const fallbackPlugin = loader.getPlugin(packageName);
+      if (!fallbackPlugin) {
+        logger.warn(`[plugin] enable aborted, plugin not readable: ${packageName}`);
+        return undefined;
+      }
+      plugin = fallbackPlugin;
+    }
+
+    Object.assign(plugin, {
+      dependencies: plugin.dependencies || [],
+      optionalDependencies: plugin.optionalDependencies || [],
+      contributes: plugin.contributes || { commands: [] },
+      blockedBy: plugin.blockedBy || [],
+      missingDependencies: plugin.missingDependencies || [],
+      commands: plugin.commands || [],
+    });
+
+    // activatingPlugins 兜底循环依赖场景：依赖激活在 promise 登记前同步重入
+    if (plugin.active || loader.activatingPlugins.has(packageName)) {
+      return plugin;
+    }
+
+    Object.assign(plugin, refreshPluginStatus(plugin));
+    if (plugin.available === false) {
       loader.emit('plugin:error', {
         plugin,
         pluginId: packageName,
-        error: new Error(message),
+        error: new Error(plugin.statusText),
         operation: 'enable',
       });
       return plugin;
     }
 
-    Object.assign(plugin, createRuntimeState(), refreshPluginStatus(plugin));
-    pluginMain.enabled = true;
-    pluginMain.active = true;
-    pluginMain.loadTime = Date.now();
-    pluginMain.loadDuration = pluginMain.loadTime - activatedAt;
-    mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
-
-    const mergedPlugin = Object.assign(plugin, pluginMain || {});
-
-    if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
-      mergedPlugin.ipcHandlers.forEach((handler) => {
-        const ipc = appManager.getIpc();
-        if (ipc) {
-          ipc.appendHandler(
-            `${handler.type}@${mergedPlugin.packageName}`,
-            handler.handler,
-            { owner: mergedPlugin.packageName },
-          );
-        }
-      });
-    }
-
-    if (mergedPlugin.commands?.length) {
-      mergedPlugin.commands.forEach((command) => {
-        loader.runtimeCommandHandlers.set(command.id, {
-          pluginId: mergedPlugin.packageName,
-          handler: command.handler,
-        });
-      });
-    }
-
-    if (mergedPlugin.libs) {
-      pluginInterop.register(mergedPlugin.packageName, mergedPlugin.libs);
-    }
-
-    mergedPlugin.windowOptions = {};
-    if (mergedPlugin.windowUrl) {
-      mergedPlugin.windowMode = true;
-      mergedPlugin.windowOptions = pluginMain.windowOptions || {};
-    } else if (typeof mergedPlugin.windowMode === 'undefined') {
-      mergedPlugin.windowMode = mainStore.config.get(
-        `plugin.${plugin.packageName}.windowMode`,
-        false,
-      );
-    }
-
-    // pluginDidLoad 的异常不允许向上传播：宿主需要保持状态机一致，
-    // 并清掉刚才注册的 IPC / 命令 / interop，让插件停留在可重试的 load-error 状态
-    try {
-      processPlugin(mergedPlugin);
-    } catch (err) {
-      logger.error(`[plugin] pluginDidLoad 执行失败: ${mergedPlugin.packageName}`, err);
-      cleanupRuntimeRegistrations(loader, mergedPlugin);
-      Object.assign(
-        mergedPlugin,
-        applyPluginStatus(
-          mergedPlugin,
-          PLUGIN_STATUS_LOAD_ERROR,
-          `pluginDidLoad 执行失败：${err.message}`,
-        ),
-        { enabled: false, active: false },
-      );
-      mainStore.config.set(`plugin.${mergedPlugin.packageName}.enabled`, false);
-      loader.emit('plugin:error', {
-        plugin: mergedPlugin,
-        pluginId: packageName,
-        error: err,
-        operation: 'didLoad',
-      });
-      return mergedPlugin;
-    }
-
-    if (mergedPlugin.loadDuration > SLOW_ACTIVATION_THRESHOLD) {
-      logger.warn(`[plugin] 插件 "${mergedPlugin.packageName}" 激活耗时 ${mergedPlugin.loadDuration}ms，建议改用 onAppReady/onView 等延迟激活事件`);
-    }
-
-    Object.assign(mergedPlugin, refreshPluginStatus(mergedPlugin));
-    loader.emit('plugin:enabled', {
-      plugin: mergedPlugin,
-      pluginId: mergedPlugin.packageName,
-      isInit: init,
+    const disabledDependencies = plugin.dependencies.filter((dependencyId) => {
+      const dependency = loader.getPlugin(dependencyId);
+      if (!dependency) {
+        return true;
+      }
+      // 不可用的依赖（产物缺失/不兼容/加载失败）同样阻塞启用，
+      // 不能只看 enabled 标记——扫描不再因产物缺失改写启用状态
+      if (dependency.available === false) {
+        return true;
+      }
+      return !dependency.enabled;
     });
 
-    return mergedPlugin;
+    if (disabledDependencies.length) {
+      plugin.missingDependencies = uniqueStrings([
+        ...plugin.missingDependencies,
+        ...disabledDependencies,
+      ]);
+      Object.assign(plugin, refreshPluginStatus(plugin), {
+        enabled: false,
+      });
+      loader.emit('plugin:error', {
+        plugin,
+        pluginId: packageName,
+        error: new Error(plugin.statusText),
+        operation: 'enable',
+      });
+      return plugin;
+    }
+
+    loader.activatingPlugins.add(packageName);
+    Object.assign(plugin, applyPluginStatus(plugin, PLUGIN_STATUS_ACTIVATING));
+    try {
+      // 顺序激活依赖，保证依赖插件激活完成后_dependent_的 pluginDidLoad 才执行
+      for (const dependencyId of plugin.dependencies) { // eslint-disable-line no-restricted-syntax
+        await loader.enablePlugin(dependencyId, true); // eslint-disable-line no-await-in-loop
+      }
+
+      if (plugin.isolated) {
+        return activateIsolatedPlugin(loader, plugin, {
+          init,
+          cleanup: (target) => cleanupRuntimeRegistrations(loader, target),
+        });
+      }
+
+      const activatedAt = Date.now();
+      let pluginMain = {};
+      if (plugin.exports) {
+        try {
+          const pluginImport = await loadPluginEntry(plugin);
+          pluginMain = {
+            pluginDidLoad: pluginImport.pluginDidLoad,
+            pluginWillUnload: pluginImport.pluginWillUnload,
+            pluginSettingSaved: pluginImport.pluginSettingSaved,
+            settingMenu: pluginImport.settingMenu,
+            pluginMenu: pluginImport.pluginMenu,
+            ipcHandlers: pluginImport.ipcHandlers,
+            libs: pluginImport.libs,
+            windowOptions: pluginImport.windowOptions,
+            commands: normalizeRuntimeCommands(pluginImport.commands),
+          };
+        } catch (err) {
+          logger.error('[plugin] enable error: ', err);
+          Object.assign(
+            plugin,
+            applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, err.message),
+            { enabled: false },
+          );
+          loader.emit('plugin:error', {
+            plugin: plugin || null,
+            pluginId: packageName,
+            error: err,
+            operation: 'enable',
+          });
+          return plugin;
+        }
+      }
+
+      if (plugin.exports && !hasRuntimeExports(pluginMain)) {
+        const message = '插件入口未导出任何插件 API（pluginDidLoad / ipcHandlers / commands 等），请检查入口构建产物';
+        logger.error(`[plugin] ${packageName}: ${message}`);
+        Object.assign(
+          plugin,
+          applyPluginStatus(plugin, PLUGIN_STATUS_LOAD_ERROR, message),
+          { enabled: false },
+        );
+        loader.emit('plugin:error', {
+          plugin,
+          pluginId: packageName,
+          error: new Error(message),
+          operation: 'enable',
+        });
+        return plugin;
+      }
+
+      Object.assign(plugin, createRuntimeState(), refreshPluginStatus(plugin));
+      pluginMain.enabled = true;
+      pluginMain.active = true;
+      pluginMain.loadTime = Date.now();
+      pluginMain.loadDuration = pluginMain.loadTime - activatedAt;
+      mainStore.config.set(`plugin.${plugin.packageName}.enabled`, true);
+
+      const mergedPlugin = Object.assign(plugin, pluginMain || {});
+
+      if (mergedPlugin.ipcHandlers && mergedPlugin.ipcHandlers.length) {
+        mergedPlugin.ipcHandlers.forEach((handler) => {
+          const ipc = appManager.getIpc();
+          if (ipc) {
+            ipc.appendHandler(
+              `${handler.type}@${mergedPlugin.packageName}`,
+              handler.handler,
+              { owner: mergedPlugin.packageName },
+            );
+          }
+        });
+      }
+
+      if (mergedPlugin.commands?.length) {
+        mergedPlugin.commands.forEach((command) => {
+          loader.runtimeCommandHandlers.set(command.id, {
+            pluginId: mergedPlugin.packageName,
+            handler: command.handler,
+          });
+        });
+      }
+
+      if (mergedPlugin.libs) {
+        pluginInterop.register(mergedPlugin.packageName, mergedPlugin.libs);
+      }
+
+      mergedPlugin.windowOptions = {};
+      if (mergedPlugin.windowUrl) {
+        mergedPlugin.windowMode = true;
+        mergedPlugin.windowOptions = pluginMain.windowOptions || {};
+      } else if (typeof mergedPlugin.windowMode === 'undefined') {
+        mergedPlugin.windowMode = mainStore.config.get(
+          `plugin.${plugin.packageName}.windowMode`,
+          false,
+        );
+      }
+
+      // pluginDidLoad 的异常不允许向上传播：宿主需要保持状态机一致，
+      // 并清掉刚才注册的 IPC / 命令 / interop，让插件停留在可重试的 load-error 状态
+      try {
+        processPlugin(mergedPlugin);
+      } catch (err) {
+        logger.error(`[plugin] pluginDidLoad 执行失败: ${mergedPlugin.packageName}`, err);
+        cleanupRuntimeRegistrations(loader, mergedPlugin);
+        Object.assign(
+          mergedPlugin,
+          applyPluginStatus(
+            mergedPlugin,
+            PLUGIN_STATUS_LOAD_ERROR,
+            `pluginDidLoad 执行失败：${err.message}`,
+          ),
+          { enabled: false, active: false },
+        );
+        mainStore.config.set(`plugin.${mergedPlugin.packageName}.enabled`, false);
+        loader.emit('plugin:error', {
+          plugin: mergedPlugin,
+          pluginId: packageName,
+          error: err,
+          operation: 'didLoad',
+        });
+        return mergedPlugin;
+      }
+
+      if (mergedPlugin.loadDuration > SLOW_ACTIVATION_THRESHOLD) {
+        logger.warn(`[plugin] 插件 "${mergedPlugin.packageName}" 激活耗时 ${mergedPlugin.loadDuration}ms，建议改用 onAppReady/onView 等延迟激活事件`);
+      }
+
+      Object.assign(mergedPlugin, refreshPluginStatus(mergedPlugin));
+      loader.emit('plugin:enabled', {
+        plugin: mergedPlugin,
+        pluginId: mergedPlugin.packageName,
+        isInit: init,
+      });
+
+      return mergedPlugin;
+    } finally {
+      loader.activatingPlugins.delete(packageName);
+    }
+  })();
+
+  loader.activatingPromises.set(packageName, activation);
+  try {
+    return await activation;
   } finally {
-    loader.activatingPlugins.delete(packageName);
+    loader.activatingPromises.delete(packageName);
   }
 };
 
@@ -585,30 +603,14 @@ const disablePlugin = (loader, packageName, options = {}) => {
     appManager.getChildWin(`plugin-window-${packageName}`).close();
   }
 
-  const cacheKeys = Object.keys(requireFresh.cache);
-  const packagePattern = `${path.sep}${plugin.packageName}${path.sep}`.toLowerCase();
-  const normalizedPluginPath = plugin.pluginPath ? plugin.pluginPath.toLowerCase() : '';
-
-  let deletedCount = 0;
-  cacheKeys.forEach((key) => {
-    const lowerKey = key.toLowerCase();
-    if (
-      lowerKey.includes(packagePattern)
-      || (normalizedPluginPath && lowerKey.startsWith(normalizedPluginPath))
-    ) {
-      delete requireFresh.cache[key];
-      deletedCount += 1;
-    }
-  });
+  const deletedCount = clearEntryCache(plugin);
 
   if (deletedCount > 0) {
     logger.debug(
       `[plugin] 已清理插件 "${plugin.packageName}" 的 ${deletedCount} 个缓存项`,
     );
   } else {
-    logger.debug(`[plugin] 未找到插件 "${plugin.packageName}" 的相关缓存`, {
-      target: packagePattern,
-    });
+    logger.debug(`[plugin] 未找到插件 "${plugin.packageName}" 的相关缓存`);
   }
 
   const isDev = plugin.dev;
@@ -669,9 +671,9 @@ const disablePlugin = (loader, packageName, options = {}) => {
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} packageName - 插件包名。
- * @returns {object} 重启后的插件对象。
+ * @returns {Promise<object>} 重启后的插件对象。
  */
-const restartPlugin = (loader, packageName) => {
+const restartPlugin = async (loader, packageName) => {
   const plugin = loader.getPlugin(packageName);
   if (!plugin) {
     throw new Error(`插件 "${packageName}" 不存在`);

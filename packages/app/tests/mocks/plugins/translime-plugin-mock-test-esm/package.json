@@ -1,0 +1,37 @@
+{
+  "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
+  "name": "translime-plugin-mock-test-esm",
+  "version": "1.0.0",
+  "description": "A mock ESM plugin for translime E2E testing",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.esm.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "icon.png"
+  ],
+  "plugin": {
+    "title": "Mock Test Plugin (ESM)",
+    "description": "Mock ESM plugin for testing features and settings",
+    "icon": "./icon.png",
+    "activationEvents": [
+      "onView"
+    ],
+    "dependencies": [],
+    "optionalDependencies": [],
+    "contributes": {
+      "commands": [
+        {
+          "id": "translime-plugin-mock-test-esm.increment-counter",
+          "title": "Increase Counter"
+        }
+      ]
+    },
+    "ui": "dist/ui.esm.js"
+  }
+}

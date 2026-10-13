@@ -17,9 +17,11 @@ const config = ({ mode }) => ({
     emptyOutDir: mode !== 'watch',
     lib: {
       entry: 'index.js',
-      name: 'plugin',
-      formats: ['cjs'],
-      fileName: (format) => `index.${format}.js`,
+      // 主进程入口默认输出 ESM（宿主经动态 import 加载并支持热重载）；
+      // 入口需保持单文件 bundle：宿主的热重载以 query 击穿入口缓存，
+      // 多文件 chunk 的相对依赖不会被击穿
+      formats: ['es'],
+      fileName: () => 'index.esm.js',
     },
     rolldownOptions: {
       external: [

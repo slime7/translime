@@ -13,7 +13,33 @@ const { mockClipboard } = vi.hoisted(() => ({
 }));
 
 vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn(() => 'C:/mock-userdata'),
+  },
   clipboard: mockClipboard,
+}));
+
+// menuRegistry（textEditMenu 的动作经它分发）引入 logger，其模块链需要 store 桩
+vi.mock('@main/utils/useMainStore', () => ({
+  default: {
+    config: {
+      get: vi.fn((key, defaultValue) => defaultValue),
+      set: vi.fn(),
+    },
+    APP_VERSION: '0.0.0-test',
+    APPDATA_PATH: 'C:/mock-userdata',
+    TEMP_DIR: 'C:/mock-temp',
+  },
+}));
+
+vi.mock('@main/utils/logger', () => ({
+  default: {
+    log: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 const createSender = (overrides = {}) => ({

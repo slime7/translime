@@ -10,6 +10,8 @@
  * 不能 require 任何依赖 Electron 的模块。
  */
 
+import { pathToFileURL } from 'node:url';
+
 const ALLOWED_LOG_LEVELS = ['error', 'warn', 'info', 'verbose', 'debug', 'silly'];
 
 const { parentPort } = process;
@@ -63,6 +65,40 @@ const state = {
   handlers: new Map(),
   commands: new Map(),
   registered: false,
+};
+
+/**
+ * 加载插件入口并提取有效导出。
+ *
+ * ESM 入口经动态 import() 加载（支持顶层 await；隔离子进程每次激活都是
+ * 新进程，无需关心 ESM 缓存失效），CJS 入口保持 require。
+ * default export 为对象时优先取 default（仓库约定的汇总写法）。
+ *
+ * 经 Function 构造动态 import：插件入口是运行期路径，必须由 Node 原生
+ * ESM loader 处理，不能被构建器改写。
+ *
+ * @param {string} entryPath - 插件入口绝对路径。
+ * @param {string} [entryFormat] - 入口格式（'esm' | 'cjs'）。
+ * @returns {Promise<object>} 入口的有效导出对象。
+ */
+// eslint-disable-next-line no-new-func -- 唯一能稳定发出原生动态 import 的方式
+const nativeImport = new Function('specifier', 'return import(specifier);');
+
+const loadEntryExports = async (entryPath, entryFormat) => {
+  if (entryFormat === 'esm' || entryPath.toLowerCase().endsWith('.mjs')) {
+    const imported = await nativeImport(pathToFileURL(entryPath).href);
+    if (
+      imported
+      && typeof imported === 'object'
+      && imported.default !== null
+      && typeof imported.default === 'object'
+    ) {
+      return imported.default;
+    }
+    return imported;
+  }
+  // eslint-disable-next-line import-x/no-dynamic-require
+  return require(entryPath);
 };
 
 const buildIpcContext = () => ({
@@ -139,8 +175,10 @@ parentPort.on('message', async (event) => {
   switch (message.channel) {
   case 'activate': {
     try {
-      // eslint-disable-next-line import-x/no-dynamic-require
-      state.entryExports = require(process.env.TRANSLIME_PLUGIN_ENTRY);
+      state.entryExports = await loadEntryExports(
+        process.env.TRANSLIME_PLUGIN_ENTRY,
+        process.env.TRANSLIME_PLUGIN_ENTRY_FORMAT,
+      );
     } catch (err) {
       postMessage({
         channel: 'load-error',

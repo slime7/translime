@@ -1,6 +1,7 @@
 /* eslint-disable no-param-reassign */
 import fs from 'node:fs';
 import mainStore from '../../utils/useMainStore';
+import logger from '../../utils/logger';
 import {
   ACTIVATION_ON_STARTUP,
   isPluginPackageName,
@@ -200,22 +201,28 @@ const rebuildActivationIndexes = (loader) => {
  * 激活所有声明为 `onStartup` 的已启用插件。
  *
  * 对不需要立即激活的插件，也会同步刷新一次状态文本。
+ * 激活为异步流程，逐个顺序执行以保持与插件列表一致的次序；
+ * 调用方（如 main-renderer-ready）需要 await 以保证主窗口展示前
+ * 插件状态就绪，后台路径可 fire-and-forget（激活结果经
+ * `plugin:enabled` / `plugin:error` 事件广播）。
  *
  * @param {object} loader - `PluginLoader` 实例。
- * @returns {void}
+ * @returns {Promise<void>} 全部插件激活流程完成后 resolve。
  */
-const activateStartupPlugins = (loader) => {
-  loader.plugins.forEach((plugin) => {
+const activateStartupPlugins = async (loader) => {
+  for (const plugin of loader.plugins) { // eslint-disable-line no-restricted-syntax
     if (!plugin.enabled) {
-      return;
+      // eslint-disable-next-line no-continue
+      continue;
     }
 
     if (plugin.activationEvents.includes(ACTIVATION_ON_STARTUP)) {
-      loader.enablePlugin(plugin.packageName, true);
+      // eslint-disable-next-line no-await-in-loop
+      await loader.enablePlugin(plugin.packageName, true);
     } else {
       Object.assign(plugin, refreshPluginStatus(plugin));
     }
-  });
+  }
 };
 
 /**
@@ -256,7 +263,10 @@ const resolvePlugins = (loader, { activate = true } = {}) => {
   buildDependencyGraph(loader);
   rebuildActivationIndexes(loader);
   if (activate) {
-    activateStartupPlugins(loader);
+    // 同步扫描路径的后台激活：插件状态就绪后经事件广播通知渲染端
+    activateStartupPlugins(loader).catch((err) => {
+      logger.error(`[plugin] onStartup 插件激活流程异常: ${err.message}`);
+    });
   }
   loader.emit('init', loader.plugins);
   return loader.plugins;
@@ -296,7 +306,9 @@ const enablePlugins = (loader, plugins) => {
     ...plugin,
   }));
   rebuildActivationIndexes(loader);
-  activateStartupPlugins(loader);
+  activateStartupPlugins(loader).catch((err) => {
+    logger.error(`[plugin] 受控初始化激活流程异常: ${err.message}`);
+  });
   loader.emit('init', loader.plugins);
 };
 

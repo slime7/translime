@@ -56,8 +56,9 @@ flowchart LR
 - `core/pluginLoader.js`：插件系统门面，维护插件列表、命令注册表与激活索引，把具体实现委托给 `plugin-loader/` 子模块：
   - `plugin-loader/constants.js`：路径、状态与激活常量
   - `plugin-loader/discovery.js`：目录扫描、manifest 解析、依赖图与激活索引
-  - `plugin-loader/metadata.js`：manifest 安全读取、`engines.translime` 兼容校验、manifest 警告收集与状态刷新
-  - `plugin-loader/runtime.js`：激活、启停、命令执行与 IPC 就绪；生命周期回调（`pluginDidLoad`/`pluginWillUnload`/`pluginSettingSaved`）异常隔离，激活全程记录耗时；静态元数据（`settingMenu`）支持激活前按需延迟加载，未激活/未启用插件也能打开配置面板
+  - `plugin-loader/metadata.js`：manifest 安全读取、主进程入口解析（支持 `exports` 的 import/require 条件）与格式识别（ESM/CJS）、`engines.translime` 兼容校验、manifest 警告收集与状态刷新
+  - `plugin-loader/entryLoader.js`：插件主进程入口加载的统一出口。ESM 入口经原生动态 `import()` 加载并以递增 query 击穿 ESM 缓存（dev 热重载依赖），CJS 入口沿用 require + 按插件清理 require 缓存；统一提取 default 汇总导出
+  - `plugin-loader/runtime.js`：激活、启停、命令执行与 IPC 就绪（激活为异步流程，并发启用共享同一份激活 Promise）；生命周期回调（`pluginDidLoad`/`pluginWillUnload`/`pluginSettingSaved`）异常隔离，激活全程记录耗时；静态元数据（`settingMenu`）支持激活前按需延迟加载，未激活/未启用插件也能打开配置面板
   - `plugin-loader/isolatedRuntime.js`：隔离模式宿主侧，fork utilityProcess 并桥接 IPC/命令/日志，子进程崩溃转为 `load-error`
   - `plugin-loader/pluginSenderRegistry.js`：插件渲染端（webview / 独立窗口）归属登记，供 IPC 收口校验
   - `plugin-loader/installer.js` 与 `plugin-loader/packageInstaller.js`：插件安装与卸载
@@ -109,12 +110,12 @@ flowchart LR
 
 ### 插件包（packages/translime-plugin-*）
 
-标准结构：主进程入口构建为 `dist/index.cjs.js`，UI 入口构建为 `dist/ui.esm.js`，元数据声明在 `package.json.plugin`。`packages/template-translime-plugin` 是脚手架模板与开发指南；`translime-plugin-steam-save-backup` 与 `translime-plugin-hdr-capture` 是进阶参考（复杂 UI、原生绑定、覆盖窗口）。
+标准结构：主进程入口构建为 `dist/index.esm.js`（ESM，默认；保持单文件 bundle），UI 入口构建为 `dist/ui.esm.js`，元数据声明在 `package.json.plugin`；旧 CJS 主进程入口（`dist/index.cjs.js`）仍被宿主兼容。`packages/template-translime-plugin` 是脚手架模板与开发指南；`translime-plugin-steam-save-backup` 与 `translime-plugin-hdr-capture` 是进阶参考（复杂 UI、原生绑定、覆盖窗口）。
 
 ## 关键数据流
 
 1. 插件发现：应用就绪后扫描 `userData/plugins`（发布插件）与 `userData/plugins_dev`（开发插件）下的 `node_modules`，与渲染进程首屏并行执行；读取各包 manifest，构建依赖图与激活索引，插件状态进入 `ready`。主窗口首屏（含关键字体）就绪后激活 `onStartup` 插件并展示主窗口，启动动画持续到内容就绪；异步激活（如隔离插件握手）在完成后由宿主推送 `plugins-changed` 通知渲染端刷新。
-2. 插件激活：激活事件触发后，宿主加载插件主进程入口（CJS，配合原生模块加载补丁），执行 `pluginDidLoad`，注册命令与 IPC handler，状态进入 `active`。
+2. 插件激活：激活事件触发后，宿主按入口格式加载主进程入口（ESM 经原生动态 `import()` 并以递增 query 击穿 ESM 缓存，CJS 沿用 require + 缓存清理，原生模块加载补丁对两者生效），执行 `pluginDidLoad`，注册命令与 IPC handler，状态进入 `active`；并发触发同一插件时共享同一份激活流程。
 3. IPC 调用：插件 UI 通过 `ipc.invoke('事件名@插件ID', ...)` 调用；宿主按插件 ID 路由到对应 `ipcHandlers`，handler 可拿到 `sendToClient` 主动推送；若插件尚未激活且声明了 `onIpc`，宿主先激活再路由。
 4. 插件 UI 加载：渲染进程请求 `load-plugin-ui`，`ui` 由 `PluginRender.vue` 在宿主 renderer 文档中动态加载（该路径可位于缓存的 webview 中），`windowUrl` 在独立窗口中加载；webview 实例在路由切换时缓存复用。
 5. 设置读写：`getPluginSetting` / `setPluginSetting` 读写配置中 `plugin.<插件ID>.settings.*`。

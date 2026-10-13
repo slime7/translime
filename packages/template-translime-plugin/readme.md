@@ -62,7 +62,8 @@
   "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
   "name": "your-plugin-name",
   "version": "1.0.0",
-  "main": "./dist/index.cjs.js", // 插件后端逻辑入口
+  "type": "module", // 主进程入口为 ESM 产物
+  "main": "./dist/index.esm.js", // 插件后端逻辑入口（保持单文件 bundle）
   "engines": {
     "translime": ">=0.7.0" // 要求的宿主版本（semver 范围）；未声明时默认兼容任意版本。UI 使用 mde-vue 时需 >=0.7.0
   },

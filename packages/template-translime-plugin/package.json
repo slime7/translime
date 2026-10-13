@@ -5,10 +5,11 @@
   "description": "a plugin example",
   "license": "MIT",
   "private": true,
-  "main": "./dist/index.cjs.js",
+  "type": "module",
+  "main": "./dist/index.esm.js",
   "exports": {
     ".": {
-      "require": "./dist/index.cjs.js"
+      "import": "./dist/index.esm.js"
     }
   },
   "engines": {

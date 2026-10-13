@@ -63,6 +63,8 @@ class PluginLoader extends EventEmitter {
     this.runtimeCommandHandlers = new Map();
     this.ipcActivationRegistry = new Map();
     this.activatingPlugins = new Set();
+    /** 插件包名 → 进行中的激活 Promise，并发启用同一插件时共享等待。 */
+    this.activatingPromises = new Map();
     this.pluginPackageDir = PLUGIN_PACKAGE_DIR;
   }
 
@@ -144,10 +146,10 @@ class PluginLoader extends EventEmitter {
   /**
    * 激活所有声明为启动即加载的插件。
    *
-   * @returns {void}
+   * @returns {Promise<void>} 全部 onStartup 插件激活完成后 resolve。
    */
   activateStartupPlugins() {
-    activateStartupPlugins(this);
+    return activateStartupPlugins(this);
   }
 
   /**
@@ -188,7 +190,7 @@ class PluginLoader extends EventEmitter {
    * 触发指定激活事件，加载匹配该事件的插件。
    *
    * @param {string} eventName - 激活事件名。
-   * @returns {Array<object>} 被触发的插件列表。
+   * @returns {Promise<Array<object>>} 被触发的插件列表。
    */
   triggerActivation(eventName) {
     return triggerActivation(this, eventName);
@@ -198,7 +200,7 @@ class PluginLoader extends EventEmitter {
    * 触发某个插件的视图激活流程。
    *
    * @param {string} packageName - 插件包名。
-   * @returns {object} 激活后的插件对象。
+   * @returns {Promise<object>} 激活后的插件对象。
    */
   triggerViewActivation(packageName) {
     return triggerViewActivation(this, packageName);
@@ -209,7 +211,7 @@ class PluginLoader extends EventEmitter {
    *
    * @param {string} commandId - 命令 ID。
    * @param {...any} args - 命令参数。
-   * @returns {any} 命令处理函数的返回值。
+   * @returns {Promise<any>} 命令处理函数的返回值。
    */
   executeCommand(commandId, ...args) {
     return executeCommand(this, commandId, ...args);
@@ -219,7 +221,7 @@ class PluginLoader extends EventEmitter {
    * 根据 IPC 激活索引确保目标插件已经处于可处理状态。
    *
    * @param {string} channelType - IPC 通道类型。
-   * @returns {boolean} 是否找到了对应的懒激活插件。
+   * @returns {Promise<boolean>} 是否找到了对应的懒激活插件。
    */
   ensurePluginIpcReady(channelType) {
     return ensurePluginIpcReady(this, channelType);
@@ -252,10 +254,10 @@ class PluginLoader extends EventEmitter {
    *
    * @param {string} packageName - 插件包名。
    * @param {boolean} [init=false] - 是否属于初始化阶段激活。
-   * @returns {object} 启用后的插件对象。
+   * @returns {Promise<object>} 启用后的插件对象。
    */
-  enablePlugin(packageName, init = false) {
-    const result = enablePlugin(this, packageName, init);
+  async enablePlugin(packageName, init = false) {
+    const result = await enablePlugin(this, packageName, init);
     syncDevPluginWatchers(this);
     return result;
   }
@@ -277,7 +279,7 @@ class PluginLoader extends EventEmitter {
    * 重启指定插件。
    *
    * @param {string} packageName - 插件包名。
-   * @returns {object} 重启后的插件对象。
+   * @returns {Promise<object>} 重启后的插件对象。
    */
   restartPlugin(packageName) {
     return restartPlugin(this, packageName);
@@ -290,7 +292,7 @@ class PluginLoader extends EventEmitter {
    * 供菜单与设置面板在插件激活前读取。
    *
    * @param {string} packageName - 插件包名。
-   * @returns {object} 插件对象。
+   * @returns {Promise<object>} 插件对象。
    */
   ensurePluginMetadata(packageName) {
     return ensurePluginMetadata(this, packageName);

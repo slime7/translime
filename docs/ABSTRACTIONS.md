@@ -32,7 +32,9 @@
 `incompatible` 状态并保持停用。解析阶段收集的 `manifestWarnings`（无法识别的激活事件、缺少 id
 的命令、非法 engines 范围等）会随插件对象返回，由插件卡片展示。
 
-主进程入口由包级 `main` 字段指向（如 `dist/index.cjs.js`）；未声明时插件作为纯 UI 插件运行
+主进程入口由包级 `main` 字段指向（推荐 ESM 产物如 `dist/index.esm.js`，包需声明
+`"type": "module"`；CJS 产物 `dist/index.cjs.js` 仍兼容，宿主按扩展名与 package type
+识别入口格式）；未声明时插件作为纯 UI 插件运行
 （激活后不注册主进程能力），并记录 manifest 警告。入口已声明但产物缺失才视为 `build-missing`。
 插件 ID 即包名，必须全局唯一，且符合 `translime-plugin-[a-z0-9-]+`。
 
@@ -85,7 +87,7 @@ stateDiagram-v2
 
 - 包名：`translime-plugin-*`（小写字母、数字、连字符）。
 - IPC 事件：`事件名@插件ID`，例如 `ipc.invoke('get-data@translime-plugin-example')`；渲染端 `useIpc(pluginId)` 与主进程 `defineIpcHandlers` 的 `type` 均可省略后缀，由 SDK / 宿主自动补全。
-- 构建产物：主进程入口 `index.cjs.js`（CJS），UI 入口 `ui.esm.js`（ESM）。
+- 构建产物：主进程入口 `index.esm.js`（ESM，默认；入口保持单文件 bundle，宿主热重载以 query 击穿入口缓存，多文件 chunk 的相对依赖不会被击穿），旧 CJS 产物 `index.cjs.js` 仍兼容；UI 入口 `ui.esm.js`（ESM）。
 - 图标：Material Design Icons（md）风格，禁止 `mdi-` 前缀。
 - 配置键：`plugin.<插件ID>.settings.<key>`。
 
@@ -107,8 +109,11 @@ stateDiagram-v2
 （`ensurePluginMetadata`，只读静态导出，不注册 IPC / 命令 / libs，也不执行
 `pluginDidLoad`），因此未激活、未启用的插件同样能随时打开配置面板；配置读写走
 config store，保存时的 `pluginSettingSaved` 仅在插件处于激活态时回调。入口模块经
-require 缓存与激活共享，预读不会重复执行顶层代码；停用/卸载会随缓存清理一并失效
+加载缓存与激活共享，预读不会重复执行顶层代码；停用/卸载会随缓存清理一并失效
 静态元数据。`pluginMenu` 的点击语义伴随激活，仍在激活时合并。
+
+入口导出形态：插件 API 以命名导出提供并在 default export 中汇总（仓库约定）；
+宿主提取时 default export 为对象则优先取 default，纯命名导出同样可用。
 
 ## 插件顶栏按钮区
 

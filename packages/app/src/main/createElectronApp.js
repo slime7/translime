@@ -89,10 +89,15 @@ class CreateElectronApp extends EventEmitter {
       },
     }]);
 
-    ipcMain.on('main-renderer-ready', () => {
+    ipcMain.on('main-renderer-ready', async () => {
       setupDeepLink();
-      // 切换窗口前完成 onStartup 激活，确保主窗口展示时插件状态与字体均已就绪
-      appManager.getPluginLoader()?.activateStartupPlugins();
+      // 切换窗口前完成 onStartup 激活，确保主窗口展示时插件状态与字体均已就绪；
+      // 激活为异步流程，单个插件的失败已在 loader 内隔离为 load-error
+      try {
+        await appManager.getPluginLoader()?.activateStartupPlugins();
+      } catch (err) {
+        logger.error(`[plugin] onStartup 插件激活流程异常: ${err.message}`);
+      }
 
       if (appManager.getLaunchWin()) {
         appManager.getLaunchWin().close();

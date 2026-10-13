@@ -26,7 +26,7 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 ## 3. 编译与模块规范
 
 *   **模块格式**:
-    *   **主进程入口**: 源码使用 **MJS**，Vite 编译目标必须为 **CJS** (`formats: ['cjs']`)，输出文件名通常为 `index.cjs.js`。
+    *   **主进程入口**: 源码使用 **MJS**，Vite 编译目标为 **ESM** (`formats: ['es']`)，输出文件名通常为 `index.esm.js`，package.json 需声明 `"type": "module"`；入口必须保持**单文件 bundle**（宿主热重载以 query 击穿入口缓存，多文件 chunk 的相对依赖不会被击穿）。CJS 产物（`index.cjs.js` + `exports['.'].require`）仍被宿主兼容。
     *   **UI 渲染入口**: 源码使用 **MJS/Vue**，Vite 编译目标必须为 **ESM** (`formats: ['esm']`)，输出文件名通常为 `ui.esm.js`。
 *   **Vite 构建要求**:
     *   **推荐**在 `plugins` 中包含 `translimeSdk()`。
@@ -49,7 +49,8 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 ```json
 {
   "name": "translime-plugin-example",
-  "main": "dist/index.cjs.js",
+  "type": "module",
+  "main": "dist/index.esm.js",
   "plugin": {
     "title": "显示标题",
     "description": "功能描述",

@@ -72,15 +72,21 @@ export const injectMockPlugins = (userDataDir) => {
  * 插件内容复制自 release mock 插件但使用独立包名，避免开发插件覆盖
  * release 注入的同名插件；用于开发插件生命周期相关 E2E 场景。
  * @param {string} userDataDir - 目标应用的临时 userData 绝对路径
+ * @param {object} [options={}] - 注入选项
+ * @param {boolean} [options.esm=false] - 使用 ESM 入口版本的 mock 插件
  * @returns {void}
  */
-export const injectDevPlugin = (userDataDir) => {
+export const injectDevPlugin = (userDataDir, { esm = false } = {}) => {
   const devModulesDir = path.join(userDataDir, 'plugins_dev', 'node_modules');
   const targetPluginDir = path.join(devModulesDir, 'translime-plugin-dev-e2e');
   fs.mkdirSync(devModulesDir, { recursive: true });
-  fs.cpSync(path.join(dirname, 'plugins', 'translime-plugin-mock-test'), targetPluginDir, {
-    recursive: true,
-  });
+  fs.cpSync(
+    path.join(dirname, 'plugins', esm ? 'translime-plugin-mock-test-esm' : 'translime-plugin-mock-test'),
+    targetPluginDir,
+    {
+      recursive: true,
+    },
+  );
 
   const manifestPath = path.join(targetPluginDir, 'package.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));

@@ -32,6 +32,9 @@ vi.mock('@main/utils/useMainStore', () => ({
     config: {
       get: vi.fn((key, defaultValue) => defaultValue),
     },
+    // discovery 引入的 logger 在模块加载期读取日志目录路径
+    APPDATA_PATH: testUserDataDir,
+    TEMP_DIR: `${testUserDataDir}/temp`,
   },
 }));
 

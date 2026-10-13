@@ -110,9 +110,9 @@ describe('plugin-loader/menu', () => {
     vi.clearAllMocks();
   });
 
-  it('启用的插件应展示禁用/重启/卸载，而不展示启用', () => {
+  it('启用的插件应展示禁用/重启/卸载，而不展示启用', async () => {
     const { loader } = createLoader();
-    const { items } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { items } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     expect(itemIds(items)).toContain('disable-plugin');
     expect(itemIds(items)).toContain('restart-plugin');
@@ -120,36 +120,36 @@ describe('plugin-loader/menu', () => {
     expect(itemIds(items)).not.toContain('enable-plugin');
   });
 
-  it('禁用且无 UI 的插件只展示启用/卸载', () => {
+  it('禁用且无 UI 的插件只展示启用/卸载', async () => {
     const { loader } = createLoader({ enabled: false, ui: false });
-    const { items } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { items } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     expect(itemIds(items)).toEqual(['enable-plugin', 'uninstall-plugin', 'copy-plugin-link']);
   });
 
-  it('仅开发插件展示“打开插件目录”，与启用状态无关', () => {
+  it('仅开发插件展示“打开插件目录”，与启用状态无关', async () => {
     const devEnabled = createLoader({ dev: true });
-    expect(itemIds(buildPluginMenu(devEnabled.loader, 'p').items)).toContain('open-plugin-dir');
+    expect(itemIds((await buildPluginMenu(devEnabled.loader, 'p')).items)).toContain('open-plugin-dir');
 
     const devDisabled = createLoader({ dev: true, enabled: false, ui: false });
-    expect(itemIds(buildPluginMenu(devDisabled.loader, 'p').items)).toContain('open-plugin-dir');
+    expect(itemIds((await buildPluginMenu(devDisabled.loader, 'p')).items)).toContain('open-plugin-dir');
 
     const releasePlugin = createLoader({ dev: false });
-    expect(itemIds(buildPluginMenu(releasePlugin.loader, 'p').items)).not.toContain('open-plugin-dir');
+    expect(itemIds((await buildPluginMenu(releasePlugin.loader, 'p')).items)).not.toContain('open-plugin-dir');
   });
 
-  it('回传动作应执行对应处理：打开插件目录', () => {
+  it('回传动作应执行对应处理：打开插件目录', async () => {
     const { loader } = createLoader({ dev: true, pluginPath: 'C:/mock/translime-plugin-demo' });
-    const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { menuId } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     dispatchMenuAction(menuId, 'open-plugin-dir');
 
     expect(mockShellOpenPath).toHaveBeenCalledWith('C:/mock/translime-plugin-demo');
   });
 
-  it('有设置项的插件展示“设置”，与启用状态无关', () => {
+  it('有设置项的插件展示“设置”，与启用状态无关', async () => {
     const enabledWithSettings = createLoader({ settingMenu: [{ label: 'general' }] });
-    expect(itemIds(buildPluginMenu(enabledWithSettings.loader, 'p').items)).toContain(
+    expect(itemIds((await buildPluginMenu(enabledWithSettings.loader, 'p')).items)).toContain(
       'open-plugin-setting-panel',
     );
 
@@ -158,17 +158,17 @@ describe('plugin-loader/menu', () => {
       enabled: false,
       settingMenu: [{ label: 'general' }],
     });
-    expect(itemIds(buildPluginMenu(disabledWithSettings.loader, 'p').items)).toContain(
+    expect(itemIds((await buildPluginMenu(disabledWithSettings.loader, 'p')).items)).toContain(
       'open-plugin-setting-panel',
     );
 
     const withoutSettings = createLoader();
-    expect(itemIds(buildPluginMenu(withoutSettings.loader, 'p').items)).not.toContain(
+    expect(itemIds((await buildPluginMenu(withoutSettings.loader, 'p')).items)).not.toContain(
       'open-plugin-setting-panel',
     );
   });
 
-  it('打开菜单应延迟加载入口的 settingMenu，不触发激活', () => {
+  it('打开菜单应延迟加载入口的 settingMenu，不触发激活', async () => {
     // 防止的回归：settingMenu 在插件激活时才合并进主进程插件对象，
     // 若菜单不按需加载静态元数据，未激活插件的配置面板入口会消失
     const { loader, plugin } = createLoader({
@@ -177,7 +177,7 @@ describe('plugin-loader/menu', () => {
       pluginPath: tempPluginDir,
     });
 
-    const { items } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { items } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     expect(plugin.metadataLoaded).toBe(true);
     expect(plugin.settingMenu).toEqual([{ type: 'input', name: '演示设置' }]);
@@ -186,55 +186,56 @@ describe('plugin-loader/menu', () => {
     expect(loader.enablePlugin).not.toHaveBeenCalled();
   });
 
-  it('入口产物缺失时菜单不展示设置且不抛错', () => {
+  it('入口产物缺失时菜单不展示设置且不抛错', async () => {
     const { loader, plugin } = createLoader({
       enabled: false,
       exports: 'dist/index.cjs.js',
       pluginPath: path.join(tempPluginDir, 'not-exist'),
     });
 
-    expect(() => buildPluginMenu(loader, 'translime-plugin-demo')).not.toThrow();
+    await expect(buildPluginMenu(loader, 'translime-plugin-demo')).resolves.toBeDefined();
     expect(plugin.metadataLoaded).toBeUndefined();
-    expect(itemIds(buildPluginMenu(loader, 'translime-plugin-demo').items)).not.toContain(
+    const { items } = await buildPluginMenu(loader, 'translime-plugin-demo');
+    expect(itemIds(items)).not.toContain(
       'open-plugin-setting-panel',
     );
   });
 
-  it('隔离插件不在主进程预读元数据，避免顶层代码双进程执行', () => {
+  it('隔离插件不在主进程预读元数据，避免顶层代码双进程执行', async () => {
     const { loader, plugin } = createLoader({
       isolated: true,
       exports: 'dist/index.cjs.js',
       pluginPath: tempPluginDir,
     });
 
-    buildPluginMenu(loader, 'translime-plugin-demo');
+    await buildPluginMenu(loader, 'translime-plugin-demo');
 
     expect(plugin.metadataLoaded).toBeUndefined();
     expect(plugin.settingMenu).toEqual([]);
   });
 
-  it('带 UI 且未固定 windowUrl 的插件才展示窗口模式开关，并透传选中态', () => {
+  it('带 UI 且未固定 windowUrl 的插件才展示窗口模式开关，并透传选中态', async () => {
     const withUi = createLoader({ windowMode: true });
-    const { items } = buildPluginMenu(withUi.loader, 'p');
+    const { items } = await buildPluginMenu(withUi.loader, 'p');
     const switchItem = items.find((item) => item.id === 'switch-plugin-window-mode');
     expect(switchItem).toMatchObject({ checked: true });
 
     const withWindowUrl = createLoader({ windowUrl: 'index.html' });
-    expect(itemIds(buildPluginMenu(withWindowUrl.loader, 'p').items)).not.toContain(
+    expect(itemIds((await buildPluginMenu(withWindowUrl.loader, 'p')).items)).not.toContain(
       'switch-plugin-window-mode',
     );
   });
 
-  it('菜单描述应可序列化（不携带处理函数）', () => {
+  it('菜单描述应可序列化（不携带处理函数）', async () => {
     const { loader } = createLoader({
       pluginMenu: [{ id: 'custom', label: 'custom', click: vi.fn() }],
     });
-    const { items } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { items } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     expect(JSON.parse(JSON.stringify(items))).toEqual(items);
   });
 
-  it('插件自定义菜单应过滤不可见项并追加在内置项之后的分隔线上', () => {
+  it('插件自定义菜单应过滤不可见项并追加在内置项之后的分隔线上', async () => {
     const { loader } = createLoader({
       pluginMenu: [
         { id: 'custom-a', label: 'custom a', click: vi.fn() },
@@ -243,7 +244,7 @@ describe('plugin-loader/menu', () => {
         },
       ],
     });
-    const { items } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { items } = await buildPluginMenu(loader, 'translime-plugin-demo');
     const ids = itemIds(items);
 
     expect(ids).not.toContain('hidden');
@@ -251,9 +252,9 @@ describe('plugin-loader/menu', () => {
     expect(ids).toContain('disable-plugin');
   });
 
-  it('回传动作应执行对应处理：禁用插件并广播插件变更', () => {
+  it('回传动作应执行对应处理：禁用插件并广播插件变更', async () => {
     const { loader } = createLoader();
-    const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { menuId } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     dispatchMenuAction(menuId, 'disable-plugin');
 
@@ -261,9 +262,31 @@ describe('plugin-loader/menu', () => {
     expect(mockSendToMain).toHaveBeenCalledWith('plugins-changed');
   });
 
+  it('回传动作应执行对应处理：启用的异步动作完成后才广播插件变更', async () => {
+    // 防止的回归：启用/重启改为异步激活后，若不等待完成就广播，
+    // 渲染端会拿到“已启用但尚未 active”的中间状态
+    let resolveEnable;
+    const { loader } = createLoader({ enabled: false, ui: false });
+    loader.enablePlugin.mockReturnValue(new Promise((resolve) => {
+      resolveEnable = resolve;
+    }));
+    const { menuId } = await buildPluginMenu(loader, 'translime-plugin-demo');
+
+    dispatchMenuAction(menuId, 'enable-plugin');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockSendToMain).not.toHaveBeenCalledWith('plugins-changed');
+
+    resolveEnable({ active: true });
+    await vi.waitFor(() => {
+      expect(mockSendToMain).toHaveBeenCalledWith('plugins-changed');
+    });
+    expect(loader.enablePlugin).toHaveBeenCalledWith('translime-plugin-demo');
+  });
+
   it('回传动作应执行对应处理：卸载完成后广播插件变更', async () => {
     const { loader } = createLoader();
-    const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { menuId } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     dispatchMenuAction(menuId, 'uninstall-plugin');
     await Promise.resolve();
@@ -273,9 +296,9 @@ describe('plugin-loader/menu', () => {
     expect(mockSendToMain).toHaveBeenCalledWith('plugins-changed');
   });
 
-  it('回传动作应执行对应处理：切换窗口模式并持久化', () => {
+  it('回传动作应执行对应处理：切换窗口模式并持久化', async () => {
     const { loader, plugin } = createLoader({ windowMode: false });
-    const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { menuId } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     dispatchMenuAction(menuId, 'switch-plugin-window-mode');
 
@@ -287,9 +310,9 @@ describe('plugin-loader/menu', () => {
     expect(mockSendToMain).toHaveBeenCalledWith('plugins-changed');
   });
 
-  it('回传动作应执行对应处理：复制分享链接并提示', () => {
+  it('回传动作应执行对应处理：复制分享链接并提示', async () => {
     const { loader } = createLoader();
-    const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { menuId } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     dispatchMenuAction(menuId, 'copy-plugin-link');
 
@@ -299,12 +322,12 @@ describe('plugin-loader/menu', () => {
     expect(mockSendToMain).toHaveBeenCalledWith('ipc-toast', ['链接已复制']);
   });
 
-  it('回传动作应执行插件自定义菜单的点击处理', () => {
+  it('回传动作应执行插件自定义菜单的点击处理', async () => {
     const customClick = vi.fn();
     const { loader } = createLoader({
       pluginMenu: [{ id: 'custom-a', label: 'custom a', click: customClick }],
     });
-    const { menuId } = buildPluginMenu(loader, 'translime-plugin-demo');
+    const { menuId } = await buildPluginMenu(loader, 'translime-plugin-demo');
 
     dispatchMenuAction(menuId, 'custom-a');
 

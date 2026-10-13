@@ -480,21 +480,49 @@ const resolvePluginWindowUrl = (pluginPath, windowUrl) => {
 };
 
 /**
+ * 解析插件声明的宿主入口格式（CJS / ESM）。
+ *
+ * 判定优先级：文件扩展名（.mjs / .cjs / 仓库约定的 .cjs.js 与 .esm.js 后缀）
+ * 优先于 package.json 的 `type` 字段；两者都未指明时视为 CJS，保证旧插件
+ * 行为不变。
+ *
+ * @param {string|null} entryPath - 入口相对路径（package.json main）。
+ * @param {object} [pluginPkg] - package.json 内容。
+ * @returns {string} `'esm'` 或 `'cjs'`。
+ */
+const resolveEntryFormat = (entryPath, pluginPkg) => {
+  if (!entryPath) {
+    return 'cjs';
+  }
+  const lower = String(entryPath).toLowerCase();
+  if (lower.endsWith('.mjs') || lower.endsWith('.esm.js')) {
+    return 'esm';
+  }
+  if (lower.endsWith('.cjs') || lower.endsWith('.cjs.js')) {
+    return 'cjs';
+  }
+  return pluginPkg?.type === 'module' ? 'esm' : 'cjs';
+};
+
+/**
  * 从 package.json 中解析插件主入口。
  *
- * 优先读取 `exports['.'].require`，否则回退到 `main`。
+ * 支持 `exports['.']` 的字符串形式与对象条件形式；对象形式按
+ * `import` → `require` → `default` 的顺序取值（宿主原生支持 ESM 入口，
+ * 双格式包优先走 ESM），最后回退到 `main`。
  *
  * @param {object} pluginPkg - package.json 内容。
  * @returns {string|null} 插件主入口相对路径。
  */
 const resolvePluginExports = (pluginPkg) => {
-  let exportsEntry = pluginPkg.main || null;
-
-  if (pluginPkg.exports?.['.']?.require) {
-    exportsEntry = pluginPkg.exports['.'].require;
+  const dotEntry = pluginPkg.exports?.['.'];
+  if (typeof dotEntry === 'string') {
+    return dotEntry;
   }
-
-  return exportsEntry;
+  if (dotEntry && typeof dotEntry === 'object') {
+    return dotEntry.import || dotEntry.require || dotEntry.default || pluginPkg.main || null;
+  }
+  return pluginPkg.main || null;
 };
 
 /**
@@ -518,6 +546,7 @@ const initializePluginState = (plugin, pluginPath, pluginPkg, source) => {
       commands: normalizeCommands(plugin.contributes?.commands, manifestWarnings),
     },
     exports: resolvePluginExports(pluginPkg),
+    entryFormat: resolveEntryFormat(resolvePluginExports(pluginPkg), pluginPkg),
     pluginPath,
     version: pluginPkg.version,
     dev: source === PLUGIN_SOURCE_DEV,
@@ -666,5 +695,6 @@ export {
   parseActivationMeta,
   readPluginSafe,
   refreshPluginStatus,
+  resolveEntryFormat,
   uniqueStrings,
 };

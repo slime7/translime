@@ -38,12 +38,12 @@ const doInstallFromTarball = async (loader, packageName, tarballPath, version) =
     loader.resolvePlugins();
     let plugin = loader.getPlugin(packageName);
     if (!plugin) {
-      plugin = loader.enablePlugin(packageName);
+      plugin = await loader.enablePlugin(packageName);
     }
     if (plugin) {
       plugin.enabled = true;
       mainStore.config.set(`plugin.${packageName}.enabled`, true);
-      loader.enablePlugin(packageName);
+      await loader.enablePlugin(packageName);
     }
     loader.emit('plugin:installed', { plugin, pluginId: packageName });
 

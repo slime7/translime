@@ -136,12 +136,14 @@ const { mockRequire } = vi.hoisted(() => {
 vi.mock('node:module', () => ({
   default: {
     createRequire: () => mockRequire,
+    pathToFileURL: (p) => ({ href: `file:///${String(p).replace(/\\/g, '/')}` }),
     _extensions: {
       '.node': vi.fn(),
       '.js': vi.fn(),
     },
   },
   createRequire: () => mockRequire,
+  pathToFileURL: (p) => ({ href: `file:///${String(p).replace(/\\/g, '/')}` }),
 }));
 
 describe('pluginLoader', () => {
@@ -190,7 +192,7 @@ describe('pluginLoader', () => {
   });
 
   describe('scanPlugins', () => {
-    it('扫描阶段只做发现不激活 onStartup 插件，激活由 activateStartupPlugins 收尾', () => {
+    it('扫描阶段只做发现不激活 onStartup 插件，激活由 activateStartupPlugins 收尾', async () => {
       // 扫描阶段仅发现插件，不执行插件代码
       mockFs.readFileSync.mockReturnValueOnce(JSON.stringify({
         dependencies: {
@@ -212,7 +214,7 @@ describe('pluginLoader', () => {
       expect(pluginLoader.plugins[0].active).toBe(false);
       expect(pluginLoader.plugins[0].status).toBe('ready');
 
-      pluginLoader.activateStartupPlugins();
+      await pluginLoader.activateStartupPlugins();
 
       expect(pluginLoader.plugins[0].active).toBe(true);
       expect(pluginLoader.plugins[0].status).toBe('active');
@@ -332,7 +334,7 @@ describe('pluginLoader', () => {
   });
 
   describe('enablePlugin/disablePlugin', () => {
-    it('启用带有 libs 的插件时应注册 interop，禁用时应注销', () => {
+    it('启用带有 libs 的插件时应注册 interop，禁用时应注销', async () => {
       const mockLibs = { sayHello: () => 'hello' };
       mockRequire.mockReturnValue({ libs: mockLibs });
 
@@ -347,7 +349,7 @@ describe('pluginLoader', () => {
         dependencies: [],
       }];
 
-      pluginLoader.enablePlugin(packageName);
+      await pluginLoader.enablePlugin(packageName);
       expect(pluginInterop.register).toHaveBeenCalledWith(packageName, mockLibs);
 
       pluginLoader.disablePlugin(packageName);
@@ -370,7 +372,7 @@ describe('pluginLoader', () => {
       expect(pluginLoader.plugins[0].packageName).toBe('translime-plugin-existing');
     });
 
-    it('启动阶段初始化插件时也应调用 pluginDidLoad', () => {
+    it('启动阶段初始化插件时也应调用 pluginDidLoad', async () => {
       const pluginDidLoad = vi.fn();
       mockRequire.mockReturnValue({ pluginDidLoad });
 
@@ -384,11 +386,12 @@ describe('pluginLoader', () => {
         },
       ]);
 
-      expect(pluginDidLoad).toHaveBeenCalledTimes(1);
+      // enablePlugins 的激活为后台流程，等待其完成
+      await vi.waitFor(() => expect(pluginDidLoad).toHaveBeenCalledTimes(1));
       expect(pluginLoader.plugins[0].pluginDidLoad).toBe(pluginDidLoad);
     });
 
-    it('onAppReady 插件应在触发前保持未激活，触发后再加载', () => {
+    it('onAppReady 插件应在触发前保持未激活，触发后再加载', async () => {
       const pluginDidLoad = vi.fn();
       mockRequire.mockReturnValue({ pluginDidLoad });
 
@@ -410,12 +413,12 @@ describe('pluginLoader', () => {
       pluginLoader.rebuildActivationIndexes();
 
       expect(pluginLoader.plugins[0].active).toBe(false);
-      pluginLoader.triggerActivation('onAppReady');
+      await pluginLoader.triggerActivation('onAppReady');
       expect(pluginDidLoad).toHaveBeenCalledTimes(1);
       expect(pluginLoader.plugins[0].active).toBe(true);
     });
 
-    it('执行命令时应先激活插件再调用处理函数', () => {
+    it('执行命令时应先激活插件再调用处理函数', async () => {
       const commandHandler = vi.fn(() => 'ok');
       mockRequire.mockReturnValue({
         commands: [
@@ -450,14 +453,38 @@ describe('pluginLoader', () => {
       }];
       pluginLoader.rebuildActivationIndexes();
 
-      const result = pluginLoader.executeCommand('translime-plugin-command.run', 1, 2);
+      const result = await pluginLoader.executeCommand('translime-plugin-command.run', 1, 2);
 
       expect(result).toBe('ok');
       expect(commandHandler).toHaveBeenCalledWith(1, 2);
       expect(pluginLoader.plugins[0].active).toBe(true);
     });
 
-    it('pluginDidLoad 抛错时应转为 load-error 且不卡死激活状态', () => {
+    it('同一插件的并发启用应共享同一份激活流程', async () => {
+      const pluginDidLoad = vi.fn();
+      mockRequire.mockReturnValue({ pluginDidLoad });
+
+      pluginLoader.plugins = [{
+        packageName: 'translime-plugin-concurrent',
+        pluginPath: '/mock/path',
+        exports: 'index.js',
+        enabled: true,
+        dependencies: [],
+      }];
+
+      // 激活期间（Promise 未落定）再次启用应等待首个激活，而不是重复加载入口
+      const [first, second] = await Promise.all([
+        pluginLoader.enablePlugin('translime-plugin-concurrent'),
+        pluginLoader.enablePlugin('translime-plugin-concurrent'),
+      ]);
+
+      expect(first.active).toBe(true);
+      expect(second.active).toBe(true);
+      expect(pluginLoader.activatingPromises.has('translime-plugin-concurrent')).toBe(false);
+      await vi.waitFor(() => expect(pluginDidLoad).toHaveBeenCalledTimes(1));
+    });
+
+    it('pluginDidLoad 抛错时应转为 load-error 且不卡死激活状态', async () => {
       const pluginDidLoad = vi.fn(() => {
         throw new Error('did-load boom');
       });
@@ -471,18 +498,19 @@ describe('pluginLoader', () => {
         dependencies: [],
       }];
 
-      const plugin = pluginLoader.enablePlugin('translime-plugin-didload-crash');
+      const plugin = await pluginLoader.enablePlugin('translime-plugin-didload-crash');
 
       expect(plugin.status).toBe('load-error');
       expect(plugin.statusText).toContain('did-load boom');
       expect(plugin.enabled).toBe(false);
       // 关键回归：激活标记必须被清理，否则插件永久无法再次激活
       expect(pluginLoader.activatingPlugins.has('translime-plugin-didload-crash')).toBe(false);
+      expect(pluginLoader.activatingPromises.has('translime-plugin-didload-crash')).toBe(false);
       // 再次启用允许重试（即便仍会失败）
-      expect(() => pluginLoader.enablePlugin('translime-plugin-didload-crash')).not.toThrow();
+      await expect(pluginLoader.enablePlugin('translime-plugin-didload-crash')).resolves.toBeDefined();
     });
 
-    it('入口未导出任何插件 API 时应报 load-error', () => {
+    it('入口未导出任何插件 API 时应报 load-error', async () => {
       mockRequire.mockReturnValue({});
 
       pluginLoader.plugins = [{
@@ -493,14 +521,14 @@ describe('pluginLoader', () => {
         dependencies: [],
       }];
 
-      const plugin = pluginLoader.enablePlugin('translime-plugin-empty-entry');
+      const plugin = await pluginLoader.enablePlugin('translime-plugin-empty-entry');
 
       expect(plugin.status).toBe('load-error');
       expect(plugin.statusText).toContain('未导出任何插件 API');
       expect(plugin.enabled).toBe(false);
     });
 
-    it('pluginWillUnload 抛错时禁用流程应继续清理', () => {
+    it('pluginWillUnload 抛错时禁用流程应继续清理', async () => {
       const pluginWillUnload = vi.fn(() => {
         throw new Error('will-unload boom');
       });
@@ -515,7 +543,7 @@ describe('pluginLoader', () => {
         dependencies: [],
       }];
 
-      pluginLoader.enablePlugin(packageName);
+      await pluginLoader.enablePlugin(packageName);
       const result = pluginLoader.disablePlugin(packageName);
 
       expect(result).toBe(true);
@@ -523,7 +551,7 @@ describe('pluginLoader', () => {
       expect(pluginLoader.plugins[0].enabled).toBe(false);
     });
 
-    it('激活完成后应记录 loadDuration 耗时', () => {
+    it('激活完成后应记录 loadDuration 耗时', async () => {
       mockRequire.mockReturnValue({ pluginDidLoad: vi.fn() });
 
       pluginLoader.plugins = [{
@@ -534,7 +562,7 @@ describe('pluginLoader', () => {
         dependencies: [],
       }];
 
-      const plugin = pluginLoader.enablePlugin('translime-plugin-timing');
+      const plugin = await pluginLoader.enablePlugin('translime-plugin-timing');
 
       expect(typeof plugin.loadDuration).toBe('number');
       expect(plugin.loadDuration).toBeGreaterThanOrEqual(0);
@@ -542,7 +570,7 @@ describe('pluginLoader', () => {
   });
 
   describe('restartPlugin', () => {
-    it('重启应从磁盘重读清单与产物：产物修复后无需整表刷新即可恢复', () => {
+    it('重启应从磁盘重读清单与产物：产物修复后无需整表刷新即可恢复', async () => {
       // 内存快照停留在产物缺失时：build-missing 且不可用
       pluginLoader.plugins = [{
         packageName: 'translime-plugin-stale',
@@ -577,14 +605,14 @@ describe('pluginLoader', () => {
       });
       mockRequire.mockReturnValue({ pluginDidLoad: vi.fn() });
 
-      const plugin = pluginLoader.restartPlugin('translime-plugin-stale');
+      const plugin = await pluginLoader.restartPlugin('translime-plugin-stale');
 
       expect(plugin.status).toBe('active');
       expect(plugin.available).toBe(true);
       expect(plugin.entryIssues).toEqual([]);
     });
 
-    it('依赖不可用时即使其 enabled 为 true 也应阻塞启用（可用性不依赖 enabled 标记）', () => {
+    it('依赖不可用时即使其 enabled 为 true 也应阻塞启用（可用性不依赖 enabled 标记）', async () => {
       pluginLoader.plugins = [
         {
           packageName: 'translime-plugin-dep-broken',
@@ -606,7 +634,7 @@ describe('pluginLoader', () => {
         },
       ];
 
-      const plugin = pluginLoader.enablePlugin('translime-plugin-dependent');
+      const plugin = await pluginLoader.enablePlugin('translime-plugin-dependent');
 
       expect(plugin.status).toBe('blocked');
       expect(plugin.available).toBe(false);

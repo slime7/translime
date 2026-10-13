@@ -71,14 +71,14 @@ const scheduleRestart = (loader, packageName) => {
   clearRestartTimer(packageName);
   restartTimers.set(
     packageName,
-    setTimeout(() => {
+    setTimeout(async () => {
       restartTimers.delete(packageName);
       const plugin = loader.getPlugin(packageName);
       if (!plugin || !plugin.dev || !shouldWatchPlugin(plugin)) {
         return;
       }
       try {
-        const restarted = loader.restartPlugin(packageName);
+        const restarted = await loader.restartPlugin(packageName);
         if (restarted?.enabled) {
           logger.info(`[plugin] 开发插件 "${packageName}" 构建产物变化，已自动重启`);
         } else {

@@ -35,6 +35,73 @@ describe('plugin-loader/metadata', () => {
     vi.clearAllMocks();
   });
 
+  it('resolveEntryFormat 应按扩展名与 package type 识别入口格式', async () => {
+    const { resolveEntryFormat } = await import('@main/core/plugin-loader/metadata');
+
+    expect(resolveEntryFormat('dist/index.esm.js', {})).toBe('esm');
+    expect(resolveEntryFormat('dist/index.mjs', {})).toBe('esm');
+    expect(resolveEntryFormat('dist/index.cjs.js', {})).toBe('cjs');
+    expect(resolveEntryFormat('dist/index.cjs', {})).toBe('cjs');
+    // .js 归 package.json type 决定；未声明时保持 CJS 兼容
+    expect(resolveEntryFormat('dist/index.js', { type: 'module' })).toBe('esm');
+    expect(resolveEntryFormat('dist/index.js', { type: 'commonjs' })).toBe('cjs');
+    expect(resolveEntryFormat('dist/index.js', {})).toBe('cjs');
+    expect(resolveEntryFormat(null, { type: 'module' })).toBe('cjs');
+  });
+
+  it('readPluginSafe 应识别 ESM 入口并写入 entryFormat', async () => {
+    const { readPluginSafe } = await import('@main/core/plugin-loader/metadata');
+
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({
+      name: 'translime-plugin-esm-demo',
+      version: '1.0.0',
+      type: 'module',
+      main: 'dist/index.esm.js',
+      plugin: { title: 'ESM Demo' },
+    }));
+    mockFs.accessSync.mockImplementation((targetPath) => {
+      const normalizedPath = String(targetPath).replace(/\\/g, '/');
+      if (!normalizedPath.endsWith('/package.json') && !normalizedPath.endsWith('/dist/index.esm.js')) {
+        throw new Error('not found');
+      }
+    });
+
+    const plugin = readPluginSafe('/mock/plugins/translime-plugin-esm-demo');
+
+    expect(plugin.exports).toBe('dist/index.esm.js');
+    expect(plugin.entryFormat).toBe('esm');
+    expect(plugin.status).toBe('discovered');
+  });
+
+  it('exports 条件形式应按 import → require → default 取入口', async () => {
+    const { readPluginSafe } = await import('@main/core/plugin-loader/metadata');
+
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({
+      name: 'translime-plugin-dual',
+      version: '1.0.0',
+      main: 'dist/fallback.js',
+      exports: {
+        '.': {
+          import: './dist/index.esm.js',
+          require: './dist/index.cjs.js',
+        },
+      },
+      plugin: { title: 'Dual' },
+    }));
+    mockFs.accessSync.mockImplementation((targetPath) => {
+      const normalizedPath = String(targetPath).replace(/\\/g, '/');
+      if (!normalizedPath.endsWith('/package.json') && !normalizedPath.endsWith('/dist/index.esm.js')) {
+        throw new Error('not found');
+      }
+    });
+
+    const plugin = readPluginSafe('/mock/plugins/translime-plugin-dual');
+
+    // 双格式包宿主优先走 ESM
+    expect(plugin.exports).toBe('./dist/index.esm.js');
+    expect(plugin.entryFormat).toBe('esm');
+  });
+
   it('readPluginSafe 应该归一化插件元数据', async () => {
     const { readPluginSafe } = await import('@main/core/plugin-loader/metadata');
 

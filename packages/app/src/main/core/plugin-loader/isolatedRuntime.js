@@ -392,6 +392,7 @@ const activateIsolatedPlugin = (loader, plugin, { init = false, cleanup = null }
         ...process.env,
         TRANSLIME_ISOLATED_PLUGIN: plugin.packageName,
         TRANSLIME_PLUGIN_ENTRY: entryPath,
+        TRANSLIME_PLUGIN_ENTRY_FORMAT: plugin.entryFormat === 'esm' ? 'esm' : 'cjs',
       },
     });
   } catch (err) {

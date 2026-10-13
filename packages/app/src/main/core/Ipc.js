@@ -43,12 +43,13 @@ const extractTargetPluginId = (type) => {
  * 规则：已归属插件的发送方只能调用自身通道；跨插件访问仅对
  * 暴露了 libs（pluginInterop 已注册）的插件放行，其余一律拒绝。
  * 主机侧发送方（宿主窗口等未归属的 WebContents）不受限制。
+ * 目标插件未激活时会先触发懒激活（onIpc 声明），因此本函数为异步。
  *
  * @param {string} type - IPC 通道类型。
  * @param {import('electron').WebContents} sender - 发送方。
- * @returns {string|null} 拒绝原因；允许时返回 `null`。
+ * @returns {Promise<string|null>} 拒绝原因；允许时返回 `null`。
  */
-const assertIpcAllowed = (type, sender) => {
+const assertIpcAllowed = async (type, sender) => {
   const targetPluginId = extractTargetPluginId(type);
   if (!targetPluginId) {
     return null;
@@ -57,7 +58,7 @@ const assertIpcAllowed = (type, sender) => {
   if (!senderPluginId || senderPluginId === targetPluginId) {
     return null;
   }
-  appManager.getPluginLoader()?.ensurePluginIpcReady(type);
+  await appManager.getPluginLoader()?.ensurePluginIpcReady(type);
   if (pluginInterop.getRegisteredPlugins().includes(targetPluginId)) {
     return null;
   }
@@ -84,14 +85,15 @@ export default class Ipc {
     };
 
     // 注册通用处理通道
-    this.listener.handle('ipc-fn', (ev, { type, args }) => {
+    this.listener.handle('ipc-fn', async (ev, { type, args }) => {
       let handler = this.handlerList[type];
       if (!handler) {
-        appManager.getPluginLoader()?.ensurePluginIpcReady(type);
+        // 通道不存在时尝试按 onIpc 声明懒激活对应插件后重查
+        await appManager.getPluginLoader()?.ensurePluginIpcReady(type);
         handler = this.handlerList[type];
       }
       if (handler) {
-        const denial = assertIpcAllowed(type, ev.sender);
+        const denial = await assertIpcAllowed(type, ev.sender);
         if (denial) {
           return { data: null, err: denial };
         }
@@ -108,13 +110,18 @@ export default class Ipc {
     });
 
     this.listener.on('ipc-msg', (ev, { type, data }) => {
-      let handler = this.handlerList[type];
-      if (!handler) {
-        appManager.getPluginLoader()?.ensurePluginIpcReady(type);
-        handler = this.handlerList[type];
-      }
-      if (handler) {
-        const denial = assertIpcAllowed(type, ev.sender);
+      // 懒激活为异步流程，fire-and-forget 消息改为异步派发；
+      // 异常统一落日志，行为与原同步路径的 try/catch 一致
+      (async () => {
+        let handler = this.handlerList[type];
+        if (!handler) {
+          await appManager.getPluginLoader()?.ensurePluginIpcReady(type);
+          handler = this.handlerList[type];
+        }
+        if (!handler) {
+          return;
+        }
+        const denial = await assertIpcAllowed(type, ev.sender);
         if (denial) {
           logger.warn(`[ipc] 拦截 ipc-msg 调用：${denial}`);
           return;
@@ -126,7 +133,9 @@ export default class Ipc {
             logger.error(`[ipc] ipc-msg handler 执行失败：${this.describeHandlerError(type, err)}`);
           }
         });
-      }
+      })().catch((err) => {
+        logger.error(`[ipc] ipc-msg 处理失败：${this.describeHandlerError(type, err)}`);
+      });
     });
   }
 

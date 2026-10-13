@@ -26,7 +26,7 @@
     },
     "main": {
       "type": "string",
-      "description": "插件主进程入口（如 dist/index.cjs.js）；未声明时插件作为纯 UI 插件运行并记录 manifest 警告"
+      "description": "插件主进程入口（推荐 ESM 产物如 dist/index.esm.js，需保持单文件 bundle；CJS 产物 index.cjs.js 仍兼容）；未声明时插件作为纯 UI 插件运行并记录 manifest 警告"
     },
     "exports": {
       "type": "object"

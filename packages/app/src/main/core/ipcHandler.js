@@ -433,11 +433,11 @@ const ipcHandler = {
     }, '插件启用出错');
   },
   async [ipcType.ACTIVATE_PLUGIN](packageName, reason = 'manual') {
-    return withPluginLoader((loader) => {
+    return withPluginLoader(async (loader) => {
       if (reason === 'view') {
-        loader.triggerViewActivation(packageName);
+        await loader.triggerViewActivation(packageName);
       } else {
-        loader.enablePlugin(packageName);
+        await loader.enablePlugin(packageName);
       }
       return true;
     }, '插件激活出错');

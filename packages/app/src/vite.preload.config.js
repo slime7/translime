@@ -40,10 +40,9 @@ export default defineConfig(({ mode }) => {
       },
       lib: {
         entry: 'index.js',
-        /**
-         * preload 使用 esm 出现 bug
-         * https://github.com/electron/electron/issues/46614
-         */
+        // preload 产物必须保持 CJS：主窗口、启动窗与通用窗口均为 sandbox: true，
+        // Electron 仅在非沙箱渲染进程支持 ESM preload（.mjs），沙箱环境只加载 CJS。
+        // preload 源码本身是 ESM 写法，由构建器编译为 CJS 产物。
         formats: ['cjs'],
         fileName: () => '[name].cjs',
       },

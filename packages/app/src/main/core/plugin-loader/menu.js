@@ -49,12 +49,12 @@ const serializeMenu = (template) => {
  *
  * @param {object} loader - `PluginLoader` 实例。
  * @param {string} packageName - 插件包名。
- * @returns {{menuId: string, items: Array<object>}} 渲染端菜单描述。
+ * @returns {Promise<{menuId: string, items: Array<object>}>} 渲染端菜单描述。
  */
-const buildPluginMenu = (loader, packageName) => {
+const buildPluginMenu = async (loader, packageName) => {
   // 设置项属于声明式元数据：打开菜单时按需加载入口的静态导出（不触发激活），
   // 使未激活/未启用的插件同样能随时打开配置面板
-  ensurePluginMetadata(loader, packageName);
+  await ensurePluginMetadata(loader, packageName);
   const plugin = loader.getPlugin(packageName);
   const ipcEv = appManager.getIpc();
 
@@ -72,8 +72,9 @@ const buildPluginMenu = (loader, packageName) => {
       id: 'enable-plugin',
       label: '启用插件',
       visible: !plugin.enabled,
-      click() {
-        loader.enablePlugin(packageName);
+      click: async () => {
+        // 等激活完成再广播，避免渲染端拿到启用了但尚未 active 的中间状态
+        await loader.enablePlugin(packageName);
         ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
       },
     },
@@ -81,8 +82,8 @@ const buildPluginMenu = (loader, packageName) => {
       id: 'restart-plugin',
       label: '重启插件',
       visible: plugin.enabled,
-      click() {
-        loader.restartPlugin(packageName);
+      click: async () => {
+        await loader.restartPlugin(packageName);
         ipcEv.sendToMain(ipcType.PLUGINS_CHANGED);
       },
     },

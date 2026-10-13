@@ -12,11 +12,14 @@ export const test = base.extend({
   /** 开发插件生命周期场景：注入开发版 mock 插件并开启「显示开发中插件」 */
   devPluginScenario: [false, { option: true }],
 
-  electronContext: async ({ devPluginScenario }, use) => {
+  /** 开发插件使用 ESM 入口版本（配合 devPluginScenario 使用） */
+  devPluginEsm: [false, { option: true }],
+
+  electronContext: async ({ devPluginScenario, devPluginEsm }, use) => {
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'translime-e2e-'));
     injectAllMocks(userDataDir);
     if (devPluginScenario) {
-      injectDevPlugin(userDataDir);
+      injectDevPlugin(userDataDir, { esm: devPluginEsm });
     }
 
     const app = await electron.launch({

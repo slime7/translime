@@ -171,10 +171,15 @@ describe('Ipc', () => {
   });
 
   describe('ipc-msg handler', () => {
-    it('应该调用存在的 handler', () => {
+    it('应该调用存在的 handler', async () => {
+      const { default: ipcHandler } = await import('@main/core/ipcHandler');
+
       onCallback({}, { type: 'testHandler', data: 'test data' });
 
-      // handler 会被调用并传入 data
+      // 懒激活改造成异步派发后，handler 在微任务中被调用
+      await vi.waitFor(() => {
+        expect(ipcHandler.testHandler).toHaveBeenCalledWith('test data');
+      });
     });
 
     it('handler 不存在时不应抛出错误', () => {
