@@ -4,13 +4,14 @@ import {
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import SimpleDialog from '@/components/SimpleDialog.vue';
+import useDialog from '@/hooks/useDialog';
 import useDialogStore from '@/store/dialogStore';
 
 const globalStubs = {
   global: {
     stubs: {
       'mat-dialog': {
-        template: '<div class="mat-dialog-stub">{{ title }}<slot name="title" /><slot /><slot name="actions" /></div>',
+        template: '<div class="mat-dialog-stub"><button class="dialog-request-close" @click="$emit(\'update:modelValue\', false)" />{{ title }}<slot name="title" /><slot /><slot name="actions" /></div>',
         props: ['modelValue', 'title', 'width'],
       },
       'mat-btn': {
@@ -79,5 +80,17 @@ describe('SimpleDialog.vue', () => {
     await btns[1].trigger('click');
 
     await expect(p).resolves.toBeUndefined();
+  });
+
+  it('确认框收到关闭请求（Escape/帷幕）应该按取消结算并复位状态', async () => {
+    const dialog = useDialog();
+    const p = dialog.showConfirm({ title: 'Confirm', content: 'Content' });
+
+    const wrapper = mount(SimpleDialog, globalStubs);
+    await wrapper.find('.dialog-request-close').trigger('click');
+
+    // 防止回归：关闭请求若不结算 Promise，showConfirm 的调用方会永久悬挂
+    await expect(p).resolves.toEqual({ confirm: false, cancel: true });
+    expect(useDialogStore().confirm.visible).toBe(false);
   });
 });

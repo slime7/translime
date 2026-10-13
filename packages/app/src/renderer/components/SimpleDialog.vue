@@ -43,9 +43,10 @@
     </div>
 
     <mat-dialog
-      v-model="confirm.visible"
+      :model-value="confirm.visible"
       width="290"
       :title="confirm.title || '提示'"
+      @update:model-value="onConfirmUpdate"
     >
       <!-- eslint-disable-next-line vue/no-v-text-v-html-on-component -->
       <div v-text="confirm.content" />
@@ -89,12 +90,21 @@ export default {
       dialog.pop();
     };
 
+    // Escape / 帷幕关闭请求视为取消，保证 showConfirm 的 Promise 以取消结算而不是悬挂
+    const onConfirmUpdate = (value) => {
+      if (value) {
+        return;
+      }
+      confirm.value.reject();
+    };
+
     return {
       dialogs,
       titleClass,
       loader,
       confirm,
       close,
+      onConfirmUpdate,
     };
   },
 };

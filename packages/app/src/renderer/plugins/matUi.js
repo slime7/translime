@@ -22,6 +22,21 @@ const matUi = createMatUi({
     tooltip: {
       openDelay: 600,
     },
+    // Escape/帷幕关闭由 closeOnBack 控制；全局开启让对话框保持可快速关闭，
+    // 表单型对话框（收集输入需显式提交）在模板中显式 :close-on-back="false" 防止误关丢失输入
+    dialog: {
+      closeOnBack: true,
+    },
+    // mde-vue 为文本输入提供 488px 默认最大宽度；宿主布局按输入铺满容器设计，统一禁用
+    textField: {
+      block: true,
+    },
+    textarea: {
+      block: true,
+    },
+    select: {
+      block: true,
+    },
   },
 });
 

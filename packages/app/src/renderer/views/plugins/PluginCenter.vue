@@ -267,6 +267,7 @@
       v-model="installLocalPluginDialog.visible"
       width="600"
       title="安装本地插件"
+      :close-on-back="false"
     >
       <mat-tooltip
         :content="installLocalPluginDialog.filepath || '未选择'"

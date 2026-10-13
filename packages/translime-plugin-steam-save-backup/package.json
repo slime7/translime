@@ -47,7 +47,7 @@
     "eslint-config-airbnb-extended": "^3.0.1",
     "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-vue": "^10.0.0",
-    "mde-vue": "git+https://github.com/slime7/mde-vue.git#f339bf900fe9c525b6a6171553c0ddbfe3fa2bda",
+    "mde-vue": "git+https://github.com/slime7/mde-vue.git#v26.10.12",
     "translime-sdk": "workspace:*",
     "vite": "^8.2.0",
     "vite-plugin-css-injected-by-js": "^3.4.0",

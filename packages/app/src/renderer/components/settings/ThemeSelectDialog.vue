@@ -3,6 +3,7 @@
     v-model="visible"
     width="500"
     title="选择主题"
+    :close-on-back="false"
     data-test="theme-select-dialog"
   >
     <mat-list

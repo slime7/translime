@@ -3,6 +3,7 @@
     v-model="internalValue"
     width="560"
     title="配置"
+    :close-on-back="false"
     data-test="plugin-setting-dialog"
   >
     <div class="mt-4">

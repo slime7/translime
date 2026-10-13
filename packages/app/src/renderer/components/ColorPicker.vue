@@ -60,6 +60,7 @@ const setColorDialogConfirm = () => {
       v-model="dialogVisible"
       width="364"
       title="颜色选择器"
+      :close-on-back="false"
     >
       <div class="flex justify-center">
         <input

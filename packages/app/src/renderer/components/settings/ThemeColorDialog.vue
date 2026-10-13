@@ -3,6 +3,7 @@
     v-model="visible"
     width="640"
     title="选择颜色"
+    :close-on-back="false"
   >
     <div class="mt-4">
       <mat-btn-group

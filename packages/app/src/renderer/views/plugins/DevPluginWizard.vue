@@ -3,6 +3,7 @@
     v-model="visible"
     width="640"
     title="创建开发插件"
+    :close-on-back="false"
   >
     <div class="mb-4 flex items-center gap-2">
       <mat-btn

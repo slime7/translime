@@ -51,8 +51,9 @@ const globalMountOptions = {
   global: {
     stubs: {
       'mat-dialog': {
+        name: 'MatDialogStub',
         template: '<div class="mat-dialog-stub"><slot name="title" /><slot /><slot name="actions" /></div>',
-        props: ['modelValue', 'title', 'width'],
+        props: ['modelValue', 'title', 'width', 'closeOnBack'],
       },
       'mat-btn': {
         template: '<button class="mat-btn-stub" @click="$emit(\'click\')"><slot /></button>',
@@ -219,5 +220,13 @@ describe('PluginSettingPanel.vue', () => {
     const wrapper = await mountPanel({}, plugin);
 
     expect(wrapper.vm.validateSettings()).toBe(true);
+  });
+
+  it('配置对话框应禁用 Escape/帷幕关闭，防止误关丢失未保存设置', async () => {
+    const wrapper = await mountPanel();
+
+    // closeOnBack 已通过全局 defaults 开启，表单型对话框必须显式覆盖为 false
+    const dialog = wrapper.findComponent({ name: 'MatDialogStub' });
+    expect(dialog.props('closeOnBack')).toBe(false);
   });
 });

@@ -34,6 +34,7 @@
       v-model="customRegistryPanelVisible"
       width="500"
       title="自定义 npm 域名"
+      :close-on-back="false"
     >
       <mat-text-field
         v-model="customRegistryItem.link"
