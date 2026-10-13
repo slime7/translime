@@ -119,33 +119,34 @@ export default defineConfig(async ({ mode }) => {
       ],
     },
     plugins: [
-      /* 使插件和本体都能使用同一个 vue 与 mde 实例，构建后放入 libs 目录为两者提供引用 */
+      /* 使插件和本体都能使用同一个 vue 与 mde 实例，构建后放入 libs 目录为两者提供引用；
+         vite-plugin-static-copy v4 起保留源文件目录结构，需 stripBase 展平到 dest */
       viteStaticCopy({
         targets: [
           {
             src: normalizePath(resolve(MODULES_ROOT, `./vue/dist/vue.esm-browser${isProd ? '.prod' : ''}.js`)),
             dest: 'libs/vue',
-            rename: 'vue.esm-browser.js',
+            rename: { stripBase: true, name: 'vue.esm-browser.js' },
           },
           {
             src: sharedMdeStandaloneSource,
             dest: 'libs/mde',
-            rename: 'mde.esm.js',
+            rename: { stripBase: true, name: 'mde.esm.js' },
           },
           {
             src: SHARED_MDE_CSS_SOURCE,
             dest: 'libs/mde',
-            rename: 'mde.css',
+            rename: { stripBase: true, name: 'mde.css' },
           },
           {
             src: SHARED_MDE_TAILWIND_SOURCE,
             dest: 'libs/mde',
-            rename: 'mde-tailwind.css',
+            rename: { stripBase: true, name: 'mde-tailwind.css' },
           },
           {
             src: SHARED_MDE_BOOTSTRAP_SOURCE,
             dest: 'libs/mde',
-            rename: 'bootstrap.js',
+            rename: { stripBase: true, name: 'bootstrap.js' },
           },
         ],
       }),

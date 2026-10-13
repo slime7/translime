@@ -27,16 +27,16 @@
     "build": "pnpm run build:plugin && pnpm run build:ui"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.8",
+    "@vitejs/plugin-vue": "^6.0.10",
     "eslint": "~9.24.0",
     "eslint-config-airbnb-extended": "^3.0.1",
     "eslint-import-resolver-alias": "^1.1.2",
-    "eslint-plugin-vue": "^10.0.0",
+    "eslint-plugin-vue": "^10.11.1",
     "mde-vue": "git+https://github.com/slime7/mde-vue.git#v26.10.12",
     "translime-sdk": "workspace:*",
-    "vite": "^8.2.0",
-    "vite-plugin-css-injected-by-js": "^3.4.0",
-    "vue": "^3.5.40"
+    "vite": "^8.3.4",
+    "vite-plugin-css-injected-by-js": "^5.0.2",
+    "vue": "^3.5.44"
   },
   "peerDependencies": {
     "vue": "^3.5.40"
