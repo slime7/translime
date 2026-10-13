@@ -4,6 +4,7 @@ import * as ipcType from '@pkg/share/utils/ipcConstant';
 import mainStore from '../../utils/useMainStore';
 import appManager from '../../utils/useAppManager';
 import logger from '../../utils/logger';
+import { PLUGIN_STATUS_LOAD_ERROR } from './constants';
 import createDistChangeDetector from './distChangeDetector';
 
 /**
@@ -16,6 +17,9 @@ import createDistChangeDetector from './distChangeDetector';
  * 事件到达后先与产物快照对比：读取产物（如打开插件 UI 时加载
  * `dist/ui.esm.js`）只改变访问属性、不改 mtime，不得触发重启。
  *
+ * 重启落在产物半成品上（构建器尚未写完）进入 load-error 时保留监听：
+ * 后续产物变化会再次触发重启，插件自愈恢复，无需手动重启。
+ *
  * 监听器在每次 `resolvePlugins` 后与插件列表重新对齐：
  * 新启用/出现的 dev 插件补充监听，不再启用或消失的移除监听。
  */
@@ -26,6 +30,15 @@ const RESTART_DEBOUNCE_MS = 800;
 const distWatchers = new Map();
 /** 插件包名 → 防抖定时器。 */
 const restartTimers = new Map();
+
+/**
+ * 插件是否应被监听：已启用，或自动重启失败进入 load-error 等待产物修复。
+ *
+ * @param {object} plugin - 插件对象。
+ * @returns {boolean} 是否监听。
+ */
+const shouldWatchPlugin = (plugin) => plugin.enabled
+  || plugin.status === PLUGIN_STATUS_LOAD_ERROR;
 
 const sendPluginsChanged = () => {
   try {
@@ -61,12 +74,16 @@ const scheduleRestart = (loader, packageName) => {
     setTimeout(() => {
       restartTimers.delete(packageName);
       const plugin = loader.getPlugin(packageName);
-      if (!plugin || !plugin.enabled || !plugin.dev) {
+      if (!plugin || !plugin.dev || !shouldWatchPlugin(plugin)) {
         return;
       }
       try {
-        loader.restartPlugin(packageName);
-        logger.info(`[plugin] 开发插件 "${packageName}" 构建产物变化，已自动重启`);
+        const restarted = loader.restartPlugin(packageName);
+        if (restarted?.enabled) {
+          logger.info(`[plugin] 开发插件 "${packageName}" 构建产物变化，已自动重启`);
+        } else {
+          logger.warn(`[plugin] 开发插件 "${packageName}" 自动重启后仍不可用，等待产物下次变化后重试`);
+        }
         sendPluginsChanged();
       } catch (err) {
         logger.warn(`[plugin] 开发插件 "${packageName}" 自动重启失败`, {
@@ -138,7 +155,7 @@ const syncDevPluginWatchers = (loader) => {
 
   const watchable = new Set();
   loader.plugins.forEach((plugin) => {
-    if (plugin.dev && plugin.enabled) {
+    if (plugin.dev && shouldWatchPlugin(plugin)) {
       watchable.add(plugin.packageName);
       watchPluginDist(loader, plugin);
     }

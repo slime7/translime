@@ -5,7 +5,7 @@
   >
     <div
       v-for="entry in cachedEntries"
-      :key="entry.cacheKey || entry.packageName"
+      :key="entry.packageName"
       v-show="entry.packageName === activePackageName"
       class="embedded-plugin-webview-item"
     >
@@ -48,6 +48,39 @@ const setWebviewRef = (packageName, element) => {
   }
   webviewRefs.delete(packageName);
 };
+
+// 插件重启（loadTime 变化）时原地 reload：同一 webview 元素重新加载宿主页面，
+// 挂载时读取最新构建产物。销毁重建元素会触发 Electron webview 附加竞态，
+// 使新 webview 长时间无响应
+const reloadedLoadTimes = new Map();
+
+watch(
+  () => store.embeddedPluginWebviews,
+  (webviews) => {
+    Object.entries(webviews).forEach(([packageName, entry]) => {
+      const loadTime = entry.loadTime || 0;
+      const seenLoadTime = reloadedLoadTimes.get(packageName);
+      if (seenLoadTime === undefined) {
+        // 首次登记：webview 正以当前产物创建，无需重载
+        reloadedLoadTimes.set(packageName, loadTime);
+        return;
+      }
+      if (loadTime > seenLoadTime) {
+        reloadedLoadTimes.set(packageName, loadTime);
+        const webview = webviewRefs.get(packageName);
+        // 页面仍在导航时不重复重载：本次挂载本就会读取最新构建产物
+        if (webview && !webview.isLoading()) {
+          webview.reload();
+        }
+      }
+    });
+    [...reloadedLoadTimes.keys()].forEach((packageName) => {
+      if (!webviews[packageName]) {
+        reloadedLoadTimes.delete(packageName);
+      }
+    });
+  },
+);
 
 watch(
   () => store.embeddedPluginInspectRequest,

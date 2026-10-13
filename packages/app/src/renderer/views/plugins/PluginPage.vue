@@ -111,7 +111,7 @@ export default {
       if (!isEmbeddedRoute.value || !pluginId.value || !loaderVisible.value || !preloadPath.value) {
         return;
       }
-      // cacheKey 由 store 依据 loadTime 变化推导（仅在插件重启时重建 webview）
+      // loadTime 记录进 store，插件重启时由 EmbeddedPluginWebviews 原地 reload
       store.setEmbeddedPluginWebview(pluginId.value, {
         src: webviewSrc.value,
         preloadPath: preloadPath.value,

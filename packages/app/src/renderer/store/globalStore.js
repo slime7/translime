@@ -50,21 +50,15 @@ const useGlobalStore = defineStore('globalStore', {
       if (!packageName) {
         return;
       }
-      const existing = this.embeddedPluginWebviews[packageName];
-      // 仅在插件重启（两次非零 loadTime 变化）时更换 cacheKey 重建 webview，首次激活时保持复用
-      const prevLoadTime = existing?.loadTime || 0;
-      const nextLoadTime = webviewInfo.loadTime || 0;
-      const isRestart = prevLoadTime > 0 && nextLoadTime > 0 && prevLoadTime !== nextLoadTime;
-      const cacheKey = isRestart
-        ? `${packageName}:${nextLoadTime}`
-        : existing?.cacheKey || `${packageName}:${nextLoadTime || prevLoadTime}`;
+      // webview 元素身份保持稳定（key 固定为插件 ID）。插件重启时由
+      // EmbeddedPluginWebviews 依据 loadTime 变化原地 reload 加载新产物，
+      // 避免销毁重建元素触发 Electron webview 附加竞态导致 UI 卡死
       this.embeddedPluginWebviews = {
         ...this.embeddedPluginWebviews,
         [packageName]: {
           packageName,
-          ...existing,
+          ...this.embeddedPluginWebviews[packageName],
           ...webviewInfo,
-          cacheKey,
         },
       };
     },

@@ -73,18 +73,27 @@ describe('globalStore', () => {
   });
 
   describe('setEmbeddedPluginWebview', () => {
-    it('首次激活（loadTime 0→非 0）不更换 cacheKey，只有插件重启时才重建 webview', () => {
-      // 首次激活不更换 cacheKey，避免刷新导致加载中的插件 UI 重载
+    it('插件重启（loadTime 变化）只更新记录，不改变条目身份，webview 不销毁重建', () => {
+      // webview 元素必须保持同一实例：销毁重建会触发 Electron webview
+      // 附加竞态，导致插件热重载后 UI 卡死；重启改由原地 reload 承担
       const store = useGlobalStore();
 
       store.setEmbeddedPluginWebview('translime-plugin-a', { src: 'app://a', loadTime: 0 });
-      expect(store.embeddedPluginWebviews['translime-plugin-a'].cacheKey).toBe('translime-plugin-a:0');
+      const initial = store.embeddedPluginWebviews['translime-plugin-a'];
+      expect(initial.src).toBe('app://a');
+      expect(initial.loadTime).toBe(0);
 
       store.setEmbeddedPluginWebview('translime-plugin-a', { src: 'app://a', loadTime: 111 });
-      expect(store.embeddedPluginWebviews['translime-plugin-a'].cacheKey).toBe('translime-plugin-a:0');
+      const afterFirstLoad = store.embeddedPluginWebviews['translime-plugin-a'];
+      expect(afterFirstLoad).not.toBe(initial);
+      expect(afterFirstLoad.packageName).toBe('translime-plugin-a');
+      expect(afterFirstLoad.loadTime).toBe(111);
 
       store.setEmbeddedPluginWebview('translime-plugin-a', { src: 'app://a', loadTime: 222 });
-      expect(store.embeddedPluginWebviews['translime-plugin-a'].cacheKey).toBe('translime-plugin-a:222');
+      const afterRestart = store.embeddedPluginWebviews['translime-plugin-a'];
+      expect(afterRestart.packageName).toBe('translime-plugin-a');
+      expect(afterRestart.src).toBe('app://a');
+      expect(afterRestart.loadTime).toBe(222);
     });
   });
 
