@@ -379,7 +379,7 @@ const enablePlugin = async (loader, packageName, init = false) => {
     loader.activatingPlugins.add(packageName);
     Object.assign(plugin, applyPluginStatus(plugin, PLUGIN_STATUS_ACTIVATING));
     try {
-      // 顺序激活依赖，保证依赖插件激活完成后_dependent_的 pluginDidLoad 才执行
+      // 顺序激活依赖：前置插件激活完成后，本插件的 pluginDidLoad 才执行
       for (const dependencyId of plugin.dependencies) { // eslint-disable-line no-restricted-syntax
         await loader.enablePlugin(dependencyId, true); // eslint-disable-line no-await-in-loop
       }

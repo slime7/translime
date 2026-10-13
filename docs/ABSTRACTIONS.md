@@ -87,7 +87,7 @@ stateDiagram-v2
 
 - 包名：`translime-plugin-*`（小写字母、数字、连字符）。
 - IPC 事件：`事件名@插件ID`，例如 `ipc.invoke('get-data@translime-plugin-example')`；渲染端 `useIpc(pluginId)` 与主进程 `defineIpcHandlers` 的 `type` 均可省略后缀，由 SDK / 宿主自动补全。
-- 构建产物：主进程入口 `index.esm.js`（ESM，默认；入口保持单文件 bundle，宿主热重载以 query 击穿入口缓存，多文件 chunk 的相对依赖不会被击穿），旧 CJS 产物 `index.cjs.js` 仍兼容；UI 入口 `ui.esm.js`（ESM）。
+- 构建产物：主进程入口 `index.esm.js`（ESM，默认）或 `index.cjs.js`（CJS，仍兼容）；UI 入口 `ui.esm.js`（ESM）。主进程入口保持单文件 bundle：宿主热重载以 query 击穿入口缓存，多文件 chunk 的相对依赖不会被击穿。
 - 图标：Material Design Icons（md）风格，禁止 `mdi-` 前缀。
 - 配置键：`plugin.<插件ID>.settings.<key>`。
 

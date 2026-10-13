@@ -15,6 +15,8 @@ git submodule update --init
 pnpm install
 ```
 
+根 `package.json` 通过 `pnpm.overrides` 把全仓库的 `vue` 收敛到同一版本：workspace 内存在多份 vue 运行时会破坏组件解析与测试桩（vitest 下 `@vue/test-utils` 等经 Node 原生 require 解析依赖）。升级 vue 时调整该 override 并整体重装。
+
 ## 最短运行
 
 ```text

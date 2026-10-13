@@ -21,6 +21,11 @@
       "packages/*"
     ]
   },
+  "pnpm": {
+    "overrides": {
+      "vue": "^3.5.40"
+    }
+  },
   "devDependencies": {
     "@babel/eslint-parser": "^7.28.6",
     "@babel/plugin-syntax-import-attributes": "^7.28.6",
