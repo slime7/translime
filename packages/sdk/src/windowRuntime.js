@@ -5,7 +5,10 @@
 
 import { createRequire } from 'node:module';
 
-const req = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
+// 以 cwd 而非 import.meta.url 为基准，避免 SDK 被以 CJS 打包时触发 rolldown 的 EMPTY_IMPORT_META 告警
+const req = typeof require !== 'undefined'
+  ? require
+  : createRequire(`${process.cwd()}/`);
 
 const getElectron = () => {
   try {
