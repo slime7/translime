@@ -164,8 +164,8 @@ class CreateElectronApp extends EventEmitter {
         createProtocol('app');
         if (this.isDevelopment) {
           try {
-            const { installExtension, VUEJS_DEVTOOLS } = await import('electron-devtools-installer');
-            await installExtension(VUEJS_DEVTOOLS, {
+            const { installExtension, VUEJS_DEVTOOLS_BETA } = await import('electron-devtools-installer');
+            await installExtension(VUEJS_DEVTOOLS_BETA, {
               loadExtensionOptions: {
                 allowFileAccess: true,
               },
