@@ -1,15 +1,15 @@
 <template>
-  <div class="text-center mt-10">
+  <div class="text-center">
     <mat-progress
       variant="circular"
       indeterminate
       :size="64"
       class="loading-spinner"
-      aria-label="正在扫描 Steam 游戏"
+      aria-label="正在扫描游戏存档"
     />
 
     <div class="loading-text mt-4">
-      正在扫描 Steam 游戏...
+      正在扫描游戏存档...
     </div>
   </div>
 </template>

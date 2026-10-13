@@ -22,7 +22,7 @@ packages/translime-plugin-steam-save-backup/
 │   ├── index.js            # 主进程入口 (Main Process Entry)
 │   ├── ui/                 # 渲染进程 (UI)
 │   │   ├── ui.vue          # 插件 UI 主组件
-│   │   ├── components/     # UI 子组件（游戏卡片/详情对话框/自定义目录对话框/远程同步对话框/直通云存档视图等）
+│   │   ├── components/     # UI 子组件（分页页头/游戏卡片/详情对话框/自定义目录对话框/远程同步对话框/直通云存档视图等）
 │   │   ├── composables/    # useSteamSaveBackup / useSyncStatus 组合式状态
 │   │   └── preview-mocks.mjs # preview 模式声明式 IPC mock
 │   └── utils/              # 逻辑与辅助工具 (Logic & Helpers)
@@ -86,7 +86,7 @@ packages/translime-plugin-steam-save-backup/
 *   **1. 主界面 (`src/ui/ui.vue` 与 `src/ui/components/`)**:
     *   **框架**: Vue 3 + mde-vue（宿主通过 `window.mde$` 提供运行时，插件不打包组件库；需要宿主 `engines.translime >= 0.7.0`）。模板中直接使用 `mat-*` 标签，SDK 编译期自动注入组件。
     *   **布局**: 页面根为 `mat-layout`（自带 `overflow:auto`，滚动条贴页面边缘），顶部操作放 `mat-app-bar`（默认插槽为标题、`trailing` 插槽为操作按钮，随滚动停靠/填色）；页面高度锚定 `100dvh`（preview 模式回退 `100%`），不依赖宿主 `#app` 高度链，避免文档+内容双层滚动。
-    *   **工具栏**: `SteamBackupToolbar` 仅保留「手动添加 / 刷新列表」两个按钮（统一 `filled-tonal` 变体）；页面宽度 < 640px 时由 ResizeObserver 收缩为图标按钮（带 tooltip 与 aria-label）。「打开备份目录 / 同步设置 / 发现远程数据」在宿主插件页顶栏按钮区（见 3.5）。
+    *   **三页结构**: 顶部 `mat-app-bar` 的 `trailing` 插槽放「自动检测 / 自定义存档 / 直通存档」三页切换（`mat-btn-group`）；三页共用同一结构——`PageHeader` 页头（标题 + 说明 + 操作按钮：自动检测页「刷新列表」、自定义存档页「手动添加」、直通页「立即同步 / 添加存档目录」）→ 卡片网格（`GameGrid`）→ 附加面板（自动检测/自定义页为「已隐藏的游戏」，直通页为对账报告）→ 统一空状态（`EmptyGamesState`，参数化图标/标题/提示/动作）。「打开备份目录 / 同步设置 / 发现远程数据」在宿主插件页顶栏按钮区（见 3.5）。
     *   **图标**: 使用 Material Design Icons (md) 风格 (例如 `<mat-icon icon="home" />`)，**不要**使用 `mdi-home`。
     *   **样式注入**: 使用 SDK 的 `createPluginCssIsolationPlugins`（内部封装 `vite-plugin-css-injected-by-js`），`styleId` 为插件名。
     *   **CSS**: 使用 `<style scoped>` + Tailwind utilities（`@layer tailwind` 降权引入）。
@@ -107,9 +107,9 @@ packages/translime-plugin-steam-save-backup/
     2.  调用 `restoreSave` 将备份文件覆盖回原存档路径。
 
 *   **自定义存档目录（手动添加）**:
-    1.  主页面工具栏「手动添加」打开 `CustomSaveDirsDialog`；游戏名手动填写（支持非 Steam 游戏），选择目录后走 `add-custom-save-dir` IPC 校验并写入 `plugin.<id>.settings.customSaveDirs`（`[{ gameName, dir }]`）。目录必须存在且含文件；发现远程备份的添加流程携带 `allowEmptyDir` 放行空目录（新设备先登记游戏、稍后同步拉取备份）。
+    1.  「自定义存档」分页页头的「手动添加」按钮打开 `CustomSaveDirsDialog`；游戏名手动填写（支持非 Steam 游戏），选择目录后走 `add-custom-save-dir` IPC 校验并写入 `plugin.<id>.settings.customSaveDirs`（`[{ gameName, dir }]`）。目录必须存在且含文件；发现远程备份的添加流程携带 `allowEmptyDir` 放行空目录（新设备先登记游戏、稍后同步拉取备份）。
     2.  `remove-custom-save-dir` 移除条目，**可选同时清理备份**：确认面板提供「删除本地备份」与「同时删除远程存档」开关——本地按该自定义游戏（`hashGameKey(gameName)`）的全部备份目录逐份删除；远端逐份走墓碑（`cleanupCustomDirBackups`，`utils/custom-dir-removal.js`，原 info.json 在本地删除前读取、best-effort 单份失败记告警不中断），完成后触发一次对账把墓碑传播给其他设备；未勾选则仅解除绑定，备份原样保留。
-    3.  `scan-games` 时按游戏名（大小写不敏感）合并：与扫描游戏同名的目录并入该游戏 `saveSources`；未命中的条目按名称生成自定义游戏（appid 为 `custom-<名称哈希>`，`isCustom: true`），与 Steam 游戏一同出现在列表中参与备份/还原。
+    3.  `scan-games` 时按游戏名（大小写不敏感）合并：与扫描游戏同名的目录并入该游戏 `saveSources`（仍在「自动检测」分页展示）；未命中的条目按名称生成自定义游戏（appid 为 `custom-<名称哈希>`，`isCustom: true`），出现在「自定义存档」分页参与备份/还原。
 
 *   **已卸载游戏的存档管理**: 扫描时把每个 Steam 游戏的云存档配置（`savePaths`，来自 remotecache.vdf）登记到插件配置 `settings.knownGames`（appid → { appid, name, savePaths }，`src/utils/known-games.js` 纯函数实现）。游戏卸载后扫描不到，但登记过且本地仍有备份的游戏以「未安装 · 仅存档管理」标识继续出现在列表中——`saveSources` 置空（`canBackup` 自然为 false，不支持新增备份），还原 / 删除 / 备注 / 同步照常可用；已安装游戏的实时扫描配置始终优先（登记条目随之更新，不重复列出），无备份的登记条目不展示，删除其全部备份后自然从列表消失。
 
@@ -145,12 +145,12 @@ packages/translime-plugin-steam-save-backup/
         *   删除冲突：可选择保留本机存档（重新上传并撤销删除）或确认删除本地。
         *   内容冲突：可选择保留本机存档（上传覆盖远端）或采用远端存档（快照替换本地）。
     *   **取消链接与墓碑**: 取消链接仅解除绑定，本地目录保留；勾选「同时删除远程存档」时清理远端数据并写入删除墓碑，通知其他设备跟随删除。
-    *   **UI**: 顶部「存档备份 | 直通云存档」视图切换。直通条目使用卡片展示，点击打开详情弹窗进行冲突处理、恢复下载、取消链接与立即同步。
+    *   **UI**: 顶部「自动检测 | 自定义存档 | 直通存档」三页切换（三页共用 `PageHeader` 页头 + `GameGrid` 卡片网格 + 统一空状态结构）。直通条目点击打开详情弹窗进行冲突处理、恢复下载、取消链接与立即同步。
     *   **IPC**: 支持条目增删查、打开目录、恢复下载与冲突处置，状态集成于 `sync-get-status`。远端条目可通过「发现远程数据」登记到本地。
 
 ### 3.5 宿主顶栏按钮区 (Host Title-Bar Actions)
 
-*   插件经 SDK `setTitleBarActions(pluginId, actions)`（主进程 API，需宿主 `>= 0.8.1`）在**宿主插件页顶栏**（inspect 按钮旁）声明公共操作按钮，与插件自身 UI 分离——两个视图（备份/直通）都能使用。模板结构类似 Electron Menu：`{ label, icon, iconOnly, tooltip, enabled, visible, click }` 直按钮或 `{ ..., submenu: [...] }` 下拉菜单。
+*   插件经 SDK `setTitleBarActions(pluginId, actions)`（主进程 API，需宿主 `>= 0.8.1`）在**宿主插件页顶栏**（inspect 按钮旁）声明公共操作按钮，与插件自身 UI 分离——三个视图（自动检测/自定义存档/直通）都能使用。模板结构类似 Electron Menu：`{ label, icon, iconOnly, tooltip, enabled, visible, click }` 直按钮或 `{ ..., submenu: [...] }` 下拉菜单。
 *   本插件注册三个图标按钮：「打开备份目录」（主进程直接 `shell.openPath` 备份根目录，与 `open-backup-dir` IPC 共用 `openBackupRoot`）、「同步设置」（`notifyClient({ kind: 'open-sync-settings' })` 推送插件 UI，任意视图弹出 `SyncSettingsDialog`）与「发现远程数据」（`notifyClient({ kind: 'open-remote-discovery' })` 弹出 `DiscoverRemoteBackupsDialog`，`enabled` 跟随远程目标配置，见 3.4「远程数据发现」）。
 *   宿主在插件停用/重启时自动清除；`pluginWillUnload` 中也显式传 `null` 清除。宿主过旧时 API 返回 `false` 静默降级，不影响其余功能。
 
@@ -159,7 +159,7 @@ packages/translime-plugin-steam-save-backup/
 *   **文档同步**: 每次完成新功能或修改核心逻辑后，**必须同步更新本文件 (`memo.md`)**，以保持项目的一致性与可维护性。
 *   **版本号策略**: 版本号在分支合并（发布）时提升，开发阶段不改动版本号。
 *   **当前状态**:
-    *   状态: 稳定。核心备份/还原、多端远程同步（打包传输、集合对账、冲突确认、墓碑删除）、文件监控自动备份、已卸载游戏存档管理、直通云存档快照同步与远程数据发现均已实现。顶栏公共操作按钮在各视图可用。
+    *   状态: 稳定。核心备份/还原、多端远程同步（打包传输、集合对账、冲突确认、墓碑删除）、文件监控自动备份、已卸载游戏存档管理、直通云存档快照同步与远程数据发现均已实现。主界面按「自动检测 / 自定义存档 / 直通存档」三页展示，顶栏公共操作按钮在各视图可用。
 *   **自动同步参数**: 监控防抖 2s / 同步后静默宽限 3s / 自动备份防抖 3s / 每游戏冷却 10 分钟，集中定义在 `src/index.js`（`WATCHER_*` / `AUTO_BACKUP_*` 常量），调参后需同步本文件。
 *   **Vite 配置**: 主进程和 UI 使用不同的配置文件，请确保修改对应配置。
 *   **构建**: `npm run build` 同时构建插件主逻辑和 UI。

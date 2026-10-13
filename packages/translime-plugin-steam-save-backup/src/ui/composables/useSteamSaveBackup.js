@@ -62,8 +62,11 @@ export default function useSteamSaveBackup() {
     loading: false,
   });
 
-  const visibleGames = computed(() => games.value.filter((game) => !game.excluded));
-  const hiddenGames = computed(() => games.value.filter((game) => game.excluded));
+  // 自动检测页：Steam 扫描与已卸载登记游戏（含带云存档的非游戏应用）；自定义页：手动登记的独立游戏
+  const visibleAutoGames = computed(() => games.value.filter((game) => !game.isCustom && !game.excluded));
+  const hiddenAutoGames = computed(() => games.value.filter((game) => !game.isCustom && game.excluded));
+  const visibleCustomGames = computed(() => games.value.filter((game) => game.isCustom && !game.excluded));
+  const hiddenCustomGames = computed(() => games.value.filter((game) => game.isCustom && game.excluded));
   const canBackup = computed(() => saveSourcesToSavePaths(getGameSaveSources(selectedGame.value)).length > 0);
 
   const showMessage = (text, color = 'success') => {
@@ -353,8 +356,10 @@ export default function useSteamSaveBackup() {
     dialog,
     noteDialog,
     confirmDialog,
-    visibleGames,
-    hiddenGames,
+    visibleAutoGames,
+    hiddenAutoGames,
+    visibleCustomGames,
+    hiddenCustomGames,
     canBackup,
     formatTime,
     scanGames,

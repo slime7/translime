@@ -11,67 +11,133 @@
       <span class="page-bar-title">Steam 存档备份</span>
 
       <template #trailing>
-        <div class="bar-trailing">
-          <!-- 备份区工具栏 -->
-          <SteamBackupToolbar
-            v-if="activeView === 'backup'"
-            :collapsed="collapsed"
-            :scan-loading="loading.scan"
-            @add-custom-dir="customDirOpen = true"
-            @scan-games="scanGames"
+        <!-- 视图切换：自动检测 / 自定义存档 / 直通存档 -->
+        <mat-btn-group
+          variant="connected"
+          selection="single"
+          shape="square"
+          size="small"
+          :selected="activeView"
+          @select="activeView = $event.nextSelected"
+        >
+          <mat-btn
+            value="auto"
+            icon="radar"
+            label="自动检测"
           />
-
-          <!-- 视图切换：存档备份 / 直通云存档 -->
-          <mat-btn-group
-            variant="connected"
-            selection="single"
-            shape="square"
-            size="small"
-            :selected="activeView"
-            @select="activeView = $event.nextSelected"
-          >
-            <mat-btn
-              value="backup"
-              icon="backup"
-              label="存档备份"
-            />
-            <mat-btn
-              value="passthrough"
-              icon="cloud_sync"
-              label="直通云存档"
-            />
-          </mat-btn-group>
-        </div>
+          <mat-btn
+            value="custom"
+            icon="create_new_folder"
+            label="自定义存档"
+          />
+          <mat-btn
+            value="passthrough"
+            icon="cloud_sync"
+            label="直通存档"
+          />
+        </mat-btn-group>
       </template>
     </mat-app-bar>
 
+    <!-- 自动检测页：Steam 扫描结果与已卸载登记游戏，保留云存档内容（有些非游戏也带云存档） -->
     <main
-      v-if="activeView === 'backup'"
+      v-if="activeView === 'auto'"
       class="save-backup-content"
     >
+      <PageHeader
+        title="自动检测游戏"
+        description="扫描 Steam 库自动发现的存档，含带云存档的非游戏应用与已卸载游戏"
+      >
+        <template #actions>
+          <mat-btn
+            variant="filled-tonal"
+            prefix="refresh"
+            :loading="loading.scan"
+            @click="scanGames"
+          >
+            刷新列表
+          </mat-btn>
+        </template>
+      </PageHeader>
+
       <LoadingState v-if="loading.scan && games.length === 0" />
 
-      <GameGrid
-        v-if="visibleGames.length > 0"
-        :games="visibleGames"
-        :exclude-loading="loading.exclude"
-        @open-game="openGameDetails"
-        @exclude-game="excludeGame"
-      />
+      <template v-else>
+        <GameGrid
+          v-if="visibleAutoGames.length > 0"
+          :games="visibleAutoGames"
+          :exclude-loading="loading.exclude"
+          @open-game="openGameDetails"
+          @exclude-game="excludeGame"
+        />
 
-      <HiddenGamesPanel
-        v-if="hiddenGames.length > 0"
-        :games="hiddenGames"
-        :exclude-loading="loading.exclude"
-        @include-game="includeGame"
-      />
+        <HiddenGamesPanel
+          v-if="hiddenAutoGames.length > 0"
+          :games="hiddenAutoGames"
+          :exclude-loading="loading.exclude"
+          @include-game="includeGame"
+        />
 
-      <EmptyGamesState
-        v-if="!loading.scan && visibleGames.length === 0 && hiddenGames.length === 0"
-        @scan="scanGames"
-      />
+        <EmptyGamesState
+          v-if="!loading.scan && visibleAutoGames.length === 0 && hiddenAutoGames.length === 0"
+          title="未发现可自动检测的游戏"
+          hint="可在插件设置中配置 Steam 路径，或手动添加存档目录"
+          action-text="重新扫描"
+          @action="scanGames"
+        />
+      </template>
     </main>
 
+    <!-- 自定义存档页：手动登记的游戏存档目录 -->
+    <main
+      v-else-if="activeView === 'custom'"
+      class="save-backup-content"
+    >
+      <PageHeader
+        title="自定义游戏存档"
+        description="手动登记的存档目录，支持非 Steam 游戏；与自动检测游戏同名的目录会并入该游戏"
+      >
+        <template #actions>
+          <mat-btn
+            variant="filled-tonal"
+            prefix="create_new_folder"
+            @click="customDirOpen = true"
+          >
+            手动添加
+          </mat-btn>
+        </template>
+      </PageHeader>
+
+      <LoadingState v-if="loading.scan && games.length === 0" />
+
+      <template v-else>
+        <GameGrid
+          v-if="visibleCustomGames.length > 0"
+          :games="visibleCustomGames"
+          :exclude-loading="loading.exclude"
+          @open-game="openGameDetails"
+          @exclude-game="excludeGame"
+        />
+
+        <HiddenGamesPanel
+          v-if="hiddenCustomGames.length > 0"
+          :games="hiddenCustomGames"
+          :exclude-loading="loading.exclude"
+          @include-game="includeGame"
+        />
+
+        <EmptyGamesState
+          v-if="!loading.scan && visibleCustomGames.length === 0 && hiddenCustomGames.length === 0"
+          icon="create_new_folder"
+          title="暂无自定义存档"
+          hint="通过「手动添加」登记游戏存档目录，支持非 Steam 游戏"
+          action-text="手动添加"
+          @action="customDirOpen = true"
+        />
+      </template>
+    </main>
+
+    <!-- 直通存档页 -->
     <main
       v-else
       class="save-backup-content"
@@ -164,8 +230,8 @@ import GameGrid from './components/GameGrid.vue';
 import HiddenGamesPanel from './components/HiddenGamesPanel.vue';
 import LoadingState from './components/LoadingState.vue';
 import NoteDialog from './components/NoteDialog.vue';
+import PageHeader from './components/PageHeader.vue';
 import PassthroughView from './components/passthrough/PassthroughView.vue';
-import SteamBackupToolbar from './components/SteamBackupToolbar.vue';
 import SyncSettingsDialog from './components/SyncSettingsDialog.vue';
 import useSteamSaveBackup from './composables/useSteamSaveBackup';
 import {
@@ -182,11 +248,10 @@ defineOptions({
 const PLUGIN_ID = 'translime-plugin-steam-save-backup';
 
 const layoutRef = ref(null);
-const collapsed = ref(false);
 const customDirOpen = ref(false);
 const discoverDialogOpen = ref(false);
 const syncDialogOpen = ref(false);
-const activeView = ref('backup');
+const activeView = ref('auto');
 const previewMode = isPreviewMode();
 
 const syncSnackbar = ref({ show: false, text: '', color: 'success' });
@@ -251,20 +316,12 @@ const onSyncNotify = (payload) => {
   }
 };
 
-let resizeObserver;
-
 onMounted(() => {
-  // 响应式调整工具栏模式
-  resizeObserver = new ResizeObserver((entries) => {
-    collapsed.value = entries[0].contentRect.width < 640;
-  });
-  resizeObserver.observe(layoutRef.value?.$el ?? layoutRef.value);
   refreshSyncStatus();
   ipc?.on('sync-notify', onSyncNotify);
 });
 
 onBeforeUnmount(() => {
-  resizeObserver?.disconnect();
   ipc?.detach('sync-notify', onSyncNotify);
   stopSyncStatusPolling();
 });
@@ -278,8 +335,10 @@ const {
   dialog,
   noteDialog,
   confirmDialog,
-  visibleGames,
-  hiddenGames,
+  visibleAutoGames,
+  hiddenAutoGames,
+  visibleCustomGames,
+  hiddenCustomGames,
   canBackup,
   formatTime,
   scanGames,
@@ -335,12 +394,9 @@ watch(syncRunning, (running, wasRunning) => {
 }
 
 .save-backup-content {
-  padding: 16px;
-}
-
-.bar-trailing {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
 }
 </style>

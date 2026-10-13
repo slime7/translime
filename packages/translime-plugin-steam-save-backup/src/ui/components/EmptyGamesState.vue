@@ -1,31 +1,50 @@
 <template>
-  <div class="flex flex-col items-center justify-center w-full mt-10">
+  <div class="flex flex-col items-center justify-center w-full">
     <mat-icon
-      icon="sports_esports"
+      :icon="icon"
       class="empty-icon"
     />
 
     <div class="empty-title mt-4 text-xl">
-      未发现可备份的游戏
+      {{ title }}
     </div>
 
     <div class="empty-hint mt-1 text-sm">
-      可通过工具栏手动添加存档目录，或在插件设置中配置 Steam 路径
+      {{ hint }}
     </div>
 
     <mat-btn
       class="mt-4"
       variant="text"
       color="primary"
-      @click="$emit('scan')"
+      @click="$emit('action')"
     >
-      重新扫描
+      {{ actionText }}
     </mat-btn>
   </div>
 </template>
 
 <script setup>
-defineEmits(['scan']);
+defineProps({
+  icon: {
+    type: String,
+    default: 'sports_esports',
+  },
+  title: {
+    type: String,
+    required: true,
+  },
+  hint: {
+    type: String,
+    default: '',
+  },
+  actionText: {
+    type: String,
+    default: '重新扫描',
+  },
+});
+
+defineEmits(['action']);
 </script>
 
 <style scoped>

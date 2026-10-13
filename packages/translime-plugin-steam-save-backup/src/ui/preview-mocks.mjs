@@ -23,6 +23,16 @@ const mockGames = [
     excluded: false,
   },
   {
+    appid: '570',
+    name: 'Dota 2',
+    installDir: null,
+    libraryPath: null,
+    savePaths: [],
+    saveSources: [],
+    backupCount: 0,
+    excluded: true,
+  },
+  {
     appid: '413150',
     name: 'Stardew Valley',
     uninstalled: true,

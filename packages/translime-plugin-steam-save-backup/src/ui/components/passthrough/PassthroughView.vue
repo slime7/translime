@@ -27,12 +27,13 @@
     </div>
 
     <template v-else>
-      <div class="pt-toolbar">
-        <div class="pt-toolbar-text">
+      <PageHeader
+        title="直通存档"
+        description="本地存档目录与远程直接镜像同步（双向对账，双端都有更新时会询问保留哪边），不占用多余本地备份空间。取消链接时可选删除远程存档。"
+      >
+        <template #title>
           <div style="display: flex; align-items: center; gap: 6px">
-            <div class="pt-title">
-              直通云存档
-            </div>
+            直通存档
             <mat-tooltip
               rich
               subhead="何时使用直通存档同步："
@@ -50,11 +51,8 @@
               不需要多余备份，直接同步存档位置和远程存档
             </mat-tooltip>
           </div>
-          <div class="pt-desc">
-            本地存档目录与远程直接镜像同步（双向对账，双端都有更新时会询问保留哪边），不占用多余本地备份空间。取消链接时可选删除远程存档。
-          </div>
-        </div>
-        <div class="pt-toolbar-actions">
+        </template>
+        <template #actions>
           <mat-btn
             variant="filled-tonal"
             prefix="cloud_sync"
@@ -72,8 +70,8 @@
           >
             添加存档目录
           </mat-btn>
-        </div>
-      </div>
+        </template>
+      </PageHeader>
 
       <!-- 条目卡片 -->
       <div
@@ -86,12 +84,14 @@
         />
       </div>
 
-      <div
+      <EmptyGamesState
         v-else-if="!loading.list"
-        class="pt-empty"
-      >
-        暂无直通条目，添加后本地变更将自动同步到远程。
-      </div>
+        icon="cloud_off"
+        title="暂无直通条目"
+        hint="添加后本地存档目录将与远程保持镜像同步"
+        action-text="添加存档目录"
+        @action="addOpen = true"
+      />
 
       <!-- 最近对账结果 -->
       <div class="pt-report">
@@ -147,7 +147,9 @@ import {
   ref,
   watch,
 } from 'vue';
+import EmptyGamesState from '../EmptyGamesState.vue';
 import GameGrid from '../GameGrid.vue';
+import PageHeader from '../PageHeader.vue';
 import PassthroughAddDialog from './PassthroughAddDialog.vue';
 import PassthroughDetailsDialog from './PassthroughDetailsDialog.vue';
 import usePassthrough from '../../composables/usePassthrough';
@@ -384,49 +386,8 @@ const syncNow = async () => {
   color: var(--mat-sys-color-on-surface-variant);
 }
 
-.pt-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.pt-toolbar-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.pt-title {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  color: var(--mat-sys-color-on-surface);
-}
-
-.pt-desc {
-  font-size: .8125rem;
-  color: var(--mat-sys-color-on-surface-variant);
-}
-
-.pt-toolbar-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 .pt-grid {
   margin: 0 -4px;
-}
-
-.pt-empty {
-  padding: 24px;
-  border: 1px dashed var(--mat-sys-color-outline-variant);
-  border-radius: 12px;
-  font-size: .875rem;
-  color: var(--mat-sys-color-on-surface-variant);
-  text-align: center;
 }
 
 .pt-report {

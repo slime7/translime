@@ -1,5 +1,5 @@
 <template>
-  <div class="mt-8">
+  <div>
     <mat-expansion-panel
       :split="false"
       :title="`已隐藏的游戏 (${games.length} 个)`"
