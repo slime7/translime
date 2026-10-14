@@ -23,7 +23,7 @@
     }
   },
   "engines": {
-    "translime": ">=0.7.0"
+    "translime": ">=0.8.3"
   },
   "files": [
     "dist",
