@@ -25,7 +25,9 @@
       />
     </div>
 
-    <div v-if="error" class="error" role="alert">{{ error }}</div>
+    <div v-if="error" class="error" role="alert">
+      {{ error }}
+    </div>
 
     <div class="filter-row">
       <input
@@ -37,8 +39,12 @@
       >
     </div>
 
-    <div v-if="loadingApps" class="hint">加载应用列表…</div>
-    <div v-else-if="apps.length === 0" class="hint">{{ serial ? '未获取到应用列表' : '请先连接设备' }}</div>
+    <div v-if="loadingApps" class="hint">
+      加载应用列表…
+    </div>
+    <div v-else-if="apps.length === 0" class="hint">
+      {{ serial ? '未获取到应用列表' : '请先连接设备' }}
+    </div>
     <ul v-else class="app-list">
       <li v-for="pkg in filteredApps" :key="pkg" class="app-item">
         <span class="pkg">{{ pkg }}</span>

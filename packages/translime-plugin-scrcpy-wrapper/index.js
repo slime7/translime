@@ -1,7 +1,7 @@
-import { useLogger, usePluginConfig, defineIpcHandlers } from 'translime-sdk';
-import * as adbModule from './src/adb.js';
-import * as scrcpyModule from './src/scrcpy.js';
-import { resolveScrcpyPath, resolveAdbPath } from './src/bin-resolver.js';
+import { defineIpcHandlers, useLogger, usePluginConfig } from 'translime-sdk';
+import * as adbModule from './src/adb';
+import * as scrcpyModule from './src/scrcpy';
+import { resolveAdbPath, resolveScrcpyPath } from './src/bin-resolver';
 
 const id = 'translime-plugin-scrcpy-wrapper';
 const baseLogger = useLogger();

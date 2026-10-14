@@ -12,7 +12,12 @@ export const nextWindowTitle = () => {
  * 构建 scrcpy 启动参数：
  * 默认 h265 编码 + 声音开启；virtual 模式使用虚拟屏幕并可选直接拉起应用
  */
-export const buildScrcpyArgs = ({ mode, serial, pkg, title }) => {
+export const buildScrcpyArgs = ({
+  mode,
+  serial,
+  pkg,
+  title,
+}) => {
   const args = [
     `--serial=${serial}`,
     `--window-title=${title}`,

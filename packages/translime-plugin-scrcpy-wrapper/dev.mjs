@@ -42,6 +42,7 @@ const forwardOutput = (name, stream) => {
 const startTask = (task) => {
   // Windows 下 vite 是 .cmd 脚本，需要经过 shell 启动；
   // 命令与参数拼成单个字符串，避免 shell + args 数组的弃用告警
+  // eslint-disable-next-line no-param-reassign
   task.child = spawn(`vite ${task.args.join(' ')}`, {
     shell: process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],

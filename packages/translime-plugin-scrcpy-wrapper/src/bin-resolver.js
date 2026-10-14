@@ -28,17 +28,11 @@ export const searchPathFor = (command, options = {}) => {
     return null;
   }
   const ext = platform === 'win32' ? '.exe' : '';
-  const dirs = envPath.split(path.delimiter);
-  for (const dir of dirs) {
-    if (!dir) {
-      continue;
-    }
-    const full = path.join(dir, `${command}${ext}`);
-    if (existsSync(full)) {
-      return full;
-    }
-  }
-  return null;
+  const dirs = envPath.split(path.delimiter).filter((dir) => dir !== '');
+  const found = dirs
+    .map((dir) => path.join(dir, `${command}${ext}`))
+    .find((full) => existsSync(full));
+  return found ?? null;
 };
 
 /**

@@ -3,9 +3,9 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { BrowserWindow, screen } from 'electron';
 import { setupMdeWindow } from 'translime-sdk';
-import { findWindowByTitle, mountSdlToElectron, setupBlurResizeHooks } from './win32.js';
-import { resolveScrcpyPath, resolveAdbPath } from './bin-resolver.js';
-import { nextWindowTitle, buildScrcpyArgs } from './scrcpy-args.js';
+import { findWindowByTitle, mountSdlToElectron, setupBlurResizeHooks } from './win32';
+import { resolveAdbPath, resolveScrcpyPath } from './bin-resolver';
+import { buildScrcpyArgs, nextWindowTitle } from './scrcpy-args';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -120,7 +120,12 @@ export const launchSession = async (options = {}) => {
   const adbPath = resolveAdbPath({ scrcpyResolved: scrcpyInfo.resolved });
   const title = nextWindowTitle();
   const sessionId = `session-${title}`;
-  const args = buildScrcpyArgs({ mode, serial, pkg, title });
+  const args = buildScrcpyArgs({
+    mode,
+    serial,
+    pkg,
+    title,
+  });
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
 
   // scrcpy 与本插件使用同一个 adb，避免两个版本的 adb server 相互踢下线
