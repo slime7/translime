@@ -1,9 +1,9 @@
 import { createRequire } from 'node:module';
+import { fitVideoRect } from './window-size';
 
 const requireNative = createRequire(import.meta.url);
 
 export const GWL_STYLE = -16;
-export const WM_ENTERSIZEMOVE = 0x0231;
 export const WM_EXITSIZEMOVE = 0x0232;
 
 // 窗口样式值含第 31 位（WS_POPUP），超出 JS 32 位位运算范围，必须经 BigInt 参与运算
@@ -12,13 +12,10 @@ const WS_CLIPCHILDREN = 0x02000000n;
 const WS_CHILD = 0x40000000n;
 const WS_POPUP = 0x80000000n;
 
-const SWP_NOSIZE = 0x0001;
-const SWP_NOMOVE = 0x0002;
 const SWP_NOZORDER = 0x0004;
 const SWP_NOACTIVATE = 0x0010;
 const SWP_FRAMECHANGED = 0x0020;
 const SWP_SHOWWINDOW = 0x0040;
-const SWP_HIDEWINDOW = 0x0080;
 
 let bindings = null;
 let bindingsError = null;
@@ -90,20 +87,37 @@ export const findWindowByTitle = (title) => {
 };
 
 /**
- * 按客户区（减去底部控制条）同步子窗口位置，物理像素坐标
+ * 同步子窗口到客户区，物理像素坐标。
+ *
+ * aspect（设备分辨率）存在时等比缩放并居中，四周留黑边；
+ * 缺省时铺满客户区减底条。frameChanged 仅挂载后样式变更时需要，
+ * 持续同步阶段不发送以免逐帧重算非客户区
  */
 export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
   const b = loadBindings();
-  const { barPhysicalHeight = 0, show = true } = options;
+  const {
+    barPhysicalHeight = 0,
+    show = true,
+    frameChanged = false,
+    aspect = null,
+  } = options;
   const parentHwnd = hwndFromWindow(wrapperWin);
   if (!b.GetClientRect(parentHwnd, b.rectPtr)) {
     return;
   }
   const rect = b.decodeRect(b.rectPtr);
-  const width = rect.right - rect.left;
-  const height = rect.bottom - rect.top - Math.max(0, Math.round(barPhysicalHeight));
-  const flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | (show ? SWP_SHOWWINDOW : 0);
-  b.SetWindowPos(sdlHwnd, 0, 0, 0, width, Math.max(1, height), flags);
+  const clientW = rect.right - rect.left;
+  const clientH = rect.bottom - rect.top;
+  const barH = Math.max(0, Math.round(barPhysicalHeight));
+  const video = fitVideoRect({
+    areaWidth: clientW,
+    areaHeight: clientH - barH,
+    aspect,
+  });
+  const flags = SWP_NOZORDER | SWP_NOACTIVATE
+    | (frameChanged ? SWP_FRAMECHANGED : 0)
+    | (show ? SWP_SHOWWINDOW : 0);
+  b.SetWindowPos(sdlHwnd, 0, video.x, video.y, video.width, video.height, flags);
 };
 
 /**
@@ -126,7 +140,7 @@ export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
     b.SetWindowLongPtrW(sdlHwnd, GWL_STYLE, childNext);
 
     b.SetParent(sdlHwnd, parentHwnd);
-    syncChildRect(wrapperWin, sdlHwnd, options);
+    syncChildRect(wrapperWin, sdlHwnd, { ...options, frameChanged: true });
   } finally {
     if (attached) {
       b.AttachThreadInput(currentThread, sdlThread, 0);
@@ -135,60 +149,32 @@ export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
 };
 
 /**
- * 拦截宿主窗口的模态拖动/缩放循环：
- * 进入时隐藏子窗口避免逐帧残影，退出后单次 SetWindowPos 落地
+ * 缩放实时同步：Electron 在交互缩放期间持续发出 resize 事件，
+ * 每次都把子窗口贴合到当前客户区，画面跟随缩放且不中断 scrcpy；
+ * WM_EXITSIZEMOVE 兜底覆盖不经过 resize 事件的系统级窗口排布
  */
-export const setupBlurResizeHooks = (wrapperWin, sdlHwnd, options = {}) => {
-  const { getBarPhysicalHeight = () => 0 } = options;
-  let resizing = false;
+export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
+  const { getBarPhysicalHeight = () => 0, getAspect = () => null } = options;
 
-  const hideChild = () => {
-    const b = loadBindings();
-    b.SetWindowPos(
-      sdlHwnd,
-      0,
-      0,
-      0,
-      0,
-      0,
-      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_HIDEWINDOW,
-    );
-  };
-  const showChild = () => {
-    syncChildRect(wrapperWin, sdlHwnd, { barPhysicalHeight: getBarPhysicalHeight(), show: true });
-  };
-  const onEnterSizeMove = () => {
-    resizing = true;
-    hideChild();
-  };
-  const onExitSizeMove = () => {
-    resizing = false;
-    showChild();
-  };
-  const onResize = () => {
-    if (resizing) {
-      return;
-    }
-    showChild();
+  const sync = () => {
+    syncChildRect(wrapperWin, sdlHwnd, {
+      barPhysicalHeight: getBarPhysicalHeight(),
+      aspect: getAspect(),
+      show: true,
+    });
   };
 
-  wrapperWin.hookWindowMessage(WM_ENTERSIZEMOVE, onEnterSizeMove);
-  wrapperWin.hookWindowMessage(WM_EXITSIZEMOVE, onExitSizeMove);
-  wrapperWin.on('resize', onResize);
+  wrapperWin.on('resize', sync);
+  wrapperWin.hookWindowMessage(WM_EXITSIZEMOVE, sync);
 
   return {
     destroy() {
       try {
-        wrapperWin.unhookWindowMessage(WM_ENTERSIZEMOVE);
+        wrapperWin.unhookWindowMessage(WM_EXITSIZEMOVE);
       } catch {
         // 窗口可能已销毁
       }
-      try {
-        wrapperWin.unhookWindowMessage(WM_EXITSIZEMOVE);
-      } catch {
-        // 同上
-      }
-      wrapperWin.removeListener('resize', onResize);
+      wrapperWin.removeListener('resize', sync);
     },
   };
 };

@@ -30,6 +30,7 @@
     "build": "pnpm run build:plugin && pnpm run build:wrapper && pnpm run build:ui"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-vue": "^6.0.10",
     "electron": "~44.7.0",
     "eslint": "~9.24.0",
@@ -37,6 +38,7 @@
     "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-vue": "^10.11.1",
     "mde-vue": "git+https://github.com/slime7/mde-vue.git#v26.10.12",
+    "tailwindcss": "^4.3.3",
     "translime-sdk": "workspace:*",
     "vite": "^8.3.4",
     "vite-plugin-css-injected-by-js": "^5.0.2",

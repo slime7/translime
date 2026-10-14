@@ -1,0 +1,22 @@
+/* 层序需先于 mde.css（wrapper.html 内联声明）确立，保证 Preflight 在 mde 组件层之前、
+   Tailwind utilities 在其之后、mde-final 兜底收尾 */
+@layer tailwind-theme, tailwind-reset, mde, tailwind-utilities, mde-final;
+
+@import 'tailwindcss/theme.css' layer(tailwind-theme);
+@import 'tailwindcss/preflight.css' layer(tailwind-reset);
+@import 'tailwindcss/utilities.css' layer(tailwind-utilities);
+
+/* mde-vue/styles.css 已由 wrapper.html 经 app:// 链接加载，这里只引入 Tailwind 语义映射 */
+@import 'mde-vue/tailwind.css';
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #000;
+  user-select: none;
+}

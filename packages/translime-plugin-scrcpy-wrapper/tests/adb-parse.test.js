@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAdbDevices, parsePackageList } from '../src/adb';
+import { parseAdbDevices, parsePackageList, parseWmSize } from '../src/adb';
 
 describe('parseAdbDevices', () => {
   it('仅保留 state 为 device 的行并解析 model', () => {
@@ -43,5 +43,23 @@ describe('parsePackageList', () => {
     expect(parsePackageList('this line has no prefix\npackage:com.ok\n')).toEqual(['com.ok']);
     expect(parsePackageList('')).toEqual([]);
     expect(parsePackageList(undefined)).toEqual([]);
+  });
+});
+
+describe('parseWmSize', () => {
+  it('仅有 Physical size 时返回物理分辨率', () => {
+    expect(parseWmSize('Physical size: 1080x2400\n')).toEqual({ width: 1080, height: 2400 });
+  });
+
+  it('存在 Override size 时优先返回覆盖分辨率', () => {
+    const output = 'Physical size: 1080x2400\nOverride size: 1080x2340\n';
+    expect(parseWmSize(output)).toEqual({ width: 1080, height: 2340 });
+  });
+
+  it('无法解析或字段非法时返回 null', () => {
+    expect(parseWmSize('')).toBeNull();
+    expect(parseWmSize(null)).toBeNull();
+    expect(parseWmSize('Physical size: abc')).toBeNull();
+    expect(parseWmSize('Physical size: 0x0')).toBeNull();
   });
 });

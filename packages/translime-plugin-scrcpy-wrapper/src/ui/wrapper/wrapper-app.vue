@@ -1,25 +1,49 @@
 <template>
-  <div class="wrapper-root">
-    <div class="hint">
-      <span>等待画面接入…</span>
+  <mat-app-root class="wrapper-root">
+    <!-- 高度用 100dvh：app-root 内容层高度为 auto，百分比高度链在此不通 -->
+    <div class="flex h-dvh flex-col">
+      <!-- 画面接入前占位；接入后该区域被原生 SDL 子窗口覆盖 -->
+      <div class="flex min-h-0 grow items-center justify-center">
+        <span class="text-sm text-white/50">等待画面接入…</span>
+      </div>
+
+      <!-- 高度 48px（h-12）与主进程 BAR_CSS_HEIGHT 一致：SDL 子窗口按客户区减该高度定位 -->
+      <div class="flex h-12 shrink-0 items-center justify-center gap-3 bg-mat-surface-container">
+        <mat-btn
+          variant="text"
+          label="返回"
+          :disabled="sending"
+          @click="sendKey(KEYCODE_BACK)"
+        >
+          <template #prefix>
+            <svg
+              class="bar-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+            </svg>
+          </template>
+        </mat-btn>
+        <mat-btn
+          variant="text"
+          label="主页"
+          :disabled="sending"
+          @click="sendKey(KEYCODE_HOME)"
+        >
+          <template #prefix>
+            <svg
+              class="bar-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+            </svg>
+          </template>
+        </mat-btn>
+      </div>
     </div>
-    <div class="control-bar">
-      <mat-btn
-        icon="arrow_back"
-        label="返回"
-        variant="text"
-        :disabled="sending"
-        @click="sendKey(KEYCODE_BACK)"
-      />
-      <mat-btn
-        icon="home"
-        label="主页"
-        variant="text"
-        :disabled="sending"
-        @click="sendKey(KEYCODE_HOME)"
-      />
-    </div>
-  </div>
+  </mat-app-root>
 </template>
 
 <script setup>
@@ -48,32 +72,12 @@ const sendKey = async (keycode) => {
 };
 </script>
 
-<!-- 高度 48px 与主进程 BAR_CSS_HEIGHT 一致：SDL 子窗口按客户区减该高度定位 -->
+<!-- 独立窗口无宿主 Material Symbols 字体，底条图标使用内联 SVG，随主题色着色 -->
 <style scoped>
-.wrapper-root {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  background: #000;
-}
-
-.hint {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.55);
-  font: 14px system-ui, sans-serif;
-}
-
-.control-bar {
-  display: flex;
-  flex: none;
-  gap: 12px;
-  align-items: center;
-  justify-content: center;
-  height: 48px;
-  background: #0a0a0a;
+.bar-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 </style>

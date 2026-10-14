@@ -36,6 +36,25 @@ export const parsePackageList = (text) => String(text ?? '')
   .filter((name) => name !== '')
   .sort();
 
+/**
+ * 解析 `wm size` 输出，优先取 Override size（存在时为实际生效分辨率），
+ * 回落 Physical size；无法解析时返回 null
+ */
+export const parseWmSize = (text) => {
+  const overrideMatch = String(text ?? '').match(/Override size:\s*(\d+)x(\d+)/);
+  const physicalMatch = String(text ?? '').match(/Physical size:\s*(\d+)x(\d+)/);
+  const match = overrideMatch || physicalMatch;
+  if (!match) {
+    return null;
+  }
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!width || !height) {
+    return null;
+  }
+  return { width, height };
+};
+
 export const adbExec = async (adbPath, args, options = {}) => {
   const { timeoutMs = 10000 } = options;
   const { stdout } = await execFileAsync(adbPath, args, {
@@ -44,6 +63,17 @@ export const adbExec = async (adbPath, args, options = {}) => {
     maxBuffer: 4 * 1024 * 1024,
   });
   return stdout;
+};
+
+/**
+ * 查询设备屏幕分辨率；查询失败不阻断启动，返回 null 走默认尺寸
+ */
+export const getDeviceResolution = async (adbPath, serial) => {
+  try {
+    return parseWmSize(await adbExec(adbPath, ['-s', serial, 'shell', 'wm', 'size']));
+  } catch {
+    return null;
+  }
 };
 
 export const listDevices = async (adbPath) => parseAdbDevices(await adbExec(adbPath, ['devices', '-l']));

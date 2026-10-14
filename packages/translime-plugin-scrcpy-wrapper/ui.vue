@@ -1,70 +1,115 @@
 <template>
-  <div class="plugin-main">
-    <div class="toolbar">
-      <select
-        v-model="serial"
-        class="device-select"
-        :disabled="loadingDevices || devices.length === 0"
-        aria-label="选择设备"
-      >
-        <option v-for="device in devices" :key="device.serial" :value="device.serial">
-          {{ device.model ? `${device.model} (${device.serial})` : device.serial }}
-        </option>
-      </select>
+  <mat-app-root
+    :fill-viewport="false"
+    class="h-full overflow-hidden"
+  >
+    <!-- 页面只保留列表一个滚动容器，避免双滚动条叠加 -->
+    <div class="flex h-full flex-col gap-3 overflow-hidden p-3">
+      <!-- 设备行：下拉占满剩余宽度，刷新按钮不压缩 -->
+      <div class="flex shrink-0 items-center gap-2">
+        <mat-select
+          v-model="serial"
+          class="min-w-0 grow"
+          block
+          label="设备"
+          placeholder="选择设备"
+          :items="deviceItems"
+          :disabled="loadingDevices || devices.length === 0"
+        />
+        <mat-btn
+          icon="refresh"
+          label="刷新设备"
+          variant="text"
+          class="shrink-0"
+          :loading="loadingDevices"
+          @click="loadDevices"
+        />
+      </div>
+
       <mat-btn
-        icon="refresh"
-        label="刷新设备"
-        :disabled="loadingDevices"
-        @click="loadDevices"
-      />
-      <mat-btn
-        icon="smartphone"
-        label="镜像整屏"
+        variant="filled"
+        class="shrink-0 self-start"
         :disabled="!serial || launching"
+        :loading="launching"
         @click="launch('mirror')"
-      />
-    </div>
-
-    <div v-if="error" class="error" role="alert">
-      {{ error }}
-    </div>
-
-    <div class="filter-row">
-      <input
-        v-model="keyword"
-        class="filter-input"
-        type="text"
-        placeholder="过滤应用包名"
-        aria-label="过滤应用包名"
       >
-    </div>
+        <template #prefix>
+          cast
+        </template>
+        镜像整屏
+      </mat-btn>
 
-    <div v-if="loadingApps" class="hint">
-      加载应用列表…
-    </div>
-    <div v-else-if="apps.length === 0" class="hint">
-      {{ serial ? '未获取到应用列表' : '请先连接设备' }}
-    </div>
-    <ul v-else class="app-list">
-      <li v-for="pkg in filteredApps" :key="pkg" class="app-item">
-        <span class="pkg">{{ pkg }}</span>
-        <span class="actions">
-          <mat-btn
-            icon="screen_mirror"
-            label="镜像"
-            :disabled="launching"
-            @click="launch('mirror', pkg)"
+      <div
+        v-if="error"
+        role="alert"
+        class="shrink-0 rounded-lg bg-[var(--mat-sys-color-error-container)] px-3 py-2 text-sm break-all text-[var(--mat-sys-color-on-error-container)]"
+      >
+        {{ error }}
+      </div>
+
+      <mat-search
+        v-model="keyword"
+        class="shrink-0"
+        label="过滤应用包名"
+        placeholder="过滤应用包名"
+      />
+
+      <div class="min-h-0 grow overflow-y-auto">
+        <div
+          v-if="loadingApps"
+          class="flex h-full items-center justify-center"
+        >
+          <mat-progress
+            indeterminate
+            class="w-48"
+            aria-label="加载应用列表"
           />
-          <mat-btn
-            icon="monitor"
-            label="虚拟屏"
-            :disabled="launching"
-            @click="launch('virtual', pkg)"
-          />
-        </span>
-      </li>
-    </ul>
-  </div>
+        </div>
+        <div
+          v-else-if="apps.length === 0"
+          class="flex h-full items-center justify-center text-sm text-[var(--mat-sys-color-on-surface-variant)]"
+        >
+          {{ serial ? '未获取到应用列表' : '请先连接设备' }}
+        </div>
+        <div
+          v-else-if="filteredApps.length === 0"
+          class="flex h-full items-center justify-center text-sm text-[var(--mat-sys-color-on-surface-variant)]"
+        >
+          无匹配应用
+        </div>
+        <mat-list
+          v-else
+          interaction="multi-action"
+        >
+          <mat-list-item
+            v-for="pkg in filteredApps"
+            :key="pkg"
+            :value="pkg"
+          >
+            {{ pkg }}
+            <template #trailing>
+              <mat-btn
+                icon="cast"
+                label="镜像"
+                size="small"
+                variant="standard"
+                :disabled="launching"
+                @click="launch('mirror', pkg)"
+              />
+              <mat-btn
+                icon="picture_in_picture"
+                label="虚拟屏"
+                size="small"
+                variant="standard"
+                :disabled="launching"
+                @click="launch('virtual', pkg)"
+              />
+            </template>
+          </mat-list-item>
+        </mat-list>
+      </div>
+    </div>
+  </mat-app-root>
 </template>
 
 <script setup>
@@ -86,6 +131,11 @@ const loadingDevices = ref(false);
 const loadingApps = ref(false);
 const launching = ref(false);
 const error = ref('');
+
+const deviceItems = computed(() => devices.value.map((device) => ({
+  title: device.model ? `${device.model} (${device.serial})` : device.serial,
+  value: device.serial,
+})));
 
 const filteredApps = computed(() => {
   const kw = keyword.value.trim().toLowerCase();
@@ -162,103 +212,11 @@ watch(serial, () => {
 onMounted(loadDevices);
 </script>
 
-<style scoped>
-.plugin-main {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  height: 100%;
-  padding: 12px;
-  box-sizing: border-box;
-}
-
-.toolbar {
-  display: flex;
-  flex: none;
-  gap: 8px;
-  align-items: center;
-}
-
-.device-select {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-}
-
-.error {
-  flex: none;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(179, 38, 30, 0.15);
-  color: #f2b8b5;
-  font-size: 13px;
-  word-break: break-all;
-}
-
-.filter-row {
-  display: flex;
-  flex: none;
-}
-
-.filter-input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-}
-
-.hint {
-  flex: none;
-  padding: 24px 0;
-  color: rgba(128, 128, 128, 1);
-  text-align: center;
-  font-size: 13px;
-}
-
-.app-list {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
-}
-
-.app-item {
-  display: flex;
-  flex: none;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  border-radius: 8px;
-}
-
-.app-item:hover {
-  background: rgba(128, 128, 128, 0.12);
-}
-
-.pkg {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.actions {
-  display: flex;
-  flex: none;
-  gap: 4px;
+<!-- 不引入 Preflight：插件样式经宿主 @scope 隔离注入，重置层会破坏 mde 组件基础样式 -->
+<style>
+@layer tailwind {
+  @layer theme, utilities;
+  @import 'tailwindcss/theme.css' layer(theme);
+  @import 'tailwindcss/utilities.css' layer(utilities);
 }
 </style>

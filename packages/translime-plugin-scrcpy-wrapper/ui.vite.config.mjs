@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-// import tailwindcss from '@tailwindcss/vite';
+import tailwindcss from '@tailwindcss/vite';
 import {
   createPluginCssIsolationPlugins,
   translimeSdk,
@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
 
   const plugins = [
     vue(),
-    // tailwindcss(), // 可选
+    tailwindcss(),
     translimeSdk({
       // preview 模式下的声明式 IPC mock，见 preview-mocks.mjs
       previewIpcMocks: './preview-mocks.mjs',
