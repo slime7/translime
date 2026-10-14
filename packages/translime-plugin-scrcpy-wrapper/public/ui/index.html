@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' blob: 'unsafe-inline'">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>translime-plugin-scrcpy-wrapper</title>
+</head>
+<body>
+<div>hello plugin</div>
+<pre class="pre"></pre>
+
+<div>
+  <button class="open-devtool">打开 devtools</button>
+  <button class="win-maximize">最大化窗口</button>
+  <button class="win-close">关闭窗口</button>
+</div>
+
+<div>
+  <input value="status" />
+</div>
+<script>
+(function() {
+  const data = {
+    versions: window.electron.versions,
+    root: window.electron.APP_ROOT,
+    pre: document.querySelector('.pre'),
+    btnDev: document.querySelector('.open-devtool'),
+    btnMaximize: document.querySelector('.win-maximize'),
+    btnClose: document.querySelector('.win-close'),
+  };
+
+  data.pre.innerHTML = `${JSON.stringify(data.versions, null, 2)}\n\n${data.root}`;
+  data.btnDev.addEventListener('click', () => {
+    window.ts.windowControl.devtools('plugin-window-translime-plugin-scrcpy-wrapper');
+  });
+  data.btnMaximize.addEventListener('click', () => {
+    window.ts.windowControl.maximize('plugin-window-translime-plugin-scrcpy-wrapper');
+  });
+  data.btnClose.addEventListener('click', () => {
+    window.ts.windowControl.close('plugin-window-translime-plugin-scrcpy-wrapper');
+  });
+})();
+</script>
+</body>
+</html>

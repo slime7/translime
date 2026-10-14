@@ -1,0 +1,54 @@
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+// import tailwindcss from '@tailwindcss/vite';
+import {
+  createPluginCssIsolationPlugins,
+  translimeSdk,
+} from 'translime-sdk/vite';
+
+/**
+ * @type {import('vite').UserConfig}
+ * @see https://vitejs.dev/config/
+ */
+export default defineConfig(({ mode }) => {
+  const isPreview = mode === 'preview';
+
+  const plugins = [
+    vue(),
+    // tailwindcss(), // 可选
+    translimeSdk({
+      // preview 模式下的声明式 IPC mock，见 preview-mocks.mjs
+      previewIpcMocks: './preview-mocks.mjs',
+    }),
+  ];
+
+  // 非 preview 模式下添加 CSS 注入插件
+  if (!isPreview) {
+    plugins.push(
+      ...createPluginCssIsolationPlugins('translime-plugin-scrcpy-wrapper'),
+    );
+  }
+
+  return {
+    plugins,
+    envDir: process.cwd(),
+    build: {
+      minify: false,
+      // watch 构建输出 inline sourcemap，便于 webview devtools 定位插件 UI 源码
+      sourcemap: mode === 'production' ? false : 'inline',
+      target: 'node20',
+      outDir: './dist',
+      lib: {
+        entry: 'ui.vue',
+        name: 'translime-plugin-scrcpy-wrapper', // 需要指定一个唯一 id
+        formats: ['esm'], // 现在使用 esm 导入插件 ui
+        fileName: (format) => `ui.${format}.js`,
+        cssFileName: 'ui',
+      },
+      rolldownOptions: {
+        external: ['vue'], // 打包排除 vue 依赖并且主项目有 `importmap`，不需要设置全局变量
+      },
+      emptyOutDir: false,
+    },
+  };
+});

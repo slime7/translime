@@ -1,0 +1,68 @@
+{
+  "$schema": "https://slime7.github.io/translime/translime-plugin.schema.json",
+  "name": "translime-plugin-scrcpy-wrapper",
+  "version": "1.0.0",
+  "description": "包装 scrcpy 快捷弹出安卓远程画面窗口",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.esm.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js"
+    }
+  },
+  "engines": {
+    "translime": ">=0.7.0"
+  },
+  "files": [
+    "dist",
+    "icon.png"
+  ],
+  "scripts": {
+    "dev": "node dev.mjs",
+    "lint": "eslint .",
+    "test": "pnpm exec vitest run -c vitest.config.mjs",
+    "preview:ui": "vite -c ui.vite.config.mjs --mode preview",
+    "build:plugin": "vite build",
+    "build:wrapper": "vite build -c wrapper.vite.config.mjs",
+    "build:ui": "vite build -c ui.vite.config.mjs",
+    "build": "pnpm run build:plugin && pnpm run build:wrapper && pnpm run build:ui"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.10",
+    "electron": "~44.7.0",
+    "eslint": "~9.24.0",
+    "eslint-config-airbnb-extended": "^3.0.1",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-vue": "^10.11.1",
+    "mde-vue": "git+https://github.com/slime7/mde-vue.git#v26.10.12",
+    "translime-sdk": "workspace:*",
+    "vite": "^8.3.4",
+    "vite-plugin-css-injected-by-js": "^5.0.2",
+    "vitest": "5.0.4",
+    "vue": "^3.5.44"
+  },
+  "peerDependencies": {
+    "electron": "~44.7.0",
+    "vue": "^3.5.40"
+  },
+  "dependencies": {
+    "koffi": "^2.12.0"
+  },
+  "plugin": {
+    "title": "Scrcpy Wrapper",
+    "description": "包装 scrcpy 快捷弹出安卓远程画面窗口",
+    "icon": "./icon.png",
+    "activationEvents": [
+      "onView"
+    ],
+    "dependencies": [],
+    "optionalDependencies": [],
+    "contributes": {
+      "commands": []
+    },
+    "//windowUrl": "dist/ui/index.html",
+    "ui": "dist/ui.esm.js"
+  }
+}
