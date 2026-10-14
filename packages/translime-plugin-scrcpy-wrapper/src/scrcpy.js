@@ -40,6 +40,10 @@ const createWrapperWindow = ({ title, sessionId }) => {
     },
   });
   setupMdeWindow(win, { injectTheme: true, syncTheme: true, bootstrap: true });
+  // 页面 <title> 会覆盖窗口标题，固定保持会话专属标题供任务栏与 FindWindowW 识别
+  win.on('page-title-updated', (event) => {
+    event.preventDefault();
+  });
   win.loadFile(path.join(dirname, 'wrapper.html'), { query: { session: sessionId } });
   return win;
 };

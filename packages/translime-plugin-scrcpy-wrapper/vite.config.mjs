@@ -13,8 +13,9 @@ const config = ({ mode }) => ({
     sourcemap: mode === 'production' ? false : 'inline',
     target: 'node20',
     outDir: './dist',
-    // watch 模式下 UI 构建会并行写入同一个 dist，清空会删掉对方产物
-    emptyOutDir: mode !== 'watch',
+    // 本插件有三段产物（主进程 / 画面窗口 / 启动器 UI）共用 dist，
+    // 任何一段单独构建都不清空目录，避免删掉其余两段产物
+    emptyOutDir: false,
     lib: {
       entry: 'index.js',
       // 主进程入口默认输出 ESM（宿主经动态 import 加载并支持热重载）；

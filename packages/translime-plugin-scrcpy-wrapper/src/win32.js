@@ -50,6 +50,9 @@ const loadBindings = () => {
     const gdi32 = koffi.load('gdi32.dll');
     bindings = {
       RECT,
+      // koffi 2.x 的 struct 类型不能 new，出参结构体经 alloc/decode 读写
+      rectPtr: koffi.alloc(RECT, 1),
+      decodeRect: (ptr) => koffi.decode(ptr, RECT),
       FindWindowW: user32.func('intptr_t __stdcall FindWindowW(const str16 lpClassName, const str16 lpWindowName)'),
       SetParent: user32.func('intptr_t __stdcall SetParent(intptr_t hWndChild, intptr_t hWndNewParent)'),
       GetWindowLongPtrW: user32.func('uintptr_t __stdcall GetWindowLongPtrW(intptr_t hWnd, int32_t nIndex)'),
@@ -93,10 +96,10 @@ export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
   const b = loadBindings();
   const { barPhysicalHeight = 0, show = true } = options;
   const parentHwnd = hwndFromWindow(wrapperWin);
-  const rect = new b.RECT();
-  if (!b.GetClientRect(parentHwnd, rect)) {
+  if (!b.GetClientRect(parentHwnd, b.rectPtr)) {
     return;
   }
+  const rect = b.decodeRect(b.rectPtr);
   const width = rect.right - rect.left;
   const height = rect.bottom - rect.top - Math.max(0, Math.round(barPhysicalHeight));
   const flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | (show ? SWP_SHOWWINDOW : 0);
