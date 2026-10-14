@@ -12,7 +12,11 @@ const WS_CLIPCHILDREN = 0x02000000n;
 const WS_CHILD = 0x40000000n;
 const WS_POPUP = 0x80000000n;
 
-const SWP_NOZORDER = 0x0004;
+const GW_CHILD = 5;
+
+// HWND_TOP 取值 0，作为 hWndInsertAfter 传入表示抬到同层级最上层
+const SWP_NOSIZE = 0x0001;
+const SWP_NOMOVE = 0x0002;
 const SWP_NOACTIVATE = 0x0010;
 const SWP_FRAMECHANGED = 0x0020;
 const SWP_SHOWWINDOW = 0x0040;
@@ -51,6 +55,7 @@ const loadBindings = () => {
       rectPtr: koffi.alloc(RECT, 1),
       decodeRect: (ptr) => koffi.decode(ptr, RECT),
       FindWindowW: user32.func('intptr_t __stdcall FindWindowW(const str16 lpClassName, const str16 lpWindowName)'),
+      GetWindow: user32.func('intptr_t __stdcall GetWindow(intptr_t hWnd, uint32_t nCmd)'),
       SetParent: user32.func('intptr_t __stdcall SetParent(intptr_t hWndChild, intptr_t hWndNewParent)'),
       GetWindowLongPtrW: user32.func('uintptr_t __stdcall GetWindowLongPtrW(intptr_t hWnd, int32_t nIndex)'),
       SetWindowLongPtrW: user32.func('uintptr_t __stdcall SetWindowLongPtrW(intptr_t hWnd, int32_t nIndex, uintptr_t dwNewLong)'),
@@ -91,7 +96,11 @@ export const findWindowByTitle = (title) => {
  *
  * aspect（设备分辨率）存在时等比缩放并居中，四周留黑边；
  * 缺省时铺满客户区减底条。frameChanged 仅挂载后样式变更时需要，
- * 持续同步阶段不发送以免逐帧重算非客户区
+ * 持续同步阶段不发送以免逐帧重算非客户区。
+ *
+ * 每次都必须以 HWND_TOP 落位：父窗口缩放时 Chromium 会把网页输入
+ * 子窗口（Chrome_RenderWidgetHostHWND）重新置顶，若不抬回 SDL，
+ * 物理点击会被它截走（该窗口不参与绘制，画面可见但点击失效）
  */
 export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
   const b = loadBindings();
@@ -114,10 +123,24 @@ export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
     areaHeight: clientH - barH,
     aspect,
   });
-  const flags = SWP_NOZORDER | SWP_NOACTIVATE
+  const flags = SWP_NOACTIVATE
     | (frameChanged ? SWP_FRAMECHANGED : 0)
     | (show ? SWP_SHOWWINDOW : 0);
   b.SetWindowPos(sdlHwnd, 0, video.x, video.y, video.width, video.height, flags);
+};
+
+/**
+ * 校验 SDL 子窗口是否仍是父窗口最上层子窗口，不是则抬回。
+ * 最大化/还原等窗口排布路径 Chromium 会重新置顶网页输入子窗口
+ * 且不一定伴随可监听的 resize 事件，作为 z 序的独立兜底
+ */
+export const ensureChildOnTop = (wrapperWin, sdlHwnd) => {
+  const b = loadBindings();
+  const parentHwnd = hwndFromWindow(wrapperWin);
+  if (b.GetWindow(parentHwnd, GW_CHILD) === sdlHwnd) {
+    return;
+  }
+  b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
 };
 
 /**
@@ -150,8 +173,9 @@ export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
 
 /**
  * 缩放实时同步：Electron 在交互缩放期间持续发出 resize 事件，
- * 每次都把子窗口贴合到当前客户区，画面跟随缩放且不中断 scrcpy；
- * WM_EXITSIZEMOVE 兜底覆盖不经过 resize 事件的系统级窗口排布
+ * 每次都把子窗口贴合到当前客户区并抬回 z 序最上层；
+ * WM_EXITSIZEMOVE 兜底覆盖不经过 resize 事件的系统级窗口排布；
+ * 低频 z 序巡检兜底最大化/还原等未触发监听的置顶路径
  */
 export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
   const { getBarPhysicalHeight = () => 0, getAspect = () => null } = options;
@@ -166,9 +190,17 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
 
   wrapperWin.on('resize', sync);
   wrapperWin.hookWindowMessage(WM_EXITSIZEMOVE, sync);
+  const zOrderTimer = setInterval(() => {
+    try {
+      ensureChildOnTop(wrapperWin, sdlHwnd);
+    } catch {
+      // 窗口可能已销毁，destroy 时统一清理定时器
+    }
+  }, 500);
 
   return {
     destroy() {
+      clearInterval(zOrderTimer);
       try {
         wrapperWin.unhookWindowMessage(WM_EXITSIZEMOVE);
       } catch {
