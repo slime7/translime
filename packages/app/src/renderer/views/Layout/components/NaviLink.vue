@@ -17,10 +17,8 @@
           v-navi="to"
         >
           <mat-badge
-            v-if="isDev"
-            content="D"
-            location="bottom-end"
-            :offset="{ inline: 12, block: -2 }"
+            v-if="isDev || dot"
+            v-bind="badgeProps"
             color="error"
           >
             <div
@@ -72,10 +70,8 @@
       v-navi="to"
     >
       <mat-badge
-        v-if="isDev"
-        content="D"
-        location="bottom-end"
-        :offset="{ inline: 12, block: -2 }"
+        v-if="isDev || dot"
+        v-bind="badgeProps"
         color="error"
       >
         <div
@@ -131,10 +127,8 @@
         @click="openPluginWindow"
       >
         <mat-badge
-          v-if="isDev"
-          content="D"
-          location="bottom-end"
-          :offset="{ inline: 12, block: -2 }"
+          v-if="isDev || dot"
+          v-bind="badgeProps"
           color="error"
         >
           <div class="navi-avatar flex items-center justify-center size-14 overflow-hidden navi-avatar--round">
@@ -182,10 +176,8 @@
     @click="openPluginWindow"
   >
     <mat-badge
-      v-if="isDev"
-      content="D"
-      location="bottom-end"
-      :offset="{ inline: 12, block: -2 }"
+      v-if="isDev || dot"
+      v-bind="badgeProps"
       color="error"
     >
       <div class="navi-avatar flex items-center justify-center size-14 overflow-hidden navi-avatar--round">
@@ -226,6 +218,7 @@
 </template>
 
 <script>
+import { computed } from 'vue';
 import useGlobalStore from '@/store/globalStore';
 import { openPluginWindow } from '@/utils';
 
@@ -257,6 +250,11 @@ export default {
       default: false,
       type: Boolean,
     },
+    // 点型角标（如关于入口的新版本提示）；与 isDev 徽标互斥时 dev 徽标优先
+    dot: {
+      default: false,
+      type: Boolean,
+    },
     dataTest: {
       default: '',
       type: String,
@@ -266,7 +264,19 @@ export default {
   setup(props) {
     const store = useGlobalStore();
 
+    const badgeProps = computed(() => {
+      if (props.isDev) {
+        return {
+          content: 'D',
+          location: 'bottom-end',
+          offset: { inline: 12, block: -2 },
+        };
+      }
+      return { dot: true };
+    });
+
     return {
+      badgeProps,
       openPluginWindow: () => {
         const plugin = store.plugin(props.open);
         openPluginWindow(plugin);

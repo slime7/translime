@@ -175,11 +175,13 @@
 
 <script>
 import { onMounted, ref, version as vueVersion } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 import { version as vuetifyVersion } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import globalStore from '@/store/globalStore';
+import useUpdateStore from '@/store/updateStore';
 import useDialog from '@/hooks/useDialog';
 import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
@@ -234,58 +236,23 @@ export default {
       openLink('https://github.com/slime7/translime');
     };
 
-    // 自动更新逻辑
-    const updateStatus = ref(''); // checking, available, not-available, downloading, downloaded, error
-    const updateInfo = ref({});
-    const downloadProgress = ref({ percent: 0 });
-    const updateError = ref('');
-    const downloading = ref(false);
-
-    const initAutoUpdate = () => {
-      ipc.on(ipcType.UPDATE_CHECKING, () => {
-        updateStatus.value = 'checking';
-      });
-      ipc.on(ipcType.UPDATE_AVAILABLE, (info) => {
-        updateStatus.value = 'available';
-        updateInfo.value = info;
-        toast.show(`发现新版本 v${info.version}`);
-      });
-      ipc.on(ipcType.UPDATE_NOT_AVAILABLE, () => {
-        updateStatus.value = 'not-available';
-      });
-      ipc.on(ipcType.UPDATE_ERROR, (err) => {
-        updateStatus.value = 'error';
-        updateError.value = err;
-      });
-      ipc.on(ipcType.UPDATE_DOWNLOAD_PROGRESS, (progress) => {
-        updateStatus.value = 'downloading';
-        downloadProgress.value = progress;
-        downloading.value = true;
-      });
-      ipc.on(ipcType.UPDATE_DOWNLOADED, (info) => {
-        updateStatus.value = 'downloaded';
-        updateInfo.value = info;
-        downloading.value = false;
-        toast.show('更新已下载，下次启动时自动生效');
-      });
-    };
-
-    const startDownload = () => {
-      downloading.value = true;
-      ipc.send(ipcType.START_DOWNLOAD_UPDATE);
-    };
-
-    const quitAndInstall = () => {
-      ipc.send(ipcType.QUIT_AND_INSTALL);
-    };
-
-    const checkForUpdate = () => {
-      ipc.send(ipcType.CHECK_FOR_UPDATE);
-    };
+    // 自动更新状态由 updateStore 全局维护，事件监听在主窗口启动时注册
+    const updateStore = useUpdateStore();
+    const {
+      status: updateStatus,
+      info: updateInfo,
+      downloadProgress,
+      error: updateError,
+      downloading,
+    } = storeToRefs(updateStore);
+    const {
+      startDownload,
+      quitAndInstall,
+      checkForUpdate,
+    } = updateStore;
 
     onMounted(() => {
       getVersions();
-      initAutoUpdate();
     });
 
     return {

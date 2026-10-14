@@ -3,7 +3,9 @@ import {
 } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+import * as ipcType from '@pkg/share/utils/ipcConstant';
 import About from '@/views/About.vue';
+import useUpdateStore from '@/store/updateStore';
 
 const { ipcMock } = vi.hoisted(() => ({
   ipcMock: {
@@ -87,5 +89,25 @@ describe('About.vue 检查更新入口', () => {
 
     expect(button.exists()).toBe(true);
     expect(button.attributes('disabled')).toBeUndefined();
+  });
+
+  // 防止的回归：更新状态迁移到全局 store 后，关于页必须继续展示新版本信息与下载入口
+  it('检测到新版本时展示版本号并提供下载入口', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    setActivePinia(createPinia());
+    const updateStore = useUpdateStore();
+    updateStore.status = 'available';
+    updateStore.info = { version: '1.2.0' };
+
+    const wrapper = mount(About, globalMountOptions);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('发现新版本: v1.2.0');
+
+    const downloadBtn = wrapper.find('[data-test="about-download-update-btn"]');
+    expect(downloadBtn.exists()).toBe(true);
+
+    await downloadBtn.trigger('click');
+    expect(ipcMock.send).toHaveBeenCalledWith(ipcType.START_DOWNLOAD_UPDATE);
   });
 });

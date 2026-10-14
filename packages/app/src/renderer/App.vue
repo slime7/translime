@@ -14,6 +14,7 @@ import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
 import globalStore from '@/store/globalStore';
+import useUpdateStore from '@/store/updateStore';
 import HostMenu from '@/components/HostMenu.vue';
 import checkPluginUpdates from '@/views/plugins/hooks/usePluginUpdateCheck';
 import { appConfigStore } from '@/utils';
@@ -26,6 +27,7 @@ import {
 const ipc = useIpc();
 const ipcRaw = useIpc(false);
 const store = globalStore();
+const updateStore = useUpdateStore();
 const theme = useTheme();
 const mdColor = useMdColor();
 const alert = useAlert();
@@ -178,6 +180,8 @@ onMounted(async () => {
     ipcRaw.send('main-renderer-ready');
     // 升级提示依赖市场版本数据，主窗口启动拉取后立即检查，不等页面二次进入
     initialLoad();
+    // 更新事件只投递主窗口：全局注册后关于页角标不依赖关于页是否打开过
+    updateStore.initListeners();
   } else {
     getPlugins();
   }

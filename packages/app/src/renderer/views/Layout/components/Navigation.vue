@@ -23,6 +23,7 @@
         :to="{ name: 'About' }"
         tooltip="关于"
         icon="support"
+        :dot="hasUpdate"
         data-test="nav-about"
       >
         关于
@@ -72,8 +73,10 @@
 
 <script>
 import { computed } from 'vue';
+import { storeToRefs } from 'pinia';
 import NaviLink from '@/views/Layout/components/NaviLink.vue';
 import useGlobalStore from '@/store/globalStore';
+import useUpdateStore from '@/store/updateStore';
 import useAlert from '@/hooks/useAlert';
 
 export default {
@@ -85,7 +88,10 @@ export default {
 
   setup() {
     const store = useGlobalStore();
+    const updateStore = useUpdateStore();
     const alert = useAlert();
+
+    const { hasUpdate } = storeToRefs(updateStore);
 
     const pluginPages = computed(() => {
       const pinned = store.appSetting?.pinnedPlugins || [];
@@ -96,6 +102,7 @@ export default {
     };
 
     return {
+      hasUpdate,
       pluginPages,
       showNotification,
     };
