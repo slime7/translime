@@ -3,7 +3,7 @@ name: Publish Packages
 on:
   push:
     branches:
-      - dev
+      - master
     paths:
       - 'packages/sdk/package.json'
       - 'packages/translime-plugin-*/package.json'

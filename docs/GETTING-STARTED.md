@@ -98,7 +98,7 @@ docs/                         # 项目文档体系
 
 1. 修改 `packages/sdk/package.json` 或对应 `packages/translime-plugin-*/package.json` 的稳定版本号。
 2. 在本地完成对应包的构建与测试。
-3. 将提交推送到 `dev`。当发布包的 `package.json` 变化时，GitHub Actions 会扫描所有允许发布的包。
+3. 将提交推送到 `master`。当发布包的 `package.json` 变化时，GitHub Actions 会扫描所有允许发布的包。
 4. Action 只发布本地版本高于 npm 最新版本且尚不存在的包；相同版本会跳过，低于 npm 最新版本会报错。
 5. 发布失败时可在 Actions 页面手动运行 `Publish Packages`，输入准确包名进行补发。
 

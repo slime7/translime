@@ -14,7 +14,7 @@ translime 是一个基于 Electron 的小功能加载器，用于快速加载以
 
 ## 开发流程
 
-- 仓库默认分支为 `dev`，新功能按仓库现有实践在 `feature/*` 分支开发。
+- 仓库默认分支为 `master`，作为发布分支，build、发布、Pages 等 GitHub Actions 由它触发；`dev` 为开发分支，新功能按仓库现有实践在 `feature/*` 分支开发。
 
 ## 插件创建规则
 

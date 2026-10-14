@@ -146,8 +146,8 @@ flowchart TD
 - 自动更新：electron-updater 从 GitHub Releases（slime7/translime）拉取 `latest.yml` 与安装包。
 - CI（.github/workflows）：
   - `build.yaml`：打 tag `v*.*.*` 或手动触发，在 windows-latest 与 ubuntu-latest + Node 20 矩阵上安装依赖并构建宿主，产物（Windows exe/yml 与 Linux AppImage/tar.gz）上传为 draft release。
-  - `publish-package.yaml`：`dev` 上 SDK 或插件的版本清单变化时，在固定的 Windows 2022 runner 上扫描本地版本；只构建、测试、打包并发布 npm 中尚不存在且高于最新版本的包，也可手动指定包名补发。发布使用 npm Trusted Publishing/OIDC，不依赖长期 npm token。
-  - `github-page.yaml`：push 到 `dev` 分支时把 `github-page/` 部署到 GitHub Pages。
+  - `publish-package.yaml`：`master` 上 SDK 或插件的版本清单变化时，在固定的 Windows 2022 runner 上扫描本地版本；只构建、测试、打包并发布 npm 中尚不存在且高于最新版本的包，也可手动指定包名补发。发布使用 npm Trusted Publishing/OIDC，不依赖长期 npm token。
+  - `github-page.yaml`：push 到 `master` 分支时把 `github-page/` 部署到 GitHub Pages。
 - 深链：宿主注册 `translime://` 协议，`translime://open/...` 会转发到主窗口；`pnpm dev:isolate` 模式以 `--user-data-dir` 指向独立的 `translime-dev` 数据目录启动并注册 `translime-dev://`，dev 与安装版实例可共存且数据、深链路由互不影响；常规开发模式（`pnpm dev`）则使用默认用户数据目录。
 
 ## 内嵌插件样式隔离
