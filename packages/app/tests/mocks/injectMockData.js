@@ -126,10 +126,18 @@ export const injectMockConfig = (userDataDir, initialConfig = {}) => {
     },
     ...initialConfig,
   };
+  // setting 内部做字段级合并，覆盖单项配置时不丢默认项
+  const mergedConfig = {
+    ...defaultConfig,
+    setting: {
+      ...defaultConfig.setting,
+      ...initialConfig.setting,
+    },
+  };
 
   fs.writeFileSync(
     path.join(userDataDir, 'config.json'),
-    JSON.stringify(defaultConfig, null, 2),
+    JSON.stringify(mergedConfig, null, 2),
     'utf8',
   );
 };

@@ -15,9 +15,12 @@ export const test = base.extend({
   /** 开发插件使用 ESM 入口版本（配合 devPluginScenario 使用） */
   devPluginEsm: [false, { option: true }],
 
-  electronContext: async ({ devPluginScenario, devPluginEsm }, use) => {
+  /** 应用配置覆盖：合并进注入的 config.json（如 setting.registry 指向测试内启动的本地服务） */
+  appConfig: [{}, { option: true }],
+
+  electronContext: async ({ devPluginScenario, devPluginEsm, appConfig }, use) => {
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'translime-e2e-'));
-    injectAllMocks(userDataDir);
+    injectAllMocks(userDataDir, { config: appConfig });
     if (devPluginScenario) {
       injectDevPlugin(userDataDir, { esm: devPluginEsm });
     }

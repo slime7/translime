@@ -29,7 +29,17 @@ const useGlobalStore = defineStore('globalStore', {
   },
   actions: {
     setPlugins(plugins) {
-      this.plugins = plugins;
+      // versions 是渲染端从市场补充的版本列表，主进程下发的插件数据不含该字段；
+      // 整体替换列表时按包名保留，避免插件状态刷新后升级提示丢失
+      const versionsByPackage = new Map(
+        this.plugins
+          .filter((plugin) => plugin.versions)
+          .map((plugin) => [plugin.packageName, plugin.versions]),
+      );
+      this.plugins = plugins.map((plugin) => {
+        const versions = versionsByPackage.get(plugin.packageName);
+        return versions ? { ...plugin, versions } : plugin;
+      });
       const availablePluginIds = new Set(
         plugins
           .filter((plugin) => plugin.enabled && plugin.ui && !plugin.windowMode)

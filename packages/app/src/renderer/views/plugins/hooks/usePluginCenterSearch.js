@@ -9,6 +9,37 @@ import useGlobalStore from '@/store/globalStore';
 
 export const SEARCH_PAGE_SIZE = 8;
 
+// 与安装流程使用同一个 registry 配置（setting.registry），避免搜索与安装来源不一致
+const getRegistryBase = () => {
+  const store = useGlobalStore();
+  const registry = String(store.appSetting?.registry || '').replace(/\/+$/, '');
+  return registry || 'https://registry.npmjs.org';
+};
+
+export const getPluginDetail = async (packageName) => {
+  const request = (registryBase) => useHttp(`${registryBase}/${packageName}`, {
+    params: {
+      x: Math.random(),
+    },
+  }).get();
+  const alert = useAlert();
+  try {
+    return await request(getRegistryBase());
+  } catch (err) {
+    // 配置的镜像源查询失败时回退 npm 官方源重试一次
+    if (getRegistryBase() === 'https://registry.npmjs.org') {
+      alert.show(err.message, 'error');
+      return null;
+    }
+    try {
+      return await request('https://registry.npmjs.org');
+    } catch (fallbackErr) {
+      alert.show(fallbackErr.message, 'error');
+    }
+  }
+  return null;
+};
+
 export const parseSearchResult = (item) => {
   const versions = Object.keys(item.versions).map((version) => ({
     value: version,
@@ -105,35 +136,6 @@ export default function usePluginCenterSearch() {
   const canUpdated = (item) => {
     const installedPlugin = store.plugins.find((p) => p.packageName === item.packageName);
     return !!installedPlugin && verCompare(item.version, installedPlugin.version) > 0;
-  };
-
-  // 与安装流程使用同一个 registry 配置（setting.registry），避免搜索与安装来源不一致
-  const getRegistryBase = () => {
-    const registry = String(store.appSetting?.registry || '').replace(/\/+$/, '');
-    return registry || 'https://registry.npmjs.org';
-  };
-
-  const getPluginDetail = async (packageName) => {
-    const request = (registryBase) => useHttp(`${registryBase}/${packageName}`, {
-      params: {
-        x: Math.random(),
-      },
-    }).get();
-    try {
-      return await request(getRegistryBase());
-    } catch (err) {
-      // 配置的镜像源查询失败时回退 npm 官方源重试一次
-      if (getRegistryBase() === 'https://registry.npmjs.org') {
-        alert.show(err.message, 'error');
-        return null;
-      }
-      try {
-        return await request('https://registry.npmjs.org');
-      } catch (fallbackErr) {
-        alert.show(fallbackErr.message, 'error');
-      }
-    }
-    return null;
   };
 
   const searchRequest = async (q = '', page = 0) => {
@@ -264,7 +266,6 @@ export default function usePluginCenterSearch() {
     withVersion,
     isInstalled,
     canUpdated,
-    getPluginDetail,
     searchRequest,
     searchAction,
     searchMore,

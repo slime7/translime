@@ -95,6 +95,7 @@
               class="ml-2"
               icon="deployed_code_update"
               label="升级"
+              data-test="plugin-upgrade-btn"
               :color="STATUS_SUCCESS"
               :disabled="disabled"
               @click="install(versionList[1]?.value)"

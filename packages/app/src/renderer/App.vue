@@ -15,6 +15,7 @@ import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
 import globalStore from '@/store/globalStore';
 import HostMenu from '@/components/HostMenu.vue';
+import checkPluginUpdates from '@/views/plugins/hooks/usePluginUpdateCheck';
 import { appConfigStore } from '@/utils';
 import waitForCriticalFonts from '@/utils/fonts';
 import {
@@ -48,6 +49,11 @@ const getPlugins = async () => {
   } catch (err) {
     alert.show(err.message, 'error');
   }
+};
+// 启动列表就绪后检查已安装插件的市场版本，升级提示不依赖进入插件中心的第二次拉取
+const initialLoad = async () => {
+  await getPlugins();
+  checkPluginUpdates();
 };
 const syncOverlayColor = () => {
   const win = route.name === 'PluginWindow' ? `plugin-window-${route.params.packageName}` : 'app';
@@ -165,13 +171,16 @@ handleAppArgv();
 
 onMounted(async () => {
   await router.isReady();
-  if (route.name !== 'PluginWindow' && route.name !== 'PluginRender') {
+  const isMainWindowRoute = route.name !== 'PluginWindow' && route.name !== 'PluginRender';
+  if (isMainWindowRoute) {
     // 首屏图标字体就绪后通知主进程展示主窗口
     await waitForCriticalFonts();
     ipcRaw.send('main-renderer-ready');
+    // 升级提示依赖市场版本数据，主窗口启动拉取后立即检查，不等页面二次进入
+    initialLoad();
+  } else {
+    getPlugins();
   }
-
-  getPlugins();
   onUpdatePlugins();
   onTitleBarActionsChanged();
   onShowSettingPanel();

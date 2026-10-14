@@ -316,7 +316,8 @@ import { selectFileDialog, showTextEditContextMenu } from '@/utils';
 import { STATUS_SUCCESS } from '@/utils/statusColors';
 import PluginCard from './PluginCard.vue';
 import DevPluginWizard from './DevPluginWizard.vue';
-import usePluginCenterSearch, { parseSearchResult, SEARCH_PAGE_SIZE } from './hooks/usePluginCenterSearch';
+import usePluginCenterSearch, { SEARCH_PAGE_SIZE } from './hooks/usePluginCenterSearch';
+import checkPluginUpdates from './hooks/usePluginUpdateCheck';
 
 const ipc = useIpc();
 const store = useGlobalStore();
@@ -346,32 +347,12 @@ const {
   withVersion,
   isInstalled,
   canUpdated,
-  getPluginDetail,
   searchAction,
   searchMore,
   clearSearchResult,
   switchToSearch,
   switchToInstalled,
 } = usePluginCenterSearch();
-
-const checkPluginUpdates = async () => {
-  // 对所有非 dev 插件进行更新检查
-  plugins.value.forEach(async (p) => {
-    if (p.dev) return;
-    try {
-      const detail = await getPluginDetail(p.packageName);
-      if (detail) {
-        const searchItem = parseSearchResult(detail);
-        store.updatePlugin(p.packageName, {
-          versions: searchItem.versions,
-        });
-      }
-    } catch (err) {
-      // 单个检查失败不影响整体
-      console.error(`Check update failed for ${p.packageName}`, err);
-    }
-  });
-};
 
 const getPlugins = async () => {
   try {

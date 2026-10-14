@@ -63,6 +63,32 @@ describe('globalStore', () => {
       expect(store.plugins).toHaveLength(2);
     });
 
+    it('整体替换插件列表时应保留渲染端补充的市场版本列表', () => {
+      // 防止的回归：PLUGINS_CHANGED 刷新触发 setPlugins 整体替换数组，
+      // updatePlugin 合并进来的 versions 被抹掉，已安装卡片的升级提示随之消失
+      const store = useGlobalStore();
+      store.setPlugins([{ packageName: 'plugin-a', version: '1.0.0' }]);
+      store.updatePlugin('plugin-a', { versions: [{ value: '1.1.0', title: '@1.1.0' }] });
+
+      store.setPlugins([{ packageName: 'plugin-a', version: '1.0.0' }]);
+
+      expect(store.plugins[0].versions).toEqual([{ value: '1.1.0', title: '@1.1.0' }]);
+    });
+
+    it('已卸载插件残留的市场版本列表不应保留', () => {
+      const store = useGlobalStore();
+      store.setPlugins([
+        { packageName: 'plugin-a', version: '1.0.0' },
+        { packageName: 'plugin-b', version: '1.0.0' },
+      ]);
+      store.updatePlugin('plugin-b', { versions: [{ value: '2.0.0', title: '@2.0.0' }] });
+
+      store.setPlugins([{ packageName: 'plugin-a', version: '1.0.0' }]);
+
+      expect(store.plugins).toHaveLength(1);
+      expect(store.plugins[0].versions).toBeUndefined();
+    });
+
     it('应该能够清空插件列表', () => {
       const store = useGlobalStore();
       store.setPlugins([{ packageName: 'test' }]);
