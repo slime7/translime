@@ -25,7 +25,7 @@
     "test": "pnpm exec vitest run -c vitest.config.mjs",
     "preview:ui": "vite -c ui.vite.config.mjs --mode preview",
     "build:plugin": "vite build",
-    "build:wrapper": "vite build -c wrapper.vite.config.mjs",
+    "build:wrapper": "vite build -c wrapper.vite.config.mjs && vite build -c wrapper.vite.config.mjs --mode preload",
     "build:ui": "vite build -c ui.vite.config.mjs",
     "build": "pnpm run build:plugin && pnpm run build:wrapper && pnpm run build:ui"
   },

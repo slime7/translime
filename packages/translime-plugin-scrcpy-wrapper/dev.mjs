@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 const TASKS = [
   { name: '[main]', args: ['build', '--watch', '--mode', 'watch'] },
   { name: '[ui]', args: ['build', '-c', 'ui.vite.config.mjs', '--watch', '--mode', 'watch'] },
+  { name: '[wrapper]', args: ['build', '-c', 'wrapper.vite.config.mjs', '--watch', '--mode', 'watch'] },
 ];
 
 let exiting = false;

@@ -5,8 +5,24 @@
  * invoke 命中时返回其返回值，未命中返回 null 并打印调用日志。
  */
 export default {
-  'test-ipc': (arg1, arg2) => ({
+  'list-devices': () => ({
     success: true,
-    message: `mock reply from preview: ${arg1} ${arg2}`,
+    devices: [
+      { serial: 'MOCK123ABC', state: 'device', model: 'Pixel Mock' },
+      { serial: 'emulator-5554', state: 'device', model: 'Emulator' },
+    ],
+  }),
+  'list-apps': () => ({
+    success: true,
+    packages: [
+      'com.android.chrome',
+      'com.tencent.weread',
+      'org.videolan.vlc',
+    ],
+  }),
+  launch: () => ({
+    success: true,
+    sessionId: 'session-mock-1',
+    title: 'translime-scrcpy-1',
   }),
 };
