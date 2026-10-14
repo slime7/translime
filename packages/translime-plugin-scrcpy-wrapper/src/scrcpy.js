@@ -205,6 +205,13 @@ export const launchSession = async (options = {}) => {
     serial,
     pkg,
     title,
+    // 虚拟屏以画面区物理分辨率创建并开启 flex-display，分辨率连续跟随窗口
+    virtualDisplaySize: mode === 'virtual'
+      ? {
+        width: Math.max(1, Math.round(contentSize.width * display.scaleFactor)),
+        height: Math.max(1, Math.round((contentSize.height - BAR_CSS_HEIGHT) * display.scaleFactor)),
+      }
+      : null,
   });
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
 

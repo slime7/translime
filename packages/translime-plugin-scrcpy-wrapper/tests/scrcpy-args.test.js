@@ -15,7 +15,7 @@ describe('buildScrcpyArgs', () => {
     ]);
   });
 
-  it('虚拟屏模式附带 new-display 与 start-app', () => {
+  it('虚拟屏模式默认仅输出 new-display', () => {
     expect(buildScrcpyArgs({
       mode: 'virtual',
       serial: 'ABC123',
@@ -26,6 +26,23 @@ describe('buildScrcpyArgs', () => {
       '--window-title=translime-scrcpy-2',
       '--video-codec=h265',
       '--new-display',
+      '--start-app=com.foo',
+    ]);
+  });
+
+  it('虚拟屏模式给定分辨率时输出显式 new-display 并开启 flex-display', () => {
+    expect(buildScrcpyArgs({
+      mode: 'virtual',
+      serial: 'ABC123',
+      pkg: 'com.foo',
+      title: 'translime-scrcpy-2',
+      virtualDisplaySize: { width: 871, height: 1184 },
+    })).toEqual([
+      '--serial=ABC123',
+      '--window-title=translime-scrcpy-2',
+      '--video-codec=h265',
+      '--new-display=871x1184',
+      '-x',
       '--start-app=com.foo',
     ]);
   });

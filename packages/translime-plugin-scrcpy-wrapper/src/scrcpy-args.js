@@ -10,13 +10,16 @@ export const nextWindowTitle = () => {
 
 /**
  * 构建 scrcpy 启动参数：
- * 默认 h265 编码 + 声音开启；virtual 模式使用虚拟屏幕并可选直接拉起应用
+ * 默认 h265 编码 + 声音开启；virtual 模式使用虚拟屏幕并可选直接拉起应用。
+ * virtualDisplaySize 给定时以显式分辨率创建虚拟屏，并开启 flex-display
+ * 让虚拟屏连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）
  */
 export const buildScrcpyArgs = ({
   mode,
   serial,
   pkg,
   title,
+  virtualDisplaySize = null,
 }) => {
   const args = [
     `--serial=${serial}`,
@@ -24,7 +27,11 @@ export const buildScrcpyArgs = ({
     '--video-codec=h265',
   ];
   if (mode === 'virtual') {
-    args.push('--new-display');
+    if (virtualDisplaySize) {
+      args.push(`--new-display=${virtualDisplaySize.width}x${virtualDisplaySize.height}`, '-x');
+    } else {
+      args.push('--new-display');
+    }
     if (pkg) {
       args.push(`--start-app=${pkg}`);
     }
