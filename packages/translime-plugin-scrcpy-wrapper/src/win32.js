@@ -27,7 +27,10 @@ const NONCLIENT_STYLES = WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBO
 
 const GW_CHILD = 5;
 
-// HWND_TOP 取值 0，作为 hWndInsertAfter 传入表示抬到同层级最上层
+// hWndInsertAfter 取值：HWND_TOP 抬到同层级最上层，HWND_BOTTOM 压到最底层
+const HWND_TOP = 0;
+const HWND_BOTTOM = 1;
+
 const SWP_NOSIZE = 0x0001;
 const SWP_NOMOVE = 0x0002;
 const SWP_NOZORDER = 0x0004;
@@ -138,9 +141,11 @@ export const findWindowByTitle = (title) => {
  * 等比缩放并居中，四周留黑边；缺省时铺满画面区。frameChanged 仅挂载后样式
  * 变更时需要，持续同步阶段不发送以免逐帧重算非客户区。
  *
- * 每次都必须以 HWND_TOP 落位：父窗口缩放时 Chromium 会把网页输入
+ * 每次默认以 HWND_TOP 落位：父窗口缩放时 Chromium 会把网页输入
  * 子窗口（Chrome_RenderWidgetHostHWND）重新置顶，若不抬回 SDL，
- * 物理点击会被它截走（该窗口不参与绘制，画面可见但点击失效）
+ * 物理点击会被它截走（该窗口不参与绘制，画面可见但点击失效）。
+ * keepBelow 供冻结覆盖层显示期间使用：改为压到网页之下以免盖住覆盖层，
+ * 抬回由撤下覆盖层的一方负责
  */
 export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
   const b = loadBindings();
@@ -150,6 +155,7 @@ export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
     show = true,
     frameChanged = false,
     aspect = null,
+    keepBelow = false,
   } = options;
   const parentHwnd = hwndFromWindow(wrapperWin);
   if (!b.GetClientRect(parentHwnd, b.rectPtr)) {
@@ -168,7 +174,7 @@ export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
   const flags = SWP_NOACTIVATE
     | (frameChanged ? SWP_FRAMECHANGED : 0)
     | (show ? SWP_SHOWWINDOW : 0);
-  b.SetWindowPos(sdlHwnd, 0, video.x, video.y + topH, video.width, video.height, flags);
+  b.SetWindowPos(sdlHwnd, keepBelow ? HWND_BOTTOM : HWND_TOP, video.x, video.y + topH, video.width, video.height, flags);
 };
 
 /**
@@ -182,7 +188,7 @@ export const ensureChildOnTop = (wrapperWin, sdlHwnd) => {
   if (b.GetWindow(parentHwnd, GW_CHILD) === sdlHwnd) {
     return;
   }
-  b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+  b.SetWindowPos(sdlHwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
 };
 
 const delay = (ms) => new Promise((resolve) => {
@@ -243,20 +249,21 @@ export const mountSdlToElectron = async (wrapperWin, sdlHwnd, options = {}) => {
 };
 
 /**
- * 显示/隐藏 SDL 子窗口。冻结帧覆盖层是网页内容，层级在原生子窗口之下，
- * 显示覆盖层期间必须先隐藏子窗口，settle 时的 syncChildRect 会重显
+ * 把 SDL 子窗口压到同层兄弟窗口的最底部（保持可见）。
+ * 冻结帧覆盖层是网页内容，层级在原生子窗口之下：压低而不是隐藏，
+ * scrcpy 才能继续保持渲染与推流，覆盖期间 pixels 比对才有新内容可读；
+ * 抬回由撤下覆盖层时的 ensureChildOnTop 负责
  */
-export const setWindowVisible = (sdlHwnd, visible) => {
+export const lowerWindowBelowSiblings = (sdlHwnd) => {
   const b = loadBindings();
-  b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
-    | (visible ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+  b.SetWindowPos(sdlHwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 };
 
 /**
- * 抓取 SDL 画面窗口当前帧，返回可直接用于 <img> 的 dataURL。
- * 拖动调整窗口尺寸时该冻结帧以拉伸 + blur 形式临时覆盖画面区
+ * 抓取 SDL 画面窗口当前帧的原始 BGRA 像素与尺寸，供冻结覆盖层图片与
+ * settle 后的「画面是否跟上」比对使用；返回 null 表示窗口无效或抓帧失败
  */
-export const captureWindowImage = (sdlHwnd) => {
+export const captureWindowPixels = (sdlHwnd) => {
   const b = loadBindings();
   if (!b.GetClientRect(sdlHwnd, b.rectPtr)) {
     return null;
@@ -299,8 +306,7 @@ export const captureWindowImage = (sdlHwnd) => {
     if (lines !== height) {
       return null;
     }
-    return nativeImage.createFromBitmap(buffer, { width, height })
-      .toDataURL({ format: 'jpeg', quality: 80 });
+    return { buffer, width, height };
   } finally {
     if (bitmap) {
       b.DeleteObject(bitmap);
@@ -314,17 +320,24 @@ export const captureWindowImage = (sdlHwnd) => {
   }
 };
 
+/** 把 captureWindowPixels 的结果编码为可直接用于 <img> 的 dataURL */
+export const windowPixelsToDataUrl = ({ buffer, width, height }) => nativeImage
+  .createFromBitmap(buffer, { width, height })
+  .toDataURL({ format: 'jpeg', quality: 80 });
+
 /**
  * 缩放实时同步：交互缩放期间 resize 事件经调度器聚合成一次滞后同步，
- * 拖动期间画面区显示冻结帧模糊层；防抖到期（或 WM_EXITSIZEMOVE、
- * resized 事件）时真正调整 SDL 尺寸并撤下模糊层；
- * 低频 z 序巡检兜底最大化/还原等未触发监听的置顶路径
+ * 拖动期间画面区由调用方冻结并显示模糊层；防抖到期（或 WM_EXITSIZEMOVE、
+ * resized 事件）时真正调整 SDL 尺寸并回调 onResizeSettled，模糊层何时撤下
+ * 由调用方决定；低频 z 序巡检兜底最大化/还原等未触发监听的置顶路径，
+ * isFrozen 为真期间跳过巡检且落位压底，避免盖住覆盖层
  */
 export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
   const {
     getBarPhysicalHeight = () => 0,
     getTopBarPhysicalHeight = () => 0,
     getAspect = () => null,
+    isFrozen = () => false,
     debounceMs = 120,
     onResizeBurstStart = null,
     onResizeSettled = null,
@@ -336,6 +349,7 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
       topBarPhysicalHeight: getTopBarPhysicalHeight(),
       aspect: getAspect(),
       show: true,
+      keepBelow: isFrozen(),
     });
   };
 
@@ -355,6 +369,9 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
   wrapperWin.on('resized', settleNow);
   wrapperWin.hookWindowMessage(WM_EXITSIZEMOVE, settleNow);
   const zOrderTimer = setInterval(() => {
+    if (isFrozen()) {
+      return;
+    }
     try {
       ensureChildOnTop(wrapperWin, sdlHwnd);
     } catch {

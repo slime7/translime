@@ -13,7 +13,7 @@
       </div>
 
       <!-- 画面区：接入前显示占位；SDL 子窗口覆盖在网页之上，
-           因此冻结帧覆盖层显示期间会先隐藏子窗口 -->
+           因此冻结帧覆盖层显示期间主进程会把子窗口压到网页之下 -->
       <div class="relative flex min-h-0 grow items-center justify-center overflow-hidden">
         <span
           v-if="!freezeImage"
