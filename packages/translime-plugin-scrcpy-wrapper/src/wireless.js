@@ -1,7 +1,10 @@
-import { randomBytes } from 'node:crypto';
 import { parseConnectOutput } from './adb';
+import scanOpenPorts from './port-scan';
 
 const WIRELESS_SERIAL_RE = /^[\w.-]+:\d{1,5}$/;
+
+// 无线调试端口由内核从临时端口范围随机分配（Linux 默认 32768-60999），5555 兼容经典 tcpip 模式
+const SCAN_PORTS = [5555, ...Array.from({ length: 60999 - 32768 + 1 }, (item, index) => 32768 + index)];
 
 const defaultDelay = (ms) => new Promise((resolve) => {
   setTimeout(resolve, ms);
@@ -71,6 +74,11 @@ const buildConnectFailMessage = (serial, attempt) => {
   return `无法连接无线设备 ${serial}：请确认手机已开启无线调试且与电脑处于同一网络；端口可能已变化，可在手机「无线调试」页面查看最新的 IP 地址和端口`;
 };
 
+const tryConnectAddress = (adb, adbPath, address, options = {}) => adb.connectDevice(adbPath, address, options).then(
+  (output) => parseConnectOutput(output),
+  () => ({ ok: false }),
+);
+
 /**
  * 依次尝试候选地址连接，返回第一个连上的地址；全部失败返回 null
  */
@@ -79,10 +87,7 @@ const connectFirstCandidate = async (adb, adbPath, candidates) => {
     return null;
   }
   const [first, ...rest] = candidates;
-  const attempt = await adb.connectDevice(adbPath, first).then(
-    (output) => parseConnectOutput(output),
-    () => ({ ok: false }),
-  );
+  const attempt = await tryConnectAddress(adb, adbPath, first);
   if (attempt.ok) {
     return first;
   }
@@ -90,13 +95,57 @@ const connectFirstCandidate = async (adb, adbPath, candidates) => {
 };
 
 /**
+ * mDNS 不可用时的兜底：扫描手机 IP 的临时端口段，对开放端口逐个尝试 adb connect
+ */
+const connectByPortScan = async ({
+  adb, adbPath, ip, excludeSerials = [], scan = scanOpenPorts,
+}) => {
+  const openPorts = await scan({ host: ip, ports: SCAN_PORTS });
+  const tryPort = async (candidates) => {
+    if (candidates.length === 0) {
+      return null;
+    }
+    const [port, ...rest] = candidates;
+    const address = formatAddress({ ip, port });
+    if (excludeSerials.includes(address)) {
+      return tryPort(rest);
+    }
+    const attempt = await tryConnectAddress(adb, adbPath, address, { timeoutMs: 5000 });
+    if (attempt.ok) {
+      return address;
+    }
+    return tryPort(rest);
+  };
+  return tryPort(openPorts);
+};
+
+/**
+ * 发现指定 IP 的连接端口并连接：先 mDNS，再端口扫描兜底
+ */
+const connectDiscovered = async ({
+  adb, adbPath, ip, excludeSerials = [], scan,
+}) => {
+  const discovered = await adb.getMdnsConnectAddresses(adbPath).catch(() => []);
+  const viaMdns = await connectFirstCandidate(adb, adbPath, discovered
+    .filter((address) => !excludeSerials.includes(address) && parseAddress(address)?.ip === ip));
+  if (viaMdns) {
+    return viaMdns;
+  }
+  return connectByPortScan({
+    adb, adbPath, ip, excludeSerials, scan,
+  });
+};
+
+/**
  * 确保无线设备处于已连接状态：
- * 已在线直接返回；否则按传入地址连接，失败后用 mDNS 发现的当前端口重连
- * （高版本安卓每次开关无线调试或重启后端口都会变化），并回报端口变化
+ * 已在线直接返回；否则按传入地址连接，失败后用 mDNS 发现的当前端口重连，
+ * 再不行扫描端口段兜底（高版本安卓每次开关无线调试或重启后端口都会变化），并回报端口变化
  *
  * adb 注入 { listDevices, connectDevice, getMdnsConnectAddresses } 以便单测
  */
-export const ensureWirelessConnected = async ({ serial, adbPath, adb }) => {
+export const ensureWirelessConnected = async ({
+  serial, adbPath, adb, scan = scanOpenPorts,
+}) => {
   const online = await adb.listDevices(adbPath);
   if (online.some((device) => device.serial === serial && device.state === 'device')) {
     return { ok: true, serial };
@@ -112,10 +161,9 @@ export const ensureWirelessConnected = async ({ serial, adbPath, adb }) => {
   if (!parsed) {
     return { ok: false, message: attempt.message || buildConnectFailMessage(serial, attempt) };
   }
-  const discovered = await adb.getMdnsConnectAddresses(adbPath);
-  const candidates = discovered
-    .filter((address) => address !== serial && parseAddress(address)?.ip === parsed.ip);
-  const connected = await connectFirstCandidate(adb, adbPath, candidates);
+  const connected = await connectDiscovered({
+    adb, adbPath, ip: parsed.ip, excludeSerials: [serial], scan,
+  });
   if (connected) {
     return { ok: true, serial: connected, portChanged: true };
   }
@@ -123,52 +171,18 @@ export const ensureWirelessConnected = async ({ serial, adbPath, adb }) => {
 };
 
 /**
- * 生成扫码配对的随机服务名与密码。
- * 字符集仅用字母数字，避免 WIFI QR 文本转义问题；
- * 服务名作为 mdns 实例名请求，密码为配对共享密钥
- */
-export const createQrPairingSecrets = ({ random = randomBytes } = {}) => {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const pick = (length) => Array.from(random(length))
-    .map((byte) => alphabet[byte % alphabet.length])
-    .join('');
-  return { name: `translime-${pick(8)}`, password: pick(10) };
-};
-
-/**
- * 构建手机「使用二维码配对设备」可扫描的二维码内容（WPA 扫码格式的 ADB 变体）
- */
-export const buildQrPairingPayload = ({ name, password }) => `WIFI:T:ADB;S:${name};P:${password};;`;
-
-const tryConnectDiscovered = async (adb, adbPath, { ip = null, knownSerials = [] }) => {
-  const discovered = await adb.getMdnsConnectAddresses(adbPath).catch(() => []);
-  const candidate = discovered
-    .map((address) => ({ raw: address, parsed: parseAddress(address) }))
-    .find(({ raw, parsed }) => parsed
-      && !knownSerials.includes(raw)
-      && (!ip || parsed.ip === ip));
-  if (!candidate) {
-    return null;
-  }
-  const attempt = await adb.connectDevice(adbPath, candidate.raw).then(
-    (output) => parseConnectOutput(output),
-    () => ({ ok: false }),
-  );
-  return attempt.ok ? candidate.raw : null;
-};
-
-/**
- * 配对成功后等待连接建立：
+ * 配对成功后建立连接：
  * 轮询在线设备识别新上线的无线设备（新版 adb 配对后会自动回连），
- * 已知 IP 时（配对码流程）额外用 mDNS 发现连接端口主动连接
+ * 期间辅以 mDNS 发现；轮询结束仍未出现时用端口扫描兜底
  */
 export const connectAfterPairing = async ({
   adbPath,
   adb,
   knownSerials = [],
-  ip = null,
-  attempts = 10,
+  ip,
+  attempts = 5,
   pollIntervalMs = 1000,
+  scan = scanOpenPorts,
   delay = defaultDelay,
 }) => {
   const devices = await adb.listDevices(adbPath).catch(() => []);
@@ -178,14 +192,21 @@ export const connectAfterPairing = async ({
   if (fresh) {
     return { ok: true, serial: fresh.serial };
   }
-  const connected = await tryConnectDiscovered(adb, adbPath, { ip, knownSerials });
-  if (connected) {
-    return { ok: true, serial: connected };
+  const viaMdns = await connectFirstCandidate(adb, adbPath, (await adb.getMdnsConnectAddresses(adbPath).catch(() => []))
+    .filter((address) => !knownSerials.includes(address) && parseAddress(address)?.ip === ip));
+  if (viaMdns) {
+    return { ok: true, serial: viaMdns };
   }
   if (attempts <= 1) {
+    const viaScan = await connectByPortScan({
+      adb, adbPath, ip, excludeSerials: knownSerials, scan,
+    });
+    if (viaScan) {
+      return { ok: true, serial: viaScan };
+    }
     return {
       ok: false,
-      message: '未能发现设备的连接端口，请保持手机无线调试开启；多次失败请检查电脑 adb 的 mDNS 是否可用（adb mdns check）',
+      message: '已配对成功，但未能连接设备。请保持手机无线调试开启并与电脑处于同一网络后重试；若路由器开启了 AP 隔离或热点，请关闭对应隔离选项',
     };
   }
   await delay(pollIntervalMs);
@@ -196,70 +217,7 @@ export const connectAfterPairing = async ({
     ip,
     attempts: attempts - 1,
     pollIntervalMs,
-    delay,
-  });
-};
-
-const tryPairByServiceName = async (adb, adbPath, name, password) => {
-  try {
-    await adb.pairDevice(adbPath, name, password);
-    return { ok: true };
-  } catch (e) {
-    if (/wrong password/i.test(String(e.message))) {
-      return { ok: false, fatal: true, message: '配对密码校验失败，请重新生成二维码' };
-    }
-    // 服务尚未广播（手机还未扫码）等情况，继续等待
-    return { ok: false };
-  }
-};
-
-/**
- * 扫码配对：轮询 `adb pair <服务名> <密码>`（adb 客户端按 mdns 服务名解析手机
- * 扫码后广播的配对服务），配对成功后等待连接建立。
- * 单次调用窗口内未等到扫码时返回 pending，由 UI 决定是否继续轮询
- */
-export const pairByQrServiceName = async ({
-  adbPath,
-  adb,
-  name,
-  password,
-  knownSerials = [],
-  attempts = 4,
-  pollIntervalMs = 2000,
-  connectAttempts = 10,
-  delay = defaultDelay,
-}) => {
-  const attempt = await tryPairByServiceName(adb, adbPath, name, password);
-  if (attempt.ok) {
-    const connected = await connectAfterPairing({
-      adbPath,
-      adb,
-      knownSerials,
-      attempts: connectAttempts,
-      pollIntervalMs,
-      delay,
-    });
-    if (connected.ok) {
-      return connected;
-    }
-    return { ok: false, message: `配对成功，但连接失败：${connected.message}` };
-  }
-  if (attempt.fatal) {
-    return attempt;
-  }
-  if (attempts <= 1) {
-    return { ok: false, pending: true };
-  }
-  await delay(pollIntervalMs);
-  return pairByQrServiceName({
-    adbPath,
-    adb,
-    name,
-    password,
-    knownSerials,
-    attempts: attempts - 1,
-    pollIntervalMs,
-    connectAttempts,
+    scan,
     delay,
   });
 };

@@ -3,16 +3,32 @@ import {
 } from 'vitest';
 import { parseConnectOutput, parseMdnsServices } from '../src/adb';
 import {
-  buildQrPairingPayload,
   connectAfterPairing,
-  createQrPairingSecrets,
   ensureWirelessConnected,
   formatAddress,
   isWirelessSerial,
   mergeWirelessDevices,
-  pairByQrServiceName,
   parseAddress,
 } from '../src/wireless';
+
+const adbPath = 'adb';
+
+const createAdb = ({ online = [], connectResults = {}, mdnsAddresses = [] } = {}) => ({
+  listDevices: vi.fn().mockResolvedValue(online),
+  connectDevice: vi.fn().mockImplementation((path, address) => {
+    const result = connectResults[address];
+    if (result instanceof Error) {
+      return Promise.reject(result);
+    }
+    return Promise.resolve(result ?? 'cannot connect to address');
+  }),
+  getMdnsConnectAddresses: vi.fn().mockResolvedValue(mdnsAddresses),
+});
+
+const noDelay = () => Promise.resolve();
+
+// 扫描兜底在单测中一律注入桩，避免真实 TCP 探测
+const noScan = () => Promise.resolve([]);
 
 describe('parseAddress', () => {
   it('解析合法 IP:端口并可还原为字符串', () => {
@@ -155,20 +171,6 @@ describe('mergeWirelessDevices', () => {
   });
 });
 
-const adbPath = 'adb';
-
-const createAdb = ({ online = [], connectResults = {}, mdnsAddresses = [] } = {}) => ({
-  listDevices: vi.fn().mockResolvedValue(online),
-  connectDevice: vi.fn().mockImplementation((path, address) => {
-    const result = connectResults[address];
-    if (result instanceof Error) {
-      return Promise.reject(result);
-    }
-    return Promise.resolve(result ?? 'cannot connect to address');
-  }),
-  getMdnsConnectAddresses: vi.fn().mockResolvedValue(mdnsAddresses),
-});
-
 describe('ensureWirelessConnected', () => {
   it('设备已在线时直接返回，不再执行连接', async () => {
     const adb = createAdb({ online: [{ serial: '192.168.1.5:37895', state: 'device' }] });
@@ -205,6 +207,22 @@ describe('ensureWirelessConnected', () => {
     expect(result).toEqual({ ok: true, serial: '192.168.1.5:41025', portChanged: true });
   });
 
+  it('mDNS 也失败时用端口扫描兜底重连', async () => {
+    const scan = vi.fn().mockResolvedValue([41025]);
+    const adb = createAdb({
+      connectResults: { '192.168.1.5:41025': 'connected to 192.168.1.5:41025' },
+      mdnsAddresses: [],
+    });
+    const result = await ensureWirelessConnected({
+      serial: '192.168.1.5:37895',
+      adbPath,
+      adb,
+      scan,
+    });
+    expect(result).toEqual({ ok: true, serial: '192.168.1.5:41025', portChanged: true });
+    expect(scan).toHaveBeenCalledWith({ host: '192.168.1.5', ports: expect.any(Array) });
+  });
+
   it('mDNS 发现的非同 IP 服务不会被用于重连', async () => {
     const adb = createAdb({
       mdnsAddresses: ['10.0.0.8:5555'],
@@ -213,6 +231,7 @@ describe('ensureWirelessConnected', () => {
       serial: '192.168.1.5:37895',
       adbPath,
       adb,
+      scan: noScan,
     });
     expect(result.ok).toBe(false);
     expect(adb.connectDevice).toHaveBeenCalledTimes(1);
@@ -224,6 +243,7 @@ describe('ensureWirelessConnected', () => {
       serial: '192.168.1.5:37895',
       adbPath,
       adb,
+      scan: noScan,
     });
     expect(result.ok).toBe(false);
     expect(result.message).toContain('端口可能已变化');
@@ -240,39 +260,14 @@ describe('ensureWirelessConnected', () => {
       serial: '192.168.1.5:37895',
       adbPath,
       adb,
+      scan: noScan,
     });
     expect(result.ok).toBe(false);
     expect(result.message).toContain('重新配对');
   });
 });
 
-describe('createQrPairingSecrets / buildQrPairingPayload', () => {
-  it('按注入的随机源生成服务名与密码，并输出手机可扫描的 QR 内容', () => {
-    const bytes = Array.from({ length: 32 }, (item, index) => (index + 1) % 256);
-    let offset = 0;
-    const secrets = createQrPairingSecrets({
-      random: (length) => {
-        const slice = Uint8Array.from(bytes.slice(offset, offset + length));
-        offset += length;
-        return slice;
-      },
-    });
-    expect(secrets.name).toMatch(/^translime-[A-Za-z0-9]{8}$/);
-    expect(secrets.password).toMatch(/^[A-Za-z0-9]{10}$/);
-    expect(buildQrPairingPayload(secrets)).toBe(`WIFI:T:ADB;S:${secrets.name};P:${secrets.password};;`);
-  });
-
-  it('两次生成互不相同', () => {
-    const first = createQrPairingSecrets();
-    const second = createQrPairingSecrets();
-    expect(first.name).not.toBe(second.name);
-    expect(first.password).not.toBe(second.password);
-  });
-});
-
 describe('connectAfterPairing', () => {
-  const noDelay = () => Promise.resolve();
-
   it('识别 adb 自动回连的新上线无线设备', async () => {
     const adb = createAdb({
       online: [{ serial: '192.168.1.5:37895', state: 'device' }],
@@ -302,21 +297,26 @@ describe('connectAfterPairing', () => {
     expect(result).toEqual({ ok: true, serial: '192.168.1.5:37895' });
   });
 
-  it('扫码流程不限定 IP，识别任意新上线的无线设备', async () => {
+  it('mDNS 不可用时用端口扫描兜底建立连接', async () => {
+    const scan = vi.fn().mockResolvedValue([40001, 40002]);
     const adb = createAdb({
-      online: [{ serial: '10.0.0.8:5555', state: 'device' }],
+      connectResults: { '192.168.1.5:40001': 'connected to 192.168.1.5:40001' },
+      mdnsAddresses: [],
     });
     const result = await connectAfterPairing({
       adbPath,
       adb,
-      knownSerials: ['192.168.1.5:37895'],
-      ip: null,
+      knownSerials: [],
+      ip: '192.168.1.5',
+      attempts: 2,
+      scan,
       delay: noDelay,
     });
-    expect(result).toEqual({ ok: true, serial: '10.0.0.8:5555' });
+    expect(result).toEqual({ ok: true, serial: '192.168.1.5:40001' });
+    expect(scan).toHaveBeenCalledWith({ host: '192.168.1.5', ports: expect.any(Array) });
   });
 
-  it('始终无法建立连接时返回指引性错误', async () => {
+  it('端口扫描也失败时返回可操作的错误提示', async () => {
     const adb = createAdb({ mdnsAddresses: [] });
     const result = await connectAfterPairing({
       adbPath,
@@ -324,81 +324,10 @@ describe('connectAfterPairing', () => {
       knownSerials: [],
       ip: '192.168.1.5',
       attempts: 2,
+      scan: noScan,
       delay: noDelay,
     });
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('mDNS');
-  });
-});
-
-describe('pairByQrServiceName', () => {
-  const noDelay = () => Promise.resolve();
-
-  const createPairingAdb = ({ pairResults = [], ...rest } = {}) => {
-    const adb = createAdb(rest);
-    let call = 0;
-    adb.pairDevice = vi.fn().mockImplementation(() => {
-      const result = pairResults[call];
-      call += 1;
-      if (result instanceof Error) {
-        return Promise.reject(result);
-      }
-      return Promise.resolve(result ?? 'Successfully paired to name [guid=guid]');
-    });
-    return adb;
-  };
-
-  it('手机尚未扫码（服务未广播）时返回 pending 等待继续轮询', async () => {
-    const adb = createPairingAdb({
-      pairResults: [
-        new Error('Failed to parse address for pairing: ...'),
-        new Error('Failed to parse address for pairing: ...'),
-      ],
-    });
-    const result = await pairByQrServiceName({
-      adbPath,
-      adb,
-      name: 'translime-test',
-      password: 'pwd1234567',
-      attempts: 2,
-      delay: noDelay,
-    });
-    expect(result).toEqual({ ok: false, pending: true });
-    expect(adb.pairDevice).toHaveBeenCalledTimes(2);
-  });
-
-  it('服务广播后配对成功并等待连接建立', async () => {
-    const adb = createPairingAdb({
-      pairResults: [new Error('Failed to parse address for pairing: ...')],
-      online: [{ serial: '192.168.1.9:40001', state: 'device' }],
-    });
-    const result = await pairByQrServiceName({
-      adbPath,
-      adb,
-      name: 'translime-test',
-      password: 'pwd1234567',
-      knownSerials: ['192.168.1.5:37895'],
-      attempts: 3,
-      delay: noDelay,
-    });
-    expect(result).toEqual({ ok: true, serial: '192.168.1.9:40001' });
-  });
-
-  it('密码校验失败时立即终止并提示重新生成', async () => {
-    const adb = createPairingAdb({
-      pairResults: [new Error('Failed: Wrong password or connection was dropped.')],
-    });
-    const result = await pairByQrServiceName({
-      adbPath,
-      adb,
-      name: 'translime-test',
-      password: 'pwd1234567',
-      attempts: 3,
-      delay: noDelay,
-    });
-    expect(result.ok).toBe(false);
-    expect(result.pending).toBeFalsy();
-    expect(result.message).toContain('重新生成');
-    expect(adb.pairDevice).toHaveBeenCalledTimes(1);
+    expect(result.message).toContain('AP 隔离');
   });
 });

@@ -130,7 +130,7 @@ export const pairDevice = async (adbPath, address, pairingCode) => {
   }
 };
 
-export const connectDevice = async (adbPath, address) => adbExecTolerant(adbPath, ['connect', address]);
+export const connectDevice = async (adbPath, address, options = {}) => adbExecTolerant(adbPath, ['connect', address], options);
 
 export const getMdnsConnectAddresses = async (adbPath) => {
   try {

@@ -597,16 +597,13 @@ importers:
         version: 3.0.1(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.57.2(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-node@0.3.9)(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3)
       eslint-import-resolver-alias:
         specifier: ^1.1.2
-        version: 1.1.2(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3))(eslint@9.24.0(jiti@2.7.0)))
+        version: 1.1.2(eslint-plugin-import@2.32.0)
       eslint-plugin-vue:
         specifier: ^10.11.1
         version: 10.11.1(@stylistic/eslint-plugin@5.10.0(eslint@9.24.0(jiti@2.7.0)))(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3))(eslint@9.24.0(jiti@2.7.0))(vue-eslint-parser@10.4.1(eslint@9.24.0(jiti@2.7.0)))
       mde-vue:
         specifier: git+https://github.com/slime7/mde-vue.git#v26.10.12
         version: https://codeload.github.com/slime7/mde-vue/tar.gz/d7bb16b5b98c346e27e4663e08043fa490b38234(tailwindcss@4.3.3)(vue@3.5.44(typescript@5.9.3))
-      qrcode.vue:
-        specifier: ^3.11.0
-        version: 3.11.0(vue@3.5.44(typescript@5.9.3))
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -5095,10 +5092,6 @@ packages:
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
 
-  lru-cache@11.2.4:
-    resolution: {integrity: sha512-B5Y16Jr9LB9dHVkh6ZevG+vAbOsNOYCX+sXvFWFu7B3Iz5mijW3zdbMyhsh8ANd2mSWBYdJgnqi+mL7/LrOPYg==}
-    engines: {node: 20 || >=22}
-
   lru-cache@11.5.3:
     resolution: {integrity: sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg==}
     engines: {node: 20 || >=22}
@@ -5811,11 +5804,6 @@ packages:
   qified@0.5.3:
     resolution: {integrity: sha512-kXuQdQTB6oN3KhI6V4acnBSZx8D2I4xzZvn9+wFLLFCoBNQY/sFnCW6c43OL7pOQ2HvGV4lnWIXNmgfp7cTWhQ==}
     engines: {node: '>=20'}
-
-  qrcode.vue@3.11.0:
-    resolution: {integrity: sha512-PnaO9yqcEVsH9euUmo4Nn0JZMkNwk4u6fDUosKjDTXv2Cgv7rHZhr2D8Iq54clBvSycOESwgUE/rw/tBRBjIVg==}
-    peerDependencies:
-      vue: ^3.5.44
 
   quansync@0.2.11:
     resolution: {integrity: sha512-AifT7QEbW9Nri4tAwR5M/uzpBuqfZf+zwaEM/QkzEjj7NBuFD2rBuy0K3dE+8wltbezDV7JMA0WfnCPYRSYbXA==}
@@ -7193,7 +7181,7 @@ snapshots:
       '@csstools/css-color-parser': 3.1.0(@csstools/css-parser-algorithms@3.0.5(@csstools/css-tokenizer@3.0.4))(@csstools/css-tokenizer@3.0.4)
       '@csstools/css-parser-algorithms': 3.0.5(@csstools/css-tokenizer@3.0.4)
       '@csstools/css-tokenizer': 3.0.4
-      lru-cache: 11.2.4
+      lru-cache: 11.5.3
 
   '@asamuzakjp/dom-selector@6.7.6':
     dependencies:
@@ -7201,7 +7189,7 @@ snapshots:
       bidi-js: 1.0.3
       css-tree: 3.1.0
       is-potential-custom-element-name: 1.0.1
-      lru-cache: 11.2.4
+      lru-cache: 11.5.3
 
   '@asamuzakjp/nwsapi@2.3.9': {}
 
@@ -9843,7 +9831,7 @@ snapshots:
   css-tree@3.1.0:
     dependencies:
       mdn-data: 2.12.2
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   css-what@6.1.0: {}
 
@@ -9862,7 +9850,7 @@ snapshots:
       '@asamuzakjp/css-color': 4.1.1
       '@csstools/css-syntax-patches-for-csstree': 1.0.22
       css-tree: 3.1.0
-      lru-cache: 11.2.4
+      lru-cache: 11.5.3
 
   csstype@3.2.3: {}
 
@@ -10458,6 +10446,10 @@ snapshots:
       unrs-resolver: 1.11.1
 
   eslint-import-resolver-alias@1.1.2(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3))(eslint@9.24.0(jiti@2.7.0))):
+    dependencies:
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-typescript@4.4.4)(eslint@9.24.0(jiti@2.7.0))
+
+  eslint-import-resolver-alias@1.1.2(eslint-plugin-import@2.32.0):
     dependencies:
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.57.2(eslint@9.24.0(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-typescript@4.4.4)(eslint@9.24.0(jiti@2.7.0))
 
@@ -12253,8 +12245,6 @@ snapshots:
 
   lru-cache@10.4.3: {}
 
-  lru-cache@11.2.4: {}
-
   lru-cache@11.5.3: {}
 
   lru-cache@5.1.1:
@@ -12925,10 +12915,6 @@ snapshots:
   qified@0.5.3:
     dependencies:
       hookified: 1.14.0
-
-  qrcode.vue@3.11.0(vue@3.5.44(typescript@5.9.3)):
-    dependencies:
-      vue: 3.5.44(typescript@5.9.3)
 
   quansync@0.2.11: {}
 

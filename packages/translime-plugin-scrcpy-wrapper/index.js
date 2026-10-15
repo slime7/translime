@@ -124,30 +124,6 @@ const ipcHandlers = defineIpcHandlers([
     },
   },
   {
-    type: 'create-wireless-qr',
-    handler: () => async () => {
-      const secrets = wirelessModule.createQrPairingSecrets();
-      return { success: true, ...secrets, payload: wirelessModule.buildQrPairingPayload(secrets) };
-    },
-  },
-  {
-    type: 'wait-wireless-qr-pairing',
-    handler: () => async ({ name, password, knownSerials = [] }) => {
-      // adb pair 以服务名解析手机扫码后广播的 mdns 配对服务；单次窗口未等到时返回 pending
-      const result = await wirelessModule.pairByQrServiceName({
-        adbPath: getAdbPath(),
-        adb: adbModule,
-        name,
-        password,
-        knownSerials,
-      });
-      if (!result.ok) {
-        return { success: false, pending: Boolean(result.pending), message: result.message };
-      }
-      return storeWirelessConnection(result.serial);
-    },
-  },
-  {
     type: 'remove-wireless',
     handler: () => async ({ serial }) => {
       const stored = getStoredWirelessDevices().filter((item) => item.serial !== serial);
