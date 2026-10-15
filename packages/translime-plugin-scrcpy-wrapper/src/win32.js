@@ -12,14 +12,25 @@ const WS_CLIPCHILDREN = 0x02000000n;
 const WS_CHILD = 0x40000000n;
 const WS_POPUP = 0x80000000n;
 
+// 非客户区样式：SDL 窗口若保留标题栏与可调边框，嵌入后父窗口内会出现
+// 第二套标题栏与拖动边缘并挤占画面区，挂载时一律去除
+const WS_CAPTION = 0x00c00000n;
+const WS_THICKFRAME = 0x00040000n;
+const WS_SYSMENU = 0x00080000n;
+const WS_MINIMIZEBOX = 0x00020000n;
+const WS_MAXIMIZEBOX = 0x00010000n;
+const NONCLIENT_STYLES = WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+
 const GW_CHILD = 5;
 
 // HWND_TOP 取值 0，作为 hWndInsertAfter 传入表示抬到同层级最上层
 const SWP_NOSIZE = 0x0001;
 const SWP_NOMOVE = 0x0002;
+const SWP_NOZORDER = 0x0004;
 const SWP_NOACTIVATE = 0x0010;
 const SWP_FRAMECHANGED = 0x0020;
 const SWP_SHOWWINDOW = 0x0040;
+const SWP_HIDEWINDOW = 0x0080;
 
 let bindings = null;
 let bindingsError = null;
@@ -144,8 +155,11 @@ export const ensureChildOnTop = (wrapperWin, sdlHwnd) => {
 };
 
 /**
- * 把 scrcpy 的 SDL 窗口嵌入 Electron wrapper 窗口：
- * 父窗口开 WS_CLIPCHILDREN，子窗口转 WS_CHILD 并去 WS_POPUP，
+ * 把 scrcpy 的 SDL 窗口以无边框形式嵌入 Electron wrapper 窗口：
+ * 父窗口开 WS_CLIPCHILDREN，子窗口转 WS_CHILD 并去除 WS_POPUP 与
+ * 标题栏/可调边框等非客户区样式，避免父窗口内出现第二套标题栏、
+ * 拖动边缘与画面黑边；SetParent 后先隐藏再重显，促使任务栏按
+ * 子窗口身份移除 scrcpy 原有的任务栏项；
  * 跨进程挂接输入线程完成后立即解绑
  */
 export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
@@ -159,10 +173,11 @@ export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
     b.SetWindowLongPtrW(parentHwnd, GWL_STYLE, Number(BigInt(parentStyle) | WS_CLIPCHILDREN));
 
     const childStyle = b.GetWindowLongPtrW(sdlHwnd, GWL_STYLE);
-    const childNext = Number((BigInt(childStyle) | WS_CHILD | WS_VISIBLE) & ~WS_POPUP);
+    const childNext = Number((BigInt(childStyle) | WS_CHILD | WS_VISIBLE) & ~WS_POPUP & ~NONCLIENT_STYLES);
     b.SetWindowLongPtrW(sdlHwnd, GWL_STYLE, childNext);
 
     b.SetParent(sdlHwnd, parentHwnd);
+    b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_HIDEWINDOW);
     syncChildRect(wrapperWin, sdlHwnd, { ...options, frameChanged: true });
   } finally {
     if (attached) {
