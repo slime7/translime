@@ -56,37 +56,4 @@ const computeWindowSize = ({
   };
 };
 
-/**
- * 计算画面矩形在可用区域内的摆放位置。
- *
- * aspect（设备分辨率）存在时等比缩放并居中，形成黑边 letterbox；
- * 缺失或虚拟屏模式时铺满整个可用区域。
- *
- * @param {object} options
- * @param {number} options.areaWidth - 可用区域宽（物理像素）。
- * @param {number} options.areaHeight - 可用区域高（物理像素，已扣除底条）。
- * @param {{ width: number, height: number } | null} options.aspect - 设备分辨率。
- * @returns {{ x: number, y: number, width: number, height: number }}
- */
-const fitVideoRect = ({ areaWidth, areaHeight, aspect }) => {
-  const safeW = Math.max(1, Math.round(areaWidth));
-  const safeH = Math.max(1, Math.round(areaHeight));
-  if (!aspect || !(aspect.width > 0) || !(aspect.height > 0) || safeW <= 1 || safeH <= 1) {
-    return {
-      x: 0, y: 0, width: safeW, height: safeH,
-    };
-  }
-  const ratio = aspect.width / aspect.height;
-  let width = Math.min(safeW, Math.round(safeH * ratio));
-  const height = Math.min(safeH, Math.round(width / ratio));
-  width = Math.min(safeW, Math.round(height * ratio));
-  return {
-    x: Math.round((safeW - width) / 2),
-    y: Math.round((safeH - height) / 2),
-    width,
-    height,
-  };
-};
-
 export default computeWindowSize;
-export { fitVideoRect };

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * file 类型设置项可能以数组（多选遗留格式）或字符串保存，统一取第一个有效路径
@@ -36,37 +37,53 @@ export const searchPathFor = (command, options = {}) => {
 };
 
 /**
- * 解析 scrcpy 命令：设置项路径 > PATH 探测 > 裸命令名
- * command 用于 spawn，resolved 为实际所在路径（可能为 null，供 adb 同目录探测）
- */
-export const resolveScrcpyPath = (options = {}) => {
-  const { settingValue, ...searchOptions } = options;
-  const settingPath = normalizeFileSetting(settingValue);
-  if (settingPath) {
-    return { command: settingPath, resolved: settingPath };
-  }
-  const found = searchPathFor('scrcpy', searchOptions);
-  if (found) {
-    return { command: found, resolved: found };
-  }
-  return { command: 'scrcpy', resolved: null };
-};
-
-/**
- * 解析 adb 命令：scrcpy 发行包自带的同目录 adb.exe 优先，否则回落 PATH 中的 adb
+ * 解析 adb 命令：设置项显式路径 > 旧版 scrcpy 设置项同目录的 adb > PATH 探测 > 裸命令名
  */
 export const resolveAdbPath = (options = {}) => {
   const {
-    scrcpyResolved,
+    settingValue,
+    legacyScrcpySettingValue,
     existsSync = fs.existsSync,
     platform = process.platform,
+    ...searchOptions
   } = options;
-  if (scrcpyResolved) {
+  const explicit = normalizeFileSetting(settingValue);
+  if (explicit) {
+    return explicit;
+  }
+  const legacyScrcpy = normalizeFileSetting(legacyScrcpySettingValue);
+  if (legacyScrcpy) {
     const ext = platform === 'win32' ? '.exe' : '';
-    const candidate = path.join(path.dirname(scrcpyResolved), `adb${ext}`);
+    const candidate = path.join(path.dirname(legacyScrcpy), `adb${ext}`);
     if (existsSync(candidate)) {
       return candidate;
     }
   }
+  const found = searchPathFor('adb', { existsSync, platform, ...searchOptions });
+  if (found) {
+    return found;
+  }
   return 'adb';
+};
+
+/**
+ * 捆绑的 scrcpy-server 文件路径（随插件发布，位于插件根目录 bin/ 下）
+ */
+export const bundledServerPath = () => fileURLToPath(new URL('../bin/scrcpy-server', import.meta.url));
+
+/**
+ * 解析 scrcpy-server 文件：设置项显式路径（存在时）> 捆绑文件；
+ * 两者都不可用时返回显式路径（缺失时启动阶段会给出明确报错），完全未配置返回 null
+ */
+export const resolveServerPath = (options = {}) => {
+  const { settingValue, existsSync = fs.existsSync } = options;
+  const explicit = normalizeFileSetting(settingValue);
+  if (explicit && existsSync(explicit)) {
+    return explicit;
+  }
+  const bundled = bundledServerPath();
+  if (existsSync(bundled)) {
+    return bundled;
+  }
+  return explicit;
 };

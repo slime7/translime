@@ -27,8 +27,6 @@ const config = ({ mode }) => ({
     rolldownOptions: {
       external: [
         'electron',
-        // koffi 含原生二进制，不能打进 JS 产物，运行时从插件目录 node_modules 解析
-        'koffi',
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
       ],

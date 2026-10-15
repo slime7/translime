@@ -1,12 +1,21 @@
 import path from 'node:path';
+import net from 'node:net';
 import { spawn } from 'node:child_process';
+import { randomInt } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { BrowserWindow, session as electronSession, screen } from 'electron';
+import {
+  BrowserWindow, clipboard, session as electronSession, screen,
+} from 'electron';
 import { setupMdeWindow } from 'translime-sdk';
-import { findWindowByTitle, mountSdlToElectron, setupResizeSync } from './win32';
-import { getDeviceResolution } from './adb';
-import { resolveAdbPath, resolveScrcpyPath } from './bin-resolver';
-import { buildScrcpyArgs, nextWindowTitle } from './scrcpy-args';
+import { MediaStreamParser } from './server/video-frame-parser';
+import { buildServerCommand, SERVER_DEVICE_PATH, socketNameForScid } from './server/server-args';
+import {
+  ControlReplyParser, encodeControlMessage, setClipboard, startApp,
+} from './server/control-message';
+import {
+  getDeviceResolution, pushServer, reverseAdd, reverseRemove,
+} from './adb';
+import { resolveAdbPath, resolveServerPath } from './bin-resolver';
 import computeWindowSize from './window-size';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +24,10 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 export const BAR_CSS_HEIGHT = 48;
 // 预留系统标题栏与非客户区高度，避免窗口弹出时被工作区裁剪破坏画面比例
 const TITLE_BAR_CSS_ESTIMATE = 48;
+// 主进程 → 画面窗口的媒体/状态推送通道
+export const MEDIA_CHANNEL = 'scrcpy-media@translime-plugin-scrcpy-wrapper';
+// 等待设备侧 server 建立三条连接的超时
+const CONNECT_TIMEOUT_MS = 15000;
 
 // 开发期 dist 产物变化后 Electron 对 file:// 子资源的缓存不会失效，
 // 给本插件 dist 的请求追加时间戳查询参数击穿缓存（file 协议读取忽略查询参数）；
@@ -42,26 +55,9 @@ const sessionKeys = new Map();
 
 const sessionKey = ({ serial, pkg }) => (pkg ? `app:${serial}:${pkg}` : `mirror:${serial}`);
 
-const getBarPhysicalHeight = (win) => {
-  try {
-    const display = screen.getDisplayMatching(win.getBounds());
-    return BAR_CSS_HEIGHT * display.scaleFactor;
-  } catch {
-    return BAR_CSS_HEIGHT;
-  }
-};
-
-/** 生成未与存活会话或现存顶层窗口冲突的 scrcpy 窗口标题 */
-const nextUniqueTitle = () => {
-  const used = new Set(Array.from(sessions.values(), (session) => session.title));
-  let title = nextWindowTitle();
-  while (used.has(title) || findWindowByTitle(title)) {
-    title = nextWindowTitle();
-  }
-  return title;
-};
-
-const createWrapperWindow = ({ title, sessionId, contentSize }) => {
+const createWrapperWindow = ({
+  title, sessionId, contentSize, mode,
+}) => {
   const win = new BrowserWindow({
     // useContentSize 让宽高只描述网页内容区，画面区按设备比例精确铺满
     useContentSize: true,
@@ -79,47 +75,16 @@ const createWrapperWindow = ({ title, sessionId, contentSize }) => {
       contextIsolation: true,
     },
   });
-  // 移除默认菜单栏，画面窗口只保留标题栏
+  // 移除默认菜单栏
   win.removeMenu();
   // 不启用 bootstrap：它会在页面内再装一套默认（跟随系统）主题控制器，覆盖本窗口的固定深色主题
   setupMdeWindow(win, { injectTheme: true, syncTheme: true });
-  // 页面 <title> 会覆盖窗口标题，固定保持会话专属标题供任务栏与 FindWindowW 识别
+  // 固定窗口标题供任务栏识别，页面 <title> 不覆盖
   win.on('page-title-updated', (event) => {
     event.preventDefault();
   });
-  win.loadFile(path.join(dirname, 'wrapper.html'), { query: { session: sessionId } });
+  win.loadFile(path.join(dirname, 'wrapper.html'), { query: { session: sessionId, mode } });
   return win;
-};
-
-const waitForScrcpyWindow = (title, options = {}) => {
-  const { intervalMs = 100, timeoutMs = 15000, shouldAbort } = options;
-  return new Promise((resolve, reject) => {
-    // 先同步校验一次 koffi 绑定可用性，失败立即返回而不是在轮询中抛出
-    try {
-      findWindowByTitle(title);
-    } catch (e) {
-      reject(e);
-      return;
-    }
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      if (shouldAbort()) {
-        clearInterval(timer);
-        reject(new Error('scrcpy 进程已退出'));
-        return;
-      }
-      const hwnd = findWindowByTitle(title);
-      if (hwnd) {
-        clearInterval(timer);
-        resolve(hwnd);
-        return;
-      }
-      if (Date.now() - startedAt > timeoutMs) {
-        clearInterval(timer);
-        reject(new Error(`等待 scrcpy 窗口超时（${timeoutMs}ms）`));
-      }
-    }, intervalMs);
-  });
 };
 
 const killProcessTree = (proc) => {
@@ -133,6 +98,106 @@ const killProcessTree = (proc) => {
   proc.kill();
 };
 
+/** 生成未与存活会话冲突的 31 位非负 scid */
+const nextScid = () => {
+  const used = new Set(Array.from(sessions.values(), (session) => session.scid));
+  let scid = randomInt(0, 0x80000000);
+  while (used.has(scid)) {
+    scid = randomInt(0, 0x80000000);
+  }
+  return scid;
+};
+
+const sendMedia = (session, payload) => {
+  const { win } = session;
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(MEDIA_CHANNEL, { sessionId: session.id, ...payload });
+  }
+};
+
+/**
+ * 在 socket 上挂媒体解析器并把事件转发到画面窗口。
+ *
+ * 视频流错误视为致命（画面已不可用）；音频流错误仅通知页面，不中断会话
+ */
+const attachMediaStream = (session, socket, { video }) => {
+  const parser = new MediaStreamParser({ deviceMeta: video, video });
+  socket.on('data', (chunk) => {
+    parser.push(chunk).forEach((event) => {
+      if (event.kind === 'codec') {
+        session.logger?.info(`[scrcpy:${session.id}] ${video ? 'video' : 'audio'} codec: ${event.codec}`);
+      } else if (event.kind === 'device-meta') {
+        session.logger?.info(`[scrcpy:${session.id}] device: ${event.deviceName}`);
+      } else if (event.kind === 'session') {
+        sendMedia(session, {
+          kind: 'session', media: video ? 'video' : 'audio', width: event.width, height: event.height, clientResized: event.clientResized,
+        });
+      } else if (event.kind === 'frame') {
+        sendMedia(session, {
+          kind: video ? 'video' : 'audio', pts: event.pts, keyframe: event.keyframe, data: event.data,
+        });
+      } else if (event.kind === 'error') {
+        if (video) {
+          session.fail(event.message);
+        } else {
+          sendMedia(session, { kind: 'error', scope: 'audio', message: event.message });
+        }
+      }
+    });
+  });
+};
+
+/**
+ * 等待设备侧 server 按序接入：video → audio → control
+ */
+const waitForConnections = (tcpServer, expected, options = {}) => {
+  const { timeoutMs = CONNECT_TIMEOUT_MS, shouldAbort } = options;
+  return new Promise((resolve, reject) => {
+    const sockets = [];
+    let settled = false;
+    const startedAt = Date.now();
+    let timer = null;
+
+    const finish = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearInterval(timer);
+      tcpServer.removeAllListeners('connection');
+      if (error) {
+        sockets.forEach((socket) => socket.destroy());
+        reject(error);
+        return;
+      }
+      resolve(sockets);
+    };
+
+    const onConnection = (socket) => {
+      if (settled) {
+        socket.destroy();
+        return;
+      }
+      sockets.push(socket);
+      if (sockets.length >= expected) {
+        finish(null);
+      }
+    };
+
+    timer = setInterval(() => {
+      if (shouldAbort?.()) {
+        finish(new Error('scrcpy server 已退出，未能建立连接'));
+        return;
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        finish(new Error(`等待设备画面连接超时（${timeoutMs}ms）`));
+      }
+    }, 100);
+    tcpServer.on('connection', onConnection);
+    tcpServer.on('error', (e) => finish(e));
+  });
+};
+
 const destroySession = (sessionId) => {
   const session = sessions.get(sessionId);
   if (!session) {
@@ -142,17 +207,56 @@ const destroySession = (sessionId) => {
   if (session.key && sessionKeys.get(session.key) === sessionId) {
     sessionKeys.delete(session.key);
   }
-  if (session.hooks) {
-    session.hooks.destroy();
+  session.destroyed = true;
+  try {
+    session.videoSocket?.destroy();
+    session.audioSocket?.destroy();
+    session.controlSocket?.destroy();
+  } catch {
+    // socket 可能已销毁
+  }
+  try {
+    session.tcpServer?.close();
+    session.tcpServer?.closeAllConnections?.();
+  } catch {
+    // server 可能已关闭
   }
   const { proc } = session;
-  if (proc.exitCode === null && !session.spawnError) {
+  if (proc?.exitCode === null && !session.spawnError) {
     killProcessTree(proc);
+  }
+  // 释放 reverse 隧道；规则可能已被 adb 侧回收，失败静默
+  if (session.adbPath && session.serial && session.socketName) {
+    reverseRemove(session.adbPath, session.serial, session.socketName);
   }
 };
 
 /**
- * 启动一个 scrcpy 会话：spawn 进程、创建 wrapper 窗口、等待并挂载 SDL 窗口。
+ * 向会话画面注入一条控制消息（触摸/滚轮/按键/剪贴板等）
+ *
+ * @param {string} sessionId
+ * @param {object} message - 结构化输入消息，见 encodeControlMessage；
+ *   额外支持 `{ type: 'paste-clipboard' }`：PC 剪贴板内容写入设备并触发粘贴。
+ * @returns {boolean} 是否成功写入。
+ */
+export const sendInput = (sessionId, message) => {
+  const session = sessions.get(sessionId);
+  if (!session || session.destroyed || !session.controlSocket) {
+    return false;
+  }
+  if (message?.type === 'paste-clipboard') {
+    const text = clipboard.readText();
+    session.lastClipboardSet = text;
+    session.controlSocket.write(setClipboard({ text, paste: true }));
+    return true;
+  }
+  session.controlSocket.write(encodeControlMessage(message));
+  return true;
+};
+
+/**
+ * 启动一个投屏会话：建立 reverse 隧道、推送并启动设备侧 scrcpy-server、
+ * 接收媒体流转发到画面窗口。
  *
  * 同一设备的镜像会话与同一应用（任意模式）的会话各自只保留一个窗口，
  * 重复启动改为唤起已有窗口
@@ -163,6 +267,9 @@ export const launchSession = async (options = {}) => {
     serial,
     pkg = null,
     settingValue = null,
+    adbSettingValue = null,
+    serverSettingValue = null,
+    videoCodec = 'h264',
     logger = console,
   } = options;
   if (!serial) {
@@ -182,12 +289,12 @@ export const launchSession = async (options = {}) => {
     }
   }
 
-  const scrcpyInfo = resolveScrcpyPath({ settingValue });
-  const adbPath = resolveAdbPath({ scrcpyResolved: scrcpyInfo.resolved });
-  const title = nextUniqueTitle();
-  const sessionId = `session-${title}`;
+  const adbPath = resolveAdbPath({ settingValue: adbSettingValue, legacyScrcpySettingValue: settingValue });
+  const serverPath = resolveServerPath({ settingValue: serverSettingValue });
+  if (!serverPath) {
+    throw new Error('未找到 scrcpy-server，请检查插件安装完整性或设置项');
+  }
 
-  // 弹出时按设备分辨率与鼠标所在显示器的工作区计算初始窗口尺寸，画面等比铺满
   bustWrapperCache();
   const resolution = await getDeviceResolution(adbPath, serial);
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -200,97 +307,173 @@ export const launchSession = async (options = {}) => {
     barCssHeight: BAR_CSS_HEIGHT,
   });
 
-  const args = buildScrcpyArgs({
-    mode,
-    serial,
-    pkg,
-    title,
-    // 虚拟屏以画面区物理分辨率创建并开启 flex-display，分辨率连续跟随窗口
-    virtualDisplaySize: mode === 'virtual'
-      ? {
-        width: Math.max(1, Math.round(contentSize.width * display.scaleFactor)),
-        height: Math.max(1, Math.round((contentSize.height - BAR_CSS_HEIGHT) * display.scaleFactor)),
-      }
-      : null,
-  });
+  const scid = nextScid();
+  const socketName = socketNameForScid(scid);
+  const sessionId = `session-${socketName}`;
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
-
-  // scrcpy 与本插件使用同一个 adb，避免两个版本的 adb server 相互踢下线
-  const env = { ...process.env };
-  if (scrcpyInfo.resolved && adbPath !== 'adb') {
-    env.ADB = adbPath;
-  }
-
-  const proc = spawn(scrcpyInfo.command, args, {
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env,
+  // 虚拟屏以画面区物理分辨率创建并开启 flex-display，分辨率连续跟随窗口
+  const virtualDisplaySize = mode === 'virtual'
+    ? {
+      width: Math.max(1, Math.round(contentSize.width * display.scaleFactor)),
+      height: Math.max(1, Math.round((contentSize.height - BAR_CSS_HEIGHT) * display.scaleFactor)),
+    }
+    : null;
+  const serverCommand = buildServerCommand({
+    scid,
+    videoCodec,
+    audio: true,
+    newDisplay: virtualDisplaySize ? `${virtualDisplaySize.width}x${virtualDisplaySize.height}` : null,
+    flexDisplay: virtualDisplaySize !== null,
   });
-  const win = createWrapperWindow({ title: wrapperTitle, sessionId, contentSize });
+
+  const tcpServer = net.createServer();
+  await new Promise((resolve, reject) => {
+    tcpServer.once('error', reject);
+    tcpServer.listen({ host: '127.0.0.1', port: 0 }, resolve);
+  });
+  const listenPort = tcpServer.address().port;
+
   const session = {
     id: sessionId,
     key,
     serial,
     mode,
     pkg,
-    title,
-    proc,
-    win,
+    scid,
+    socketName,
     adbPath,
-    resolution,
-    hooks: null,
+    serverPath,
+    resolution: virtualDisplaySize ?? resolution,
+    logger,
+    tcpServer,
+    listenPort,
+    videoSocket: null,
+    audioSocket: null,
+    controlSocket: null,
+    proc: null,
     spawnError: null,
+    stderrTail: [],
+    lastClipboardSet: null,
+    destroyed: false,
+    win: null,
+    fail: null,
   };
   sessions.set(sessionId, session);
   sessionKeys.set(key, sessionId);
 
   let winClosed = false;
-  win.on('closed', () => {
-    winClosed = true;
-    destroySession(sessionId);
-  });
-  const forwardLog = (chunk) => {
-    const text = String(chunk).trim();
-    if (text) {
-      logger.info(`[scrcpy:${sessionId}] ${text}`);
+  const cleanupAndRethrow = async (e) => {
+    if (!winClosed && session.win && !session.win.isDestroyed()) {
+      session.win.destroy();
     }
+    destroySession(sessionId);
+    throw e;
   };
-  proc.stdout?.on('data', forwardLog);
-  proc.stderr?.on('data', forwardLog);
-  proc.on('error', (e) => {
-    session.spawnError = e;
-  });
-  proc.on('exit', () => {
-    if (!winClosed) {
-      win.destroy();
-    }
-    destroySession(sessionId);
-  });
 
   try {
-    const hwnd = await waitForScrcpyWindow(title, {
-      shouldAbort: () => proc.exitCode !== null || session.spawnError !== null,
+    await reverseAdd(adbPath, serial, socketName, listenPort);
+    await pushServer(adbPath, serial, serverPath, SERVER_DEVICE_PATH);
+
+    // 常驻 adb shell 进程作为设备侧 server 的生命周期锚点：
+    // 进程退出即代表 server 结束，socket 关闭（EOF）也会让 server 自行退出
+    const proc = spawn(adbPath, ['-s', serial, ...serverCommand], {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
-    // 镜像模式按设备分辨率等比缩放（letterbox）；虚拟屏分辨率随窗口，铺满
-    const aspect = mode === 'mirror' ? resolution : null;
-    mountSdlToElectron(win, hwnd, {
-      barPhysicalHeight: getBarPhysicalHeight(win),
-      aspect,
+    session.proc = proc;
+    proc.on('error', (e) => {
+      session.spawnError = e;
     });
-    session.hooks = setupResizeSync(win, hwnd, {
-      getBarPhysicalHeight: () => getBarPhysicalHeight(win),
-      getAspect: () => (mode === 'mirror' ? session.resolution : null),
+    proc.stdout?.on('data', (chunk) => {
+      const text = String(chunk).trim();
+      if (text) {
+        logger.info(`[scrcpy:${sessionId}] ${text}`);
+      }
     });
-    return { sessionId, title };
+    proc.stderr?.on('data', (chunk) => {
+      const text = String(chunk).trim();
+      if (!text) {
+        return;
+      }
+      logger.info(`[scrcpy:${sessionId}] ${text}`);
+      session.stderrTail.push(text);
+      if (session.stderrTail.length > 20) {
+        session.stderrTail.shift();
+      }
+    });
+    proc.on('exit', (code) => {
+      logger.info(`[scrcpy:${sessionId}] server process exited (code=${code})`);
+      if (!session.destroyed && session.win && !session.win.isDestroyed()) {
+        // 设备侧 server 意外结束：直接关窗（用户已可见的失败反馈）
+        session.win.destroy();
+      }
+      destroySession(sessionId);
+    });
+
+    session.win = createWrapperWindow({
+      title: wrapperTitle, sessionId, contentSize, mode,
+    });
+    session.win.on('closed', () => {
+      winClosed = true;
+      destroySession(sessionId);
+    });
+
+    const connections = await waitForConnections(tcpServer, 3, {
+      shouldAbort: () => session.destroyed || proc.exitCode !== null || session.spawnError !== null,
+    });
+    const [videoSocket, audioSocket, controlSocket] = connections;
+    session.videoSocket = videoSocket;
+    session.audioSocket = audioSocket;
+    session.controlSocket = controlSocket;
+    // 控制通道消息小而频繁，禁用 Nagle 降低输入延迟
+    controlSocket.setNoDelay(true);
+
+    // 控制通道回包（设备剪贴板自动同步）：写回 PC 剪贴板；
+    // 与自身粘贴的内容相同则跳过，避免回环覆盖
+    const replyParser = new ControlReplyParser();
+    controlSocket.on('data', (chunk) => {
+      replyParser.push(chunk).forEach((reply) => {
+        if (reply.type === 'clipboard' && reply.text && reply.text !== session.lastClipboardSet) {
+          clipboard.writeText(reply.text);
+        }
+      });
+    });
+
+    videoSocket.on('close', () => {
+      if (!session.destroyed) {
+        session.fail('视频连接已断开');
+      }
+    });
+    audioSocket.on('close', () => {
+      if (!session.destroyed) {
+        sendMedia(session, { kind: 'error', scope: 'audio', message: '音频连接已断开' });
+      }
+    });
+    attachMediaStream(session, videoSocket, { video: true });
+    attachMediaStream(session, audioSocket, { video: false });
+
+    session.fail = (message) => {
+      logger.error(`[scrcpy:${sessionId}] ${message}`);
+      sendMedia(session, { kind: 'error', scope: 'video', message });
+      if (session.win && !session.win.isDestroyed()) {
+        session.win.destroy();
+      }
+      destroySession(sessionId);
+    };
+
+    if (pkg) {
+      // scrcpy 以 LAUNCHER intent 拉起应用：已在后台运行的任务会被带到前台
+      controlSocket.write(startApp(pkg));
+    }
+    return { sessionId, title: wrapperTitle };
   } catch (e) {
-    if (!winClosed && !win.isDestroyed()) {
-      win.destroy();
-    }
-    destroySession(sessionId);
+    const detail = session.stderrTail.length > 0
+      ? `：${session.stderrTail.slice(-3).join(' / ')}`
+      : '';
     if (session.spawnError) {
-      throw new Error(`无法启动 scrcpy（${scrcpyInfo.command}）：${session.spawnError.message}`);
+      return cleanupAndRethrow(new Error(`无法启动 adb（${adbPath}）：${session.spawnError.message}`));
     }
-    throw e;
+    return cleanupAndRethrow(e instanceof Error ? new Error(`${e.message}${detail}`) : new Error(String(e)));
   }
 };
 
@@ -301,7 +484,7 @@ export const closeSession = (sessionId) => {
   if (!session) {
     return false;
   }
-  if (!session.win.isDestroyed()) {
+  if (session.win && !session.win.isDestroyed()) {
     session.win.destroy();
   } else {
     destroySession(sessionId);

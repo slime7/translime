@@ -1,24 +1,97 @@
-# Translime 插件开发指南
+# translime-plugin-scrcpy-wrapper
 
-本指南将介绍如何开发和调试 Translime 插件。
+基于 scrcpy-server 协议直连的安卓投屏画面窗口插件。画面以 WebCodecs 硬解渲染在
+Electron 窗口的 `<canvas>` 中，点击/滚轮/键盘/剪贴板经 scrcpy 控制通道注入设备，
+整个投屏过程只有一个原生窗口。
 
-## 推荐开发流程
+## 功能
 
-优先以已安装的 Translime 宿主作为真实开发环境。推荐流程如下：
+- **镜像整屏**：镜像设备默认显示器，画面按设备分辨率等比缩放（letterbox）。
+- **虚拟屏投屏**：以指定分辨率创建虚拟屏（`new_display`），开启 flex-display 后
+  分辨率连续跟随窗口拉伸（`RESIZE_DISPLAY` 控制消息），内容随拉伸重排、无黑边。
+- **按应用投屏**：启动时经 `START_APP` 控制消息拉起指定应用到前台（镜像默认屏或虚拟屏内）。
+- **输入复刻**：鼠标（pointerId=-1，右键=返回、中键=主页由 UI 承担）、多点触控
+  （基础 action + pointerId，设备端合成 POINTER 事件）、滚轮（i16 定点 ±16）、
+  键盘（`event.code` → Android keycode 映射表，无映射的可打印字符与 IME 组合串走文本注入）。
+- **音频转发**：Opus 48kHz 立体声裸包 → `AudioDecoder` → `AudioContext` 按播放时钟调度，
+  积压丢帧、落后重对齐；AudioContext 受自动播放策略限制时，窗口内首次点击后恢复。
+- **剪贴板同步**：设备复制自动回传电脑（控制通道回包）；`Ctrl+V` 将电脑剪贴板写入
+  设备并触发粘贴。
+- **无线投屏**：支持无线调试配对（`adb pair`）、mDNS/端口扫描兜底连接与已存设备自动重连。
 
-1. 在宿主插件中心点击「创建开发插件」，基于内置模板生成插件项目（或「引入已有目录」链接现有项目），宿主会自动完成 `plugins_dev` 链接与开发插件列表刷新。
-2. 在插件目录运行 `pnpm install && pnpm dev`，同时监听主进程与 UI 两套构建。
-3. 每次构建产物变化后，宿主会自动重启该开发插件（需在设置中开启"显示开发中插件"）；也可以使用插件卡片上的重载按钮或右键菜单中的重载入口手动验证。
-4. 插件卡片右键的「打开插件目录」可以快速在文件管理器中定位项目。
+## 架构与数据流
 
-`preview:ui` 仍然保留，但只作为局部 UI 试验的辅助工具。涉及布局、主题、窗口模式、设置面板和宿主集成行为时，应以宿主内效果为准。
+```
+设备 scrcpy-server (app_process)
+   │ adb reverse localabstract:scrcpy_<scid> → 127.0.0.1:<port>
+   ▼
+插件主进程（net server，按序 accept：video → audio → control）
+   │ video: [64B 设备名][4B codec id][12B 会话头][12B 帧头+Annex B 裸流]
+   │ audio: [4B codec id][12B 帧头+Opus 裸包]
+   │ control: 结构化输入消息编码为二进制写回
+   ▼  webContents.send('scrcpy-media@<插件ID>')
+画面窗口（wrapper 页面）
+   canvas  ← WebCodecs VideoDecoder（RAF 画最新帧，积压丢弃非关键帧）
+   AudioContext ← WebCodecs AudioDecoder
+   DOM 指针/滚轮/键盘事件 → ipc-fn 通道 → 控制消息
+```
 
-### 断点调试插件主进程
+协议实现对照 scrcpy **v5.0.1** 源码（`src/server/` 下各模块注释标注了对应字段布局）：
 
-1. 在插件目录运行 `pnpm dev`（同时 watch 主进程与 UI 构建；非生产构建输出 inline sourcemap）。
-2. 在宿主开发模式（translime 仓库根目录 `pnpm dev`，固定以 `--inspect=5858` 启动 Electron）下启用插件。
-3. 在 VSCode 中使用仓库根目录 `.vscode/launch.json` 的「附加到 translime 宿主主进程 (5858)」配置附加调试器，即可直接在插件主进程源码（如 `index.js`）打断点。
-4. 渲染进程需要 CDP 调试时，用 `pnpm dev:cdp`（9222 端口）启动宿主并使用 launch.json 的对应配置；插件 UI 也可在插件页标题栏用 inspect 按钮直接打开 webview devtools。
+- `src/server/server-args.js`：server 启动命令（`app_process / com.genymobile.scrcpy.Server
+  5.0.1 key=value...`，`scid` 十六进制、socket 名 `scrcpy_%08x`）。
+- `src/server/video-frame-parser.js`：媒体流解析（设备名/codec id/会话头/帧头，
+  H.264/H.265 的 SPS/PPS config 包前置合并到下一个关键帧）。
+- `src/server/control-message.js`：控制消息编码（触摸/滚轮/按键/文本/剪贴板/
+  `RESET_VIDEO`/`RESIZE_DISPLAY` 等）与控制通道回包解析（剪贴板自动同步）。
+
+## 依赖与占用
+
+- 运行依赖 **adb**：解析顺序为插件设置 > 旧版 scrcpy 设置项同目录的 adb > 系统 PATH。
+  scrcpy.exe 本体不再需要。
+- 插件捆绑 `bin/scrcpy-server`（来自 [scrcpy v5.0.1 release](https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1)，
+  SHA256 `764eb6f79811d5211fe9df341120882ba9994c7a61b897d7bf3fb662e53bc536`）。
+  scrcpy 为 Apache-2.0 许可，版权归 Genymobile 及贡献者，可在设置中用自备 server 覆盖。
+- 推流期间的数据路径跑在 adb server 的隧道上（reverse 转发），无法在推流时完全脱离
+  adb；但 adb server 支持多客户端并存，本插件不独占设备。每会话常驻物仅：
+  1 条 reverse 规则 + 1 个 `adb shell` 生命周期锚点进程 + 设备侧 server 进程。
+  关闭窗口、server 断开、插件卸载、宿主退出（`will-quit` 兜底）时均会关闭 socket
+  （设备侧 EOF 自退）、kill 锚点进程树并移除 reverse 规则。
+
+## 设置
+
+| 设置项 | 说明 |
+| --- | --- |
+| adb 路径 | 留空按上节顺序自动解析 |
+| scrcpy 路径 | 旧版兼容项，仅用于同目录定位 adb |
+| scrcpy-server 路径 | 可选，覆盖内置 server（升级 server 版本时使用） |
+| 视频编码 | `h264`（默认，兼容性最好）或 `h265`（需设备与显卡支持 HEVC 解码） |
+
+## 代码结构与测试
+
+```
+index.js                    插件入口：设置菜单、IPC（list-devices/pair-wireless/launch/close-session/scrcpy-input）
+src/scrcpy.js               会话编排：reverse → push → 启动 server → 连接等待 → 媒体泵 → IPC 转发 → 清理
+src/server/server-args.js   server 启动参数构建
+src/server/video-frame-parser.js  媒体流帧解析（视频/音频通用）
+src/server/control-message.js     控制消息编码 + 回包解析
+src/adb.js                  adb 命令封装（devices/wm size/push/reverse/pair/connect/mdns）
+src/wireless.js             无线调试配对与重连
+src/ui/wrapper/             画面窗口页面（canvas/解码/输入/音频）与 preload 桥
+tests/                      vitest 单测：协议字节级回归、分片重组、keycode 映射、坐标换算等
+```
+
+命令：`pnpm build`（三段构建）、`pnpm test`、`pnpm lint`、`pnpm dev`（并行 watch）。
+
+真机手工验证清单（协议实现无 e2e，依赖真机行为）：
+
+1. USB 与无线两种连接下分别验证镜像/虚拟屏/按应用投屏。
+2. 有声（音乐 App）验证音频转发；窗口点击、拖动、滚轮、键盘输入（含中文 IME）。
+3. 设备旋转后画面比例随会话头更新；`Ctrl+C`/`Ctrl+V` 双向剪贴板。
+4. 推流中关闭窗口、推流中退出宿主：`adb shell ps | grep scrcpy` 应无残留进程，
+   `adb reverse --list` 应无残留规则。
+
+---
 
 ## 本地开发测试
 

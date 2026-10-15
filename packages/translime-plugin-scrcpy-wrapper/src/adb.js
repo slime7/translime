@@ -119,10 +119,6 @@ export const listPackages = async (adbPath, serial) => parsePackageList(
   await adbExec(adbPath, ['-s', serial, 'shell', 'pm', 'list', 'packages', '-3']),
 );
 
-export const sendKeyEvent = async (adbPath, serial, keycode) => {
-  await adbExec(adbPath, ['-s', serial, 'shell', 'input', 'keyevent', String(keycode)]);
-};
-
 export const pairDevice = async (adbPath, address, pairingCode) => {
   const output = await adbExecTolerant(adbPath, ['pair', address, String(pairingCode)]);
   if (!/successfully paired/i.test(output)) {
@@ -139,4 +135,42 @@ export const getMdnsConnectAddresses = async (adbPath) => {
     // 旧版 adb 无 mdns 子命令或 mdns 被禁用时按无可发现设备处理
     return [];
   }
+};
+
+/**
+ * 推送 scrcpy-server 到设备
+ *
+ * @param {string} adbPath
+ * @param {string} serial
+ * @param {string} localPath - 本地 server 文件路径。
+ * @param {string} remotePath - 设备端目标路径。
+ * @returns {Promise<void>}
+ */
+export const pushServer = async (adbPath, serial, localPath, remotePath) => {
+  await adbExecTolerant(adbPath, ['-s', serial, 'push', localPath, remotePath], { timeoutMs: 30000 });
+};
+
+/**
+ * 添加 reverse 隧道：设备侧连接 localabstract:<name> 的连接被转发到本机 tcp:<port>
+ *
+ * @param {string} adbPath
+ * @param {string} serial
+ * @param {string} name - localabstract socket 名。
+ * @param {number} port - 本机监听端口。
+ * @returns {Promise<void>}
+ */
+export const reverseAdd = async (adbPath, serial, name, port) => {
+  await adbExecTolerant(adbPath, ['-s', serial, 'reverse', `localabstract:${name}`, `tcp:${port}`]);
+};
+
+/**
+ * 移除 reverse 隧道；规则可能已被 adb server 重置等原因不存在，失败静默
+ *
+ * @param {string} adbPath
+ * @param {string} serial
+ * @param {string} name
+ * @returns {Promise<void>}
+ */
+export const reverseRemove = async (adbPath, serial, name) => {
+  await adbExecTolerant(adbPath, ['-s', serial, 'reverse', '--remove', `localabstract:${name}`]).catch(() => {});
 };

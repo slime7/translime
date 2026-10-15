@@ -1,8 +1,9 @@
 import { defineIpcHandlers, useLogger, usePluginConfig } from 'translime-sdk';
+import { app } from 'electron';
 import * as adbModule from './src/adb';
 import * as scrcpyModule from './src/scrcpy';
 import * as wirelessModule from './src/wireless';
-import { resolveAdbPath, resolveScrcpyPath } from './src/bin-resolver';
+import { resolveAdbPath } from './src/bin-resolver';
 
 const id = 'translime-plugin-scrcpy-wrapper';
 const baseLogger = useLogger();
@@ -13,25 +14,63 @@ const WIRELESS_DEVICES_KEY = 'wirelessDevices';
 
 const settingMenu = [
   {
-    key: 'scrcpyPath',
+    key: 'adbPath',
     type: 'file',
-    name: 'scrcpy 路径',
+    name: 'adb 路径',
     required: false,
     valueType: 'string',
-    placeholder: '留空则使用系统 PATH 中的 scrcpy',
+    placeholder: '留空则优先取 scrcpy 同目录的 adb，再回落系统 PATH',
+    dialogOptions: {
+      filters: [{ name: 'adb', extensions: ['exe'] }],
+      properties: ['openFile', 'dontAddToRecent'],
+    },
+  },
+  {
+    key: 'scrcpyPath',
+    type: 'file',
+    name: 'scrcpy 路径（可选，仅用于同目录定位 adb）',
+    required: false,
+    valueType: 'string',
+    placeholder: '旧版本设置项，保留以兼容已有配置',
     dialogOptions: {
       filters: [{ name: 'scrcpy', extensions: ['exe'] }],
       properties: ['openFile', 'dontAddToRecent'],
     },
   },
+  {
+    key: 'scrcpyServerPath',
+    type: 'file',
+    name: 'scrcpy-server 路径（可选覆盖内置版本）',
+    required: false,
+    valueType: 'string',
+    placeholder: '留空使用插件内置的 scrcpy-server',
+    dialogOptions: {
+      filters: [{ name: 'scrcpy-server', extensions: ['*'] }],
+      properties: ['openFile', 'dontAddToRecent'],
+    },
+  },
+  {
+    key: 'videoCodec',
+    type: 'input',
+    name: '视频编码',
+    required: false,
+    placeholder: 'h264 / h265，留空默认 h264（h264 兼容性最好）',
+  },
 ];
 
 const getScrcpySetting = () => pluginConfig.get('scrcpyPath', null);
+const getAdbSetting = () => pluginConfig.get('adbPath', null);
+const getServerSetting = () => pluginConfig.get('scrcpyServerPath', null);
 
-const getAdbPath = () => {
-  const scrcpyInfo = resolveScrcpyPath({ settingValue: getScrcpySetting() });
-  return resolveAdbPath({ scrcpyResolved: scrcpyInfo.resolved });
+const getVideoCodec = () => {
+  const value = String(pluginConfig.get('videoCodec', '') ?? '').trim().toLowerCase();
+  return value === 'h265' ? 'h265' : 'h264';
 };
+
+const getAdbPath = () => resolveAdbPath({
+  settingValue: getAdbSetting(),
+  legacyScrcpySettingValue: getScrcpySetting(),
+});
 
 /**
  * 已配对保存的无线设备列表，元素为 { serial, model }，serial 为 `IP:端口`
@@ -72,7 +111,20 @@ const storeWirelessConnection = async (serial) => {
   return { success: true, serial, devices: wirelessModule.mergeWirelessDevices(devices, stored) };
 };
 
+// 宿主退出时兜底释放全部会话（reverse 隧道、adb shell 锚点、设备侧 server）
+let quitHookRegistered = false;
+const registerQuitHook = () => {
+  if (quitHookRegistered) {
+    return;
+  }
+  quitHookRegistered = true;
+  app.on('will-quit', () => {
+    scrcpyModule.closeAllSessions();
+  });
+};
+
 const pluginDidLoad = () => {
+  registerQuitHook();
   logger.info(`[${id}] plugin loaded`);
 };
 
@@ -180,6 +232,9 @@ const ipcHandlers = defineIpcHandlers([
           serial: actualSerial,
           pkg,
           settingValue: getScrcpySetting(),
+          adbSettingValue: getAdbSetting(),
+          serverSettingValue: getServerSetting(),
+          videoCodec: getVideoCodec(),
           logger,
         });
         return { success: true, serial: actualSerial, ...result };
@@ -194,15 +249,11 @@ const ipcHandlers = defineIpcHandlers([
     handler: () => async (sessionId) => ({ success: scrcpyModule.closeSession(sessionId) }),
   },
   {
-    type: 'scrcpy-key',
-    handler: () => async (sessionId, keycode) => {
-      const session = scrcpyModule.getSession(sessionId);
-      if (!session) {
-        return { success: false, message: '会话不存在或已关闭' };
-      }
+    type: 'scrcpy-input',
+    handler: () => async (sessionId, message) => {
       try {
-        await adbModule.sendKeyEvent(session.adbPath, session.serial, keycode);
-        return { success: true };
+        const ok = scrcpyModule.sendInput(sessionId, message);
+        return ok ? { success: true } : { success: false, message: '会话不存在或已关闭' };
       } catch (e) {
         return { success: false, message: e.message };
       }
