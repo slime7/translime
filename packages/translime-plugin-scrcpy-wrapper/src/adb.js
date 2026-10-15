@@ -65,6 +65,43 @@ export const adbExec = async (adbPath, args, options = {}) => {
   return stdout;
 };
 
+const adbExecTolerant = async (adbPath, args, { timeoutMs = 15000 } = {}) => {
+  try {
+    return await adbExec(adbPath, args, { timeoutMs });
+  } catch (e) {
+    // 部分 adb 版本命令失败也以非零退出且信息在 stderr，统一转成带输出的异常
+    const detail = String(e.stderr || e.stdout || '').trim();
+    throw new Error(detail || e.message);
+  }
+};
+
+/**
+ * 解析 `adb connect` 输出；部分版本连接失败仍以 0 退出，必须按文本判断
+ */
+export const parseConnectOutput = (text) => {
+  const output = String(text ?? '').trim();
+  if (/^(already connected|connected) to /.test(output)) {
+    return { ok: true };
+  }
+  if (/failed to authenticate/i.test(output)) {
+    return { ok: false, authError: true };
+  }
+  return { ok: false };
+};
+
+/**
+ * 解析 `adb mdns services` 输出中 `_adb-tls-connect._tcp` 服务的连接地址，
+ * 兼容行式（`instance<TAB>服务名<TAB>ip:port`）与 track-services 结构化两种输出
+ */
+export const parseMdnsServices = (text) => {
+  const output = String(text ?? '');
+  const lineRe = /_adb-tls-connect\._tcp[^\r\n]*?([\w.-]+):(\d{1,5})/g;
+  const blockRe = /service:\s*"_adb-tls-connect\._tcp"[\s\S]*?ipv4:\s*"([^"]+)"[\s\S]*?port:\s*(\d{1,5})/g;
+  const fromLines = Array.from(output.matchAll(lineRe)).map((match) => `${match[1]}:${match[2]}`);
+  const fromBlocks = Array.from(output.matchAll(blockRe)).map((match) => `${match[1]}:${match[2]}`);
+  return Array.from(new Set([...fromLines, ...fromBlocks]));
+};
+
 /**
  * 查询设备屏幕分辨率；查询失败不阻断启动，返回 null 走默认尺寸
  */
@@ -84,4 +121,22 @@ export const listPackages = async (adbPath, serial) => parsePackageList(
 
 export const sendKeyEvent = async (adbPath, serial, keycode) => {
   await adbExec(adbPath, ['-s', serial, 'shell', 'input', 'keyevent', String(keycode)]);
+};
+
+export const pairDevice = async (adbPath, address, pairingCode) => {
+  const output = await adbExecTolerant(adbPath, ['pair', address, String(pairingCode)]);
+  if (!/successfully paired/i.test(output)) {
+    throw new Error(output.trim() || '配对失败');
+  }
+};
+
+export const connectDevice = async (adbPath, address, options = {}) => adbExecTolerant(adbPath, ['connect', address], options);
+
+export const getMdnsConnectAddresses = async (adbPath) => {
+  try {
+    return parseMdnsServices(await adbExec(adbPath, ['mdns', 'services']));
+  } catch {
+    // 旧版 adb 无 mdns 子命令或 mdns 被禁用时按无可发现设备处理
+    return [];
+  }
 };

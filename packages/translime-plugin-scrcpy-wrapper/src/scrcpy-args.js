@@ -10,7 +10,10 @@ export const nextWindowTitle = () => {
 
 /**
  * 构建 scrcpy 启动参数：
- * 默认 h265 编码 + 声音开启；virtual 模式使用虚拟屏幕并可选直接拉起应用。
+ * 默认 h265 编码 + 声音开启；virtual 模式使用虚拟屏幕。
+ * 指定 pkg 时通过 --start-app 拉起应用（scrcpy 以 LAUNCHER intent 启动，
+ * 已在后台运行的任务会被带到前台）：mirror 模式在默认屏拉起后镜像，
+ * virtual 模式在虚拟屏内启动。
  * virtualDisplaySize 给定时以显式分辨率创建虚拟屏，并开启 flex-display
  * 让虚拟屏连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）
  */
@@ -32,9 +35,9 @@ export const buildScrcpyArgs = ({
     } else {
       args.push('--new-display');
     }
-    if (pkg) {
-      args.push(`--start-app=${pkg}`);
-    }
+  }
+  if (pkg) {
+    args.push(`--start-app=${pkg}`);
   }
   return args;
 };

@@ -15,6 +15,20 @@ describe('buildScrcpyArgs', () => {
     ]);
   });
 
+  it('镜像模式带包名时输出 start-app，投屏前把应用拉到前台', () => {
+    expect(buildScrcpyArgs({
+      mode: 'mirror',
+      serial: 'ABC123',
+      pkg: 'com.foo',
+      title: 'translime-scrcpy-3',
+    })).toEqual([
+      '--serial=ABC123',
+      '--window-title=translime-scrcpy-3',
+      '--video-codec=h265',
+      '--start-app=com.foo',
+    ]);
+  });
+
   it('虚拟屏模式默认仅输出 new-display', () => {
     expect(buildScrcpyArgs({
       mode: 'virtual',

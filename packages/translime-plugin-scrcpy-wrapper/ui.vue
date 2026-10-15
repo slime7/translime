@@ -5,7 +5,7 @@
   >
     <!-- 页面只保留列表一个滚动容器，避免双滚动条叠加 -->
     <div class="flex h-full flex-col gap-3 overflow-hidden p-3">
-      <!-- 设备行：下拉占满剩余宽度，刷新按钮不压缩 -->
+      <!-- 设备行：下拉占满剩余宽度，操作按钮不压缩 -->
       <div class="flex shrink-0 items-center gap-2">
         <mat-select
           v-model="serial"
@@ -23,6 +23,33 @@
           class="shrink-0"
           :loading="loadingDevices"
           @click="loadDevices"
+        />
+        <mat-btn
+          icon="wifi_tethering"
+          label="无线调试配对"
+          variant="text"
+          class="shrink-0"
+          @click="openPairDialog"
+        />
+        <mat-btn
+          v-if="selectedOfflineWireless"
+          icon="link"
+          label="连接无线设备"
+          variant="text"
+          class="shrink-0"
+          :disabled="connecting"
+          :loading="connecting"
+          @click="connectSelected"
+        />
+        <mat-btn
+          v-if="selectedStoredWireless"
+          icon="link_off"
+          label="移除已保存的无线设备"
+          variant="text"
+          class="shrink-0"
+          :disabled="forgetting"
+          :loading="forgetting"
+          @click="forgetWireless"
         />
       </div>
 
@@ -69,7 +96,7 @@
           v-else-if="apps.length === 0"
           class="flex h-full items-center justify-center text-sm text-[var(--mat-sys-color-on-surface-variant)]"
         >
-          {{ serial ? '未获取到应用列表' : '请先连接设备' }}
+          {{ appEmptyText }}
         </div>
         <div
           v-else-if="filteredApps.length === 0"
@@ -90,7 +117,7 @@
             <template #trailing>
               <mat-btn
                 icon="cast"
-                label="镜像"
+                label="镜像（先在手机上拉起该应用）"
                 size="small"
                 variant="standard"
                 :disabled="launching"
@@ -109,6 +136,60 @@
         </mat-list>
       </div>
     </div>
+
+    <mat-dialog
+      v-model="pairOpen"
+      title="无线调试配对"
+      :width="420"
+      close-on-back
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <p class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">
+          首次使用：手机进入 无线调试 → 使用配对码配对设备，按配对页显示的 IP:端口 和 6 位配对码填写。
+          已配对过的设备：配对码留空，直接填无线调试主页显示的 IP:端口 即可连接。
+          连接成功后会自动保存设备，可能需要数十秒。
+        </p>
+        <mat-text-field
+          v-model="codeForm.address"
+          block
+          label="IP:端口"
+          placeholder="192.168.1.5:37849"
+          :disabled="pairing"
+        />
+        <mat-text-field
+          v-model="codeForm.pairingCode"
+          block
+          label="配对码（已配对设备可留空）"
+          placeholder="留空则跳过配对直接连接"
+          :disabled="pairing"
+          :max-length="6"
+        />
+        <div
+          v-if="pairError"
+          role="alert"
+          class="rounded-lg bg-[var(--mat-sys-color-error-container)] px-3 py-2 text-sm break-all text-[var(--mat-sys-color-on-error-container)]"
+        >
+          {{ pairError }}
+        </div>
+      </div>
+      <template #actions>
+        <mat-spacer />
+        <mat-btn
+          variant="text"
+          :disabled="pairing"
+          @click="pairOpen = false"
+        >
+          取消
+        </mat-btn>
+        <mat-btn
+          variant="filled"
+          :loading="pairing"
+          @click="pairByCode"
+        >
+          {{ codeForm.pairingCode.trim() ? '配对并连接' : '直接连接' }}
+        </mat-btn>
+      </template>
+    </mat-dialog>
   </mat-app-root>
 </template>
 
@@ -130,12 +211,42 @@ const keyword = ref('');
 const loadingDevices = ref(false);
 const loadingApps = ref(false);
 const launching = ref(false);
+const connecting = ref(false);
 const error = ref('');
 
-const deviceItems = computed(() => devices.value.map((device) => ({
-  title: device.model ? `${device.model} (${device.serial})` : device.serial,
-  value: device.serial,
-})));
+const createCodeForm = () => ({ address: '', pairingCode: '' });
+
+const pairOpen = ref(false);
+const pairing = ref(false);
+const pairError = ref('');
+const codeForm = ref(createCodeForm());
+const forgetting = ref(false);
+
+const deviceItems = computed(() => devices.value.map((device) => {
+  const base = device.model ? `${device.model} (${device.serial})` : device.serial;
+  return {
+    title: device.wireless && !device.connected ? `${base} · 未连接` : base,
+    value: device.serial,
+  };
+}));
+
+const selectedStoredWireless = computed(() => devices.value.some(
+  (device) => device.serial === serial.value && device.stored && device.wireless,
+));
+
+const selectedOfflineWireless = computed(() => devices.value.some(
+  (device) => device.serial === serial.value && device.wireless && !device.connected,
+));
+
+const appEmptyText = computed(() => {
+  if (!serial.value) {
+    return '请先连接设备';
+  }
+  if (selectedOfflineWireless.value) {
+    return '设备未连接，请点击上方「连接无线设备」';
+  }
+  return '未获取到应用列表';
+});
 
 const filteredApps = computed(() => {
   const kw = keyword.value.trim().toLowerCase();
@@ -154,7 +265,11 @@ const loadDevices = async () => {
       throw new Error(result?.message || '获取设备列表失败');
     }
     devices.value = result.devices;
-    serial.value = devices.value.length > 0 ? devices.value[0].serial : '';
+    // 刷新保留当前选择（含已保存但离线的无线设备），仅在无效时回落到首台设备
+    const stillAvailable = result.devices.some((device) => device.serial === serial.value);
+    serial.value = stillAvailable && serial.value
+      ? serial.value
+      : (result.devices[0]?.serial ?? '');
   } catch (e) {
     devices.value = [];
     serial.value = '';
@@ -166,7 +281,8 @@ const loadDevices = async () => {
 };
 
 const loadApps = async () => {
-  if (!serial.value) {
+  // 已保存但离线的无线设备先等用户手动连接，直接拉列表只会报 device not found
+  if (!serial.value || selectedOfflineWireless.value) {
     apps.value = [];
     return;
   }
@@ -197,10 +313,102 @@ const launch = async (mode, pkg = null) => {
     if (!result?.success) {
       throw new Error(result?.message || '启动失败');
     }
+    // 已保存的无线设备端口变化时主进程会重连并回报实际 serial
+    if (result.serial && result.serial !== serial.value) {
+      serial.value = result.serial;
+      await loadDevices();
+    }
   } catch (e) {
     error.value = e.message;
   } finally {
     launching.value = false;
+  }
+};
+
+// 手动重连选中的已存无线设备（端口变化时主进程回报实际 serial 并更新保存记录）
+const connectSelected = async () => {
+  if (!serial.value || connecting.value) {
+    return;
+  }
+  const targetSerial = serial.value;
+  connecting.value = true;
+  error.value = '';
+  try {
+    const result = await ipc.invoke('connect-wireless', { serial: targetSerial });
+    if (!result?.success) {
+      throw new Error(result?.message || '连接失败');
+    }
+    if (serial.value !== targetSerial) {
+      return;
+    }
+    if (result.devices) {
+      devices.value = result.devices;
+    }
+    if (result.serial && result.serial !== targetSerial) {
+      // 端口已变化：切换到实际 serial，watch 会自动加载应用列表
+      serial.value = result.serial;
+      return;
+    }
+    await loadApps();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    connecting.value = false;
+  }
+};
+
+const openPairDialog = () => {
+  codeForm.value = createCodeForm();
+  pairError.value = '';
+  pairOpen.value = true;
+};
+
+const applyPairSuccess = async (result) => {
+  pairOpen.value = false;
+  await loadDevices();
+  if (result.serial) {
+    serial.value = result.serial;
+  }
+};
+
+const pairByCode = async () => {
+  if (pairing.value) {
+    return;
+  }
+  pairing.value = true;
+  pairError.value = '';
+  try {
+    const result = await ipc.invoke('pair-wireless', {
+      address: codeForm.value.address.trim(),
+      pairingCode: codeForm.value.pairingCode.trim(),
+    });
+    if (!result?.success) {
+      throw new Error(result?.message || '配对失败');
+    }
+    await applyPairSuccess(result);
+  } catch (e) {
+    pairError.value = e.message;
+  } finally {
+    pairing.value = false;
+  }
+};
+
+const forgetWireless = async () => {
+  if (!serial.value || forgetting.value) {
+    return;
+  }
+  forgetting.value = true;
+  error.value = '';
+  try {
+    const result = await ipc.invoke('remove-wireless', { serial: serial.value });
+    if (!result?.success) {
+      throw new Error(result?.message || '移除失败');
+    }
+    await loadDevices();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    forgetting.value = false;
   }
 };
 
