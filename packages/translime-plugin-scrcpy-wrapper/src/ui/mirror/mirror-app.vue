@@ -7,14 +7,20 @@
         :class="chromeVisible ? 'opacity-100' : 'opacity-0'"
       />
 
-      <!-- 标题栏 -->
+      <!-- 顶部留白拖动带：标题栏隐藏时仍可拖动窗口 -->
       <div
-        class="absolute top-3 inset-x-4 z-30 flex h-8 items-center justify-between px-2 transition-opacity duration-200 ease-out window-drag-region"
+        class="absolute inset-x-0 top-0 z-20 h-12 window-drag-region"
+        style="-webkit-app-region: drag; app-region: drag;"
+      />
+
+      <!-- 标题栏：悬浮于顶部留白内 -->
+      <div
+        class="absolute top-2 inset-x-4 z-30 flex h-8 items-center justify-between px-2 transition-opacity duration-200 ease-out window-drag-region"
         :class="chromeVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
         style="-webkit-app-region: drag; app-region: drag;"
       >
         <div class="flex min-w-0 items-center pr-2">
-          <span class="truncate text-xs font-medium text-mat-on-surface-variant">{{ title }}</span>
+          <span class="truncate text-xs font-medium text-[var(--mat-sys-color-on-surface-variant)]">{{ title }}</span>
         </div>
         <div
           class="flex items-center gap-1 window-no-drag"
@@ -46,7 +52,7 @@
         v-if="!sdlRect && !freezeImage"
         class="pointer-events-none absolute inset-0 flex items-center justify-center"
       >
-        <span class="text-sm text-mat-on-surface-variant">等待画面接入…</span>
+        <span class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">等待画面接入…</span>
       </div>
 
       <!-- 画面外轮廓边框 -->
@@ -104,7 +110,7 @@
         variant="floating-right"
         position="start"
         class="z-30 window-no-drag"
-        style="top: 60px; right: 16px; -webkit-app-region: no-drag; app-region: no-drag;"
+        style="top: 48px; right: 16px; -webkit-app-region: no-drag; app-region: no-drag;"
       >
         <mat-btn
           variant="standard"
@@ -126,7 +132,7 @@
           variant="standard"
           size="medium"
           icon="crop_square"
-          label="最近应用"
+          label="最近任务"
           :disabled="sending"
           @click="sendKey(KEYCODE_APP_SWITCH)"
         />
@@ -134,7 +140,7 @@
           variant="standard"
           size="medium"
           icon="open_in_new"
-          :label="hasForegroundApp ? '新窗口打开' : '新窗口打开（前台无应用）'"
+          label="新窗口"
           :disabled="sending || !hasForegroundApp"
           @click="openInNewWindow"
         />
@@ -142,7 +148,7 @@
           variant="standard"
           size="medium"
           icon="power_settings_new"
-          label="亮屏/息屏"
+          label="电源"
           :disabled="sending"
           @click="toggleScreen"
         />

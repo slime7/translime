@@ -5,6 +5,7 @@ import {
   BrowserWindow,
   session as electronSession,
   ipcMain,
+  nativeTheme,
   screen,
 } from 'electron';
 import { setupMdeWindow } from 'translime-sdk';
@@ -20,7 +21,6 @@ import {
 } from './win32';
 import createCatchUpMonitor from './catch-up-monitor';
 import {
-  adbExec,
   getDefaultLauncherPackage,
   getDeviceResolution,
   getForegroundApp,
@@ -52,9 +52,15 @@ export const TOOLBAR_CSS_WIDTH = 88;
 export const SDL_BORDER_CSS = 8;
 // SDL 画面区内圆角 CSS 半径（20px，与 28px 外圆角扣除 8px 边框后的内圆角一致）
 export const SDL_CORNER_RADIUS_CSS = 20;
-// 留白与间距（outline 距窗口四周 16px，与右侧工具栏保持 24px 留白）
-export const CHROME_GAP_CSS = 16;
+// 画面区四周统一留白（标题栏悬浮在顶部留白内，使四周边缘留白大致相等）
+export const OUTER_GAP_CSS = 48;
 export const TOOLBAR_GAP_CSS = 24;
+
+// 原生标题栏按钮随宿主主题明暗切换的前景色
+const OVERLAY_SYMBOL_COLORS = {
+  dark: '#ffffff',
+  light: '#1f1f1f',
+};
 
 export const getChromeMetrics = (mode = 'mirror') => {
   if (mode === 'virtual') {
@@ -67,10 +73,10 @@ export const getChromeMetrics = (mode = 'mirror') => {
       chromeHeight: TITLE_BAR_CSS_HEIGHT,
     };
   }
-  const leftOffset = CHROME_GAP_CSS + SDL_BORDER_CSS;
-  const rightOffset = SDL_BORDER_CSS + TOOLBAR_GAP_CSS + TOOLBAR_CSS_WIDTH + CHROME_GAP_CSS;
-  const topOffset = 12 + TITLE_BAR_CSS_HEIGHT + CHROME_GAP_CSS + SDL_BORDER_CSS;
-  const bottomOffset = CHROME_GAP_CSS + SDL_BORDER_CSS;
+  const leftOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
+  const rightOffset = SDL_BORDER_CSS + TOOLBAR_GAP_CSS + TOOLBAR_CSS_WIDTH + OUTER_GAP_CSS;
+  const topOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
+  const bottomOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
   return {
     leftOffset,
     rightOffset,
@@ -99,6 +105,22 @@ const registerWindowControlHandler = () => {
   });
 };
 
+const applyOverlaySymbolColor = (win) => {
+  if (process.platform !== 'win32' || typeof win.setTitleBarOverlay !== 'function') {
+    return;
+  }
+  try {
+    win.setTitleBarOverlay({
+      color: '#00000000',
+      symbolColor: nativeTheme.shouldUseDarkColors
+        ? OVERLAY_SYMBOL_COLORS.dark
+        : OVERLAY_SYMBOL_COLORS.light,
+    });
+  } catch {
+    // 窗口可能已销毁或无标题栏 overlay
+  }
+};
+
 // 为本插件 dist 的 file 协议资源请求追加时间戳参数以绕过 Electron 本地缓存
 const bustWrapperCache = () => {
   if (globalThis.scrcpyWrapperCacheBustRegistered) {
@@ -121,6 +143,22 @@ const sessions = new Map();
 // 会话业务键（mirror:<serial> 或 virtual:<serial>:<pkg>）→ sessionId
 const sessionKeys = new Map();
 
+// 虚拟屏窗口的原生标题栏按钮跟随宿主主题明暗切换
+const registerOverlayThemeSync = () => {
+  if (globalThis.scrcpyOverlayThemeSyncRegistered) {
+    return;
+  }
+  globalThis.scrcpyOverlayThemeSyncRegistered = true;
+  nativeTheme.on('updated', () => {
+    sessions.forEach((session) => {
+      if (session.mode !== 'virtual' || !session.win || session.win.isDestroyed()) {
+        return;
+      }
+      applyOverlaySymbolColor(session.win);
+    });
+  });
+};
+
 export const sessionKey = ({ serial, mode = 'mirror', pkg = null }) => (
   mode === 'virtual' ? `virtual:${serial}:${pkg ?? 'app'}` : `mirror:${serial}`
 );
@@ -141,7 +179,7 @@ const getPhysicalDims = (win, mode = 'mirror') => {
     topBar: Math.round(TITLE_BAR_CSS_HEIGHT * scale),
     toolbar: Math.round(TOOLBAR_CSS_WIDTH * scale),
     border: Math.round(SDL_BORDER_CSS * scale),
-    gap: Math.round(CHROME_GAP_CSS * scale),
+    gap: Math.round(OUTER_GAP_CSS * scale),
     leftOffset: Math.round(m.leftOffset * scale),
     topOffset: Math.round(m.topOffset * scale),
     rightOffset: Math.round(m.rightOffset * scale),
@@ -249,13 +287,6 @@ const settleResize = (sessionId) => {
     revealFreeze(sessionId);
     return;
   }
-  // 重新应用虚拟屏沉浸模式
-  if (session.pkg) {
-    adbExec(session.adbPath, [
-      '-s', session.serial, 'shell', 'settings', 'put', 'global', 'policy_control',
-      `immersive.full=${session.pkg}`,
-    ]).catch(() => {});
-  }
   session.catchUp = createCatchUpMonitor({
     mode: session.captureReliable ? 'diff' : 'timed',
     capture: () => captureWindowPixels(session.hwnd),
@@ -288,6 +319,7 @@ const createWrapperWindow = ({
   title, sessionId, contentSize, mode = 'mirror',
 }) => {
   registerWindowControlHandler();
+  registerOverlayThemeSync();
   const isMirror = mode === 'mirror';
   const win = new BrowserWindow({
     // useContentSize 让宽高只描述网页内容区，画面区按设备比例精确铺满
@@ -309,7 +341,9 @@ const createWrapperWindow = ({
         titleBarStyle: 'hidden',
         titleBarOverlay: {
           color: '#00000000',
-          symbolColor: '#ffffff',
+          symbolColor: nativeTheme.shouldUseDarkColors
+            ? OVERLAY_SYMBOL_COLORS.dark
+            : OVERLAY_SYMBOL_COLORS.light,
           height: TITLE_BAR_CSS_HEIGHT,
         },
       }
@@ -408,11 +442,6 @@ const destroySession = (sessionId) => {
   if (session.hooks) {
     session.hooks.destroy();
   }
-  if (session.mode === 'virtual' && session.pkg) {
-    adbExec(session.adbPath, [
-      '-s', session.serial, 'shell', 'settings', 'put', 'global', 'policy_control', 'null',
-    ]).catch(() => {});
-  }
   const { proc } = session;
   if (proc.exitCode === null && !session.spawnError) {
     killProcessTree(proc);
@@ -497,7 +526,7 @@ export const launchSession = async (options = {}) => {
       toolbarCssWidth: mode === 'mirror' ? TOOLBAR_CSS_WIDTH : 0,
       titleBarCssHeight: TITLE_BAR_CSS_HEIGHT,
       borderCss: mode === 'mirror' ? SDL_BORDER_CSS : 0,
-      gapCss: mode === 'mirror' ? CHROME_GAP_CSS : 0,
+      gapCss: mode === 'mirror' ? OUTER_GAP_CSS : 0,
       barCssHeight: mode === 'virtual' ? BAR_CSS_HEIGHT : 0,
     });
   }
@@ -519,12 +548,6 @@ export const launchSession = async (options = {}) => {
       : null,
   });
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
-
-  if (mode === 'virtual' && pkg) {
-    adbExec(adbPath, ['-s', serial, 'shell', 'settings', 'put', 'global', 'policy_control', `immersive.full=${pkg}`]).catch((e) => {
-      logger.warn(`[scrcpy] 设置应用沉浸模式失败: ${e.message}`);
-    });
-  }
 
   const env = { ...process.env };
   if (scrcpyInfo.resolved && adbPath !== 'adb') {
@@ -645,7 +668,7 @@ export const launchSession = async (options = {}) => {
         y: cssY,
         width: w,
         height: h,
-        topThreshold: 12 + TITLE_BAR_CSS_HEIGHT + CHROME_GAP_CSS + 24,
+        topThreshold: OUTER_GAP_CSS + 24,
         rightThreshold: TOOLBAR_CSS_WIDTH + TOOLBAR_GAP_CSS + 24,
       });
       if (nextRevealed !== chromeRevealed) {
@@ -670,7 +693,33 @@ export const launchSession = async (options = {}) => {
     winClosed = true;
     destroySession(sessionId);
   });
+  // scrcpy 输出按行缓冲解析视频纹理尺寸：初始占位窗口比例不可信，
+  // 以解码器输出的真实视频尺寸为准修正窗口比例（设备旋转后尺寸变化会再次输出）
+  let logBuffer = '';
+  const watchVideoSize = (chunk) => {
+    logBuffer += String(chunk);
+    const lines = logBuffer.split(/\r?\n/);
+    logBuffer = lines.pop() ?? '';
+    lines.forEach((line) => {
+      const match = line.match(/Texture \([^)]*\): (\d+)x(\d+)/);
+      if (!match || mode !== 'mirror') {
+        return;
+      }
+      const width = Number(match[1]);
+      const height = Number(match[2]);
+      if (width <= 0 || height <= 0 || win.isDestroyed()) {
+        return;
+      }
+      if (session.resolution && session.resolution.width === width && session.resolution.height === height) {
+        return;
+      }
+      session.resolution = { width, height };
+      checkAndFixProportionalSize(sessionId);
+      session.hooks?.syncNow();
+    });
+  };
   const forwardLog = (chunk) => {
+    watchVideoSize(chunk);
     const text = String(chunk).trim();
     if (text) {
       logger.info(`[scrcpy:${sessionId}] ${text}`);
@@ -693,7 +742,8 @@ export const launchSession = async (options = {}) => {
       shouldAbort: () => proc.exitCode !== null || session.spawnError !== null,
     });
     session.hwnd = hwnd;
-    const aspect = mode === 'mirror' ? resolution : null;
+    // 挂载时可能已从 scrcpy 输出解析到真实视频尺寸，读取会话上的最新值
+    const aspect = mode === 'mirror' ? session.resolution : null;
     const dims = getPhysicalDims(win, mode);
     const sendRect = (rect) => {
       if (!win.isDestroyed()) {
@@ -725,6 +775,10 @@ export const launchSession = async (options = {}) => {
       onResizeSettled: () => settleResize(sessionId),
       onRect: sendRect,
     });
+    if (mode === 'mirror') {
+      checkAndFixProportionalSize(sessionId);
+      session.hooks.syncNow();
+    }
     return { sessionId, title };
   } catch (e) {
     if (!winClosed && !win.isDestroyed()) {

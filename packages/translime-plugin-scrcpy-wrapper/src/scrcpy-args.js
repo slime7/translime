@@ -15,7 +15,8 @@ export const nextWindowTitle = () => {
  * 已在后台运行的任务会被带到前台）：mirror 模式在默认屏拉起后镜像，
  * virtual 模式在虚拟屏内启动。
  * virtualDisplaySize 给定时以显式分辨率创建虚拟屏，并开启 flex-display
- * 让虚拟屏连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）
+ * 让虚拟屏连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）。
+ * 虚拟屏关闭系统装饰，应用全屏铺满画面区，不显示状态栏、手势栏与标题装饰栏
  */
 export const buildScrcpyArgs = ({
   mode,
@@ -35,6 +36,7 @@ export const buildScrcpyArgs = ({
     } else {
       args.push('--new-display');
     }
+    args.push('--no-vd-system-decorations');
   }
   if (pkg) {
     args.push(`--start-app=${pkg}`);

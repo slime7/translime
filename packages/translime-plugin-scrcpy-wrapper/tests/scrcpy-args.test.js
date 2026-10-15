@@ -29,7 +29,7 @@ describe('buildScrcpyArgs', () => {
     ]);
   });
 
-  it('虚拟屏模式默认仅输出 new-display', () => {
+  it('虚拟屏模式默认仅输出 new-display，并关闭系统装饰保证应用全屏沉浸', () => {
     expect(buildScrcpyArgs({
       mode: 'virtual',
       serial: 'ABC123',
@@ -40,6 +40,7 @@ describe('buildScrcpyArgs', () => {
       '--window-title=translime-scrcpy-2',
       '--video-codec=h265',
       '--new-display',
+      '--no-vd-system-decorations',
       '--start-app=com.foo',
     ]);
   });
@@ -57,6 +58,7 @@ describe('buildScrcpyArgs', () => {
       '--video-codec=h265',
       '--new-display=871x1184',
       '-x',
+      '--no-vd-system-decorations',
       '--start-app=com.foo',
     ]);
   });

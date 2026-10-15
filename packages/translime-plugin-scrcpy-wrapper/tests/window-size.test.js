@@ -4,11 +4,11 @@ import { calculateProportionalSize, computeWindowSize, fitVideoRect } from '../s
 const TITLE_BAR_HEIGHT = 32;
 const TOOLBAR_WIDTH = 88;
 const BORDER = 8;
-const GAP = 16;
+const GAP = 48;
 const WORK_AREA = { width: 1920, height: 1040 };
 
 describe('computeWindowSize', () => {
-  it('竖屏设备按工作区可用画面等比缩放，窗口尺寸包含标题栏、工具栏、双侧边框与呼吸间距（防止初始窗口超出屏幕或比例错位）', () => {
+  it('竖屏设备按工作区可用画面等比缩放，窗口尺寸包含标题栏、工具栏、双侧边框与四周统一留白（防止初始窗口超出屏幕或比例错位）', () => {
     const size = computeWindowSize({
       resolution: { width: 1080, height: 2400 },
       workArea: WORK_AREA,
@@ -17,11 +17,27 @@ describe('computeWindowSize', () => {
       borderCss: BORDER,
       gapCss: GAP,
     });
-    // chromeW = 24 + 136 = 160, chromeH = 12 + 32 + 16 + 8 + 24 = 92
-    // maxH = 1040 - 64 - 92 = 884, maxW = 1920 - 64 - 160 = 1696
-    // videoW = 884 * 1080 / 2400 = 397.8 -> 398
-    // width = 398 + 160 = 558, height = 884 + 92 = 976
-    expect(size).toEqual({ width: 558, height: 976 });
+    // 标题栏悬浮于顶部留白内：chromeW = 56 + 168 = 224, chromeH = 56 + 56 = 112
+    // maxH = 1040 - 64 - 112 = 864, maxW = 1920 - 64 - 224 = 1632
+    // videoW = 864 * 1080 / 2400 = 388.8
+    // width = 388.8 + 224 = 612.8 -> 613, height = 864 + 112 = 976
+    expect(size).toEqual({ width: 613, height: 976 });
+  });
+
+  it('留白容不下标题栏时标题栏额外占据顶部高度（防止小间距下标题栏与画面重叠）', () => {
+    const size = computeWindowSize({
+      resolution: { width: 1080, height: 2400 },
+      workArea: WORK_AREA,
+      toolbarCssWidth: TOOLBAR_WIDTH,
+      titleBarCssHeight: TITLE_BAR_HEIGHT,
+      borderCss: BORDER,
+      gapCss: 16,
+    });
+    // 标题栏 32 > 留白 16，额外占高：chromeH = (32 + 16 + 8) + (16 + 8) = 80
+    // maxH = 1040 - 64 - 80 = 896
+    // videoW = 896 * 1080 / 2400 = 403.2 -> width = 403.2 + 160 = 563.2 -> 563
+    // height = 896 + 80 = 976
+    expect(size).toEqual({ width: 563, height: 976 });
   });
 
   it('宽屏设备画面受限于工作区宽度限制，高度等比反推（防止宽屏设备弹窗溢出显示器）', () => {
@@ -34,11 +50,11 @@ describe('computeWindowSize', () => {
       gapCss: GAP,
       margin: 0,
     });
-    // chromeW = 160, chromeH = 92
-    // maxW = 1000 - 160 = 840, maxH = 900 - 92 = 808
-    // videoW = 840, videoH = 840 * 2160 / 3840 = 472.5 -> 473
-    // width = 840 + 160 = 1000, height = 473 + 92 = 565
-    expect(size).toEqual({ width: 1000, height: 565 });
+    // chromeW = 224, chromeH = 112
+    // maxW = 1000 - 224 = 776, maxH = 900 - 112 = 788
+    // videoW = 788 * 3840 / 2160 = 1400.9 > 776 -> videoW = 776
+    // videoH = 776 * 2160 / 3840 = 436.5 -> height = 436.5 + 112 = 548.5 -> 549
+    expect(size).toEqual({ width: 1000, height: 549 });
   });
 
   it('虚拟屏模式下无工具栏与边框间距，无底部控制条，仅按标题栏尺寸计算（防止虚拟屏窗口尺寸偏差与滚动条出现）', () => {
@@ -64,8 +80,8 @@ describe('computeWindowSize', () => {
       borderCss: BORDER,
       gapCss: GAP,
     });
-    expect(size.width).toBeGreaterThanOrEqual(240 + 160);
-    expect(size.height).toBeGreaterThanOrEqual(320 + 92);
+    expect(size.width).toBeGreaterThanOrEqual(240 + 224);
+    expect(size.height).toBeGreaterThanOrEqual(320 + 112);
   });
 
   it('分辨率缺失时安全回退默认手机比例（防止 adb 未响应时抛错中断窗口创建）', () => {
@@ -77,14 +93,14 @@ describe('computeWindowSize', () => {
       borderCss: BORDER,
       gapCss: GAP,
     });
-    expect(size.width).toBe(558);
+    expect(size.width).toBe(613);
     expect(size.height).toBe(976);
   });
 });
 
 describe('calculateProportionalSize', () => {
-  const chromeWidth = 160;
-  const chromeHeight = 92;
+  const chromeWidth = 224;
+  const chromeHeight = 112;
   const ratio = 1080 / 2400; // 0.45
 
   it('横向拖拽时以宽度为主导驱动高度等比变化（防止用户横向拖动边框时画面产生上下黑边）', () => {
@@ -98,9 +114,9 @@ describe('calculateProportionalSize', () => {
       chromeHeight,
       edge: 'right',
     });
-    // videoW = 560 - 160 = 400, videoH = round(400 / 0.45) = 889
-    // width = 560, height = 889 + 92 = 981
-    expect(result).toEqual({ width: 560, height: 981 });
+    // videoW = 560 - 224 = 336, videoH = round(336 / 0.45) = 747
+    // width = 560, height = 747 + 112 = 859
+    expect(result).toEqual({ width: 560, height: 859 });
     const videoRatio = (result.width - chromeWidth) / (result.height - chromeHeight);
     expect(Math.abs(videoRatio - ratio) / ratio).toBeLessThan(0.001);
   });
@@ -116,11 +132,12 @@ describe('calculateProportionalSize', () => {
       chromeHeight,
       edge: 'bottom',
     });
-    // videoH = 1000 - 92 = 908, videoW = round(908 * 0.45) = 409
-    // width = 409 + 160 = 569, height = 1000
-    expect(result).toEqual({ width: 569, height: 1000 });
+    // videoH = 1000 - 112 = 888, videoW = round(888 * 0.45) = 400
+    // width = 400 + 224 = 624, height = 1000
+    expect(result).toEqual({ width: 624, height: 1000 });
     const videoRatio = (result.width - chromeWidth) / (result.height - chromeHeight);
-    expect(Math.abs(videoRatio - ratio) / ratio).toBeLessThan(0.001);
+    // 容差与主进程 checkAndFixProportionalSize 的 0.5% 判定一致，容忍像素取整误差
+    expect(Math.abs(videoRatio - ratio) / ratio).toBeLessThan(0.005);
   });
 
   it('对角拖拽时按位移变化主导侧驱动等比计算（防止角部拖拽缩放时出现跳变或死锁）', () => {

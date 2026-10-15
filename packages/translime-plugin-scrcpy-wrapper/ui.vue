@@ -26,7 +26,7 @@
         />
         <mat-btn
           icon="wifi_tethering"
-          label="无线调试配对"
+          label="无线配对"
           variant="text"
           class="shrink-0"
           @click="openPairDialog"
@@ -34,7 +34,7 @@
         <mat-btn
           v-if="selectedOfflineWireless"
           icon="link"
-          label="连接无线设备"
+          label="连接"
           variant="text"
           class="shrink-0"
           :disabled="connecting"
@@ -44,7 +44,7 @@
         <mat-btn
           v-if="selectedStoredWireless"
           icon="link_off"
-          label="移除已保存的无线设备"
+          label="移除设备"
           variant="text"
           class="shrink-0"
           :disabled="forgetting"
@@ -117,7 +117,7 @@
             <template #trailing>
               <mat-btn
                 icon="cast"
-                label="镜像（先在手机上拉起该应用）"
+                label="镜像"
                 size="small"
                 variant="standard"
                 :disabled="launching"
@@ -243,7 +243,7 @@ const appEmptyText = computed(() => {
     return '请先连接设备';
   }
   if (selectedOfflineWireless.value) {
-    return '设备未连接，请点击上方「连接无线设备」';
+    return '设备未连接，请点击上方「连接」';
   }
   return '未获取到应用列表';
 });

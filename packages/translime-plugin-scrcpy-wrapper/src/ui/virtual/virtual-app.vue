@@ -7,17 +7,17 @@
     <div class="relative h-dvh w-dvw overflow-hidden bg-black select-none flex flex-col">
       <!-- 标题栏 -->
       <div
-        class="flex h-8 shrink-0 items-center justify-between px-3 bg-mat-surface-container"
+        class="flex h-8 shrink-0 items-center justify-between px-3 bg-[var(--mat-sys-color-surface-container)]"
         style="-webkit-app-region: drag"
       >
-        <span class="min-w-0 truncate text-xs font-medium text-mat-on-surface-variant">{{ title }}</span>
+        <span class="min-w-0 truncate text-xs font-medium text-[var(--mat-sys-color-on-surface-variant)]">{{ title }}</span>
       </div>
 
       <!-- 画面区 -->
       <div class="relative flex min-h-0 grow items-center justify-center overflow-hidden">
         <span
           v-if="!freezeImage"
-          class="text-sm text-mat-on-surface-variant"
+          class="text-sm text-[var(--mat-sys-color-on-surface-variant)]"
         >等待画面接入…</span>
         <div
           v-else
