@@ -278,7 +278,7 @@ const ipcHandlers = defineIpcHandlers([
         });
         return { success: true, serial: actualSerial, ...result };
       } catch (e) {
-        logger.error(`[${id}] launch failed: ${e.message}`);
+        logger.error(`[${id}] launch failed: ${e.message}\n${e.stack ?? '(no stack)'}`);
         return { success: false, message: e.message };
       }
     },

@@ -473,7 +473,12 @@ export const launchSession = async (options = {}) => {
     if (session.spawnError) {
       return cleanupAndRethrow(new Error(`无法启动 adb（${adbPath}）：${session.spawnError.message}`));
     }
-    return cleanupAndRethrow(e instanceof Error ? new Error(`${e.message}${detail}`) : new Error(String(e)));
+    const wrapped = e instanceof Error ? new Error(`${e.message}${detail}`) : new Error(String(e));
+    // 保留原始堆栈：重包裹会丢 stack，上层日志无法定位抛点
+    if (e instanceof Error) {
+      wrapped.stack = e.stack;
+    }
+    return cleanupAndRethrow(wrapped);
   }
 };
 

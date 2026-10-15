@@ -68,8 +68,15 @@ export const resolveAdbPath = (options = {}) => {
 
 /**
  * 捆绑的 scrcpy-server 文件路径（随插件发布，位于插件根目录 bin/ 下）
+ *
+ * 不能写成 new URL('../bin/scrcpy-server', import.meta.url)：vite lib 构建会把
+ * 该写法识别为资产引用，将二进制内联成 data URL，运行时 fileURLToPath(data:) 会抛
+ * ERR_INVALID_URL_SCHEME。裸 import.meta.url 不受影响（见 scrcpy.js 的 dirname）
  */
-export const bundledServerPath = () => fileURLToPath(new URL('../bin/scrcpy-server', import.meta.url));
+export const bundledServerPath = () => path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../bin/scrcpy-server',
+);
 
 /**
  * 解析 scrcpy-server 文件：设置项显式路径（存在时）> 捆绑文件；
