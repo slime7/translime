@@ -10,6 +10,22 @@ export default {
     devices: [
       { serial: 'MOCK123ABC', state: 'device', model: 'Pixel Mock' },
       { serial: 'emulator-5554', state: 'device', model: 'Emulator' },
+      {
+        serial: '192.168.1.8:37895',
+        state: 'device',
+        model: 'Xiaomi Mock',
+        wireless: true,
+        connected: true,
+        stored: true,
+      },
+      {
+        serial: '192.168.1.20:40117',
+        state: 'offline',
+        model: 'Tablet Mock',
+        wireless: true,
+        connected: false,
+        stored: true,
+      },
     ],
   }),
   'list-apps': () => ({
@@ -24,5 +40,12 @@ export default {
     success: true,
     sessionId: 'session-mock-1',
     title: 'translime-scrcpy-1',
+  }),
+  'pair-wireless': () => ({
+    success: true,
+    serial: '192.168.1.20:40117',
+  }),
+  'remove-wireless': () => ({
+    success: true,
   }),
 };

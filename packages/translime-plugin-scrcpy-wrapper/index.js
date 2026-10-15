@@ -1,6 +1,7 @@
 import { defineIpcHandlers, useLogger, usePluginConfig } from 'translime-sdk';
 import * as adbModule from './src/adb';
 import * as scrcpyModule from './src/scrcpy';
+import * as wirelessModule from './src/wireless';
 import { resolveAdbPath, resolveScrcpyPath } from './src/bin-resolver';
 
 const id = 'translime-plugin-scrcpy-wrapper';
@@ -8,6 +9,7 @@ const baseLogger = useLogger();
 const logger = baseLogger.child ? baseLogger.child({ plugin_id: id, context: 'Main' }) : baseLogger;
 
 const pluginConfig = usePluginConfig(id);
+const WIRELESS_DEVICES_KEY = 'wirelessDevices';
 
 const settingMenu = [
   {
@@ -31,6 +33,31 @@ const getAdbPath = () => {
   return resolveAdbPath({ scrcpyResolved: scrcpyInfo.resolved });
 };
 
+/**
+ * 已配对保存的无线设备列表，元素为 { serial, model }，serial 为 `IP:端口`
+ */
+const getStoredWirelessDevices = () => {
+  const raw = pluginConfig.get(WIRELESS_DEVICES_KEY, []);
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((item) => ({
+      serial: String(item?.serial ?? ''),
+      model: String(item?.model ?? ''),
+    }))
+    .filter((item) => wirelessModule.isWirelessSerial(item.serial));
+};
+
+const saveStoredWirelessDevices = (list) => {
+  pluginConfig.set(WIRELESS_DEVICES_KEY, list);
+};
+
+const listMergedDevices = async () => {
+  const devices = await adbModule.listDevices(getAdbPath());
+  return wirelessModule.mergeWirelessDevices(devices, getStoredWirelessDevices());
+};
+
 const pluginDidLoad = () => {
   logger.info(`[${id}] plugin loaded`);
 };
@@ -44,10 +71,68 @@ const ipcHandlers = defineIpcHandlers([
     type: 'list-devices',
     handler: () => async () => {
       try {
-        const devices = await adbModule.listDevices(getAdbPath());
+        const devices = await listMergedDevices();
         return { success: true, devices };
       } catch (e) {
         return { success: false, message: `获取设备列表失败: ${e.message}` };
+      }
+    },
+  },
+  {
+    type: 'pair-wireless',
+    handler: () => async ({ connectAddress, pairAddress, pairingCode }) => {
+      const connect = wirelessModule.parseAddress(connectAddress);
+      if (!connect) {
+        return { success: false, message: '连接地址无效，请填写无线调试主页显示的 IP:端口' };
+      }
+      const wantsPair = Boolean(String(pairAddress ?? '').trim() || String(pairingCode ?? '').trim());
+      if (wantsPair) {
+        const pair = wirelessModule.parseAddress(pairAddress);
+        if (!pair) {
+          return { success: false, message: '配对地址无效，请填写配对页面显示的 IP:端口' };
+        }
+        if (!/^\d{6}$/.test(String(pairingCode ?? '').trim())) {
+          return { success: false, message: '配对码应为 6 位数字' };
+        }
+        try {
+          await adbModule.pairDevice(getAdbPath(), wirelessModule.formatAddress(pair), pairingCode.trim());
+        } catch (e) {
+          return { success: false, message: `配对失败：${e.message}` };
+        }
+      }
+      const serial = wirelessModule.formatAddress(connect);
+      try {
+        const output = await adbModule.connectDevice(getAdbPath(), serial);
+        if (!adbModule.parseConnectOutput(output).ok) {
+          throw new Error(output.trim() || '连接失败');
+        }
+      } catch (e) {
+        const prefix = wantsPair ? `配对成功，但连接 ${serial} 失败` : `连接 ${serial} 失败`;
+        return {
+          success: false,
+          message: `${prefix}：${e.message}。请在手机「无线调试」页面核对 IP 地址和端口后重试`,
+        };
+      }
+      // 同一 IP 的旧条目端口已过期，保存时一并清理
+      const remaining = getStoredWirelessDevices()
+        .filter((item) => wirelessModule.parseAddress(item.serial)?.ip !== connect.ip);
+      const devices = await adbModule.listDevices(getAdbPath()).catch(() => []);
+      const model = devices.find((device) => device.serial === serial)?.model ?? '';
+      const stored = [...remaining, { serial, model }];
+      saveStoredWirelessDevices(stored);
+      logger.info(`[${id}] wireless device stored: ${serial}`);
+      return { success: true, serial, devices: wirelessModule.mergeWirelessDevices(devices, stored) };
+    },
+  },
+  {
+    type: 'remove-wireless',
+    handler: () => async ({ serial }) => {
+      const stored = getStoredWirelessDevices().filter((item) => item.serial !== serial);
+      saveStoredWirelessDevices(stored);
+      try {
+        return { success: true, devices: await listMergedDevices() };
+      } catch (e) {
+        return { success: false, message: `已移除，但刷新设备列表失败: ${e.message}` };
       }
     },
   },
@@ -69,14 +154,36 @@ const ipcHandlers = defineIpcHandlers([
     type: 'launch',
     handler: () => async ({ mode, serial, pkg }) => {
       try {
+        let actualSerial = serial;
+        if (wirelessModule.isWirelessSerial(actualSerial)) {
+          const ensured = await wirelessModule.ensureWirelessConnected({
+            serial: actualSerial,
+            adbPath: getAdbPath(),
+            adb: adbModule,
+          });
+          if (!ensured.ok) {
+            return { success: false, message: ensured.message };
+          }
+          if (ensured.portChanged) {
+            const stored = getStoredWirelessDevices();
+            const entry = stored.find((item) => item.serial === serial);
+            if (entry) {
+              saveStoredWirelessDevices(stored.map((item) => (
+                item.serial === serial ? { ...item, serial: ensured.serial } : item
+              )));
+              logger.info(`[${id}] wireless port updated: ${serial} -> ${ensured.serial}`);
+            }
+          }
+          actualSerial = ensured.serial;
+        }
         const result = await scrcpyModule.launchSession({
           mode,
-          serial,
+          serial: actualSerial,
           pkg,
           settingValue: getScrcpySetting(),
           logger,
         });
-        return { success: true, ...result };
+        return { success: true, serial: actualSerial, ...result };
       } catch (e) {
         logger.error(`[${id}] launch failed: ${e.message}`);
         return { success: false, message: e.message };
