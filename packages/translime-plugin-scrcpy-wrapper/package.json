@@ -38,6 +38,7 @@
     "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-vue": "^10.11.1",
     "mde-vue": "git+https://github.com/slime7/mde-vue.git#v26.10.12",
+    "qrcode.vue": "^3.11.0",
     "tailwindcss": "^4.3.3",
     "translime-sdk": "workspace:*",
     "vite": "^8.3.4",

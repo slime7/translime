@@ -45,6 +45,16 @@ export default {
     success: true,
     serial: '192.168.1.20:40117',
   }),
+  'create-wireless-qr': () => ({
+    success: true,
+    name: 'translime-mock0001',
+    password: 'MockPassword1',
+    payload: 'WIFI:T:ADB;S:translime-mock0001;P:MockPassword1;;',
+  }),
+  'wait-wireless-qr-pairing': () => ({
+    success: false,
+    pending: true,
+  }),
   'remove-wireless': () => ({
     success: true,
   }),

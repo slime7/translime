@@ -130,45 +130,90 @@
     <mat-dialog
       v-model="pairOpen"
       title="无线调试配对"
-      :width="480"
+      :width="420"
       close-on-back
     >
-      <div class="flex flex-col gap-3">
-        <p class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">
-          在手机上进入 开发者选项 → 无线调试 并开启。「连接地址」填无线调试主页显示的
-          IP 地址和端口；首次配对需在手机上点「使用配对码配对设备」，把配对页显示的地址与
-          6 位配对码一并填入。
-        </p>
-        <mat-text-field
-          v-model="pairForm.connectAddress"
-          block
-          label="连接地址 (IP:端口)"
-          placeholder="192.168.1.5:37895"
-          :disabled="pairing"
+      <mat-tabs
+        v-model="pairMode"
+        variant="secondary"
+      >
+        <mat-tab-item
+          value="qr"
+          label="扫码配对"
         />
-        <mat-text-field
-          v-model="pairForm.pairAddress"
-          block
-          label="配对地址 (IP:端口，仅首次配对填写)"
-          placeholder="192.168.1.5:37849"
-          :disabled="pairing"
+        <mat-tab-item
+          value="code"
+          label="配对码配对"
         />
-        <mat-text-field
-          v-model="pairForm.pairingCode"
-          block
-          label="配对码（仅首次配对填写）"
-          placeholder="123456"
-          :disabled="pairing"
-          :max-length="6"
-        />
-        <div
-          v-if="pairError"
-          role="alert"
-          class="rounded-lg bg-[var(--mat-sys-color-error-container)] px-3 py-2 text-sm break-all text-[var(--mat-sys-color-on-error-container)]"
-        >
-          {{ pairError }}
-        </div>
-      </div>
+
+        <mat-tab-content value="qr">
+          <div class="flex flex-col items-center gap-3 py-3">
+            <p class="self-start text-sm text-[var(--mat-sys-color-on-surface-variant)]">
+              手机进入 开发者选项 → 无线调试 → 使用二维码配对设备，扫描下方二维码。
+            </p>
+            <div
+              v-if="qrPayload"
+              class="rounded-lg bg-white p-3"
+            >
+              <QrcodeVue
+                :value="qrPayload"
+                :size="200"
+                level="M"
+                render-as="canvas"
+                aria-label="无线调试配对二维码"
+              />
+            </div>
+            <div
+              v-if="qrPolling"
+              class="flex items-center gap-2 text-sm text-[var(--mat-sys-color-on-surface-variant)]"
+            >
+              <mat-progress
+                indeterminate
+                class="w-32"
+                aria-label="等待手机扫码"
+              />
+              等待手机扫码…
+            </div>
+            <div
+              v-if="pairError"
+              role="alert"
+              class="self-stretch rounded-lg bg-[var(--mat-sys-color-error-container)] px-3 py-2 text-sm break-all text-[var(--mat-sys-color-on-error-container)]"
+            >
+              {{ pairError }}
+            </div>
+          </div>
+        </mat-tab-content>
+
+        <mat-tab-content value="code">
+          <div class="flex flex-col gap-3 py-3">
+            <p class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">
+              手机进入 无线调试 → 使用配对码配对设备，按配对页显示的内容填写。
+            </p>
+            <mat-text-field
+              v-model="codeForm.address"
+              block
+              label="配对地址 (IP:端口)"
+              placeholder="192.168.1.5:37849"
+              :disabled="pairing"
+            />
+            <mat-text-field
+              v-model="codeForm.pairingCode"
+              block
+              label="配对码"
+              placeholder="123456"
+              :disabled="pairing"
+              :max-length="6"
+            />
+            <div
+              v-if="pairError"
+              role="alert"
+              class="rounded-lg bg-[var(--mat-sys-color-error-container)] px-3 py-2 text-sm break-all text-[var(--mat-sys-color-on-error-container)]"
+            >
+              {{ pairError }}
+            </div>
+          </div>
+        </mat-tab-content>
+      </mat-tabs>
       <template #actions>
         <mat-spacer />
         <mat-btn
@@ -179,9 +224,10 @@
           取消
         </mat-btn>
         <mat-btn
+          v-if="pairMode === 'code'"
           variant="filled"
           :loading="pairing"
-          @click="pairWireless"
+          @click="pairByCode"
         >
           配对并连接
         </mat-btn>
@@ -192,6 +238,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
+import QrcodeVue from 'qrcode.vue';
 import { useIpc } from 'translime-sdk';
 
 defineOptions({
@@ -210,13 +257,20 @@ const loadingApps = ref(false);
 const launching = ref(false);
 const error = ref('');
 
-const createPairForm = () => ({ connectAddress: '', pairAddress: '', pairingCode: '' });
+const createCodeForm = () => ({ address: '', pairingCode: '' });
 
 const pairOpen = ref(false);
+const pairMode = ref('qr');
 const pairing = ref(false);
 const pairError = ref('');
-const pairForm = ref(createPairForm());
+const codeForm = ref(createCodeForm());
 const forgetting = ref(false);
+
+const QR_TOTAL_TIMEOUT_MS = 120000;
+
+const qrPayload = ref('');
+const qrSecrets = ref(null);
+const qrPolling = ref(false);
 
 const deviceItems = computed(() => devices.value.map((device) => {
   const base = device.model ? `${device.model} (${device.serial})` : device.serial;
@@ -307,12 +361,65 @@ const launch = async (mode, pkg = null) => {
 };
 
 const openPairDialog = () => {
-  pairForm.value = createPairForm();
+  codeForm.value = createCodeForm();
   pairError.value = '';
+  pairMode.value = 'qr';
+  qrPayload.value = '';
+  qrSecrets.value = null;
   pairOpen.value = true;
+  startQrPairing();
 };
 
-const pairWireless = async () => {
+const applyPairSuccess = async (result) => {
+  pairOpen.value = false;
+  await loadDevices();
+  if (result.serial) {
+    serial.value = result.serial;
+  }
+};
+
+const startQrPairing = async () => {
+  if (qrPolling.value) {
+    return;
+  }
+  qrPolling.value = true;
+  pairError.value = '';
+  try {
+    const created = await ipc.invoke('create-wireless-qr');
+    if (!created?.success) {
+      throw new Error(created?.message || '生成配对二维码失败');
+    }
+    qrSecrets.value = { name: created.name, password: created.password };
+    qrPayload.value = created.payload;
+    const knownSerials = devices.value.map((device) => device.serial);
+    const deadline = Date.now() + QR_TOTAL_TIMEOUT_MS;
+    while (qrPolling.value && Date.now() < deadline) {
+      const result = await ipc.invoke('wait-wireless-qr-pairing', {
+        name: created.name,
+        password: created.password,
+        knownSerials,
+      });
+      if (result?.success) {
+        await applyPairSuccess(result);
+        return;
+      }
+      if (!result?.pending) {
+        throw new Error(result?.message || '配对失败');
+      }
+    }
+    if (qrPolling.value) {
+      pairError.value = '等待扫码超时，请重新打开配对窗口重试；也可改用「配对码配对」';
+    }
+  } catch (e) {
+    if (qrPolling.value) {
+      pairError.value = e.message;
+    }
+  } finally {
+    qrPolling.value = false;
+  }
+};
+
+const pairByCode = async () => {
   if (pairing.value) {
     return;
   }
@@ -320,18 +427,13 @@ const pairWireless = async () => {
   pairError.value = '';
   try {
     const result = await ipc.invoke('pair-wireless', {
-      connectAddress: pairForm.value.connectAddress.trim(),
-      pairAddress: pairForm.value.pairAddress.trim(),
-      pairingCode: pairForm.value.pairingCode.trim(),
+      address: codeForm.value.address.trim(),
+      pairingCode: codeForm.value.pairingCode.trim(),
     });
     if (!result?.success) {
       throw new Error(result?.message || '配对失败');
     }
-    pairOpen.value = false;
-    await loadDevices();
-    if (result.serial) {
-      serial.value = result.serial;
-    }
+    await applyPairSuccess(result);
   } catch (e) {
     pairError.value = e.message;
   } finally {
@@ -361,6 +463,13 @@ const forgetWireless = async () => {
 watch(serial, () => {
   keyword.value = '';
   loadApps();
+});
+
+// dialog 关闭（含帷幕点击与 Escape）即停止扫码轮询
+watch(pairOpen, (open) => {
+  if (!open) {
+    qrPolling.value = false;
+  }
 });
 
 onMounted(loadDevices);

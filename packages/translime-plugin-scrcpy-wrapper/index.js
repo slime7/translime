@@ -58,6 +58,20 @@ const listMergedDevices = async () => {
   return wirelessModule.mergeWirelessDevices(devices, getStoredWirelessDevices());
 };
 
+/**
+ * 连接成功后把设备存入设置：同一 IP 的旧条目端口已过期，保存时一并清理
+ */
+const storeWirelessConnection = async (serial) => {
+  const devices = await adbModule.listDevices(getAdbPath()).catch(() => []);
+  const model = devices.find((device) => device.serial === serial)?.model ?? '';
+  const remaining = getStoredWirelessDevices()
+    .filter((item) => wirelessModule.parseAddress(item.serial)?.ip !== wirelessModule.parseAddress(serial)?.ip);
+  const stored = [...remaining, { serial, model }];
+  saveStoredWirelessDevices(stored);
+  logger.info(`[${id}] wireless device stored: ${serial}`);
+  return { success: true, serial, devices: wirelessModule.mergeWirelessDevices(devices, stored) };
+};
+
 const pluginDidLoad = () => {
   logger.info(`[${id}] plugin loaded`);
 };
@@ -80,48 +94,57 @@ const ipcHandlers = defineIpcHandlers([
   },
   {
     type: 'pair-wireless',
-    handler: () => async ({ connectAddress, pairAddress, pairingCode }) => {
-      const connect = wirelessModule.parseAddress(connectAddress);
-      if (!connect) {
-        return { success: false, message: '连接地址无效，请填写无线调试主页显示的 IP:端口' };
+    handler: () => async ({ address, pairingCode }) => {
+      const parsed = wirelessModule.parseAddress(address);
+      if (!parsed) {
+        return { success: false, message: '地址无效，请填写手机配对页面显示的 IP:端口' };
       }
-      const wantsPair = Boolean(String(pairAddress ?? '').trim() || String(pairingCode ?? '').trim());
-      if (wantsPair) {
-        const pair = wirelessModule.parseAddress(pairAddress);
-        if (!pair) {
-          return { success: false, message: '配对地址无效，请填写配对页面显示的 IP:端口' };
-        }
-        if (!/^\d{6}$/.test(String(pairingCode ?? '').trim())) {
-          return { success: false, message: '配对码应为 6 位数字' };
-        }
-        try {
-          await adbModule.pairDevice(getAdbPath(), wirelessModule.formatAddress(pair), pairingCode.trim());
-        } catch (e) {
-          return { success: false, message: `配对失败：${e.message}` };
-        }
+      if (!/^\d{6}$/.test(String(pairingCode ?? '').trim())) {
+        return { success: false, message: '配对码应为 6 位数字' };
       }
-      const serial = wirelessModule.formatAddress(connect);
+      const adbPath = getAdbPath();
+      const knownSerials = (await adbModule.listDevices(adbPath).catch(() => []))
+        .map((device) => device.serial);
       try {
-        const output = await adbModule.connectDevice(getAdbPath(), serial);
-        if (!adbModule.parseConnectOutput(output).ok) {
-          throw new Error(output.trim() || '连接失败');
-        }
+        await adbModule.pairDevice(adbPath, wirelessModule.formatAddress(parsed), pairingCode.trim());
       } catch (e) {
-        const prefix = wantsPair ? `配对成功，但连接 ${serial} 失败` : `连接 ${serial} 失败`;
-        return {
-          success: false,
-          message: `${prefix}：${e.message}。请在手机「无线调试」页面核对 IP 地址和端口后重试`,
-        };
+        return { success: false, message: `配对失败：${e.message}` };
       }
-      // 同一 IP 的旧条目端口已过期，保存时一并清理
-      const remaining = getStoredWirelessDevices()
-        .filter((item) => wirelessModule.parseAddress(item.serial)?.ip !== connect.ip);
-      const devices = await adbModule.listDevices(getAdbPath()).catch(() => []);
-      const model = devices.find((device) => device.serial === serial)?.model ?? '';
-      const stored = [...remaining, { serial, model }];
-      saveStoredWirelessDevices(stored);
-      logger.info(`[${id}] wireless device stored: ${serial}`);
-      return { success: true, serial, devices: wirelessModule.mergeWirelessDevices(devices, stored) };
+      // 配对成功后识别新上线设备（新版 adb 会自动回连），必要时用 mDNS 主动连接
+      const connected = await wirelessModule.connectAfterPairing({
+        adbPath,
+        adb: adbModule,
+        knownSerials,
+        ip: parsed.ip,
+      });
+      if (!connected.ok) {
+        return { success: false, message: `配对成功，但连接失败：${connected.message}` };
+      }
+      return storeWirelessConnection(connected.serial);
+    },
+  },
+  {
+    type: 'create-wireless-qr',
+    handler: () => async () => {
+      const secrets = wirelessModule.createQrPairingSecrets();
+      return { success: true, ...secrets, payload: wirelessModule.buildQrPairingPayload(secrets) };
+    },
+  },
+  {
+    type: 'wait-wireless-qr-pairing',
+    handler: () => async ({ name, password, knownSerials = [] }) => {
+      // adb pair 以服务名解析手机扫码后广播的 mdns 配对服务；单次窗口未等到时返回 pending
+      const result = await wirelessModule.pairByQrServiceName({
+        adbPath: getAdbPath(),
+        adb: adbModule,
+        name,
+        password,
+        knownSerials,
+      });
+      if (!result.ok) {
+        return { success: false, pending: Boolean(result.pending), message: result.message };
+      }
+      return storeWirelessConnection(result.serial);
     },
   },
   {
