@@ -247,9 +247,21 @@ describe('ensureWirelessConnected', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.message).toContain('端口可能已变化');
+    expect(result.authError).toBe(false);
   });
 
-  it('配对信息失效时错误信息提示重新配对', async () => {
+  it('无法解析地址的 serial 连接失败时不标记 authError', async () => {
+    const adb = createAdb({});
+    const result = await ensureWirelessConnected({
+      serial: 'not-an-address',
+      adbPath,
+      adb,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.authError).toBe(false);
+  });
+
+  it('配对信息失效时错误信息提示重新配对，并标记 authError 供上层区分指引', async () => {
     const adb = createAdb({
       connectResults: {
         '192.168.1.5:37895': 'failed to authenticate to 192.168.1.5:37895',
@@ -263,6 +275,7 @@ describe('ensureWirelessConnected', () => {
       scan: noScan,
     });
     expect(result.ok).toBe(false);
+    expect(result.authError).toBe(true);
     expect(result.message).toContain('重新配对');
   });
 });

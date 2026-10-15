@@ -45,6 +45,30 @@ export default {
     success: true,
     serial: '192.168.1.20:40117',
   }),
+  'connect-wireless': () => ({
+    success: true,
+    serial: '192.168.1.20:40117',
+    devices: [
+      { serial: 'MOCK123ABC', state: 'device', model: 'Pixel Mock' },
+      { serial: 'emulator-5554', state: 'device', model: 'Emulator' },
+      {
+        serial: '192.168.1.8:37895',
+        state: 'device',
+        model: 'Xiaomi Mock',
+        wireless: true,
+        connected: true,
+        stored: true,
+      },
+      {
+        serial: '192.168.1.20:40117',
+        state: 'device',
+        model: 'Tablet Mock',
+        wireless: true,
+        connected: true,
+        stored: true,
+      },
+    ],
+  }),
   'remove-wireless': () => ({
     success: true,
   }),

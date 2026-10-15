@@ -159,7 +159,11 @@ export const ensureWirelessConnected = async ({
   }
   const parsed = parseAddress(serial);
   if (!parsed) {
-    return { ok: false, message: attempt.message || buildConnectFailMessage(serial, attempt) };
+    return {
+      ok: false,
+      authError: Boolean(attempt.authError),
+      message: attempt.message || buildConnectFailMessage(serial, attempt),
+    };
   }
   const connected = await connectDiscovered({
     adb, adbPath, ip: parsed.ip, excludeSerials: [serial], scan,
@@ -167,7 +171,11 @@ export const ensureWirelessConnected = async ({
   if (connected) {
     return { ok: true, serial: connected, portChanged: true };
   }
-  return { ok: false, message: buildConnectFailMessage(serial, attempt) };
+  return {
+    ok: false,
+    authError: Boolean(attempt.authError),
+    message: buildConnectFailMessage(serial, attempt),
+  };
 };
 
 /**

@@ -149,16 +149,34 @@ const ipcHandlers = defineIpcHandlers([
     handler: () => async ({ address, pairingCode }) => {
       const parsed = wirelessModule.parseAddress(address);
       if (!parsed) {
-        return { success: false, message: '地址无效，请填写手机配对页面显示的 IP:端口' };
+        return { success: false, message: '地址无效，请填写手机无线调试页面显示的 IP:端口' };
       }
-      if (!/^\d{6}$/.test(String(pairingCode ?? '').trim())) {
-        return { success: false, message: '配对码应为 6 位数字' };
-      }
+      const pairingCodeValue = String(pairingCode ?? '').trim();
       const adbPath = getAdbPath();
+      // 配对码留空：设备应已与本机配对，跳过配对直接连接
+      if (!pairingCodeValue) {
+        const ensured = await wirelessModule.ensureWirelessConnected({
+          serial: wirelessModule.formatAddress(parsed),
+          adbPath,
+          adb: adbModule,
+        });
+        if (!ensured.ok) {
+          return {
+            success: false,
+            message: ensured.authError
+              ? '设备未与本机配对或配对已失效，请填写配对码重新配对'
+              : `连接失败：${ensured.message}`,
+          };
+        }
+        return storeWirelessConnection(ensured.serial);
+      }
+      if (!/^\d{6}$/.test(pairingCodeValue)) {
+        return { success: false, message: '配对码应为 6 位数字；已配对设备可将配对码留空直接连接' };
+      }
       const knownSerials = (await adbModule.listDevices(adbPath).catch(() => []))
         .map((device) => device.serial);
       try {
-        await adbModule.pairDevice(adbPath, wirelessModule.formatAddress(parsed), pairingCode.trim());
+        await adbModule.pairDevice(adbPath, wirelessModule.formatAddress(parsed), pairingCodeValue);
       } catch (e) {
         return { success: false, message: `配对失败：${e.message}` };
       }
@@ -173,6 +191,27 @@ const ipcHandlers = defineIpcHandlers([
         return { success: false, message: `配对成功，但连接失败：${connected.message}` };
       }
       return storeWirelessConnection(connected.serial);
+    },
+  },
+  {
+    type: 'connect-wireless',
+    handler: () => async ({ serial }) => {
+      if (!wirelessModule.isWirelessSerial(serial)) {
+        return { success: false, message: '仅无线设备需要手动连接' };
+      }
+      try {
+        const ensured = await wirelessModule.ensureWirelessConnected({
+          serial,
+          adbPath: getAdbPath(),
+          adb: adbModule,
+        });
+        if (!ensured.ok) {
+          return { success: false, message: ensured.message };
+        }
+        return storeWirelessConnection(ensured.serial);
+      } catch (e) {
+        return { success: false, message: `连接失败: ${e.message}` };
+      }
     },
   },
   {
