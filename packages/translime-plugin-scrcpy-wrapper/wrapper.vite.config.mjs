@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,14 +12,18 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const stripCrossoriginPlugin = () => ({
   name: 'strip-crossorigin',
   closeBundle() {
-    const htmlPath = path.resolve(dirname, 'dist/wrapper.html');
-    writeFileSync(htmlPath, readFileSync(htmlPath, 'utf8').replace(/ crossorigin(="")?/g, ''));
+    ['mirror.html', 'virtual.html', 'wrapper.html'].forEach((file) => {
+      const htmlPath = path.resolve(dirname, 'dist', file);
+      if (existsSync(htmlPath)) {
+        writeFileSync(htmlPath, readFileSync(htmlPath, 'utf8').replace(/ crossorigin(="")?/g, ''));
+      }
+    });
   },
 });
 
 /**
- * 画面窗口（wrapper）构建：
- * 默认模式产出 wrapper.html + wrapper.js（vue / mde-vue 经 importmap external），
+ * 画面窗口构建：
+ * 默认模式产出 mirror.html + virtual.html 及对应 JS/CSS，
  * preload 模式产出 wrapper-preload.cjs.js
  */
 export default defineConfig(({ mode }) => {
@@ -43,7 +47,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    root: path.resolve(dirname, 'src/ui/wrapper'),
+    root: path.resolve(dirname, 'src/ui'),
     base: './',
     plugins: [vue(), tailwindcss(), stripCrossoriginPlugin()],
     build: {
@@ -51,7 +55,8 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: false,
       rolldownOptions: {
         input: {
-          wrapper: path.resolve(dirname, 'src/ui/wrapper/wrapper.html'),
+          mirror: path.resolve(dirname, 'src/ui/mirror.html'),
+          virtual: path.resolve(dirname, 'src/ui/virtual.html'),
         },
         external: ['vue', 'mde-vue'],
         output: {

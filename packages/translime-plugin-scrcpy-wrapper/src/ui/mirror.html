@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scrcpy</title>
+  <!-- 先于 mde.css 确立完整层序：mde.css 首次加载会抢占层序首声明位置 -->
+  <style>
+    @layer tailwind-theme, tailwind-reset, mde, tailwind-utilities, mde-final;
+  </style>
+  <link rel="stylesheet" href="app://./libs/mde/mde.css" data-translime-mde-css="true">
+  <script type="importmap">
+  {
+    "imports": {
+      "vue": "app://./libs/vue/vue.esm-browser.js",
+      "mde-vue": "app://./libs/mde/mde.esm.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./mirror/mirror-main.js"></script>
+</body>
+</html>

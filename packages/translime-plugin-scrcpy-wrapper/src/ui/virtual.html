@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scrcpy</title>
-  <!-- 先于 mde.css 确立完整层序：mde.css 首次加载会抢占层序首声明位置 -->
   <style>
     @layer tailwind-theme, tailwind-reset, mde, tailwind-utilities, mde-final;
   </style>
@@ -18,8 +17,8 @@
   }
   </script>
 </head>
-<body>
+<body class="bg-black text-white">
   <div id="app"></div>
-  <script type="module" src="./wrapper-main.js"></script>
+  <script type="module" src="./virtual/virtual-main.js"></script>
 </body>
 </html>

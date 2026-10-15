@@ -55,6 +55,7 @@ export function getMdeRuntimeUrls(options = {}) {
     mdeCss: normalize('libs/mde/mde.css'),
     mdeTailwindCss: normalize('libs/mde/mde-tailwind.css'),
     bootstrapJs: normalize('libs/mde/bootstrap.js'),
+    font: normalize('libs/fonts/MaterialSymbol.woff2'),
   };
 }
 
@@ -96,7 +97,9 @@ ${importMap}
  * @returns {import('electron').WebContents|null}
  */
 const resolveWebContents = (target) => {
-  if (!target) return null;
+  if (!target) {
+    return null;
+  }
   if (typeof target.insertCSS === 'function' && typeof target.executeJavaScript === 'function') {
     return target;
   }
@@ -154,7 +157,9 @@ export function setupMdeWindow(winOrWebContents, options = {}) {
   };
 
   const applyTheme = async () => {
-    if (isDestroyed || webContents.isDestroyed()) return;
+    if (isDestroyed || webContents.isDestroyed()) {
+      return;
+    }
     try {
       const themeCss = getThemeCss();
       // 如果已有上次插入的 key，先移除再插入，避免规则重复堆积
@@ -166,16 +171,21 @@ export function setupMdeWindow(winOrWebContents, options = {}) {
         }
       }
       lastInsertedThemeKey = await webContents.insertCSS(themeCss);
+      if (!webContents.isDestroyed()) {
+        webContents.send('translime:theme-updated', { css: themeCss });
+      }
     } catch {
       // 窗口可能正在跳转或关闭，静默捕获
     }
   };
 
   const onDomReady = async () => {
-    if (isDestroyed || webContents.isDestroyed()) return;
+    if (isDestroyed || webContents.isDestroyed()) {
+      return;
+    }
 
     if (injectCss) {
-      // 注入基础样式链接或类库样式
+      // 注入基础样式链接或类库样式与统一图标字体
       try {
         const urls = getMdeRuntimeUrls(options);
         await webContents.executeJavaScript(`
@@ -187,6 +197,34 @@ export function setupMdeWindow(winOrWebContents, options = {}) {
             document.head.appendChild(link);
           }
         `).catch(() => {});
+        const fontCss = `
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  src: url('${urls.font}') format('woff2');
+}
+:root {
+  --mat-ref-typeface-icon: 'Material Symbols Outlined';
+}
+.material-icons, .mat-icon, .material-symbols-outlined {
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+`;
+        await webContents.insertCSS(fontCss).catch(() => {});
       } catch {
         // ignore
       }
@@ -212,13 +250,26 @@ export function setupMdeWindow(winOrWebContents, options = {}) {
 
   webContents.on('dom-ready', onDomReady);
 
-  // 监听主题变更
+  // 监听系统主题及宿主主题色变更
   let themeHandler = null;
-  if (syncTheme && nativeTheme) {
-    themeHandler = () => {
-      applyTheme();
-    };
-    nativeTheme.on('updated', themeHandler);
+  let unsubscribeThemeColor = null;
+  let unsubscribeTheme = null;
+  if (syncTheme) {
+    if (nativeTheme) {
+      themeHandler = () => {
+        applyTheme();
+      };
+      nativeTheme.on('updated', themeHandler);
+    }
+    const store = getGlobalStore();
+    if (store?.config && typeof store.config.onDidChange === 'function') {
+      unsubscribeThemeColor = store.config.onDidChange('setting.themeColor', () => {
+        applyTheme();
+      });
+      unsubscribeTheme = store.config.onDidChange('setting.theme', () => {
+        applyTheme();
+      });
+    }
   }
 
   const cleanup = () => {
@@ -229,6 +280,14 @@ export function setupMdeWindow(winOrWebContents, options = {}) {
     if (themeHandler && nativeTheme) {
       nativeTheme.removeListener('updated', themeHandler);
       themeHandler = null;
+    }
+    if (typeof unsubscribeThemeColor === 'function') {
+      unsubscribeThemeColor();
+      unsubscribeThemeColor = null;
+    }
+    if (typeof unsubscribeTheme === 'function') {
+      unsubscribeTheme();
+      unsubscribeTheme = null;
     }
   };
 

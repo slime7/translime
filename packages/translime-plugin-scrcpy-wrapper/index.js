@@ -53,9 +53,31 @@ const saveStoredWirelessDevices = (list) => {
   pluginConfig.set(WIRELESS_DEVICES_KEY, list);
 };
 
+const MIRROR_SIZE_KEY = 'mirrorWindowSize';
+const getSavedMirrorSize = (serial) => {
+  const map = pluginConfig.get(MIRROR_SIZE_KEY, {}) || {};
+  return map[serial] || map.default || null;
+};
+const saveMirrorSize = (serial, size) => {
+  if (size && size.width > 0 && size.height > 0) {
+    const map = pluginConfig.get(MIRROR_SIZE_KEY, {}) || {};
+    map[serial] = size;
+    map.default = size;
+    pluginConfig.set(MIRROR_SIZE_KEY, map);
+  }
+};
+
 const listMergedDevices = async () => {
-  const devices = await adbModule.listDevices(getAdbPath());
-  return wirelessModule.mergeWirelessDevices(devices, getStoredWirelessDevices());
+  const adbPath = getAdbPath();
+  const devices = await adbModule.listDevices(adbPath);
+  const devicesWithInfo = await Promise.all(devices.map(async (device) => {
+    if (device.state === 'device') {
+      const resolution = await adbModule.getDeviceResolution(adbPath, device.serial);
+      return { ...device, resolution };
+    }
+    return device;
+  }));
+  return wirelessModule.mergeWirelessDevices(devicesWithInfo, getStoredWirelessDevices());
 };
 
 /**
@@ -190,7 +212,12 @@ const ipcHandlers = defineIpcHandlers([
   },
   {
     type: 'launch',
-    handler: () => async ({ mode, serial, pkg }) => {
+    handler: () => async ({
+      mode,
+      serial,
+      pkg,
+      resolution,
+    }) => {
       try {
         let actualSerial = serial;
         if (wirelessModule.isWirelessSerial(actualSerial)) {
@@ -218,6 +245,9 @@ const ipcHandlers = defineIpcHandlers([
           mode,
           serial: actualSerial,
           pkg,
+          resolution,
+          savedSize: mode === 'mirror' ? getSavedMirrorSize(actualSerial) : null,
+          onSaveMirrorSize: (size) => saveMirrorSize(actualSerial, size),
           settingValue: getScrcpySetting(),
           logger,
         });
@@ -240,8 +270,62 @@ const ipcHandlers = defineIpcHandlers([
         return { success: false, message: '会话不存在或已关闭' };
       }
       try {
-        await adbModule.sendKeyEvent(session.adbPath, session.serial, keycode);
+        await adbModule.sendKeyEvent(session.adbPath, session.serial, keycode, {
+          displayId: session.mode === 'mirror' ? 0 : null,
+        });
         return { success: true };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'open-in-new-window',
+    handler: () => async (sessionId) => {
+      const session = scrcpyModule.getSession(sessionId);
+      if (!session) {
+        return { success: false, message: '会话不存在或已关闭' };
+      }
+      let inheritedContentSize = null;
+      if (session.win && !session.win.isDestroyed()) {
+        const [w, h] = session.win.getContentSize();
+        inheritedContentSize = { width: w, height: h };
+      }
+      let targetPkg = session.pkg;
+      if (!targetPkg) {
+        targetPkg = await adbModule.getForegroundApp(session.adbPath, session.serial, {
+          defaultLauncher: session.defaultLauncher,
+        });
+      }
+      if (!targetPkg) {
+        return { success: false, message: '前台无运行中的应用' };
+      }
+      try {
+        const result = await scrcpyModule.launchSession({
+          mode: 'virtual',
+          serial: session.serial,
+          pkg: targetPkg,
+          inheritedContentSize,
+          settingValue: getScrcpySetting(),
+          logger,
+        });
+        return { success: true, pkg: targetPkg, ...result };
+      } catch (e) {
+        logger.error(`[${id}] open in new window failed: ${e.message}`);
+        return { success: false, message: e.message };
+      }
+    },
+  },
+  {
+    type: 'toggle-screen',
+    handler: () => async (sessionId) => {
+      const session = scrcpyModule.getSession(sessionId);
+      if (!session) {
+        return { success: false, message: '会话不存在或已关闭' };
+      }
+      try {
+        const result = await adbModule.toggleScreen(session.adbPath, session.serial);
+        return { success: true, ...result };
       } catch (e) {
         return { success: false, message: e.message };
       }

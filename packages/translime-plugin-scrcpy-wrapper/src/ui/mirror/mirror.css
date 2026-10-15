@@ -1,0 +1,42 @@
+@import 'tailwindcss/theme.css' layer(tailwind-theme);
+@import 'tailwindcss/preflight.css' layer(tailwind-reset);
+@import 'tailwindcss/utilities.css' layer(tailwind-utilities);
+
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  src:
+    url('http://localhost:5173/libs/fonts/MaterialSymbol.woff2') format('woff2'),
+    url('app://./libs/fonts/MaterialSymbol.woff2') format('woff2');
+}
+
+.material-icons,
+.mat-icon,
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined' !important;
+  font-feature-settings: 'liga' !important;
+}
+
+.window-card-bg {
+  background-color: var(--mat-sys-color-background) !important;
+  border-radius: var(--mat-sys-shape-corner-extra-large, 28px);
+  box-shadow: var(--mat-sys-elevation-level2);
+}
+
+.window-drag-region {
+  -webkit-app-region: drag !important;
+  app-region: drag !important;
+}
+
+.window-no-drag,
+.window-no-drag *,
+mat-toolbar,
+mat-toolbar *,
+button,
+mat-btn {
+  -webkit-app-region: no-drag !important;
+  app-region: no-drag !important;
+}
+
+

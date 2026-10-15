@@ -36,7 +36,10 @@ export default (scheme) => {
       }
 
       try {
-        const filePath = path.join(dir, '../renderer', pathName);
+        let filePath = path.join(dir, '../renderer', pathName);
+        if (!existsSync(filePath) && pathName === '/libs/fonts/MaterialSymbol.woff2') {
+          filePath = path.join(dir, '../renderer/assets/fonts/material icons/MaterialSymbol.woff2');
+        }
         if (!existsSync(filePath)) {
           throw new Error(`File not found: ${filePath}`);
         }
@@ -57,6 +60,12 @@ export default (scheme) => {
           mimeType = 'application/json';
         } else if (extension === '.wasm') {
           mimeType = 'application/wasm';
+        } else if (extension === '.woff2') {
+          mimeType = 'font/woff2';
+        } else if (extension === '.woff') {
+          mimeType = 'font/woff';
+        } else if (extension === '.ttf') {
+          mimeType = 'font/ttf';
         }
 
         return new Response(

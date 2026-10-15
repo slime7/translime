@@ -306,10 +306,22 @@ const launch = async (mode, pkg = null) => {
   if (!serial.value || launching.value) {
     return;
   }
+  const currentDevice = devices.value.find((d) => d.serial === serial.value);
+  const rawResolution = currentDevice?.resolution
+    ? {
+      width: Number(currentDevice.resolution.width),
+      height: Number(currentDevice.resolution.height),
+    }
+    : null;
   launching.value = true;
   error.value = '';
   try {
-    const result = await ipc.invoke('launch', { mode, serial: serial.value, pkg });
+    const result = await ipc.invoke('launch', {
+      mode,
+      serial: serial.value,
+      pkg,
+      resolution: rawResolution,
+    });
     if (!result?.success) {
       throw new Error(result?.message || '启动失败');
     }

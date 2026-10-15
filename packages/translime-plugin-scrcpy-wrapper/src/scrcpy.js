@@ -1,22 +1,35 @@
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { BrowserWindow, session as electronSession, screen } from 'electron';
+import {
+  BrowserWindow,
+  session as electronSession,
+  ipcMain,
+  screen,
+} from 'electron';
 import { setupMdeWindow } from 'translime-sdk';
 import {
   captureWindowPixels,
   ensureChildOnTop,
   findWindowByTitle,
+  getCursorPosInClient,
   lowerWindowBelowSiblings,
   mountSdlToElectron,
   setupResizeSync,
   windowPixelsToDataUrl,
 } from './win32';
 import createCatchUpMonitor from './catch-up-monitor';
-import { getDeviceResolution } from './adb';
+import {
+  adbExec,
+  getDefaultLauncherPackage,
+  getDeviceResolution,
+  getForegroundApp,
+  launchApp,
+} from './adb';
 import { resolveAdbPath, resolveScrcpyPath } from './bin-resolver';
 import { buildScrcpyArgs, nextWindowTitle } from './scrcpy-args';
-import computeWindowSize from './window-size';
+import { calculateProportionalSize, computeWindowSize } from './window-size';
+import { isChromeRevealed } from './chrome-reveal';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,23 +37,76 @@ const PLUGIN_ID = 'translime-plugin-scrcpy-wrapper';
 // 冻结帧通知通道（webContents.send，非 ipc.invoke，命名仍带插件 ID 便于区分）
 const FREEZE_CHANNEL = `scrcpy-freeze@${PLUGIN_ID}`;
 const UNFREEZE_CHANNEL = `scrcpy-unfreeze@${PLUGIN_ID}`;
+const CHROME_VISIBLE_CHANNEL = `scrcpy-chrome-visible@${PLUGIN_ID}`;
+const FOREGROUND_APP_CHANNEL = `scrcpy-foreground-app@${PLUGIN_ID}`;
+const SDL_RECT_CHANNEL = `scrcpy-sdl-rect@${PLUGIN_ID}`;
+const WINDOW_CONTROL_CHANNEL = `scrcpy-window-control@${PLUGIN_ID}`;
 
-// 画面窗口底部控制条的 CSS 高度，需与 wrapper-app.vue 的底条高度保持一致
-export const BAR_CSS_HEIGHT = 48;
-// 画面窗口顶部自绘标题栏的 CSS 高度，需与 wrapper-app.vue 的标题栏及
-// titleBarOverlay.height 保持一致；SDL 画面区位于标题栏与底条之间
+// 画面窗口顶部自绘标题栏 CSS 高度
 export const TITLE_BAR_CSS_HEIGHT = 32;
+// 虚拟屏无底部控制条
+export const BAR_CSS_HEIGHT = 0;
+// 画面窗口右侧垂直工具栏 CSS 宽度（mat-toolbar 浮动宽度为 88px）
+export const TOOLBAR_CSS_WIDTH = 88;
+// SDL 画面区周围 outline 边框 CSS 宽度
+export const SDL_BORDER_CSS = 8;
+// SDL 画面区内圆角 CSS 半径（20px，与 28px 外圆角扣除 8px 边框后的内圆角一致）
+export const SDL_CORNER_RADIUS_CSS = 20;
+// 留白与间距（outline 距窗口四周 16px，与右侧工具栏保持 24px 留白）
+export const CHROME_GAP_CSS = 16;
+export const TOOLBAR_GAP_CSS = 24;
 
-// 开发期 dist 产物变化后 Electron 对 file:// 子资源的缓存不会失效，
-// 给本插件 dist 的请求追加时间戳查询参数击穿缓存（file 协议读取忽略查询参数）；
-// globalThis 标记防止插件热重载后重复注册监听
+export const getChromeMetrics = (mode = 'mirror') => {
+  if (mode === 'virtual') {
+    return {
+      leftOffset: 0,
+      rightOffset: 0,
+      topOffset: TITLE_BAR_CSS_HEIGHT,
+      bottomOffset: 0,
+      chromeWidth: 0,
+      chromeHeight: TITLE_BAR_CSS_HEIGHT,
+    };
+  }
+  const leftOffset = CHROME_GAP_CSS + SDL_BORDER_CSS;
+  const rightOffset = SDL_BORDER_CSS + TOOLBAR_GAP_CSS + TOOLBAR_CSS_WIDTH + CHROME_GAP_CSS;
+  const topOffset = 12 + TITLE_BAR_CSS_HEIGHT + CHROME_GAP_CSS + SDL_BORDER_CSS;
+  const bottomOffset = CHROME_GAP_CSS + SDL_BORDER_CSS;
+  return {
+    leftOffset,
+    rightOffset,
+    topOffset,
+    bottomOffset,
+    chromeWidth: leftOffset + rightOffset,
+    chromeHeight: topOffset + bottomOffset,
+  };
+};
+
+const registerWindowControlHandler = () => {
+  if (globalThis.scrcpyWindowControlRegistered) {
+    return;
+  }
+  globalThis.scrcpyWindowControlRegistered = true;
+  ipcMain.on(WINDOW_CONTROL_CHANNEL, (event, action) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) {
+      return;
+    }
+    if (action === 'minimize') {
+      win.minimize();
+    } else if (action === 'close') {
+      win.close();
+    }
+  });
+};
+
+// 为本插件 dist 的 file 协议资源请求追加时间戳参数以绕过 Electron 本地缓存
 const bustWrapperCache = () => {
   if (globalThis.scrcpyWrapperCacheBustRegistered) {
     return;
   }
   globalThis.scrcpyWrapperCacheBustRegistered = true;
   electronSession.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-    const isWrapperAsset = /^file:\/\/.+scrcpy-wrapper\/dist\/wrapper\.(html|js|css)(\?|$)/.test(details.url);
+    const isWrapperAsset = /^file:\/\/.+scrcpy-wrapper\/dist\/(mirror|virtual|wrapper)\.(html|js|css)(\?|$)/.test(details.url);
     if (!isWrapperAsset || details.url.includes('cb=')) {
       callback({});
       return;
@@ -52,25 +118,35 @@ const bustWrapperCache = () => {
 };
 
 const sessions = new Map();
-// 会话业务键（mirror:<serial> 或 app:<serial>:<pkg>）→ sessionId
+// 会话业务键（mirror:<serial> 或 virtual:<serial>:<pkg>）→ sessionId
 const sessionKeys = new Map();
 
-const sessionKey = ({ serial, pkg }) => (pkg ? `app:${serial}:${pkg}` : `mirror:${serial}`);
+export const sessionKey = ({ serial, mode = 'mirror', pkg = null }) => (
+  mode === 'virtual' ? `virtual:${serial}:${pkg ?? 'app'}` : `mirror:${serial}`
+);
 
-const getBarPhysicalHeight = (win) => {
+export const getSessionIdByKey = (key) => sessionKeys.get(key) ?? null;
+
+const getPhysicalDims = (win, mode = 'mirror') => {
+  let scale = 1;
   try {
     const display = screen.getDisplayMatching(win.getBounds());
-    const scale = display.scaleFactor;
-    return {
-      bar: BAR_CSS_HEIGHT * scale,
-      topBar: TITLE_BAR_CSS_HEIGHT * scale,
-    };
+    scale = display.scaleFactor;
   } catch {
-    return {
-      bar: BAR_CSS_HEIGHT,
-      topBar: TITLE_BAR_CSS_HEIGHT,
-    };
+    scale = 1;
   }
+  const m = getChromeMetrics(mode);
+  return {
+    scale,
+    topBar: Math.round(TITLE_BAR_CSS_HEIGHT * scale),
+    toolbar: Math.round(TOOLBAR_CSS_WIDTH * scale),
+    border: Math.round(SDL_BORDER_CSS * scale),
+    gap: Math.round(CHROME_GAP_CSS * scale),
+    leftOffset: Math.round(m.leftOffset * scale),
+    topOffset: Math.round(m.topOffset * scale),
+    rightOffset: Math.round(m.rightOffset * scale),
+    bottomOffset: Math.round(m.bottomOffset * scale),
+  };
 };
 
 /** 生成未与存活会话或现存顶层窗口冲突的 scrcpy 窗口标题 */
@@ -93,10 +169,7 @@ const cancelCatchUp = (sessionId) => {
 };
 
 /**
- * 撤下冻结覆盖层：先把 SDL 抬回网页之上让实时画面立即可见（覆盖层是网页
- * 内容，位于 SDL 之下，SDL 抬回后覆盖层即被盖住），再通知页面释放冻结帧。
- * 抬回会与 Chromium 缩放后重新置顶网页输入子窗口竞争，短窗口内重试几次
- * 直到稳定在最上层，避免画面区在巡检兜底前露黑
+ * 撤下缩放冻结覆盖层并将 SDL 窗口置顶。
  */
 const revealFreeze = (sessionId) => {
   const session = sessions.get(sessionId);
@@ -123,19 +196,65 @@ const revealFreeze = (sessionId) => {
   session.win.webContents.send(UNFREEZE_CHANNEL);
 };
 
+const checkAndFixProportionalSize = (sessionId) => {
+  const session = sessions.get(sessionId);
+  if (!session || !session.win || session.win.isDestroyed() || !session.resolution || session.mode !== 'mirror') {
+    return;
+  }
+  const [w, h] = session.win.getContentSize();
+  const { chromeWidth, chromeHeight } = getChromeMetrics('mirror');
+  const videoW = w - chromeWidth;
+  const videoH = h - chromeHeight;
+  if (videoW <= 0 || videoH <= 0) {
+    return;
+  }
+  const ratio = session.resolution.width / session.resolution.height;
+  const currentRatio = videoW / videoH;
+  if (Math.abs(currentRatio - ratio) / ratio > 0.005) {
+    const adjusted = calculateProportionalSize({
+      targetWidth: w,
+      targetHeight: h,
+      currentWidth: w,
+      currentHeight: h,
+      ratio,
+      chromeWidth,
+      chromeHeight,
+    });
+    session.resizingProgrammatically = true;
+    try {
+      session.win.setContentSize(adjusted.width, adjusted.height);
+    } finally {
+      session.resizingProgrammatically = false;
+    }
+  }
+};
+
 /**
- * settle 收尾：镜像模式只在本机重缩放 SDL，画面一帧内跟上，立即撤下；
- * 虚拟屏需设备端按新分辨率重建编码器，等 SDL 内容更新后再撤下——覆盖下
- * 抓帧可靠时逐帧比对（内容相对基线变化即画面跟上），不可靠时按时限兜底
+ * 窗口调整结束后的状态收尾与冻结层撤下。
  */
 const settleResize = (sessionId) => {
   const session = sessions.get(sessionId);
-  if (!session || !session.freezeActive) {
+  if (!session) {
     return;
   }
+  if (session.mode === 'mirror' && session.win && !session.win.isDestroyed()) {
+    const [w, h] = session.win.getContentSize();
+    session.onSaveMirrorSize?.({ width: w, height: h });
+  }
+  if (!session.freezeActive) {
+    return;
+  }
+  checkAndFixProportionalSize(sessionId);
   if (session.mode !== 'virtual') {
     revealFreeze(sessionId);
     return;
+  }
+  // 重新应用虚拟屏沉浸模式
+  if (session.pkg) {
+    adbExec(session.adbPath, [
+      '-s', session.serial, 'shell', 'settings', 'put', 'global', 'policy_control',
+      `immersive.full=${session.pkg}`,
+    ]).catch(() => {});
   }
   session.catchUp = createCatchUpMonitor({
     mode: session.captureReliable ? 'diff' : 'timed',
@@ -146,14 +265,7 @@ const settleResize = (sessionId) => {
 };
 
 /**
- * 拖动调整窗口尺寸期间冻结画面：抓取当前 SDL 帧，把 SDL 压到网页之下，
- * 通知页面显示拉伸 + blur 的冻结帧覆盖层（覆盖层是网页内容，层级在
- * 原生子窗口之下，覆盖期间 SDL 必须位于其下；压低而非隐藏，SDL 保持
- * 渲染推流，settle 后才有新内容可比对）。
- *
- * 压低后立即复测一次：两次抓帧间隔极短，画面来不及变化，仍读到一致像素
- * 说明覆盖下 PrintWindow 读到的仍是 SDL 自身内容，settle 后的内容比对
- * 才可信；读到覆盖像素或失败时，收尾退化为按时限撤下
+ * 调整尺寸开始时抓取当前帧作为过渡背景并下推 SDL。
  */
 const startResizeFreeze = (sessionId) => {
   const session = sessions.get(sessionId);
@@ -172,7 +284,11 @@ const startResizeFreeze = (sessionId) => {
   session.win.webContents.send(FREEZE_CHANNEL, windowPixelsToDataUrl(before));
 };
 
-const createWrapperWindow = ({ title, sessionId, contentSize }) => {
+const createWrapperWindow = ({
+  title, sessionId, contentSize, mode = 'mirror',
+}) => {
+  registerWindowControlHandler();
+  const isMirror = mode === 'mirror';
   const win = new BrowserWindow({
     // useContentSize 让宽高只描述网页内容区，画面区按设备比例精确铺满
     useContentSize: true,
@@ -181,12 +297,14 @@ const createWrapperWindow = ({ title, sessionId, contentSize }) => {
     minWidth: 200,
     minHeight: 240,
     resizable: true,
-    backgroundColor: '#000000',
+    frame: false,
+    transparent: isMirror,
+    shadow: !isMirror,
+    backgroundColor: isMirror ? '#00000000' : '#000000',
     title,
     show: true,
-    // 自绘标题栏 + 窗口控制栏覆盖（同宿主主窗口）：页面顶部为可拖动标题栏，
-    // 右上角保留系统最小化/最大化/关闭按钮
-    ...(process.platform === 'win32'
+    maximizable: !isMirror,
+    ...(!isMirror && process.platform === 'win32'
       ? {
         titleBarStyle: 'hidden',
         titleBarOverlay: {
@@ -220,23 +338,21 @@ const createWrapperWindow = ({ title, sessionId, contentSize }) => {
       win.webContents.closeDevTools();
       return;
     }
-    // detached：画面区被原生 SDL 子窗口覆盖，停靠模式会被其遮挡
     win.webContents.openDevTools({ mode: 'detach' });
   });
-  // 不启用 bootstrap：它会在页面内再装一套默认（跟随系统）主题控制器，覆盖本窗口的固定深色主题
   setupMdeWindow(win, { injectTheme: true, syncTheme: true });
-  // 页面 <title> 会覆盖窗口标题，固定保持会话专属标题供任务栏与 FindWindowW 识别
+  // 保持会话标题供任务栏与 FindWindowW 识别
   win.on('page-title-updated', (event) => {
     event.preventDefault();
   });
-  win.loadFile(path.join(dirname, 'wrapper.html'), { query: { session: sessionId, title } });
+  const htmlFile = isMirror ? 'mirror.html' : 'virtual.html';
+  win.loadFile(path.join(dirname, htmlFile), { query: { session: sessionId, title } });
   return win;
 };
 
 const waitForScrcpyWindow = (title, options = {}) => {
   const { intervalMs = 100, timeoutMs = 15000, shouldAbort } = options;
   return new Promise((resolve, reject) => {
-    // 先同步校验一次 koffi 绑定可用性，失败立即返回而不是在轮询中抛出
     try {
       findWindowByTitle(title);
     } catch (e) {
@@ -280,6 +396,10 @@ const destroySession = (sessionId) => {
   if (!session) {
     return;
   }
+  if (session.cursorTimer) {
+    clearInterval(session.cursorTimer);
+    session.cursorTimer = null;
+  }
   cancelCatchUp(sessionId);
   sessions.delete(sessionId);
   if (session.key && sessionKeys.get(session.key) === sessionId) {
@@ -288,6 +408,11 @@ const destroySession = (sessionId) => {
   if (session.hooks) {
     session.hooks.destroy();
   }
+  if (session.mode === 'virtual' && session.pkg) {
+    adbExec(session.adbPath, [
+      '-s', session.serial, 'shell', 'settings', 'put', 'global', 'policy_control', 'null',
+    ]).catch(() => {});
+  }
   const { proc } = session;
   if (proc.exitCode === null && !session.spawnError) {
     killProcessTree(proc);
@@ -295,16 +420,17 @@ const destroySession = (sessionId) => {
 };
 
 /**
- * 启动一个 scrcpy 会话：spawn 进程、创建 wrapper 窗口、等待并挂载 SDL 窗口。
- *
- * 同一设备的镜像会话与同一应用（任意模式）的会话各自只保留一个窗口，
- * 重复启动改为唤起已有窗口
+ * 启动 scrcpy 会话并挂载画面至 wrapper 窗口。
  */
 export const launchSession = async (options = {}) => {
   const {
     mode = 'mirror',
     serial,
     pkg = null,
+    resolution: passedResolution = null,
+    savedSize = null,
+    inheritedContentSize = null,
+    onSaveMirrorSize = null,
     settingValue = null,
     logger = console,
   } = options;
@@ -312,7 +438,9 @@ export const launchSession = async (options = {}) => {
     throw new Error('缺少设备 serial');
   }
 
-  const key = sessionKey({ serial, pkg });
+  const scrcpyInfo = resolveScrcpyPath({ settingValue });
+  const adbPath = resolveAdbPath({ scrcpyResolved: scrcpyInfo.resolved });
+  const key = sessionKey({ serial, mode, pkg });
   const existingId = sessionKeys.get(key);
   if (existingId) {
     const existing = sessions.get(existingId);
@@ -321,47 +449,83 @@ export const launchSession = async (options = {}) => {
         existing.win.restore();
       }
       existing.win.focus();
+      if (mode === 'mirror' && pkg) {
+        await launchApp(adbPath, serial, pkg).catch((e) => {
+          logger.warn(`[scrcpy] 启动应用失败: ${e.message}`);
+        });
+      }
       return { sessionId: existingId, title: existing.title, reused: true };
     }
   }
 
-  const scrcpyInfo = resolveScrcpyPath({ settingValue });
-  const adbPath = resolveAdbPath({ scrcpyResolved: scrcpyInfo.resolved });
+  if (mode === 'mirror' && pkg) {
+    await launchApp(adbPath, serial, pkg).catch((e) => {
+      logger.warn(`[scrcpy] 启动应用失败: ${e.message}`);
+    });
+  }
+
   const title = nextUniqueTitle();
   const sessionId = `session-${title}`;
 
-  // 弹出时按设备分辨率与鼠标所在显示器的工作区计算初始窗口尺寸，画面等比铺满
   bustWrapperCache();
-  const resolution = await getDeviceResolution(adbPath, serial);
+  const resolution = (passedResolution && passedResolution.width > 0 && passedResolution.height > 0)
+    ? passedResolution
+    : await getDeviceResolution(adbPath, serial);
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  const contentSize = computeWindowSize({
-    resolution,
-    workArea: {
-      width: display.workArea.width,
-      height: display.workArea.height - BAR_CSS_HEIGHT - TITLE_BAR_CSS_HEIGHT,
-    },
-    barCssHeight: BAR_CSS_HEIGHT,
-    titleBarCssHeight: TITLE_BAR_CSS_HEIGHT,
-  });
+  const { chromeWidth, chromeHeight } = getChromeMetrics(mode);
+
+  let contentSize;
+  if (mode === 'virtual' && inheritedContentSize && inheritedContentSize.width > 0 && inheritedContentSize.height > 0) {
+    contentSize = {
+      width: Math.min(inheritedContentSize.width, display.workArea.width - 32),
+      height: Math.min(inheritedContentSize.height, display.workArea.height - 32),
+    };
+  } else if (mode === 'mirror' && savedSize && savedSize.width > 0 && savedSize.height > 0) {
+    const maxW = display.workArea.width - 64;
+    const maxH = display.workArea.height - 64;
+    contentSize = {
+      width: Math.min(savedSize.width, maxW),
+      height: Math.min(savedSize.height, maxH),
+    };
+  } else {
+    contentSize = computeWindowSize({
+      resolution,
+      workArea: {
+        width: display.workArea.width,
+        height: display.workArea.height,
+      },
+      toolbarCssWidth: mode === 'mirror' ? TOOLBAR_CSS_WIDTH : 0,
+      titleBarCssHeight: TITLE_BAR_CSS_HEIGHT,
+      borderCss: mode === 'mirror' ? SDL_BORDER_CSS : 0,
+      gapCss: mode === 'mirror' ? CHROME_GAP_CSS : 0,
+      barCssHeight: mode === 'virtual' ? BAR_CSS_HEIGHT : 0,
+    });
+  }
 
   const args = buildScrcpyArgs({
     mode,
     serial,
     pkg,
     title,
-    // 虚拟屏以画面区物理分辨率创建并开启 flex-display，分辨率连续跟随窗口
     virtualDisplaySize: mode === 'virtual'
       ? {
-        width: Math.max(1, Math.round(contentSize.width * display.scaleFactor)),
+        width: Math.max(1, Math.round(
+          (contentSize.width - chromeWidth) * display.scaleFactor,
+        )),
         height: Math.max(1, Math.round(
-          (contentSize.height - BAR_CSS_HEIGHT - TITLE_BAR_CSS_HEIGHT) * display.scaleFactor,
+          (contentSize.height - chromeHeight) * display.scaleFactor,
         )),
       }
       : null,
   });
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
 
-  // scrcpy 与本插件使用同一个 adb，避免两个版本的 adb server 相互踢下线
+  if (mode === 'virtual' && pkg) {
+    adbExec(adbPath, ['-s', serial, 'shell', 'settings', 'put', 'global', 'policy_control', `immersive.full=${pkg}`]).catch((e) => {
+      logger.warn(`[scrcpy] 设置应用沉浸模式失败: ${e.message}`);
+    });
+  }
+
   const env = { ...process.env };
   if (scrcpyInfo.resolved && adbPath !== 'adb') {
     env.ADB = adbPath;
@@ -372,7 +536,9 @@ export const launchSession = async (options = {}) => {
     stdio: ['ignore', 'pipe', 'pipe'],
     env,
   });
-  const win = createWrapperWindow({ title: wrapperTitle, sessionId, contentSize });
+  const win = createWrapperWindow({
+    title: wrapperTitle, sessionId, contentSize, mode,
+  });
   const session = {
     id: sessionId,
     key,
@@ -384,14 +550,120 @@ export const launchSession = async (options = {}) => {
     win,
     adbPath,
     resolution,
+    defaultLauncher: null,
+    onSaveMirrorSize,
     hooks: null,
     freezeActive: false,
     captureReliable: false,
     catchUp: null,
     spawnError: null,
+    cursorTimer: null,
+    resizingProgrammatically: false,
   };
   sessions.set(sessionId, session);
   sessionKeys.set(key, sessionId);
+
+  if (mode === 'mirror') {
+    getDefaultLauncherPackage(adbPath, serial).then((launcherPkg) => {
+      session.defaultLauncher = launcherPkg;
+      getForegroundApp(adbPath, serial, { defaultLauncher: launcherPkg }).then((appPkg) => {
+        if (!win.isDestroyed()) {
+          win.webContents.send(FOREGROUND_APP_CHANNEL, {
+            hasApp: Boolean(appPkg),
+            pkg: appPkg,
+          });
+        }
+      }).catch(() => {});
+    }).catch(() => {});
+
+    // 镜像缩放期间按 SDL 画面比例锁定窗口比例
+    win.on('will-resize', (event, newBounds, details) => {
+      if (session.resizingProgrammatically) {
+        return;
+      }
+      const ratio = session.resolution && session.resolution.width > 0 && session.resolution.height > 0
+        ? session.resolution.width / session.resolution.height
+        : null;
+      if (!ratio) {
+        return;
+      }
+      const [currentWidth, currentHeight] = win.getContentSize();
+      const adjusted = calculateProportionalSize({
+        targetWidth: newBounds.width,
+        targetHeight: newBounds.height,
+        currentWidth,
+        currentHeight,
+        ratio,
+        chromeWidth,
+        chromeHeight,
+        edge: details?.edge,
+      });
+      if (adjusted.width !== newBounds.width || adjusted.height !== newBounds.height) {
+        event.preventDefault();
+        session.resizingProgrammatically = true;
+        try {
+          win.setContentSize(adjusted.width, adjusted.height);
+        } finally {
+          session.resizingProgrammatically = false;
+        }
+      }
+    });
+
+    // 监听鼠标位置控制标题栏与工具栏显隐
+    let chromeRevealed = true;
+    const initialGraceEnd = Date.now() + 4000;
+    session.cursorTimer = setInterval(() => {
+      if (win.isDestroyed()) {
+        if (session.cursorTimer) {
+          clearInterval(session.cursorTimer);
+          session.cursorTimer = null;
+        }
+        return;
+      }
+      const now = Date.now();
+      if (now < initialGraceEnd) {
+        if (!chromeRevealed) {
+          chromeRevealed = true;
+          win.webContents.send(CHROME_VISIBLE_CHANNEL, true);
+        }
+        return;
+      }
+      const pt = getCursorPosInClient(win);
+      if (!pt) {
+        if (chromeRevealed) {
+          chromeRevealed = false;
+          win.webContents.send(CHROME_VISIBLE_CHANNEL, false);
+        }
+        return;
+      }
+      const [w, h] = win.getContentSize();
+      const dims = getPhysicalDims(win, mode);
+      const cssX = pt.x / dims.scale;
+      const cssY = pt.y / dims.scale;
+      const nextRevealed = isChromeRevealed({
+        x: cssX,
+        y: cssY,
+        width: w,
+        height: h,
+        topThreshold: 12 + TITLE_BAR_CSS_HEIGHT + CHROME_GAP_CSS + 24,
+        rightThreshold: TOOLBAR_CSS_WIDTH + TOOLBAR_GAP_CSS + 24,
+      });
+      if (nextRevealed !== chromeRevealed) {
+        chromeRevealed = nextRevealed;
+        win.webContents.send(CHROME_VISIBLE_CHANNEL, nextRevealed);
+      }
+      if (nextRevealed) {
+        getForegroundApp(adbPath, serial, { defaultLauncher: session.defaultLauncher }).then((appPkg) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send(FOREGROUND_APP_CHANNEL, {
+              hasApp: Boolean(appPkg),
+              pkg: appPkg,
+            });
+          }
+        }).catch(() => {});
+      }
+    }, 180);
+  }
 
   let winClosed = false;
   win.on('closed', () => {
@@ -421,21 +693,37 @@ export const launchSession = async (options = {}) => {
       shouldAbort: () => proc.exitCode !== null || session.spawnError !== null,
     });
     session.hwnd = hwnd;
-    // 镜像模式按设备分辨率等比缩放（letterbox）；虚拟屏分辨率随窗口，铺满
     const aspect = mode === 'mirror' ? resolution : null;
-    const barHeights = getBarPhysicalHeight(win);
+    const dims = getPhysicalDims(win, mode);
+    const sendRect = (rect) => {
+      if (!win.isDestroyed()) {
+        win.webContents.send(SDL_RECT_CHANNEL, rect);
+      }
+    };
     await mountSdlToElectron(win, hwnd, {
-      barPhysicalHeight: barHeights.bar,
-      topBarPhysicalHeight: barHeights.topBar,
+      leftOffsetPhysical: dims.leftOffset,
+      topOffsetPhysical: dims.topOffset,
+      rightOffsetPhysical: dims.rightOffset,
+      bottomOffsetPhysical: dims.bottomOffset,
+      borderPhysical: dims.border,
+      cornerRadiusCss: mode === 'mirror' ? SDL_CORNER_RADIUS_CSS : 0,
+      scaleFactor: dims.scale,
       aspect,
+      onRect: sendRect,
     });
     session.hooks = setupResizeSync(win, hwnd, {
-      getBarPhysicalHeight: () => getBarPhysicalHeight(win).bar,
-      getTopBarPhysicalHeight: () => getBarPhysicalHeight(win).topBar,
+      getLeftOffsetPhysical: () => getPhysicalDims(win, mode).leftOffset,
+      getTopOffsetPhysical: () => getPhysicalDims(win, mode).topOffset,
+      getRightOffsetPhysical: () => getPhysicalDims(win, mode).rightOffset,
+      getBottomOffsetPhysical: () => getPhysicalDims(win, mode).bottomOffset,
+      getBorderPhysical: () => getPhysicalDims(win, mode).border,
+      getCornerRadiusCss: () => (mode === 'mirror' ? SDL_CORNER_RADIUS_CSS : 0),
+      getScaleFactor: () => getPhysicalDims(win, mode).scale,
       getAspect: () => (mode === 'mirror' ? session.resolution : null),
       isFrozen: () => session.freezeActive,
       onResizeBurstStart: () => startResizeFreeze(sessionId),
       onResizeSettled: () => settleResize(sessionId),
+      onRect: sendRect,
     });
     return { sessionId, title };
   } catch (e) {
