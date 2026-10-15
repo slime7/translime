@@ -2,9 +2,34 @@
   <mat-app-root class="wrapper-root">
     <!-- 高度用 100dvh：app-root 内容层高度为 auto，百分比高度链在此不通 -->
     <div class="flex h-dvh flex-col">
-      <!-- 画面接入前占位；接入后该区域被原生 SDL 子窗口覆盖 -->
-      <div class="flex min-h-0 grow items-center justify-center">
-        <span class="text-sm text-white/50">等待画面接入…</span>
+      <!-- 自绘标题栏：高度 32px（h-8）与主进程 TITLE_BAR_CSS_HEIGHT 及
+           titleBarOverlay.height 一致，整条可拖动，右上角为系统控制按钮覆盖区 -->
+      <div
+        class="flex h-8 shrink-0 items-center bg-mat-surface-container"
+        style="-webkit-app-region: drag"
+      >
+        <span class="min-w-0 truncate pl-3 text-xs text-white/70">{{ title }}</span>
+        <!-- 标题栏按钮预留位：后续新增按钮时用 no-drag 区域包裹 -->
+      </div>
+
+      <!-- 画面区：接入前显示占位；SDL 子窗口覆盖在网页之上，
+           因此冻结帧覆盖层显示期间会先隐藏子窗口 -->
+      <div class="relative flex min-h-0 grow items-center justify-center overflow-hidden">
+        <span
+          v-if="!freezeImage"
+          class="text-sm text-white/50"
+        >等待画面接入…</span>
+        <div
+          v-else
+          class="pointer-events-none absolute inset-0 transition-opacity duration-150 ease-out"
+          :class="freezeVisible ? 'opacity-100' : 'opacity-0'"
+        >
+          <img
+            :src="freezeImage"
+            alt=""
+            class="h-full w-full scale-110 object-fill blur-2xl"
+          >
+        </div>
       </div>
 
       <!-- 高度 48px（h-12）与主进程 BAR_CSS_HEIGHT 一致：SDL 子窗口按客户区减该高度定位 -->
@@ -47,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 
 defineOptions({
   name: 'ScrcpyWrapperApp',
@@ -56,8 +81,14 @@ defineOptions({
 const KEYCODE_BACK = 4;
 const KEYCODE_HOME = 3;
 
-const sessionId = new URLSearchParams(window.location.search).get('session') ?? '';
+const query = new URLSearchParams(window.location.search);
+const sessionId = query.get('session') ?? '';
+const title = query.get('title') ?? '画面';
+
 const sending = ref(false);
+// 冻结帧：拖动调整尺寸期间显示，撤帧先淡出再释放图片资源
+const freezeImage = ref('');
+const freezeVisible = ref(false);
 
 const sendKey = async (keycode) => {
   if (sending.value) {
@@ -70,6 +101,22 @@ const sendKey = async (keycode) => {
     sending.value = false;
   }
 };
+
+onMounted(() => {
+  window.scrcpyWrapper?.onFreezeFrame?.((frame) => {
+    freezeImage.value = frame;
+    freezeVisible.value = true;
+  });
+  window.scrcpyWrapper?.onFreezeEnd?.(() => {
+    if (!freezeImage.value) {
+      return;
+    }
+    freezeVisible.value = false;
+    setTimeout(() => {
+      freezeImage.value = '';
+    }, 200);
+  });
+});
 </script>
 
 <!-- 独立窗口无宿主 Material Symbols 字体，底条图标使用内联 SVG，随主题色着色 -->

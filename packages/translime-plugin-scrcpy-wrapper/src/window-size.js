@@ -16,6 +16,7 @@ const MIN_VIDEO_HEIGHT = 320;
  * @param {{ width: number, height: number } | null} options.resolution - 设备分辨率，缺失时用常见手机比例。
  * @param {{ width: number, height: number }} options.workArea - 目标显示器工作区（CSS 像素）。
  * @param {number} options.barCssHeight - 底部控制条 CSS 高度。
+ * @param {number} [options.titleBarCssHeight=0] - 顶部自绘标题栏 CSS 高度。
  * @param {number} [options.margin=64] - 工作区四周预留的呼吸边距。
  * @returns {{ width: number, height: number }} BrowserWindow 内容尺寸。
  */
@@ -23,6 +24,7 @@ const computeWindowSize = ({
   resolution,
   workArea,
   barCssHeight,
+  titleBarCssHeight = 0,
   margin = 64,
 }) => {
   const device = resolution && resolution.width > 0 && resolution.height > 0
@@ -52,7 +54,7 @@ const computeWindowSize = ({
 
   return {
     width: Math.round(videoWidth),
-    height: Math.round(videoHeight + barCssHeight),
+    height: Math.round(videoHeight + barCssHeight + titleBarCssHeight),
   };
 };
 

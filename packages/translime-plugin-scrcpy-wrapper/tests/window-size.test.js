@@ -36,6 +36,17 @@ describe('computeWindowSize', () => {
     expect(size.height).toBeGreaterThan(BAR_HEIGHT);
   });
 
+  it('标题栏高度叠加到内容高度', () => {
+    const size = computeWindowSize({
+      resolution: { width: 1080, height: 2400 },
+      workArea: WORK_AREA,
+      barCssHeight: BAR_HEIGHT,
+      titleBarCssHeight: 32,
+    });
+    // 画面高 976 = 1040 - 64 边距，内容高 = 画面 + 底条 + 标题栏
+    expect(size).toEqual({ width: 439, height: 976 + BAR_HEIGHT + 32 });
+  });
+
   it('分辨率缺失时回退常见手机比例，不抛错', () => {
     const size = computeWindowSize({
       resolution: null,

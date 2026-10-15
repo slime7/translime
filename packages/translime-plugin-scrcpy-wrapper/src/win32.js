@@ -1,10 +1,14 @@
 import { createRequire } from 'node:module';
+import { nativeImage } from 'electron';
 import { fitVideoRect } from './window-size';
+import createResizeScheduler from './resize-scheduler';
 
 const requireNative = createRequire(import.meta.url);
 
 export const GWL_STYLE = -16;
 export const WM_EXITSIZEMOVE = 0x0232;
+
+const GA_ROOT = 2;
 
 // 窗口样式值含第 31 位（WS_POPUP），超出 JS 32 位位运算范围，必须经 BigInt 参与运算
 const WS_VISIBLE = 0x10000000n;
@@ -32,6 +36,10 @@ const SWP_FRAMECHANGED = 0x0020;
 const SWP_SHOWWINDOW = 0x0040;
 const SWP_HIDEWINDOW = 0x0080;
 
+// PrintWindow 标志：只取客户区（画面区），并强制 DWM 合成内容（SDL 为 GPU 渲染窗口）
+const PW_CLIENTONLY = 0x00000001;
+const PW_RENDERFULLCONTENT = 0x00000002;
+
 let bindings = null;
 let bindingsError = null;
 
@@ -50,12 +58,27 @@ const loadBindings = () => {
     const koffi = requireNative('koffi');
     // koffi 类型注册表在宿主进程内共享，插件热重载会重复执行本模块，
     // 用随机后缀避免 RECT 结构体重名冲突
-    const rectName = `scrcpy_wrapper_rect_${Math.random().toString(36).slice(2)}`;
+    const suffix = Math.random().toString(36).slice(2);
+    const rectName = `scrcpy_wrapper_rect_${suffix}`;
     const RECT = koffi.struct(rectName, {
       left: 'int32_t',
       top: 'int32_t',
       right: 'int32_t',
       bottom: 'int32_t',
+    });
+    const bitmapInfoName = `scrcpy_wrapper_bmi_${suffix}`;
+    const BITMAPINFOHEADER = koffi.struct(bitmapInfoName, {
+      biSize: 'uint32_t',
+      biWidth: 'int32_t',
+      biHeight: 'int32_t',
+      biPlanes: 'uint16_t',
+      biBitCount: 'uint16_t',
+      biCompression: 'uint32_t',
+      biSizeImage: 'uint32_t',
+      biXPelsPerMeter: 'int32_t',
+      biYPelsPerMeter: 'int32_t',
+      biClrUsed: 'uint32_t',
+      biClrImportant: 'uint32_t',
     });
     const user32 = koffi.load('user32.dll');
     const kernel32 = koffi.load('kernel32.dll');
@@ -65,9 +88,11 @@ const loadBindings = () => {
       // koffi 2.x 的 struct 类型不能 new，出参结构体经 alloc/decode 读写
       rectPtr: koffi.alloc(RECT, 1),
       decodeRect: (ptr) => koffi.decode(ptr, RECT),
+      bitmapInfoSize: koffi.sizeof(BITMAPINFOHEADER),
       FindWindowW: user32.func('intptr_t __stdcall FindWindowW(const str16 lpClassName, const str16 lpWindowName)'),
       GetWindow: user32.func('intptr_t __stdcall GetWindow(intptr_t hWnd, uint32_t nCmd)'),
       SetParent: user32.func('intptr_t __stdcall SetParent(intptr_t hWndChild, intptr_t hWndNewParent)'),
+      GetAncestor: user32.func('intptr_t __stdcall GetAncestor(intptr_t hWnd, uint32_t nCmd)'),
       GetWindowLongPtrW: user32.func('uintptr_t __stdcall GetWindowLongPtrW(intptr_t hWnd, int32_t nIndex)'),
       SetWindowLongPtrW: user32.func('uintptr_t __stdcall SetWindowLongPtrW(intptr_t hWnd, int32_t nIndex, uintptr_t dwNewLong)'),
       SetWindowPos: user32.func('int8_t __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int32_t X, int32_t Y, int32_t cx, int32_t cy, uint32_t uFlags)'),
@@ -79,6 +104,10 @@ const loadBindings = () => {
       ReleaseDC: user32.func('int32_t __stdcall ReleaseDC(intptr_t hWnd, intptr_t hDC)'),
       GetCurrentThreadId: kernel32.func('uint32_t __stdcall GetCurrentThreadId()'),
       CreateCompatibleDC: gdi32.func('intptr_t __stdcall CreateCompatibleDC(intptr_t hdc)'),
+      CreateCompatibleBitmap: gdi32.func('intptr_t __stdcall CreateCompatibleBitmap(intptr_t hdc, int32_t nWidth, int32_t nHeight)'),
+      SelectObject: gdi32.func('intptr_t __stdcall SelectObject(intptr_t hdc, intptr_t hgdiobj)'),
+      GetDIBits: gdi32.func(`int32_t __stdcall GetDIBits(intptr_t hdc, intptr_t hbm, uint32_t start, uint32_t cLines, void *lpvBits, const ${bitmapInfoName} *lpbi, uint32_t usage)`),
+      DeleteObject: gdi32.func('int8_t __stdcall DeleteObject(intptr_t hObject)'),
       DeleteDC: gdi32.func('int8_t __stdcall DeleteDC(intptr_t hdc)'),
     };
     return bindings;
@@ -105,9 +134,9 @@ export const findWindowByTitle = (title) => {
 /**
  * 同步子窗口到客户区，物理像素坐标。
  *
- * aspect（设备分辨率）存在时等比缩放并居中，四周留黑边；
- * 缺省时铺满客户区减底条。frameChanged 仅挂载后样式变更时需要，
- * 持续同步阶段不发送以免逐帧重算非客户区。
+ * 画面区为客户区扣除顶部自绘标题栏与底部控制条；aspect（设备分辨率）存在时
+ * 等比缩放并居中，四周留黑边；缺省时铺满画面区。frameChanged 仅挂载后样式
+ * 变更时需要，持续同步阶段不发送以免逐帧重算非客户区。
  *
  * 每次都必须以 HWND_TOP 落位：父窗口缩放时 Chromium 会把网页输入
  * 子窗口（Chrome_RenderWidgetHostHWND）重新置顶，若不抬回 SDL，
@@ -117,6 +146,7 @@ export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
   const b = loadBindings();
   const {
     barPhysicalHeight = 0,
+    topBarPhysicalHeight = 0,
     show = true,
     frameChanged = false,
     aspect = null,
@@ -129,15 +159,16 @@ export const syncChildRect = (wrapperWin, sdlHwnd, options = {}) => {
   const clientW = rect.right - rect.left;
   const clientH = rect.bottom - rect.top;
   const barH = Math.max(0, Math.round(barPhysicalHeight));
+  const topH = Math.max(0, Math.round(topBarPhysicalHeight));
   const video = fitVideoRect({
     areaWidth: clientW,
-    areaHeight: clientH - barH,
+    areaHeight: clientH - barH - topH,
     aspect,
   });
   const flags = SWP_NOACTIVATE
     | (frameChanged ? SWP_FRAMECHANGED : 0)
     | (show ? SWP_SHOWWINDOW : 0);
-  b.SetWindowPos(sdlHwnd, 0, video.x, video.y, video.width, video.height, flags);
+  b.SetWindowPos(sdlHwnd, 0, video.x, video.y + topH, video.width, video.height, flags);
 };
 
 /**
@@ -154,21 +185,48 @@ export const ensureChildOnTop = (wrapperWin, sdlHwnd) => {
   b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
 };
 
+const delay = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
+
 /**
- * 把 scrcpy 的 SDL 窗口以无边框形式嵌入 Electron wrapper 窗口：
- * 父窗口开 WS_CLIPCHILDREN，子窗口转 WS_CHILD 并去除 WS_POPUP 与
- * 标题栏/可调边框等非客户区样式，避免父窗口内出现第二套标题栏、
- * 拖动边缘与画面黑边；SetParent 后先隐藏再重显，促使任务栏按
- * 子窗口身份移除 scrcpy 原有的任务栏项；
- * 跨进程挂接输入线程完成后立即解绑
+ * 跨进程 SetParent：带 WS_CHILD 样式对仍在初始化的 SDL 窗口调用会静默
+ * 失败（返回 0 且窗口保持顶层），必须保持 WS_POPUP 先挂父并校验结果，
+ * 一次未生效时等待 SDL 初始化完成再重试，超过次数仍失败视为挂载失败
  */
-export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
+const setParentVerified = async (b, sdlHwnd, parentHwnd, attempt = 1) => {
+  b.SetParent(sdlHwnd, parentHwnd);
+  if (b.GetAncestor(sdlHwnd, GA_ROOT) === parentHwnd) {
+    return;
+  }
+  if (attempt >= 10) {
+    throw new Error('scrcpy 画面窗口挂载失败：SetParent 未生效');
+  }
+  await delay(100);
+  await setParentVerified(b, sdlHwnd, parentHwnd, attempt + 1);
+};
+
+/**
+ * 把 scrcpy 的 SDL 窗口以无边框形式嵌入 Electron wrapper 窗口。
+ *
+ * 顺序不能颠倒：必须先挂父再改样式——SDL 初始化期间对带 WS_CHILD 样式的
+ * 窗口跨进程 SetParent 会静默失败；先挂父时窗口仍为 WS_POPUP 顶层窗口，
+ * 总能成功。挂父前先隐藏窗口，挂父后转 WS_CHILD 并去除 WS_POPUP 与
+ * 标题栏/可调边框等非客户区样式，避免父窗口内出现第二套标题栏、拖动边缘
+ * 与画面黑边；隐藏到重显的完整周期也让任务栏按子窗口身份移除 scrcpy
+ * 原有的任务栏项；跨进程挂接输入线程完成后立即解绑
+ */
+export const mountSdlToElectron = async (wrapperWin, sdlHwnd, options = {}) => {
   const b = loadBindings();
   const parentHwnd = hwndFromWindow(wrapperWin);
   const currentThread = b.GetCurrentThreadId();
   const sdlThread = b.GetWindowThreadProcessId(sdlHwnd, null);
   const attached = b.AttachThreadInput(currentThread, sdlThread, 1);
   try {
+    b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_HIDEWINDOW);
+
+    await setParentVerified(b, sdlHwnd, parentHwnd);
+
     const parentStyle = b.GetWindowLongPtrW(parentHwnd, GWL_STYLE);
     b.SetWindowLongPtrW(parentHwnd, GWL_STYLE, Number(BigInt(parentStyle) | WS_CLIPCHILDREN));
 
@@ -176,8 +234,6 @@ export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
     const childNext = Number((BigInt(childStyle) | WS_CHILD | WS_VISIBLE) & ~WS_POPUP & ~NONCLIENT_STYLES);
     b.SetWindowLongPtrW(sdlHwnd, GWL_STYLE, childNext);
 
-    b.SetParent(sdlHwnd, parentHwnd);
-    b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_HIDEWINDOW);
     syncChildRect(wrapperWin, sdlHwnd, { ...options, frameChanged: true });
   } finally {
     if (attached) {
@@ -187,24 +243,117 @@ export const mountSdlToElectron = (wrapperWin, sdlHwnd, options = {}) => {
 };
 
 /**
- * 缩放实时同步：Electron 在交互缩放期间持续发出 resize 事件，
- * 每次都把子窗口贴合到当前客户区并抬回 z 序最上层；
- * WM_EXITSIZEMOVE 兜底覆盖不经过 resize 事件的系统级窗口排布；
+ * 显示/隐藏 SDL 子窗口。冻结帧覆盖层是网页内容，层级在原生子窗口之下，
+ * 显示覆盖层期间必须先隐藏子窗口，settle 时的 syncChildRect 会重显
+ */
+export const setWindowVisible = (sdlHwnd, visible) => {
+  const b = loadBindings();
+  b.SetWindowPos(sdlHwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+    | (visible ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+};
+
+/**
+ * 抓取 SDL 画面窗口当前帧，返回可直接用于 <img> 的 dataURL。
+ * 拖动调整窗口尺寸时该冻结帧以拉伸 + blur 形式临时覆盖画面区
+ */
+export const captureWindowImage = (sdlHwnd) => {
+  const b = loadBindings();
+  if (!b.GetClientRect(sdlHwnd, b.rectPtr)) {
+    return null;
+  }
+  const rect = b.decodeRect(b.rectPtr);
+  const width = rect.right - rect.left;
+  const height = rect.bottom - rect.top;
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+  const screenDc = b.GetWindowDC(0);
+  const memDc = screenDc ? b.CreateCompatibleDC(screenDc) : 0;
+  const bitmap = memDc ? b.CreateCompatibleBitmap(screenDc, width, height) : 0;
+  try {
+    if (!bitmap) {
+      return null;
+    }
+    const previous = b.SelectObject(memDc, bitmap);
+    const printed = b.PrintWindow(sdlHwnd, memDc, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
+    b.SelectObject(memDc, previous);
+    if (!printed) {
+      return null;
+    }
+    // 负高度自顶向下读取 BGRA 像素，与 nativeImage.createFromBitmap 的布局一致；
+    // 32bpp BI_RGB 无调色板，仅传头部即可
+    const buffer = Buffer.allocUnsafe(width * height * 4);
+    const lines = b.GetDIBits(memDc, bitmap, 0, height, buffer, {
+      biSize: b.bitmapInfoSize,
+      biWidth: width,
+      biHeight: -height,
+      biPlanes: 1,
+      biBitCount: 32,
+      biCompression: 0,
+      biSizeImage: 0,
+      biXPelsPerMeter: 0,
+      biYPelsPerMeter: 0,
+      biClrUsed: 0,
+      biClrImportant: 0,
+    }, 0);
+    if (lines !== height) {
+      return null;
+    }
+    return nativeImage.createFromBitmap(buffer, { width, height })
+      .toDataURL({ format: 'jpeg', quality: 80 });
+  } finally {
+    if (bitmap) {
+      b.DeleteObject(bitmap);
+    }
+    if (memDc) {
+      b.DeleteDC(memDc);
+    }
+    if (screenDc) {
+      b.ReleaseDC(0, screenDc);
+    }
+  }
+};
+
+/**
+ * 缩放实时同步：交互缩放期间 resize 事件经调度器聚合成一次滞后同步，
+ * 拖动期间画面区显示冻结帧模糊层；防抖到期（或 WM_EXITSIZEMOVE、
+ * resized 事件）时真正调整 SDL 尺寸并撤下模糊层；
  * 低频 z 序巡检兜底最大化/还原等未触发监听的置顶路径
  */
 export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
-  const { getBarPhysicalHeight = () => 0, getAspect = () => null } = options;
+  const {
+    getBarPhysicalHeight = () => 0,
+    getTopBarPhysicalHeight = () => 0,
+    getAspect = () => null,
+    debounceMs = 120,
+    onResizeBurstStart = null,
+    onResizeSettled = null,
+  } = options;
 
   const sync = () => {
     syncChildRect(wrapperWin, sdlHwnd, {
       barPhysicalHeight: getBarPhysicalHeight(),
+      topBarPhysicalHeight: getTopBarPhysicalHeight(),
       aspect: getAspect(),
       show: true,
     });
   };
 
-  wrapperWin.on('resize', sync);
-  wrapperWin.hookWindowMessage(WM_EXITSIZEMOVE, sync);
+  const scheduler = createResizeScheduler({
+    debounceMs,
+    onBurstStart: () => onResizeBurstStart?.(),
+    onSettle: () => {
+      sync();
+      onResizeSettled?.();
+    },
+  });
+
+  const schedule = () => scheduler.notifyResize();
+  const settleNow = () => scheduler.settle();
+  wrapperWin.on('resize', schedule);
+  wrapperWin.on('will-resize', schedule);
+  wrapperWin.on('resized', settleNow);
+  wrapperWin.hookWindowMessage(WM_EXITSIZEMOVE, settleNow);
   const zOrderTimer = setInterval(() => {
     try {
       ensureChildOnTop(wrapperWin, sdlHwnd);
@@ -215,13 +364,16 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
 
   return {
     destroy() {
+      scheduler.dispose();
       clearInterval(zOrderTimer);
       try {
         wrapperWin.unhookWindowMessage(WM_EXITSIZEMOVE);
       } catch {
         // 窗口可能已销毁
       }
-      wrapperWin.removeListener('resize', sync);
+      wrapperWin.removeListener('resize', schedule);
+      wrapperWin.removeListener('will-resize', schedule);
+      wrapperWin.removeListener('resized', settleNow);
     },
   };
 };
