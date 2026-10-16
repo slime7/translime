@@ -11,9 +11,15 @@ const defaultDelay = (ms) => new Promise((resolve) => {
 });
 
 /**
- * 无线调试设备的 serial 为 `IP:端口` 形式（adb connect 后即以此作为设备序列号）
+ * 无线调试设备的 serial 为 `IP:端口` 形式，或 mDNS 服务名形式（如 `adb-xxx._adb-tls-connect._tcp`）
  */
-export const isWirelessSerial = (serial) => WIRELESS_SERIAL_RE.test(String(serial ?? ''));
+export const isWirelessSerial = (serial) => {
+  const str = String(serial ?? '').trim();
+  return WIRELESS_SERIAL_RE.test(str)
+    || str.startsWith('adb-')
+    || str.includes('_adb-tls-')
+    || str.includes('._tcp');
+};
 
 /**
  * 解析 `IP:端口` 形式的无线调试地址，非法输入返回 null
@@ -34,45 +40,88 @@ export const parseAddress = (text) => {
 
 export const formatAddress = ({ ip, port }) => `${ip}:${port}`;
 
+const resolveHardwareSerial = (raw, isWireless) => {
+  if (raw.hardwareSerial) {
+    return raw.hardwareSerial;
+  }
+  if (!isWireless) {
+    return raw.serial;
+  }
+  if (raw.serial.startsWith('adb-')) {
+    return raw.serial.replace(/^adb-/, '').split('-')[0];
+  }
+  return raw.serial;
+};
+
 /**
  * 合并 adb 在线设备与已保存设备（有线与无线）：
+ * 支持按硬件序列号（hardwareSerial）归一化合并，去重同一设备的多个 mDNS/IP 连接；
  * 在线设备回填已保存的机型名并标记 stored 与 connected，
  * 已保存但离线的设备以未连接状态追加，保证设备菜单始终可选
  */
 export const mergeWirelessDevices = (devices, stored = []) => {
-  const online = (devices ?? []).map((device) => {
-    const isWireless = isWirelessSerial(device.serial);
-    const saved = stored.find((item) => item.serial === device.serial);
-    if (!isWireless) {
-      if (!saved) {
-        return {
-          ...device,
-          wireless: false,
-          connected: device.state === 'device',
-          stored: false,
-        };
+  const onlineMap = new Map();
+  (devices ?? []).forEach((raw) => {
+    const isWireless = isWirelessSerial(raw.serial) || raw.type === 'wireless' || Boolean(raw.wireless);
+    const hwSerial = resolveHardwareSerial(raw, isWireless);
+    const key = hwSerial || raw.serial;
+    const adbSerial = raw.adbSerial || raw.serial;
+    if (onlineMap.has(key)) {
+      const existing = onlineMap.get(key);
+      if (existing.serial.startsWith('adb-') && !raw.serial.startsWith('adb-')) {
+        onlineMap.set(key, {
+          ...existing, ...raw, adbSerial, hardwareSerial: key,
+        });
       }
-      return {
-        ...device,
-        model: device.model || saved?.model || '',
-        wireless: false,
-        connected: device.state === 'device',
-        stored: true,
-      };
+    } else {
+      onlineMap.set(key, {
+        ...raw, adbSerial, hardwareSerial: key, wireless: isWireless,
+      });
     }
-    return {
-      ...device,
-      model: device.model || saved?.model || '',
-      wireless: true,
-      connected: true,
+  });
+
+  const online = Array.from(onlineMap.values()).map((device) => {
+    const isWireless = Boolean(device.wireless);
+    const saved = stored.find((item) => (
+      item.serial === device.serial
+      || (device.hardwareSerial && item.serial === device.hardwareSerial)
+      || (device.adbSerial && item.serial === device.adbSerial)
+    ));
+    const item = {
+      serial: isWireless && device.hardwareSerial ? device.hardwareSerial : device.serial,
+      state: device.state,
+      model: saved?.model || device.model || '',
+      wireless: isWireless,
+      connected: device.state === 'device',
       stored: Boolean(saved),
     };
+    if (device.resolution) {
+      item.resolution = device.resolution;
+    }
+    if (device.adbSerial && device.adbSerial !== item.serial) {
+      item.adbSerial = device.adbSerial;
+    }
+    if (device.hardwareSerial && device.hardwareSerial !== item.serial) {
+      item.hardwareSerial = device.hardwareSerial;
+    }
+    return item;
   });
-  const onlineSerials = new Set(online.map((device) => device.serial));
+
+  const onlineKeys = new Set();
+  online.forEach((d) => {
+    onlineKeys.add(d.serial);
+    if (d.hardwareSerial) {
+      onlineKeys.add(d.hardwareSerial);
+    }
+    if (d.adbSerial) {
+      onlineKeys.add(d.adbSerial);
+    }
+  });
+
   const offline = stored
-    .filter((item) => !onlineSerials.has(item.serial))
+    .filter((item) => !onlineKeys.has(item.serial) && (!item.hardwareSerial || !onlineKeys.has(item.hardwareSerial)))
     .map((item) => {
-      const isWireless = isWirelessSerial(item.serial) || item.type === 'wireless';
+      const isWireless = isWirelessSerial(item.serial) || item.type === 'wireless' || Boolean(item.wireless);
       return {
         serial: item.serial,
         state: 'offline',
@@ -82,6 +131,7 @@ export const mergeWirelessDevices = (devices, stored = []) => {
         stored: true,
       };
     });
+
   return [...online, ...offline];
 };
 
@@ -159,40 +209,64 @@ const connectDiscovered = async ({
  * 已在线直接返回；否则按传入地址连接，失败后用 mDNS 发现的当前端口重连，
  * 再不行扫描端口段兜底（高版本安卓每次开关无线调试或重启后端口都会变化），并回报端口变化
  *
- * adb 注入 { listDevices, connectDevice, getMdnsConnectAddresses } 以便单测
+ * adb 注入 { listDevices, connectDevice, getMdnsConnectAddresses, getMdnsServiceRecords } 以便单测
  */
 export const ensureWirelessConnected = async ({
-  serial, adbPath, adb, scan = scanOpenPorts,
+  serial, adbPath, adb, ip = null, scan = scanOpenPorts,
 }) => {
   const online = await adb.listDevices(adbPath);
-  if (online.some((device) => device.serial === serial && device.state === 'device')) {
-    return { ok: true, serial };
+  const direct = online.find((device) => (
+    (device.serial === serial || device.hardwareSerial === serial)
+    && device.state === 'device'
+  ));
+  if (direct) {
+    return { ok: true, serial: direct.serial };
   }
-  const attempt = await adb.connectDevice(adbPath, serial).then(
-    (output) => parseConnectOutput(output),
-    (e) => ({ ok: false, message: e.message }),
-  );
-  if (attempt.ok) {
-    return { ok: true, serial };
-  }
+
+  // 如果传入的是直连 IP:端口，先尝试直接连接
+  let attempt = null;
   const parsed = parseAddress(serial);
-  if (!parsed) {
-    return {
-      ok: false,
-      authError: Boolean(attempt.authError),
-      message: attempt.message || buildConnectFailMessage(serial, attempt),
-    };
+  if (parsed) {
+    attempt = await adb.connectDevice(adbPath, serial).then(
+      (output) => parseConnectOutput(output),
+      (e) => ({ ok: false, message: e.message }),
+    );
+    if (attempt.ok) {
+      return { ok: true, serial };
+    }
   }
-  const connected = await connectDiscovered({
-    adb, adbPath, ip: parsed.ip, excludeSerials: [serial], scan,
-  });
-  if (connected) {
-    return { ok: true, serial: connected, portChanged: true };
+
+  // 从 mDNS 寻找该设备服务：支持按硬件序列号或 IP 匹配
+  let records = [];
+  if (adb.getMdnsServiceRecords) {
+    records = await adb.getMdnsServiceRecords(adbPath).catch(() => []);
   }
+  const targetIp = ip || parsed?.ip;
+  const matchRecord = records.find((r) => (
+    (r.serial && r.serial === serial)
+    || (r.instance && r.instance.includes(serial))
+  ));
+  if (matchRecord?.address) {
+    const mdnsAttempt = await tryConnectAddress(adb, adbPath, matchRecord.address);
+    if (mdnsAttempt.ok) {
+      return { ok: true, serial: matchRecord.address, portChanged: true };
+    }
+  }
+
+  // 尝试 targetIp 的候选地址
+  if (targetIp) {
+    const connected = await connectDiscovered({
+      adb, adbPath, ip: targetIp, excludeSerials: [serial], scan,
+    });
+    if (connected) {
+      return { ok: true, serial: connected, portChanged: true };
+    }
+  }
+
   return {
     ok: false,
-    authError: Boolean(attempt.authError),
-    message: buildConnectFailMessage(serial, attempt),
+    authError: Boolean(attempt?.authError),
+    message: attempt?.message || buildConnectFailMessage(serial, attempt),
   };
 };
 
@@ -216,11 +290,38 @@ export const connectAfterPairing = async ({
     && !knownSerials.includes(device.serial)
     && (!ip || parseAddress(device.serial)?.ip === ip));
   if (fresh) {
+    let hwSerial = null;
+    if (adb.getDeviceHardwareSerial) {
+      hwSerial = await adb.getDeviceHardwareSerial(adbPath, fresh.serial).catch(() => null);
+    }
+    if (hwSerial) {
+      return {
+        ok: true,
+        serial: hwSerial,
+        adbSerial: fresh.serial,
+        hardwareSerial: hwSerial,
+        ip: parseAddress(fresh.serial)?.ip || ip,
+        model: fresh.model || '',
+      };
+    }
     return { ok: true, serial: fresh.serial };
   }
   const viaMdns = await connectFirstCandidate(adb, adbPath, (await adb.getMdnsConnectAddresses(adbPath).catch(() => []))
     .filter((address) => !knownSerials.includes(address) && parseAddress(address)?.ip === ip));
   if (viaMdns) {
+    let hwSerial = null;
+    if (adb.getDeviceHardwareSerial) {
+      hwSerial = await adb.getDeviceHardwareSerial(adbPath, viaMdns).catch(() => null);
+    }
+    if (hwSerial) {
+      return {
+        ok: true,
+        serial: hwSerial,
+        adbSerial: viaMdns,
+        hardwareSerial: hwSerial,
+        ip: parseAddress(viaMdns)?.ip || ip,
+      };
+    }
     return { ok: true, serial: viaMdns };
   }
   if (attempts <= 1) {
@@ -228,6 +329,19 @@ export const connectAfterPairing = async ({
       adb, adbPath, ip, excludeSerials: knownSerials, scan,
     });
     if (viaScan) {
+      let hwSerial = null;
+      if (adb.getDeviceHardwareSerial) {
+        hwSerial = await adb.getDeviceHardwareSerial(adbPath, viaScan).catch(() => null);
+      }
+      if (hwSerial) {
+        return {
+          ok: true,
+          serial: hwSerial,
+          adbSerial: viaScan,
+          hardwareSerial: hwSerial,
+          ip: parseAddress(viaScan)?.ip || ip,
+        };
+      }
       return { ok: true, serial: viaScan };
     }
     return {

@@ -354,7 +354,10 @@ const settleResize = (sessionId) => {
   }
   if (session.mode === 'virtual' && session.pkg && session.win && !session.win.isDestroyed()) {
     const [w, h] = session.win.getContentSize();
-    session.onSaveVirtualSize?.({ width: w, height: h });
+    const bounds = session.win.getBounds();
+    session.onSaveVirtualSize?.({
+      width: w, height: h, x: bounds.x, y: bounds.y,
+    });
   }
   if (!session.freezeActive) {
     return;
@@ -392,7 +395,7 @@ const startResizeFreeze = (sessionId) => {
 };
 
 const createWrapperWindow = ({
-  title, sessionId, contentSize, mode = 'mirror', toolbarLayout = TOOLBAR_LAYOUT_SIDE,
+  title, sessionId, contentSize, position = null, mode = 'mirror', toolbarLayout = TOOLBAR_LAYOUT_SIDE,
 }) => {
   registerWindowControlHandler();
   registerOverlayThemeSync();
@@ -402,6 +405,9 @@ const createWrapperWindow = ({
     useContentSize: true,
     width: contentSize.width,
     height: contentSize.height,
+    ...(position && typeof position.x === 'number' && typeof position.y === 'number'
+      ? { x: position.x, y: position.y }
+      : {}),
     minWidth: 200,
     minHeight: 240,
     resizable: true,
@@ -607,15 +613,27 @@ export const launchSession = async (options = {}) => {
   const { chromeWidth, chromeHeight } = getChromeMetrics(mode, toolbarLayout);
 
   let contentSize;
-  if (mode === 'virtual' && inheritedContentSize && inheritedContentSize.width > 0 && inheritedContentSize.height > 0) {
-    contentSize = {
-      width: Math.min(inheritedContentSize.width, display.workArea.width - 32),
-      height: Math.min(inheritedContentSize.height, display.workArea.height - 32),
-    };
-  } else if (mode === 'virtual' && savedVirtualSize && savedVirtualSize.width > 0 && savedVirtualSize.height > 0) {
+  let initialPosition = null;
+  if (mode === 'virtual' && savedVirtualSize && savedVirtualSize.width > 0 && savedVirtualSize.height > 0) {
     contentSize = {
       width: Math.min(savedVirtualSize.width, display.workArea.width - 32),
       height: Math.min(savedVirtualSize.height, display.workArea.height - 32),
+    };
+    if (typeof savedVirtualSize.x === 'number' && typeof savedVirtualSize.y === 'number') {
+      try {
+        const targetDisplay = screen.getDisplayNearestPoint({ x: savedVirtualSize.x, y: savedVirtualSize.y });
+        const wa = targetDisplay.workArea;
+        const clampedX = Math.max(wa.x, Math.min(savedVirtualSize.x, wa.x + wa.width - contentSize.width));
+        const clampedY = Math.max(wa.y, Math.min(savedVirtualSize.y, wa.y + wa.height - contentSize.height));
+        initialPosition = { x: clampedX, y: clampedY };
+      } catch {
+        initialPosition = { x: savedVirtualSize.x, y: savedVirtualSize.y };
+      }
+    }
+  } else if (mode === 'virtual' && inheritedContentSize && inheritedContentSize.width > 0 && inheritedContentSize.height > 0) {
+    contentSize = {
+      width: Math.min(inheritedContentSize.width, display.workArea.width - 32),
+      height: Math.min(inheritedContentSize.height, display.workArea.height - 32),
     };
   } else if (mode === 'mirror' && savedSize && savedSize.width > 0 && savedSize.height > 0) {
     contentSize = restoreMirrorContentSize({
@@ -679,7 +697,7 @@ export const launchSession = async (options = {}) => {
     env,
   });
   const win = createWrapperWindow({
-    title: wrapperTitle, sessionId, contentSize, mode, toolbarLayout,
+    title: wrapperTitle, sessionId, contentSize, position: initialPosition, mode, toolbarLayout,
   });
   const session = {
     id: sessionId,
@@ -794,12 +812,7 @@ export const launchSession = async (options = {}) => {
         }
         return;
       }
-      // 窗口不在前台（其他应用持焦、被遮挡或最小化）时不触发面板显示；
-      // 点击画面后焦点在 SDL 子窗口上，须按前台根窗口判定而非 win.isFocused()
-      if (!isWrapperWindowActive(win)) {
-        chromeVisibility.hide();
-        return;
-      }
+      const isFocused = isWrapperWindowActive(win);
       const now = Date.now();
       if (now < initialGraceEnd) {
         chromeVisibility.show();
@@ -831,7 +844,8 @@ export const launchSession = async (options = {}) => {
           }),
       });
       if (nextRevealed) {
-        chromeVisibility.show();
+        // 有焦点时立刻弹出，无焦点时延迟 1 秒弹出
+        chromeVisibility.show({ delayMs: isFocused ? 0 : 1000 });
       } else {
         chromeVisibility.hide();
       }
@@ -848,10 +862,50 @@ export const launchSession = async (options = {}) => {
     }, 180);
   }
 
+  if (mode === 'virtual') {
+    let moveTimer = null;
+    win.on('move', () => {
+      if (session.pkg && !win.isDestroyed()) {
+        clearTimeout(moveTimer);
+        moveTimer = setTimeout(() => {
+          if (!win.isDestroyed()) {
+            const [w, h] = win.getContentSize();
+            const bounds = win.getBounds();
+            session.onSaveVirtualSize?.({
+              width: w, height: h, x: bounds.x, y: bounds.y,
+            });
+          }
+        }, 300);
+      }
+    });
+    win.on('close', () => {
+      if (session.pkg && !win.isDestroyed()) {
+        const [w, h] = win.getContentSize();
+        const bounds = win.getBounds();
+        session.onSaveVirtualSize?.({
+          width: w, height: h, x: bounds.x, y: bounds.y,
+        });
+      }
+    });
+  }
+
   let winClosed = false;
   win.on('closed', () => {
     winClosed = true;
+    const closedMode = session.mode;
+    const closedSerial = session.serial;
     destroySession(sessionId);
+    if (closedMode === 'virtual' && closedSerial) {
+      const mirrorSession = Array.from(sessions.values()).find(
+        (s) => s.mode === 'mirror' && s.serial === closedSerial && s.win && !s.win.isDestroyed(),
+      );
+      if (mirrorSession) {
+        if (mirrorSession.win.isMinimized()) {
+          mirrorSession.win.restore();
+        }
+        mirrorSession.win.focus();
+      }
+    }
   });
   // scrcpy 输出按行缓冲解析视频纹理尺寸：初始占位窗口比例不可信，
   // 以解码器输出的真实视频尺寸为准修正窗口比例（设备旋转后尺寸变化会再次输出）

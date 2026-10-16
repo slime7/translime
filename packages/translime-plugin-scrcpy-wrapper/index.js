@@ -79,13 +79,6 @@ const saveStoredDevices = (list) => {
   pluginConfig.set(STORED_DEVICES_KEY, list);
 };
 
-const getStoredWirelessDevices = () => getStoredDevices().filter((d) => d.type === 'wireless');
-
-const saveStoredWirelessDevices = (list) => {
-  const nonWireless = getStoredDevices().filter((d) => d.type !== 'wireless');
-  saveStoredDevices([...nonWireless, ...list.map((d) => ({ ...d, type: 'wireless' }))]);
-};
-
 const getDeviceConfig = (serial) => {
   const map = pluginConfig.get(DEVICE_CONFIGS_KEY, {}) || {};
   return { ...DEFAULT_DEVICE_CONFIG, ...(map[serial] || {}) };
@@ -127,11 +120,20 @@ const saveMirrorSize = (serial, size) => {
 
 const listMergedDevices = async () => {
   const adbPath = getAdbPath();
-  const devices = await adbModule.listDevices(adbPath);
-  const devicesWithInfo = await Promise.all(devices.map(async (device) => {
+  const rawDevices = await adbModule.listDevices(adbPath);
+  const devicesWithInfo = await Promise.all(rawDevices.map(async (device) => {
     if (device.state === 'device') {
-      const resolution = await adbModule.getDeviceResolution(adbPath, device.serial);
-      return { ...device, resolution };
+      const resolution = await adbModule.getDeviceResolution(adbPath, device.serial).catch(() => null);
+      let hardwareSerial = null;
+      if (!wirelessModule.isWirelessSerial(device.serial)) {
+        hardwareSerial = device.serial;
+      } else if (device.serial.startsWith('adb-')) {
+        hardwareSerial = adbModule.extractSerialFromMdnsInstance(device.serial);
+      }
+      if (!hardwareSerial && adbModule.getDeviceHardwareSerial) {
+        hardwareSerial = await adbModule.getDeviceHardwareSerial(adbPath, device.serial).catch(() => null);
+      }
+      return { ...device, resolution, hardwareSerial: hardwareSerial || device.serial };
     }
     return device;
   }));
@@ -139,17 +141,31 @@ const listMergedDevices = async () => {
 };
 
 /**
- * 连接成功后把设备存入设置：同一 IP 的旧条目端口已过期，保存时一并清理
+ * 连接成功后把设备存入设置：以硬件 serial 为主键
  */
 const storeWirelessConnection = async (serial) => {
-  const devices = await adbModule.listDevices(getAdbPath()).catch(() => []);
-  const model = devices.find((device) => device.serial === serial)?.model ?? '';
-  const remaining = getStoredWirelessDevices()
-    .filter((item) => wirelessModule.parseAddress(item.serial)?.ip !== wirelessModule.parseAddress(serial)?.ip);
-  const stored = [...remaining, { serial, model }];
-  saveStoredWirelessDevices(stored);
-  logger.info(`[${id}] wireless device stored: ${serial}`);
-  return { success: true, serial, devices: wirelessModule.mergeWirelessDevices(devices, stored) };
+  const adbPath = getAdbPath();
+  const devices = await adbModule.listDevices(adbPath).catch(() => []);
+  const targetDevice = devices.find((device) => device.serial === serial);
+  const model = targetDevice?.model ?? '';
+  let hwSerial = null;
+  if (adbModule.getDeviceHardwareSerial) {
+    hwSerial = await adbModule.getDeviceHardwareSerial(adbPath, serial).catch(() => null);
+  }
+  const canonicalSerial = hwSerial || serial;
+  const ip = wirelessModule.parseAddress(serial)?.ip || null;
+  const stored = getStoredDevices();
+  const remaining = stored.filter((item) => item.serial !== canonicalSerial && item.serial !== serial);
+  const updated = [...remaining, {
+    serial: canonicalSerial,
+    model,
+    type: 'wireless',
+    ...(ip ? { ip } : {}),
+    lastEndpoint: serial,
+  }];
+  saveStoredDevices(updated);
+  logger.info(`[${id}] wireless device stored: ${canonicalSerial} (${serial})`);
+  return { success: true, serial: canonicalSerial, devices: await listMergedDevices() };
 };
 
 /**
@@ -164,39 +180,41 @@ const launchDeviceSession = async ({
 }) => {
   try {
     let actualSerial = serial;
-    if (wirelessModule.isWirelessSerial(actualSerial)) {
+    const stored = getStoredDevices();
+    const storedItem = stored.find((d) => d.serial === serial);
+    const isWireless = storedItem?.type === 'wireless' || wirelessModule.isWirelessSerial(serial);
+    if (isWireless) {
       const ensured = await wirelessModule.ensureWirelessConnected({
-        serial: actualSerial,
+        serial,
+        ip: storedItem?.ip,
         adbPath: getAdbPath(),
         adb: adbModule,
       });
       if (!ensured.ok) {
         return { success: false, message: ensured.message };
       }
-      if (ensured.portChanged) {
-        const stored = getStoredWirelessDevices();
-        const entry = stored.find((item) => item.serial === serial);
-        if (entry) {
-          saveStoredWirelessDevices(stored.map((item) => (
-            item.serial === serial ? { ...item, serial: ensured.serial } : item
-          )));
-          logger.info(`[${id}] wireless port updated: ${serial} -> ${ensured.serial}`);
-        }
-      }
       actualSerial = ensured.serial;
+      if (ensured.portChanged && storedItem) {
+        const parsedNew = wirelessModule.parseAddress(ensured.serial);
+        saveStoredDevices(stored.map((item) => (
+          item.serial === serial
+            ? { ...item, lastEndpoint: ensured.serial, ...(parsedNew?.ip ? { ip: parsedNew.ip } : {}) }
+            : item
+        )));
+      }
     }
-    const devConf = getDeviceConfig(actualSerial);
+    const devConf = getDeviceConfig(serial);
     const result = await scrcpyModule.launchSession({
       mode,
       serial: actualSerial,
       pkg,
       resolution,
-      savedSize: mode === 'mirror' ? getSavedMirrorSize(actualSerial) : null,
-      savedVirtualSize: mode === 'virtual' && pkg ? getSavedVirtualSize(actualSerial, pkg) : null,
-      onSaveMirrorSize: (size) => saveMirrorSize(actualSerial, size),
+      savedSize: mode === 'mirror' ? getSavedMirrorSize(serial) : null,
+      savedVirtualSize: mode === 'virtual' && pkg ? getSavedVirtualSize(serial, pkg) : null,
+      onSaveMirrorSize: (size) => saveMirrorSize(serial, size),
       onSaveVirtualSize: (size) => {
         if (pkg) {
-          saveVirtualSize(actualSerial, pkg, size);
+          saveVirtualSize(serial, pkg, size);
         }
       },
       bitRate: devConf.bitRate,
@@ -204,7 +222,7 @@ const launchDeviceSession = async ({
       settingValue: getScrcpySetting(),
       logger,
     });
-    return { success: true, serial: actualSerial, ...result };
+    return { success: true, serial, ...result };
   } catch (e) {
     logger.error(`[${id}] launch failed: ${e.message}`);
     return { success: false, message: e.message };
@@ -252,7 +270,7 @@ const ipcHandlers = defineIpcHandlers([
     handler: () => async () => {
       try {
         const devices = await listMergedDevices();
-        return { success: true, devices };
+        return { success: true, devices, storedDevices: getStoredDevices() };
       } catch (e) {
         return { success: false, message: `获取设备列表失败: ${e.message}` };
       }
@@ -304,7 +322,7 @@ const ipcHandlers = defineIpcHandlers([
       if (!connected.ok) {
         return { success: false, message: `配对成功，但连接失败：${connected.message}` };
       }
-      return storeWirelessConnection(connected.serial);
+      return storeWirelessConnection(connected.adbSerial || connected.serial);
     },
   },
   {
@@ -334,7 +352,7 @@ const ipcHandlers = defineIpcHandlers([
       const stored = getStoredDevices().filter((item) => item.serial !== serial);
       saveStoredDevices(stored);
       try {
-        return { success: true, devices: await listMergedDevices() };
+        return { success: true, devices: await listMergedDevices(), storedDevices: getStoredDevices() };
       } catch (e) {
         return { success: false, message: `已移除，但刷新设备列表失败: ${e.message}` };
       }
@@ -343,10 +361,22 @@ const ipcHandlers = defineIpcHandlers([
   {
     type: 'remove-stored-device',
     handler: () => async ({ serial }) => {
-      const stored = getStoredDevices().filter((item) => item.serial !== serial);
-      saveStoredDevices(stored);
+      const stored = getStoredDevices();
+      const target = stored.find((item) => item.serial === serial);
+      const updated = stored.filter((item) => item.serial !== serial);
+      saveStoredDevices(updated);
       try {
-        return { success: true, devices: await listMergedDevices() };
+        const adbPath = getAdbPath();
+        const online = await adbModule.listDevices(adbPath);
+        const matches = online.filter((dev) => dev.serial === serial
+          || (target?.lastEndpoint && dev.serial === target.lastEndpoint)
+          || (dev.serial.startsWith('adb-') && dev.serial.includes(serial)));
+        await Promise.all(matches.map((dev) => adbModule.disconnectDevice?.(adbPath, dev.serial).catch(() => {})));
+      } catch {
+        // 忽略断开失败
+      }
+      try {
+        return { success: true, devices: await listMergedDevices(), storedDevices: getStoredDevices() };
       } catch (e) {
         return { success: false, message: `已移除，但刷新设备列表失败: ${e.message}` };
       }
@@ -385,7 +415,7 @@ const ipcHandlers = defineIpcHandlers([
         saveStoredDevices(stored);
       }
       try {
-        return { success: true, devices: await listMergedDevices() };
+        return { success: true, devices: await listMergedDevices(), storedDevices: getStoredDevices() };
       } catch (e) {
         return { success: false, message: `添加成功，但刷新设备列表失败: ${e.message}` };
       }

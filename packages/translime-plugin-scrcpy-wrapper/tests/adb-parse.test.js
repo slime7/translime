@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  extractSerialFromMdnsInstance,
   nextForcedRotation,
   parseAdbDevices,
+  parseMdnsServiceRecords,
   parsePackageList,
   parseSystemSetting,
   parseWmSize,
@@ -90,5 +92,51 @@ describe('parseWmSize', () => {
     expect(parseWmSize(null)).toBeNull();
     expect(parseWmSize('Physical size: abc')).toBeNull();
     expect(parseWmSize('Physical size: 0x0')).toBeNull();
+  });
+});
+
+describe('extractSerialFromMdnsInstance', () => {
+  it('从标准 adb-<serial>-<random> 实例名提取硬件序列号', () => {
+    expect(extractSerialFromMdnsInstance('adb-QV770KQAMM-LiOGZb')).toBe('QV770KQAMM');
+    expect(extractSerialFromMdnsInstance('adb-ee74bb71-nMA7p7')).toBe('ee74bb71');
+    expect(extractSerialFromMdnsInstance('adb-QV780M0W8G-GjdSrv')).toBe('QV780M0W8G');
+  });
+
+  it('兼容多网卡/重命名导致的序号后缀如 (2)', () => {
+    expect(extractSerialFromMdnsInstance('adb-QV770KQAMM-LiOGZb (2)')).toBe('QV770KQAMM');
+    expect(extractSerialFromMdnsInstance('adb-QV770KQAMM-LiOGZb (3)')).toBe('QV770KQAMM');
+  });
+
+  it('空值或非法输入返回 null', () => {
+    expect(extractSerialFromMdnsInstance('')).toBeNull();
+    expect(extractSerialFromMdnsInstance(null)).toBeNull();
+    expect(extractSerialFromMdnsInstance('other-service')).toBeNull();
+  });
+});
+
+describe('parseMdnsServiceRecords', () => {
+  it('解析行式输出中的结构化服务记录', () => {
+    const output = [
+      'List of discovered mdns services',
+      'adb-QV770KQAMM-LiOGZb (3)\t_adb-tls-connect._tcp\t192.168.2.20:38927',
+      'adb-ee74bb71-nMA7p7\t_adb-tls-connect._tcp\t192.168.2.25:37473',
+      '',
+    ].join('\n');
+    const records = parseMdnsServiceRecords(output);
+    expect(records).toHaveLength(2);
+    expect(records[0]).toEqual({
+      instance: 'adb-QV770KQAMM-LiOGZb (3)',
+      address: '192.168.2.20:38927',
+      ip: '192.168.2.20',
+      port: 38927,
+      serial: 'QV770KQAMM',
+    });
+    expect(records[1]).toEqual({
+      instance: 'adb-ee74bb71-nMA7p7',
+      address: '192.168.2.25:37473',
+      ip: '192.168.2.25',
+      port: 37473,
+      serial: 'ee74bb71',
+    });
   });
 });

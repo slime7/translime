@@ -12,6 +12,7 @@
 export const createChromeVisibility = ({ hideDelayMs = 2000, onChange }) => {
   let revealed = true;
   let hideTimer = null;
+  let showTimer = null;
 
   const cancelPendingHide = () => {
     if (hideTimer) {
@@ -20,15 +21,36 @@ export const createChromeVisibility = ({ hideDelayMs = 2000, onChange }) => {
     }
   };
 
+  const cancelPendingShow = () => {
+    if (showTimer) {
+      clearTimeout(showTimer);
+      showTimer = null;
+    }
+  };
+
   return {
-    show() {
+    show({ delayMs = 0 } = {}) {
       cancelPendingHide();
-      if (!revealed) {
+      if (revealed) {
+        cancelPendingShow();
+        return;
+      }
+      if (delayMs <= 0) {
+        cancelPendingShow();
         revealed = true;
         onChange(true);
+        return;
+      }
+      if (!showTimer) {
+        showTimer = setTimeout(() => {
+          showTimer = null;
+          revealed = true;
+          onChange(true);
+        }, delayMs);
       }
     },
     hide() {
+      cancelPendingShow();
       if (!revealed || hideTimer) {
         return;
       }
@@ -40,6 +62,7 @@ export const createChromeVisibility = ({ hideDelayMs = 2000, onChange }) => {
     },
     dispose() {
       cancelPendingHide();
+      cancelPendingShow();
       revealed = true;
     },
   };

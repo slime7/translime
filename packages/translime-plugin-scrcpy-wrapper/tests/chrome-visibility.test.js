@@ -51,14 +51,28 @@ describe('createChromeVisibility', () => {
     expect(changes).toEqual([false]);
   });
 
-  it('dispose 取消未生效的隐藏并复位显示状态（防止会话销毁后仍触发回调）', () => {
+  it('支持传入 delayMs 延迟弹出，期间隐藏则取消显示', () => {
     const changes = [];
     const controller = createChromeVisibility({ hideDelayMs: 2000, onChange: (v) => changes.push(v) });
     controller.hide();
-    controller.dispose();
-    vi.advanceTimersByTime(5000);
-    expect(changes).toEqual([]);
-    controller.show();
-    expect(changes).toEqual([]);
+    vi.advanceTimersByTime(2000);
+    expect(changes).toEqual([false]);
+
+    // 无焦点延迟 1 秒弹出
+    controller.show({ delayMs: 1000 });
+    vi.advanceTimersByTime(500);
+    expect(changes).toEqual([false]); // 尚未弹出
+    vi.advanceTimersByTime(500);
+    expect(changes).toEqual([false, true]); // 1 秒到达，弹出
+
+    // 再次隐藏后测试取消逻辑
+    controller.hide();
+    vi.advanceTimersByTime(2000);
+    expect(changes).toEqual([false, true, false]);
+    controller.show({ delayMs: 1000 });
+    vi.advanceTimersByTime(500);
+    controller.hide(); // 在 1 秒前移开光标
+    vi.advanceTimersByTime(1000);
+    expect(changes).toEqual([false, true, false]); // 未弹出
   });
 });

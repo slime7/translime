@@ -4,13 +4,14 @@
     class="h-full overflow-hidden"
   >
     <div class="flex h-full flex-col gap-3 overflow-hidden p-3">
-      <!-- 顶部设备栏：设备单选按钮组紧随管理设备按钮，无刷新按钮，无多余滚动条 -->
-      <div class="flex shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-[var(--mat-sys-color-outline-variant)] pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <!-- 顶部设备栏：设备单选按钮组紧随管理设备按钮，满一行自动换行，无滚动条 -->
+      <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--mat-sys-color-outline-variant)] pb-2">
         <mat-btn-group
           v-if="devices.length > 0"
           variant="connected"
           selection="single"
           :selected="serial"
+          class="!flex-wrap gap-y-2"
           @select="onSelectDevice($event.nextSelected)"
         >
           <mat-btn
@@ -187,13 +188,23 @@
           >
             暂无已保存设备
           </div>
-          <div
-            v-for="dev in savedDevices"
-            :key="dev.serial"
-            class="flex items-center justify-between rounded-lg bg-[var(--mat-sys-color-surface-container)] px-3 py-2"
+          <mat-list
+            v-else
+            variant="segmented"
+            interaction="multi-action"
           >
-            <div class="flex min-w-0 flex-col">
-              <span class="truncate text-sm font-medium">
+            <mat-list-item
+              v-for="dev in savedDevices"
+              :key="dev.serial"
+              :value="dev.serial"
+            >
+              <template #leading>
+                <mat-icon
+                  :icon="dev.wireless ? 'wifi' : 'smartphone'"
+                  aria-hidden="true"
+                />
+              </template>
+              <span class="truncate font-medium">
                 {{ dev.model || dev.serial }}
                 <span
                   class="ml-1 text-xs font-normal"
@@ -202,17 +213,24 @@
                   {{ isOnline(dev) ? '在线' : '离线' }}
                 </span>
               </span>
-              <span class="truncate text-xs text-[var(--mat-sys-color-on-surface-variant)]">{{ dev.serial }}</span>
-            </div>
-            <mat-btn
-              icon="delete"
-              variant="standard"
-              size="small"
-              class="text-[var(--mat-sys-color-error)]"
-              :disabled="deletingSerial === dev.serial"
-              @click="removeStoredDevice(dev.serial)"
-            />
-          </div>
+              <template #supporting>
+                <span class="truncate text-xs text-[var(--mat-sys-color-on-surface-variant)]">
+                  {{ dev.serial }}
+                </span>
+              </template>
+              <template #trailing>
+                <mat-btn
+                  icon="delete"
+                  variant="standard"
+                  size="small"
+                  label="删除设备"
+                  class="text-[var(--mat-sys-color-error)]"
+                  :disabled="deletingSerial === dev.serial"
+                  @click="removeStoredDevice(dev.serial)"
+                />
+              </template>
+            </mat-list-item>
+          </mat-list>
         </div>
 
         <mat-divider />
@@ -239,31 +257,49 @@
             {{ loadingUsb ? '正在检测 USB 连接设备...' : '未检测到在线的 USB 设备，请确认已开启 USB 调试' }}
           </div>
 
-          <div
-            v-for="usb in usbCandidates"
-            :key="usb.serial"
-            class="flex items-center justify-between rounded-lg bg-[var(--mat-sys-color-surface-container)] px-3 py-2"
+          <mat-list
+            v-else
+            variant="segmented"
+            interaction="multi-action"
           >
-            <div class="flex min-w-0 flex-col">
-              <span class="truncate text-sm font-medium">{{ usb.model || 'Android 设备' }}</span>
-              <span class="truncate text-xs text-[var(--mat-sys-color-on-surface-variant)]">{{ usb.serial }}</span>
-            </div>
-            <mat-btn
-              v-if="!usb.stored"
-              size="small"
-              variant="filled-tonal"
-              :loading="addingSerial === usb.serial"
-              @click="addUsbDevice(usb)"
+            <mat-list-item
+              v-for="usb in usbCandidates"
+              :key="usb.serial"
+              :value="usb.serial"
             >
-              添加
-            </mat-btn>
-            <span
-              v-else
-              class="px-2 text-xs text-[var(--mat-sys-color-outline)]"
-            >
-              已添加
-            </span>
-          </div>
+              <template #leading>
+                <mat-icon
+                  icon="smartphone"
+                  aria-hidden="true"
+                />
+              </template>
+              <span class="truncate font-medium">
+                {{ usb.model || 'Android 设备' }}
+              </span>
+              <template #supporting>
+                <span class="truncate text-xs text-[var(--mat-sys-color-on-surface-variant)]">
+                  {{ usb.serial }}
+                </span>
+              </template>
+              <template #trailing>
+                <mat-btn
+                  v-if="!usb.stored"
+                  size="small"
+                  variant="filled-tonal"
+                  :loading="addingSerial === usb.serial"
+                  @click="addUsbDevice(usb)"
+                >
+                  添加
+                </mat-btn>
+                <span
+                  v-else
+                  class="px-2 text-xs text-[var(--mat-sys-color-outline)]"
+                >
+                  已添加
+                </span>
+              </template>
+            </mat-list-item>
+          </mat-list>
         </div>
 
         <mat-divider />
@@ -363,6 +399,7 @@ const fpsItems = [
 const manageOpen = ref(false);
 const loadingUsb = ref(false);
 const usbCandidates = ref([]);
+const storedList = ref([]);
 const addingSerial = ref('');
 const deletingSerial = ref('');
 const pairing = ref(false);
@@ -381,7 +418,25 @@ const currentDevice = computed(() => devices.value.find((d) => d.serial === seri
 
 const isDeviceOnline = computed(() => isOnline(currentDevice.value));
 
-const savedDevices = computed(() => devices.value.filter((d) => Boolean(d.stored)));
+const savedDevices = computed(() => {
+  if (storedList.value.length > 0) {
+    return storedList.value.map((stored) => {
+      const matchedOnline = devices.value.find((d) => (
+        d.serial === stored.serial
+        || d.hardwareSerial === stored.serial
+        || d.adbSerial === stored.serial
+      ));
+      return {
+        ...stored,
+        model: stored.model || matchedOnline?.model || '',
+        connected: matchedOnline ? isOnline(matchedOnline) : false,
+        state: matchedOnline?.state || 'offline',
+        wireless: stored.type === 'wireless' || isWirelessSerial(stored.serial),
+      };
+    });
+  }
+  return devices.value.filter((d) => Boolean(d.stored));
+});
 
 const selectedOfflineWireless = computed(() => Boolean(
   currentDevice.value?.wireless && !isOnline(currentDevice.value),
@@ -457,6 +512,9 @@ const loadDevices = async () => {
       throw new Error(result?.message || '获取设备列表失败');
     }
     devices.value = result.devices;
+    if (result.storedDevices) {
+      storedList.value = result.storedDevices;
+    }
     const stillAvailable = result.devices.some((device) => device.serial === serial.value);
     if (!stillAvailable) {
       const firstOnline = result.devices.find((d) => isOnline(d));
@@ -563,7 +621,14 @@ const removeStoredDevice = async (targetSerial) => {
     if (!result?.success) {
       throw new Error(result?.message || '移除失败');
     }
-    await loadDevices();
+    if (result.storedDevices) {
+      storedList.value = result.storedDevices;
+    }
+    if (result.devices) {
+      devices.value = result.devices;
+    } else {
+      await loadDevices();
+    }
     await loadUsbCandidates();
     if (serial.value === targetSerial) {
       const firstOnline = devices.value.find((d) => isOnline(d));
@@ -599,7 +664,14 @@ const addUsbDevice = async (usb) => {
       type: 'usb',
     });
     if (res?.success) {
-      await loadDevices();
+      if (res.storedDevices) {
+        storedList.value = res.storedDevices;
+      }
+      if (res.devices) {
+        devices.value = res.devices;
+      } else {
+        await loadDevices();
+      }
       await loadUsbCandidates();
       serial.value = usb.serial;
     }
@@ -632,7 +704,14 @@ const pairByCode = async () => {
       throw new Error(result?.message || '配对失败');
     }
     manageOpen.value = false;
-    await loadDevices();
+    if (result.storedDevices) {
+      storedList.value = result.storedDevices;
+    }
+    if (result.devices) {
+      devices.value = result.devices;
+    } else {
+      await loadDevices();
+    }
     if (result.serial) {
       serial.value = result.serial;
     }

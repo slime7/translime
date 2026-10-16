@@ -129,6 +129,76 @@ export const parseConnectOutput = (text) => {
 };
 
 /**
+ * 从 adb mdns 服务实例名提取硬件序列号：
+ * 实例名通常形如 `adb-<serial>-<6位随机字符>`，部分环境尾随序号 ` (2)`
+ */
+export const extractSerialFromMdnsInstance = (instance) => {
+  const str = String(instance ?? '').trim();
+  const cleaned = str.replace(/\s*\(\d+\)$/, '');
+  const match = cleaned.match(/^adb-(.+)-[A-Za-z0-9]{6}$/);
+  if (match) {
+    return match[1];
+  }
+  const fallback = cleaned.match(/^adb-([^-]+)/);
+  if (fallback) {
+    return fallback[1];
+  }
+  return null;
+};
+
+/**
+ * 解析 `adb mdns services` 输出为结构化记录列表：
+ * 每项包含 `{ instance, address, ip, port, serial }`
+ */
+export const parseMdnsServiceRecords = (text) => {
+  const output = String(text ?? '');
+  const records = [];
+  const lines = output.split(/\r?\n/);
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('List of')) {
+      return;
+    }
+    const connectIdx = trimmed.indexOf('_adb-tls-connect._tcp');
+    if (connectIdx !== -1) {
+      const before = trimmed.slice(0, connectIdx).trim();
+      const after = trimmed.slice(connectIdx + '_adb-tls-connect._tcp'.length).trim();
+      const addrMatch = after.match(/([\w.-]+):(\d{1,5})/);
+      if (addrMatch) {
+        records.push({
+          instance: before,
+          address: `${addrMatch[1]}:${addrMatch[2]}`,
+          ip: addrMatch[1],
+          port: Number(addrMatch[2]),
+          serial: extractSerialFromMdnsInstance(before),
+        });
+      }
+    }
+  });
+  const blockRe = /instance:\s*"([^"]+)"[\s\S]*?service:\s*"_adb-tls-connect\._tcp"[\s\S]*?ipv4:\s*"([^"]+)"[\s\S]*?port:\s*(\d{1,5})/g;
+  Array.from(output.matchAll(blockRe)).forEach((match) => {
+    const instance = match[1];
+    const ip = match[2];
+    const port = Number(match[3]);
+    records.push({
+      instance,
+      address: `${ip}:${port}`,
+      ip,
+      port,
+      serial: extractSerialFromMdnsInstance(instance),
+    });
+  });
+  const seen = new Set();
+  return records.filter((rec) => {
+    if (seen.has(rec.address)) {
+      return false;
+    }
+    seen.add(rec.address);
+    return true;
+  });
+};
+
+/**
  * 解析 `adb mdns services` 输出中 `_adb-tls-connect._tcp` 服务的连接地址，
  * 兼容行式（`instance<TAB>服务名<TAB>ip:port`）与 track-services 结构化两种输出
  */
@@ -205,6 +275,8 @@ export const pairDevice = async (adbPath, address, pairingCode) => {
 };
 
 export const connectDevice = async (adbPath, address, options = {}) => adbExecTolerant(adbPath, ['connect', address], options);
+
+export const disconnectDevice = async (adbPath, address, options = {}) => adbExecTolerant(adbPath, ['disconnect', address], options).catch(() => '');
 
 export const KEYCODE_HOME = 3;
 export const KEYCODE_BACK = 4;
@@ -392,4 +464,28 @@ export const getMdnsConnectAddresses = async (adbPath) => {
     // 旧版 adb 无 mdns 子命令或 mdns 被禁用时按无可发现设备处理
     return [];
   }
+};
+
+export const getMdnsServiceRecords = async (adbPath) => {
+  try {
+    return parseMdnsServiceRecords(await adbExec(adbPath, ['mdns', 'services']));
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * 查询设备的硬件序列号（ro.serialno），获取失败时返回 null
+ */
+export const getDeviceHardwareSerial = async (adbPath, serial) => {
+  try {
+    const out = await adbExec(adbPath, ['-s', serial, 'shell', 'getprop', 'ro.serialno'], { timeoutMs: 3000 });
+    const trimmed = String(out ?? '').trim();
+    if (trimmed && !trimmed.includes('\n') && !trimmed.includes(' ') && trimmed.length >= 3) {
+      return trimmed;
+    }
+  } catch {
+    // 忽略异常
+  }
+  return null;
 };

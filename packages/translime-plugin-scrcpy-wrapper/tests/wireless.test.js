@@ -52,9 +52,11 @@ describe('parseAddress', () => {
 });
 
 describe('isWirelessSerial', () => {
-  it('仅 IP:端口 形式的 serial 视为无线设备', () => {
+  it('IP:端口 与 mDNS 形式的 serial 均视为无线设备', () => {
     expect(isWirelessSerial('192.168.1.5:37895')).toBe(true);
     expect(isWirelessSerial('phone-abc:5555')).toBe(true);
+    expect(isWirelessSerial('adb-QV770KQAMM-LiOGZb._adb-tls-connect._tcp')).toBe(true);
+    expect(isWirelessSerial('adb-ee74bb71-nMA7p7')).toBe(true);
     expect(isWirelessSerial('0123456789ABCDEF')).toBe(false);
     expect(isWirelessSerial('emulator-5554')).toBe(false);
     expect(isWirelessSerial('')).toBe(false);
@@ -208,6 +210,31 @@ describe('mergeWirelessDevices', () => {
         stored: true,
       },
     ]);
+  });
+
+  it('同一设备多个连接（IP:端口 与 mDNS 伪设备）按硬件序列号自动去重', () => {
+    const rawOnline = [
+      {
+        serial: '192.168.2.20:38927', hardwareSerial: 'QV770KQAMM', state: 'device', model: 'XQ_EC72',
+      },
+      {
+        serial: 'adb-QV770KQAMM-LiOGZb._adb-tls-connect._tcp', hardwareSerial: 'QV770KQAMM', state: 'device', model: 'XQ_EC72',
+      },
+    ];
+    const saved = [
+      { serial: 'QV770KQAMM', model: 'Xperia 1 III', type: 'wireless' },
+    ];
+    const merged = mergeWirelessDevices(rawOnline, saved);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toEqual({
+      serial: 'QV770KQAMM',
+      adbSerial: '192.168.2.20:38927',
+      state: 'device',
+      model: 'Xperia 1 III',
+      wireless: true,
+      connected: true,
+      stored: true,
+    });
   });
 });
 
