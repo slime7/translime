@@ -100,8 +100,41 @@ describe('buildScrcpyArgs', () => {
       '--video-codec=h265',
       '--new-display',
       '--no-vd-system-decorations',
+      '--display-ime-policy=local',
+      '--audio-source=playback',
       '--start-app=com.foo',
     ]);
+  });
+
+  it('虚拟屏模式开启 display-ime-policy=local，输入法弹出在虚拟屏窗口内而非实体屏（默认 fallback 时窗口内看不到输入法）', () => {
+    const args = buildScrcpyArgs({
+      mode: 'virtual',
+      serial: 'ABC123',
+      pkg: null,
+      title: 't',
+    });
+    expect(args).toContain('--display-ime-policy=local');
+  });
+
+  it('虚拟屏模式音频用 playback 音源独立采集（output 会禁用设备端播放，且与镜像会话的 output 采集互斥）', () => {
+    const args = buildScrcpyArgs({
+      mode: 'virtual',
+      serial: 'ABC123',
+      pkg: null,
+      title: 't',
+    });
+    expect(args).toContain('--audio-source=playback');
+  });
+
+  it('镜像模式不改音频源与输入法策略（保持 scrcpy 默认行为，镜像静音设备属预期）', () => {
+    const args = buildScrcpyArgs({
+      mode: 'mirror',
+      serial: 'ABC123',
+      pkg: null,
+      title: 't',
+    });
+    expect(args.some((arg) => arg.startsWith('--audio-source='))).toBe(false);
+    expect(args.some((arg) => arg.startsWith('--display-ime-policy='))).toBe(false);
   });
 
   it('虚拟屏模式给定分辨率时输出显式 new-display 并开启 flex-display', () => {
@@ -118,6 +151,8 @@ describe('buildScrcpyArgs', () => {
       '--new-display=871x1184',
       '-x',
       '--no-vd-system-decorations',
+      '--display-ime-policy=local',
+      '--audio-source=playback',
       '--start-app=com.foo',
     ]);
   });

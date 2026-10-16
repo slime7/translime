@@ -65,7 +65,12 @@ export const normalizeHexColor = (value) => {
  * letterbox 底色，与外框 outline 同色以贴合圆角。需 scrcpy >= 5.0。
  * virtualDisplaySize 给定时以显式分辨率创建虚拟屏，并开启 flex-display
  * 让虚拟屏连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）。
- * 虚拟屏关闭系统装饰，应用全屏铺满画面区，不显示状态栏、手势栏与标题装饰栏
+ * 虚拟屏关闭系统装饰，应用全屏铺满画面区，不显示状态栏、手势栏与标题装饰栏。
+ * 输入法策略设为 local，软键盘弹出在虚拟屏内而不是实体屏（默认 fallback
+ * 弹在默认屏，虚拟窗口内看不到输入法）。
+ * 音频源设为 playback 独立采集：output（REMOTE_SUBMIX）会禁用设备端播放，
+ * 且与整屏镜像会话的 output 采集互斥；playback 只复制播放流，要求
+ * Android 13+，采集失败时 scrcpy 默认自动降级为无声继续
  */
 export const buildScrcpyArgs = ({
   mode,
@@ -92,7 +97,7 @@ export const buildScrcpyArgs = ({
     } else {
       args.push('--new-display');
     }
-    args.push('--no-vd-system-decorations');
+    args.push('--no-vd-system-decorations', '--display-ime-policy=local', '--audio-source=playback');
   }
   if (pkg) {
     args.push(`--start-app=${pkg}`);
