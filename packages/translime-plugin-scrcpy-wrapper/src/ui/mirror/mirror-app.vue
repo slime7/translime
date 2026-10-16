@@ -27,11 +27,12 @@
             class="window-no-drag flex items-center gap-1"
             style="-webkit-app-region: no-drag; app-region: no-drag;"
           >
+            <!-- aria-label 只作无障碍名：label 会同时成为悬浮 Tooltip 文本 -->
             <mat-btn
               variant="standard"
               size="extra-small"
               icon="remove"
-              label="最小化"
+              aria-label="最小化"
               class="window-no-drag"
               style="-webkit-app-region: no-drag; app-region: no-drag;"
               @click="minimizeWindow"
@@ -40,7 +41,7 @@
               variant="standard"
               size="extra-small"
               icon="close"
-              label="关闭"
+              aria-label="关闭"
               class="window-no-drag"
               style="-webkit-app-region: no-drag; app-region: no-drag;"
               @click="closeWindow"
@@ -120,7 +121,7 @@
       >
         <mat-btn
           variant="standard"
-          size="medium"
+          size="small"
           icon="arrow_back"
           label="返回"
           :disabled="sending"
@@ -128,7 +129,7 @@
         />
         <mat-btn
           variant="standard"
-          size="medium"
+          size="small"
           icon="home"
           label="主页"
           :disabled="sending"
@@ -136,7 +137,7 @@
         />
         <mat-btn
           variant="standard"
-          size="medium"
+          size="small"
           icon="crop_square"
           label="最近任务"
           :disabled="sending"
@@ -144,7 +145,7 @@
         />
         <mat-btn
           variant="standard"
-          size="medium"
+          size="small"
           icon="screen_rotation"
           label="切换横竖屏"
           :disabled="sending"
@@ -152,7 +153,7 @@
         />
         <mat-btn
           variant="standard"
-          size="medium"
+          size="small"
           icon="open_in_new"
           label="新窗口"
           :disabled="sending || !hasForegroundApp"
@@ -160,7 +161,7 @@
         />
         <mat-btn
           variant="standard"
-          size="medium"
+          size="small"
           icon="power_settings_new"
           label="电源"
           :disabled="sending"

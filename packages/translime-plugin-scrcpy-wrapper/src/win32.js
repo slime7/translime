@@ -434,7 +434,14 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
     },
   });
 
-  const schedule = () => scheduler.notifyResize();
+  // 上层（如禁用斜向拖拽）已 preventDefault 的提议尺寸不进入调度，
+  // 否则被拒绝的角部拖拽也会触发冻结帧闪变
+  const schedule = (event) => {
+    if (event?.defaultPrevented) {
+      return;
+    }
+    scheduler.notifyResize();
+  };
   // 拖动期间每个 resize 事件实时跟随摆放，避免画面停留旧矩形、松手后整体跳变；
   // 冻结层覆盖期间 SDL 位于覆盖层下方，仅保证位置同步、不产生视觉拉伸
   const onResized = () => {

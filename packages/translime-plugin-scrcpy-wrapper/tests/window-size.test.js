@@ -10,7 +10,7 @@ import {
 
 const TITLE_ROW_HEIGHT = 40;
 const TITLE_BAR_HEIGHT = 32;
-const TOOLBAR_WIDTH = 72;
+const TOOLBAR_WIDTH = 56;
 const BORDER = 8;
 const GAP = 16;
 const WORK_AREA = { width: 1920, height: 1040 };
@@ -26,11 +26,11 @@ describe('computeWindowSize', () => {
       borderCss: BORDER,
       gapCss: GAP,
     });
-    // chromeW = 24 + 120 = 144, chromeH = (40 + 16 + 8) + (16 + 8) = 88
-    // maxH = 1040 - 64 - 88 = 888, maxW = 1920 - 64 - 144 = 1712
+    // chromeW = 24 + 104 = 128, chromeH = (40 + 16 + 8) + (16 + 8) = 88
+    // maxH = 1040 - 64 - 88 = 888, maxW = 1920 - 64 - 128 = 1792
     // videoW = 888 * 1080 / 2400 = 399.6
-    // width = 399.6 + 144 = 543.6 -> 544, height = 888 + 88 = 976
-    expect(size).toEqual({ width: 544, height: 976 });
+    // width = 399.6 + 128 = 527.6 -> 528, height = 888 + 88 = 976
+    expect(size).toEqual({ width: 528, height: 976 });
   });
 
   it('标题区上方显式叠加顶部留白，不再按大小吸收（防止回归旧的标题栏吸收逻辑）', () => {
@@ -45,9 +45,9 @@ describe('computeWindowSize', () => {
     });
     // chromeH = (40 + 24 + 8) + (16 + 8) = 96
     // maxH = 1040 - 64 - 96 = 880
-    // videoW = 880 * 1080 / 2400 = 396 -> width = 396 + 144 = 540
+    // videoW = 880 * 1080 / 2400 = 396 -> width = 396 + 128 = 524
     // height = 880 + 96 = 976
-    expect(size).toEqual({ width: 540, height: 976 });
+    expect(size).toEqual({ width: 524, height: 976 });
   });
 
   it('宽屏设备画面受限于工作区宽度限制，高度等比反推（防止宽屏设备弹窗溢出显示器）', () => {
@@ -61,11 +61,11 @@ describe('computeWindowSize', () => {
       gapCss: GAP,
       margin: 0,
     });
-    // chromeW = 144, chromeH = 88
-    // maxW = 1000 - 144 = 856, maxH = 900 - 88 = 812
-    // videoW = 812 * 3840 / 2160 = 1443.6 > 856 -> videoW = 856
-    // videoH = 856 * 2160 / 3840 = 481.5 -> height = 481.5 + 88 = 569.5 -> 570
-    expect(size).toEqual({ width: 1000, height: 570 });
+    // chromeW = 128, chromeH = 88
+    // maxW = 1000 - 128 = 872, maxH = 900 - 88 = 812
+    // videoW = 812 * 3840 / 2160 = 1443.6 > 872 -> videoW = 872
+    // videoH = 872 * 2160 / 3840 = 490.5 -> height = 490.5 + 88 = 578.5 -> 579
+    expect(size).toEqual({ width: 1000, height: 579 });
   });
 
   it('虚拟屏模式下无工具栏与边框间距，无底部控制条，仅按标题栏尺寸计算（防止虚拟屏窗口尺寸偏差与滚动条出现）', () => {
@@ -92,7 +92,7 @@ describe('computeWindowSize', () => {
       borderCss: BORDER,
       gapCss: GAP,
     });
-    expect(size.width).toBeGreaterThanOrEqual(240 + 144);
+    expect(size.width).toBeGreaterThanOrEqual(240 + 128);
     expect(size.height).toBeGreaterThanOrEqual(320 + 88);
   });
 
@@ -106,7 +106,7 @@ describe('computeWindowSize', () => {
       borderCss: BORDER,
       gapCss: GAP,
     });
-    expect(size.width).toBe(544);
+    expect(size.width).toBe(528);
     expect(size.height).toBe(976);
   });
 });

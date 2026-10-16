@@ -59,8 +59,8 @@ export const TITLE_BAR_CSS_HEIGHT = 32;
 export const TITLE_ROW_CSS_HEIGHT = 40;
 // 虚拟屏无底部控制条
 export const BAR_CSS_HEIGHT = 0;
-// 画面窗口右侧垂直工具栏 CSS 宽度（mde floating-right 工具栏：56px 按钮 + 两侧 8px 内边距）
-export const TOOLBAR_CSS_WIDTH = 72;
+// 画面窗口右侧垂直工具栏 CSS 宽度（mde floating-right 工具栏：40px small 按钮 + 两侧 8px 内边距）
+export const TOOLBAR_CSS_WIDTH = 56;
 // SDL 画面区周围 outline 边框 CSS 宽度
 export const SDL_BORDER_CSS = 8;
 // SDL 画面区内圆角 CSS 半径（20px，与 28px 外圆角扣除 8px 边框后的内圆角一致）
@@ -454,6 +454,12 @@ const createWrapperWindow = ({
   });
   // 移除默认菜单栏，画面窗口只保留自绘标题栏
   win.removeMenu();
+  // 右键拖动区（非客户区）默认弹出系统菜单，自绘 chrome 下不再需要系统入口
+  if (process.platform === 'win32') {
+    win.on('system-context-menu', (event) => {
+      event.preventDefault();
+    });
+  }
   // F12 / Ctrl+Shift+I 开关 DevTools；SDL 子窗口持有 Win32 焦点时按键
   // 会进入 scrcpy 注入设备，此时先点击自绘标题栏或底条让页面获得焦点
   win.webContents.on('before-input-event', (event, input) => {
@@ -716,6 +722,13 @@ export const launchSession = async (options = {}) => {
     // 镜像缩放期间按 SDL 画面比例锁定窗口比例
     win.on('will-resize', (event, newBounds, details) => {
       if (session.resizingProgrammatically) {
+        return;
+      }
+      // 四角斜向拖拽同时改动宽高，与比例锁定互相拉扯导致尺寸来回跳变，直接禁用
+      const dragEdge = details?.edge ?? '';
+      if (dragEdge === 'top-left' || dragEdge === 'top-right'
+        || dragEdge === 'bottom-left' || dragEdge === 'bottom-right') {
+        event.preventDefault();
         return;
       }
       const ratio = session.resolution && session.resolution.width > 0 && session.resolution.height > 0
