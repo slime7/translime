@@ -4,9 +4,9 @@
     :fill-viewport="false"
   >
     <div class="relative flex h-full w-full flex-col overflow-hidden bg-transparent select-none">
-      <!-- 窗口背景卡片 -->
+      <!-- 窗口背景卡片：压到所有内容之下，避免面板显示时盖住画面框 outline -->
       <div
-        class="window-card-bg window-fade pointer-events-none absolute inset-0"
+        class="window-card-bg window-fade pointer-events-none absolute inset-0 -z-10"
         :class="chromeVisible ? 'opacity-100' : 'opacity-0'"
       />
 
