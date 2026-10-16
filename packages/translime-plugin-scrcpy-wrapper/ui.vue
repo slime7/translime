@@ -81,7 +81,7 @@
         placeholder="过滤应用包名"
       />
 
-      <div class="min-h-0 grow overflow-y-auto">
+      <div class="min-h-0 grow">
         <div
           v-if="loadingApps"
           class="flex h-full items-center justify-center"
@@ -106,39 +106,44 @@
         </div>
         <!-- 虚拟滚动：数百个应用包只渲染可见行，避免进入面板时整表渲染阻塞 UI；
              standard 变体保证行高无额外间隔，虚拟步距与 item-height 精确一致 -->
-        <mat-list
+        <mat-scroll-area
           v-else
-          variant="standard"
-          virtual
-          interaction="multi-action"
-          :items="filteredApps"
-          :item-height="56"
-          :item-key="(pkg) => pkg"
+          class="h-full"
+          no-scroll-padding
         >
-          <template #default="{ item }">
-            <mat-list-item :value="item">
-              {{ item }}
-              <template #trailing>
-                <mat-btn
-                  icon="cast"
-                  label="镜像"
-                  size="small"
-                  variant="standard"
-                  :disabled="launching"
-                  @click="launch('mirror', item)"
-                />
-                <mat-btn
-                  icon="picture_in_picture"
-                  label="虚拟屏"
-                  size="small"
-                  variant="standard"
-                  :disabled="launching"
-                  @click="launch('virtual', item)"
-                />
-              </template>
-            </mat-list-item>
-          </template>
-        </mat-list>
+          <mat-list
+            variant="standard"
+            virtual
+            interaction="multi-action"
+            :items="filteredApps"
+            :item-height="56"
+            :item-key="(pkg) => pkg"
+          >
+            <template #default="{ item }">
+              <mat-list-item :value="item">
+                {{ item }}
+                <template #trailing>
+                  <mat-btn
+                    icon="cast"
+                    label="镜像"
+                    size="small"
+                    variant="standard"
+                    :disabled="launching"
+                    @click="launch('mirror', item)"
+                  />
+                  <mat-btn
+                    icon="picture_in_picture"
+                    label="虚拟屏"
+                    size="small"
+                    variant="standard"
+                    :disabled="launching"
+                    @click="launch('virtual', item)"
+                  />
+                </template>
+              </mat-list-item>
+            </template>
+          </mat-list>
+        </mat-scroll-area>
       </div>
     </div>
 

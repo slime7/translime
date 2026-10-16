@@ -37,8 +37,10 @@ import {
   calculateProportionalSize,
   computeWindowSize,
   restoreMirrorContentSize,
+  swapVideoContentSize,
 } from './window-size';
 import { isChromeRevealed } from './chrome-reveal';
+import { createChromeVisibility } from './chrome-visibility';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -64,6 +66,8 @@ export const SDL_CORNER_RADIUS_CSS = 20;
 // 画面区四周统一留白（标题栏悬浮在顶部留白内，使四周边缘留白大致相等）
 export const OUTER_GAP_CSS = 48;
 export const TOOLBAR_GAP_CSS = 24;
+// 控制栏（标题栏、工具栏与背景卡片）隐藏延时：移出或失焦后延迟隐藏，显示仍即时
+export const CHROME_HIDE_DELAY_MS = 2000;
 
 // 原生标题栏按钮随宿主主题明暗切换的前景色
 const OVERLAY_SYMBOL_COLORS = {
@@ -311,6 +315,46 @@ const checkAndFixProportionalSize = (sessionId) => {
 };
 
 /**
+ * 设备横竖屏切换后交换画面宽高。
+ *
+ * 旋转不改变内容量级，窗口尺寸跟随交换而非按单轴重新适配，
+ * 避免旋转后窗口相对旋转前显著变小。
+ */
+const swapMirrorSizeForRotation = (sessionId) => {
+  const session = sessions.get(sessionId);
+  if (!session || !session.win || session.win.isDestroyed() || session.mode !== 'mirror') {
+    return;
+  }
+  const [w, h] = session.win.getContentSize();
+  const { chromeWidth, chromeHeight } = getChromeMetrics('mirror');
+  // 交换结果可能超出工作区（如竖屏窗口换横屏后宽度超屏），按比例整体缩小
+  let maxVideoWidth = null;
+  let maxVideoHeight = null;
+  try {
+    const display = screen.getDisplayMatching(session.win.getBounds());
+    const margin = 64;
+    maxVideoWidth = Math.max(1, display.workArea.width - margin - chromeWidth);
+    maxVideoHeight = Math.max(1, display.workArea.height - margin - chromeHeight);
+  } catch {
+    // 无显示器信息时不设上限
+  }
+  const adjusted = swapVideoContentSize({
+    width: w,
+    height: h,
+    chromeWidth,
+    chromeHeight,
+    maxVideoWidth,
+    maxVideoHeight,
+  });
+  session.resizingProgrammatically = true;
+  try {
+    session.win.setContentSize(adjusted.width, adjusted.height);
+  } finally {
+    session.resizingProgrammatically = false;
+  }
+};
+
+/**
  * 窗口调整结束后的状态收尾与冻结层撤下。
  */
 const settleResize = (sessionId) => {
@@ -478,6 +522,8 @@ const destroySession = (sessionId) => {
     clearInterval(session.cursorTimer);
     session.cursorTimer = null;
   }
+  session.chromeVisibility?.dispose();
+  session.chromeVisibility = null;
   cancelCatchUp(sessionId);
   // 会话期间锁定过设备旋转，退出时恢复锁定前的设置
   if (session.rotationState && session.rotationState.forced !== null) {
@@ -636,6 +682,7 @@ export const launchSession = async (options = {}) => {
     catchUp: null,
     spawnError: null,
     cursorTimer: null,
+    chromeVisibility: null,
     resizingProgrammatically: false,
     rotationState: null,
   };
@@ -701,8 +748,16 @@ export const launchSession = async (options = {}) => {
       }
     });
 
-    // 监听鼠标位置控制标题栏与工具栏显隐
-    let chromeRevealed = true;
+    // 监听鼠标位置控制标题栏与工具栏显隐：显示立即生效，隐藏延迟执行
+    const chromeVisibility = createChromeVisibility({
+      hideDelayMs: CHROME_HIDE_DELAY_MS,
+      onChange: (visible) => {
+        if (!win.isDestroyed()) {
+          win.webContents.send(CHROME_VISIBLE_CHANNEL, visible);
+        }
+      },
+    });
+    session.chromeVisibility = chromeVisibility;
     const initialGraceEnd = Date.now() + 4000;
     session.cursorTimer = setInterval(() => {
       if (win.isDestroyed()) {
@@ -715,26 +770,17 @@ export const launchSession = async (options = {}) => {
       // 窗口不在前台（其他应用持焦、被遮挡或最小化）时不触发面板显示；
       // 点击画面后焦点在 SDL 子窗口上，须按前台根窗口判定而非 win.isFocused()
       if (!isWrapperWindowActive(win)) {
-        if (chromeRevealed) {
-          chromeRevealed = false;
-          win.webContents.send(CHROME_VISIBLE_CHANNEL, false);
-        }
+        chromeVisibility.hide();
         return;
       }
       const now = Date.now();
       if (now < initialGraceEnd) {
-        if (!chromeRevealed) {
-          chromeRevealed = true;
-          win.webContents.send(CHROME_VISIBLE_CHANNEL, true);
-        }
+        chromeVisibility.show();
         return;
       }
       const pt = getCursorPosInClient(win);
       if (!pt) {
-        if (chromeRevealed) {
-          chromeRevealed = false;
-          win.webContents.send(CHROME_VISIBLE_CHANNEL, false);
-        }
+        chromeVisibility.hide();
         return;
       }
       const [w, h] = win.getContentSize();
@@ -749,9 +795,10 @@ export const launchSession = async (options = {}) => {
         topThreshold: OUTER_GAP_CSS + 24,
         rightThreshold: TOOLBAR_CSS_WIDTH + TOOLBAR_GAP_CSS + 24,
       });
-      if (nextRevealed !== chromeRevealed) {
-        chromeRevealed = nextRevealed;
-        win.webContents.send(CHROME_VISIBLE_CHANNEL, nextRevealed);
+      if (nextRevealed) {
+        chromeVisibility.show();
+      } else {
+        chromeVisibility.hide();
       }
       if (nextRevealed) {
         getForegroundApp(adbPath, serial, { defaultLauncher: session.defaultLauncher }).then((appPkg) => {
@@ -790,8 +837,18 @@ export const launchSession = async (options = {}) => {
       if (session.resolution && session.resolution.width === width && session.resolution.height === height) {
         return;
       }
+      const prevRatio = session.resolution
+        ? session.resolution.width / session.resolution.height
+        : null;
       session.resolution = { width, height };
-      checkAndFixProportionalSize(sessionId);
+      const ratio = width / height;
+      // 设备横竖屏切换会让比例反转：交换画面宽高保持窗口视觉量级，
+      // 其余尺寸变化仍按单轴等比修正
+      if (prevRatio && ((prevRatio < 1 && ratio >= 1) || (prevRatio > 1 && ratio <= 1))) {
+        swapMirrorSizeForRotation(sessionId);
+      } else {
+        checkAndFixProportionalSize(sessionId);
+      }
       session.hooks?.syncNow();
     });
   };

@@ -5,6 +5,7 @@ import {
   computeWindowSize,
   fitVideoRect,
   restoreMirrorContentSize,
+  swapVideoContentSize,
 } from '../src/window-size';
 
 const TITLE_BAR_HEIGHT = 32;
@@ -270,6 +271,35 @@ describe('calculateAspectCorrection', () => {
     expect(result).toEqual({ width: 324, height: 157 });
     const videoRatio = (result.width - chromeWidth) / (result.height - chromeHeight);
     expect(Math.abs(videoRatio - wideRatio) / wideRatio).toBeLessThan(0.005);
+  });
+});
+
+describe('swapVideoContentSize', () => {
+  const chromeWidth = 224;
+  const chromeHeight = 112;
+
+  it('旋转后交换画面宽高，窗口视觉量级与旋转前相当（防止按单轴重新适配导致窗口显著变小）', () => {
+    // 竖屏窗口 613x976：画面 389x864，交换后画面 864x389
+    expect(swapVideoContentSize({
+      width: 613,
+      height: 976,
+      chromeWidth,
+      chromeHeight,
+      maxVideoWidth: 1632,
+      maxVideoHeight: 864,
+    })).toEqual({ width: 1088, height: 501 });
+  });
+
+  it('交换结果超出工作区时按比例整体缩小（防止旋出横屏后窗口超屏）', () => {
+    // 交换后画面 864x389 超宽度上限 600：等比缩至 600x270
+    expect(swapVideoContentSize({
+      width: 613,
+      height: 976,
+      chromeWidth,
+      chromeHeight,
+      maxVideoWidth: 600,
+      maxVideoHeight: 864,
+    })).toEqual({ width: 824, height: 382 });
   });
 });
 

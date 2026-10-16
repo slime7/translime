@@ -55,6 +55,20 @@
         <span class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">等待画面接入…</span>
       </div>
 
+      <!-- 画面底垫层：与外框同色的圆角底，填满边框内弧与 SDL 圆角裁切边缘的取整缝隙 -->
+      <div
+        v-if="sdlRect"
+        class="pointer-events-none absolute"
+        :style="{
+          left: `${sdlRect.x - 1}px`,
+          top: `${sdlRect.y - 1}px`,
+          width: `${sdlRect.width + 2}px`,
+          height: `${sdlRect.height + 2}px`,
+          background: 'var(--mat-sys-color-outline)',
+          borderRadius: 'var(--mat-sys-shape-corner-large-increased, 20px)',
+        }"
+      />
+
       <!-- 画面外轮廓边框：实时跟随 SDL 矩形，不加位移过渡以免拖拽期间与画面错位 -->
       <div
         v-if="sdlRect"

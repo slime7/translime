@@ -169,6 +169,44 @@ export const calculateProportionalSize = ({
 };
 
 /**
+ * 设备横竖屏切换后交换画面宽高得到新窗口内容尺寸。
+ *
+ * 旋转只改变方向、不改变内容量级，交换宽高让旋转后的窗口与旋转前
+ * 视觉大小大致相当；交换结果超出画面区上限时按比例整体缩小。
+ *
+ * @param {object} options
+ * @param {number} options.width - 当前窗口内容宽度。
+ * @param {number} options.height - 当前窗口内容高度。
+ * @param {number} options.chromeWidth - 水平非画面宽度。
+ * @param {number} options.chromeHeight - 垂直非画面高度。
+ * @param {number} [options.maxVideoWidth] - 画面区宽度上限（CSS 像素）。
+ * @param {number} [options.maxVideoHeight] - 画面区高度上限（CSS 像素）。
+ * @returns {{ width: number, height: number }}
+ */
+export const swapVideoContentSize = ({
+  width,
+  height,
+  chromeWidth,
+  chromeHeight,
+  maxVideoWidth = null,
+  maxVideoHeight = null,
+}) => {
+  const videoW = Math.max(1, width - chromeWidth);
+  const videoH = Math.max(1, height - chromeHeight);
+  const nextW = videoH;
+  const nextH = videoW;
+  const scale = Math.min(
+    1,
+    maxVideoWidth > 0 ? maxVideoWidth / nextW : 1,
+    maxVideoHeight > 0 ? maxVideoHeight / nextH : 1,
+  );
+  return {
+    width: Math.round(nextW * scale) + chromeWidth,
+    height: Math.round(nextH * scale) + chromeHeight,
+  };
+};
+
+/**
  * 计算把画面区修正回设备比例所需的窗口内容尺寸。
  *
  * 默认宽度保持不变、高度按比例取整对齐；偏差在容差内时返回 null（无需修正），
