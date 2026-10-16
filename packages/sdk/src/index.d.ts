@@ -400,7 +400,7 @@ export function isPreviewMode(): boolean;
 
 /**
  * 当前是否运行在宿主的隔离插件子进程（plugin.isolated: true）中。
- * 隔离模式下 getMainStore / usePluginConfig / usePluginInterop / setTitleBarActions 会抛错。
+ * 隔离模式下 getMainStore / usePluginConfig / usePluginInterop / setTitleBarActions / registerDeepLinkHandlers / registerLib 会抛错。
  */
 export function isIsolatedMode(): boolean;
 
@@ -477,6 +477,41 @@ export function setTitleBarActions(
   pluginId: string,
   actions: TitleBarAction[] | null,
 ): boolean;
+
+/**
+ * 插件深链事件：宿主转发 `translime://plugin/<插件名>/<路径>` 时传入
+ */
+export interface PluginDeepLinkEvent {
+  /** 去首尾斜杠后的深链路径（不含插件段） */
+  path: string;
+  /** 深链查询参数 */
+  params: Record<string, string>;
+}
+
+/**
+ * 注册插件深链处理函数（仅主进程；隔离模式下抛错）。
+ * 深链形如 `translime://plugin/<插件名>/<路径>?<查询参数>`，插件名支持省略
+ * `translime-plugin-` 前缀；宿主收到深链后先确保插件激活再按路径精确匹配调用。
+ * 传入对象整体替换该插件的登记，传空对象或 null 清除；宿主停用/重启插件时自动清除。
+ * 宿主过旧（无注册表）时返回 false，不影响插件其余功能。
+ * @param pluginId 插件 ID (通常与 package.json 中的 name 一致)
+ * @param handlers 路径到处理函数的映射
+ */
+export function registerDeepLinkHandlers(
+  pluginId: string,
+  handlers: Record<string, (event: PluginDeepLinkEvent) => void> | null,
+): boolean;
+
+/**
+ * 注册 lib 型插件的公共库，供其他插件探知和调用（仅主进程；隔离模式下抛错）。
+ * 与入口静态导出 `libs` 等价且可覆盖之；其他插件经 `usePluginInterop()` 的
+ * `getExports` / `waitForPlugin` / `getRegisteredPlugins` 探知并调用。
+ * 传 null 清除登记；宿主停用/重启插件时自动清除。
+ * 宿主过旧（无 interop）时返回 false，不影响插件其余功能。
+ * @param pluginId 插件 ID (通常与 package.json 中的 name 一致)
+ * @param lib 公共库对象
+ */
+export function registerLib(pluginId: string, lib: Record<string, any> | null): boolean;
 
 // ----------------------------------------------------------------------
 // 通用 API

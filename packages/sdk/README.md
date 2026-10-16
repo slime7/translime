@@ -114,6 +114,16 @@ const { VBtn, VCard } = useVuetifyComponents();
   的按钮，支持直按钮与下拉菜单（Electron Menu 模板风格，含 `icon` / `tooltip` /
   `enabled` / `visible` / 嵌套 `submenu`）。传入数组整体替换，传空数组或 `null` 清除；
   宿主在插件停用/重启时自动清除。宿主过旧时返回 `false`，插件其余功能不受影响。
+- `registerDeepLinkHandlers(pluginId, handlers)`: 注册 `translime://plugin/<插件名>/<路径>`
+  深链的处理函数（`{ [路径]: (event) => void }`，按路径精确匹配，`event` 携带 `{ path,
+  params }`）。插件名支持省略 `translime-plugin-` 前缀；宿主收到深链后会先确保插件激活
+  再分发。传入对象整体替换，传空对象或 `null` 清除；宿主在插件停用/重启时自动清除。
+  宿主过旧时返回 `false`，插件其余功能不受影响。
+- `registerLib(pluginId, lib)`: 注册 lib 型插件（只提供工具方法、无 UI）的公共库，
+  供其他插件探知和调用。与入口静态导出 `libs` 等价且可覆盖之；其他插件经
+  `usePluginInterop()` 的 `getExports` / `waitForPlugin` / `getRegisteredPlugins` 探知并
+  调用。传 `null` 清除登记；宿主在插件停用/重启时自动清除。宿主过旧时返回 `false`，
+  插件其余功能不受影响。
 
 ```javascript
 import { setTitleBarActions } from 'translime-sdk';
@@ -153,6 +163,8 @@ export const ipcHandlers = defineIpcHandlers([
 #### 插件间通信
 
 `usePluginInterop()` 用于在一个插件的主进程代码中访问另一个插件导出的公共 API。
+lib 型插件既可以在入口静态导出 `libs`，也可以在 `pluginDidLoad` 里经
+`registerLib(pluginId, lib)` 运行期注册（可覆盖静态导出）。
 
 ```javascript
 import { usePluginInterop } from 'translime-sdk';
@@ -174,6 +186,18 @@ const doSomething = async () => {
   } catch (error) {
     console.error('目标插件未就绪', error);
   }
+};
+```
+
+lib 型插件经 `registerLib` 注册公共库，其他插件按插件 ID 探知并调用：
+
+```javascript
+import { registerLib } from 'translime-sdk';
+
+export const pluginDidLoad = () => {
+  registerLib('my-plugin-id', {
+    format: (value) => value.toUpperCase(),
+  });
 };
 ```
 

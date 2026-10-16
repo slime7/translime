@@ -38,6 +38,8 @@ export const parseDeepLink = (url) => {
   const result = {
     origin: url,
     main: link.hostname,
+    // 去掉首尾斜杠的路径段（如 plugin/scrcpy-wrapper/abc → scrcpy-wrapper/abc）
+    path: link.pathname.replace(/^\/+/, '').replace(/\/+$/, ''),
     params: {},
   };
   // eslint-disable-next-line no-restricted-syntax

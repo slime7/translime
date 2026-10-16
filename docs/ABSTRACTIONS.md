@@ -11,7 +11,8 @@
 | 激活 | 宿主加载插件主进程入口并执行 `pluginDidLoad` 的过程 |
 | 命令 | manifest `contributes.commands` 声明的静态命令，宿主可在插件未激活时反向激活 |
 | preview 模式 | SDK 提供的浏览器调试模式，mock 宿主 API，仅用于 UI 辅助调试 |
-| 深链 | `translime://` 协议，用于从外部启动宿主并携带参数；开发隔离模式（`dev:isolate`）注册独立的 `translime-dev://`，避免覆盖安装版的 `translime://` 注册 |
+| 深链 | `translime://` 协议，用于从外部启动宿主并携带参数；`translime://plugin/<插件名>/<路径>` 转发给对应插件注册的深链处理函数，开发隔离模式（`dev:isolate`）注册独立的 `translime-dev://`，避免覆盖安装版的 `translime://` 注册 |
+| lib 型插件 | 只提供工具方法、无 UI 的插件；经入口 `libs` 导出或 SDK `registerLib` 注册公共库，供其他插件探知和调用 |
 
 ## 插件 manifest（package.json.plugin）
 
@@ -115,6 +116,21 @@ config store，保存时的 `pluginSettingSaved` 仅在插件处于激活态时�
 入口导出形态：插件 API 以命名导出提供并在 default export 中汇总（仓库约定）；
 宿主提取时 default export 为对象则优先取 default，纯命名导出同样可用。
 
+## 插件深链与 lib 注册
+
+两项**运行期动态 API**（非入口导出），与顶栏按钮区同一模式：宿主过旧时静默降级
+返回 false，插件停用/重启时随运行期注册一并清除。
+
+- **插件深链**：插件主进程调用 SDK `registerDeepLinkHandlers(pluginId, handlers)`
+  声明 `{ [路径]: (event) => void }`；宿主收到
+  `translime://plugin/<插件名>/<路径>?<查询参数>`（插件名可省略
+  `translime-plugin-` 前缀）后，先确保插件激活再按路径精确匹配调用，事件携带
+  `{ path, params }`。未启用的插件不因深链被唤醒。
+- **lib 注册**：lib 型插件调用 SDK `registerLib(pluginId, lib)` 注册公共库，与入口
+  静态导出 `libs` 等价且可覆盖（静态 libs 先注册，`pluginDidLoad` 内的运行期注册
+  后生效）；其他插件经 `usePluginInterop()` 的 `getExports` / `waitForPlugin` /
+  `getRegisteredPlugins` 探知并调用。
+
 ## 插件顶栏按钮区
 
 插件可在宿主插件页顶栏（inspect 旁）放置公共操作按钮，与插件自身 UI 分离。这是
@@ -128,8 +144,8 @@ config store，保存时的 `pluginSettingSaved` 仅在插件处于激活态时�
 ## SDK 环境边界
 
 | API | 环境 |
-| --- | --- |
-| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()`、`defineIpcHandlers()`、`setTitleBarActions()` | 主进程（除 `defineIpcHandlers` 外在隔离模式下抛错） |
+|  --- | --- |
+| `getMainStore()`、`usePluginConfig()`、`usePluginInterop()`、`defineIpcHandlers()`、`setTitleBarActions()`、`registerDeepLinkHandlers()`、`registerLib()` | 主进程（除 `defineIpcHandlers` 外在隔离模式下抛错） |
 | `useIpc()`、`useVuetify*()`、`useMat()` / `useMde()`、`useMatComponents()`、`useMatDirectives()`、`useMatFunctions()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
 | `useLogger()`、`isPreviewMode()`、`isIsolatedMode()` | 通用 |
 
@@ -156,7 +172,8 @@ manifest 声明 `plugin.isolated: true` 时，插件主进程代码运行在独�
 
 - 支持完整的 `pluginDidLoad` / `pluginWillUnload` / `pluginSettingSaved`、`ipcHandlers` 与
   `commands`，子进程崩溃会转为 `load-error`（含退出码），不再影响宿主与其他插件。
-- 不支持 `libs` 导出与 `getMainStore` / `usePluginConfig` / `usePluginInterop`（SDK 抛出明确错误）；
+- 不支持 `libs` 导出与 `getMainStore` / `usePluginConfig` / `usePluginInterop` /
+  `registerDeepLinkHandlers` / `registerLib`（SDK 抛出明确错误）；
   `sendToClient` 仅支持主窗口与 `'all'` 两种目标。
 
 ## 不变量

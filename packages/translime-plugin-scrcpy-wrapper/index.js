@@ -1,4 +1,9 @@
-import { defineIpcHandlers, useLogger, usePluginConfig } from 'translime-sdk';
+import {
+  defineIpcHandlers,
+  registerDeepLinkHandlers,
+  useLogger,
+  usePluginConfig,
+} from 'translime-sdk';
 import * as adbModule from './src/adb';
 import * as scrcpyModule from './src/scrcpy';
 import * as wirelessModule from './src/wireless';
@@ -94,8 +99,85 @@ const storeWirelessConnection = async (serial) => {
   return { success: true, serial, devices: wirelessModule.mergeWirelessDevices(devices, stored) };
 };
 
+/**
+ * 启动 scrcpy 会话的共用流程：无线设备先确保连接（端口变化时回写存储），
+ * 再按模式交给 scrcpy 模块开窗。IPC 的 `launch` 与深链 `mirror` 共用。
+ */
+const launchDeviceSession = async ({
+  mode,
+  serial,
+  pkg,
+  resolution,
+}) => {
+  try {
+    let actualSerial = serial;
+    if (wirelessModule.isWirelessSerial(actualSerial)) {
+      const ensured = await wirelessModule.ensureWirelessConnected({
+        serial: actualSerial,
+        adbPath: getAdbPath(),
+        adb: adbModule,
+      });
+      if (!ensured.ok) {
+        return { success: false, message: ensured.message };
+      }
+      if (ensured.portChanged) {
+        const stored = getStoredWirelessDevices();
+        const entry = stored.find((item) => item.serial === serial);
+        if (entry) {
+          saveStoredWirelessDevices(stored.map((item) => (
+            item.serial === serial ? { ...item, serial: ensured.serial } : item
+          )));
+          logger.info(`[${id}] wireless port updated: ${serial} -> ${ensured.serial}`);
+        }
+      }
+      actualSerial = ensured.serial;
+    }
+    const result = await scrcpyModule.launchSession({
+      mode,
+      serial: actualSerial,
+      pkg,
+      resolution,
+      savedSize: mode === 'mirror' ? getSavedMirrorSize(actualSerial) : null,
+      onSaveMirrorSize: (size) => saveMirrorSize(actualSerial, size),
+      settingValue: getScrcpySetting(),
+      logger,
+    });
+    return { success: true, serial: actualSerial, ...result };
+  } catch (e) {
+    logger.error(`[${id}] launch failed: ${e.message}`);
+    return { success: false, message: e.message };
+  }
+};
+
+/**
+ * 深链 `translime://plugin/scrcpy-wrapper/mirror[?serial=xxx]`：
+ * 未指定 serial 时取第一台在线设备，直接弹出整屏镜像窗口。
+ */
+const launchMirrorFromDeepLink = async ({ path, params }) => {
+  let serial = String(params?.serial ?? '').trim();
+  if (!serial) {
+    const devices = await adbModule.listDevices(getAdbPath()).catch(() => []);
+    serial = devices.find((device) => device.state === 'device')?.serial ?? '';
+  }
+  if (!serial) {
+    logger.warn(`[${id}] deep link ${path}: 无在线设备，忽略`);
+    return;
+  }
+  const result = await launchDeviceSession({ mode: 'mirror', serial });
+  if (!result.success) {
+    logger.warn(`[${id}] deep link mirror 失败: ${result.message}`);
+  }
+};
+
 const pluginDidLoad = () => {
   logger.info(`[${id}] plugin loaded`);
+  registerDeepLinkHandlers(id, {
+    mirror: (event) => {
+      launchMirrorFromDeepLink(event).catch((e) => {
+        logger.error(`[${id}] deep link mirror 异常: ${e.message}`);
+      });
+    },
+  });
 };
 
 const pluginWillUnload = () => {
@@ -212,51 +294,7 @@ const ipcHandlers = defineIpcHandlers([
   },
   {
     type: 'launch',
-    handler: () => async ({
-      mode,
-      serial,
-      pkg,
-      resolution,
-    }) => {
-      try {
-        let actualSerial = serial;
-        if (wirelessModule.isWirelessSerial(actualSerial)) {
-          const ensured = await wirelessModule.ensureWirelessConnected({
-            serial: actualSerial,
-            adbPath: getAdbPath(),
-            adb: adbModule,
-          });
-          if (!ensured.ok) {
-            return { success: false, message: ensured.message };
-          }
-          if (ensured.portChanged) {
-            const stored = getStoredWirelessDevices();
-            const entry = stored.find((item) => item.serial === serial);
-            if (entry) {
-              saveStoredWirelessDevices(stored.map((item) => (
-                item.serial === serial ? { ...item, serial: ensured.serial } : item
-              )));
-              logger.info(`[${id}] wireless port updated: ${serial} -> ${ensured.serial}`);
-            }
-          }
-          actualSerial = ensured.serial;
-        }
-        const result = await scrcpyModule.launchSession({
-          mode,
-          serial: actualSerial,
-          pkg,
-          resolution,
-          savedSize: mode === 'mirror' ? getSavedMirrorSize(actualSerial) : null,
-          onSaveMirrorSize: (size) => saveMirrorSize(actualSerial, size),
-          settingValue: getScrcpySetting(),
-          logger,
-        });
-        return { success: true, serial: actualSerial, ...result };
-      } catch (e) {
-        logger.error(`[${id}] launch failed: ${e.message}`);
-        return { success: false, message: e.message };
-      }
-    },
+    handler: () => async (payload) => launchDeviceSession(payload),
   },
   {
     type: 'close-session',

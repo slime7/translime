@@ -155,6 +155,68 @@ export function setTitleBarActions(pluginId, actions) {
   return global.titleBarRegistry.setTitleBarActions(pluginId, actions);
 }
 
+/**
+ * @typedef {Object} PluginDeepLinkEvent
+ * @property {string} path 去首尾斜杠后的深链路径（不含插件段）
+ * @property {Record<string, string>} params 深链查询参数
+ */
+
+/**
+ * 注册插件深链处理函数。
+ * @description 仅在 **主进程 (Main Process)** 环境可用；隔离模式（plugin.isolated）下抛错。
+ * 深链形如 `translime://plugin/<插件名>/<路径>?<查询参数>`，插件名支持省略
+ * `translime-plugin-` 前缀；宿主收到深链后会先确保插件激活再按路径精确匹配调用。
+ * 传入对象整体替换该插件的登记，传空对象或 null 清除；宿主在插件停用/重启时也会自动清除。
+ * 宿主过旧（无注册表）时返回 false，不影响插件其余功能。
+ * @param {string} pluginId 插件 ID (通常与 package.json 中的 name 一致)
+ * @param {Record<string, function(PluginDeepLinkEvent): void>|null} handlers 路径到处理函数的映射
+ * @returns {boolean} 是否生效
+ */
+export function registerDeepLinkHandlers(pluginId, handlers) {
+  if (isIsolatedMode()) {
+    isolatedUnsupported('registerDeepLinkHandlers');
+  }
+  if (handlers != null && (typeof handlers !== 'object' || Array.isArray(handlers))) {
+    throw new Error('registerDeepLinkHandlers 需要传入路径到处理函数的对象或 null');
+  }
+  if (typeof global === 'undefined' || !global.deepLinkRegistry) {
+    // 宿主过旧：静默降级（不打日志，插件其余功能不受影响）
+    return false;
+  }
+  return global.deepLinkRegistry.setDeepLinkHandlers(pluginId, handlers);
+}
+
+/**
+ * 注册 lib 型插件的公共库，供其他插件探知和调用。
+ * @description 仅在 **主进程 (Main Process)** 环境可用；隔离模式（plugin.isolated）下抛错。
+ * 与入口静态导出 `libs` 等价且可覆盖之（静态 libs 先注册，`pluginDidLoad`
+ * 内的运行期注册后生效）；登记后其他插件经 `usePluginInterop()` 的
+ * `getExports` / `waitForPlugin` / `getRegisteredPlugins` 探知并调用。
+ * 传 null 清除登记；宿主在插件停用/重启时也会自动清除。
+ * 宿主过旧（无 interop）时返回 false，不影响插件其余功能。
+ * @param {string} pluginId 插件 ID (通常与 package.json 中的 name 一致)
+ * @param {object|null} lib 公共库对象
+ * @returns {boolean} 是否生效
+ */
+export function registerLib(pluginId, lib) {
+  if (isIsolatedMode()) {
+    isolatedUnsupported('registerLib');
+  }
+  if (lib != null && (typeof lib !== 'object' || Array.isArray(lib))) {
+    throw new Error('registerLib 需要传入库对象或 null');
+  }
+  if (typeof global === 'undefined' || !global.pluginInterop) {
+    // 宿主过旧：静默降级（不打日志，插件其余功能不受影响）
+    return false;
+  }
+  if (lib == null) {
+    global.pluginInterop.unregister(pluginId);
+    return true;
+  }
+  global.pluginInterop.register(pluginId, lib);
+  return true;
+}
+
 // ----------------------------------------------------------------------
 // UI & Renderer APIs (Renderer Process Only)
 // ----------------------------------------------------------------------
