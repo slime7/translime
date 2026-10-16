@@ -2,8 +2,9 @@
  * 画面窗口初始尺寸与等比缩放计算。
  *
  * 比例以 SDL 画面区比例（即设备分辨率宽高比）为准，
- * 窗口总尺寸 = 画面尺寸 + 标题栏 + 右侧工具栏 + 8px outline 边框 + 四周统一留白。
- * 标题栏悬浮在顶部留白内：留白容得下标题栏时不再额外占用高度。
+ * 窗口总尺寸 = 画面尺寸 + 标题区行高 + 右侧工具栏 + 8px outline 边框 + 四周留白。
+ * 镜像模式的标题栏悬浮在顶部标题区行内，行高即全部顶部占用；
+ * 虚拟屏模式顶部仅剩原生标题栏高度。
  */
 
 const FALLBACK_RESOLUTION = { width: 1080, height: 2400 };
@@ -18,9 +19,10 @@ export const MIN_VIDEO_HEIGHT = 320;
  * @param {{ width: number, height: number }} options.workArea - 目标显示器工作区（CSS 像素）。
  * @param {number} [options.toolbarCssWidth=0] - 右侧垂直工具栏 CSS 宽度。
  * @param {number} [options.toolbarGapCss=24] - 工具栏与画面区的 CSS 间距。
- * @param {number} [options.titleBarCssHeight=0] - 顶部自绘标题栏 CSS 高度。
+ * @param {number} [options.titleBarCssHeight=0] - 顶部标题区 CSS 高度。
+ * @param {number} [options.topGapCss=0] - 标题区上方的额外顶部留白。
  * @param {number} [options.borderCss=0] - SDL 四周 outline 边框 CSS 宽度。
- * @param {number} [options.gapCss=0] - 画面区四周统一留白（标题栏悬浮其中）。
+ * @param {number} [options.gapCss=0] - 画面区四周统一留白。
  * @param {number} [options.barCssHeight=0] - 底部区域 CSS 高度。
  * @param {number} [options.margin=64] - 工作区四周预留的呼吸边距。
  * @returns {{ width: number, height: number }} BrowserWindow 内容尺寸。
@@ -31,6 +33,7 @@ export const computeWindowSize = ({
   toolbarCssWidth = 0,
   toolbarGapCss = 24,
   titleBarCssHeight = 0,
+  topGapCss = 0,
   borderCss = 0,
   gapCss = 0,
   barCssHeight = 0,
@@ -46,8 +49,7 @@ export const computeWindowSize = ({
   const rightOffset = isMirror
     ? borderCss + toolbarGapCss + toolbarCssWidth + gapCss
     : borderCss + gapCss + toolbarCssWidth;
-  const topExtra = titleBarCssHeight > gapCss ? titleBarCssHeight : 0;
-  const topOffset = topExtra + gapCss + borderCss;
+  const topOffset = titleBarCssHeight + topGapCss + borderCss;
   const bottomOffset = gapCss + borderCss + barCssHeight;
 
   const chromeW = leftOffset + rightOffset;

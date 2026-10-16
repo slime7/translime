@@ -104,15 +104,13 @@
         >
           无匹配应用
         </div>
-        <!-- 虚拟滚动：数百个应用包只渲染可见行，避免进入面板时整表渲染阻塞 UI；
-             standard 变体保证行高无额外间隔，虚拟步距与 item-height 精确一致 -->
+        <!-- 虚拟滚动：数百个应用包只渲染可见行，避免进入面板时整表渲染阻塞 UI -->
         <mat-scroll-area
           v-else
           class="h-full"
           no-scroll-padding
         >
           <mat-list
-            variant="standard"
             virtual
             interaction="multi-action"
             :items="filteredApps"

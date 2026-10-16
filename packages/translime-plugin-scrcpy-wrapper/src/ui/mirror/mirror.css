@@ -24,6 +24,15 @@
   box-shadow: var(--mat-sys-elevation-level2);
 }
 
+/* 淡入淡出：时长与缓动优先取 mde motion 令牌，缺失时回落浏览器默认 */
+.window-fade {
+  transition: opacity var(--mat-sys-motion-duration-short4, 200ms) var(--mat-sys-motion-easing-standard, ease-out);
+}
+
+.window-fade-fast {
+  transition: opacity var(--mat-sys-motion-duration-short3, 150ms) var(--mat-sys-motion-easing-standard, ease-out);
+}
+
 .window-drag-region {
   -webkit-app-region: drag !important;
   app-region: drag !important;

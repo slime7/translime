@@ -402,6 +402,7 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
     debounceMs = 120,
     onResizeBurstStart = null,
     onResizeSettled = null,
+    onAfterSettleSync = null,
     onRect = null,
   } = options;
 
@@ -428,6 +429,8 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
       // 先让上层做比例修正与尺寸收尾，再按最终窗口尺寸摆放画面
       onResizeSettled?.();
       sync();
+      // SDL 移动后新暴露的透明区域不会自动重绘，触发一次整帧重画
+      onAfterSettleSync?.();
     },
   });
 

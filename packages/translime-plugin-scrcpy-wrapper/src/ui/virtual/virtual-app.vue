@@ -21,7 +21,7 @@
         >等待画面接入…</span>
         <div
           v-else
-          class="pointer-events-none absolute inset-0 transition-opacity duration-150 ease-out"
+          class="window-fade-fast pointer-events-none absolute inset-0"
           :class="freezeVisible ? 'opacity-100' : 'opacity-0'"
         >
           <img

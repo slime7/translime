@@ -8,43 +8,46 @@ import {
   swapVideoContentSize,
 } from '../src/window-size';
 
+const TITLE_ROW_HEIGHT = 40;
 const TITLE_BAR_HEIGHT = 32;
-const TOOLBAR_WIDTH = 88;
+const TOOLBAR_WIDTH = 72;
 const BORDER = 8;
-const GAP = 48;
+const GAP = 16;
 const WORK_AREA = { width: 1920, height: 1040 };
 
 describe('computeWindowSize', () => {
-  it('竖屏设备按工作区可用画面等比缩放，窗口尺寸包含标题栏、工具栏、双侧边框与四周统一留白（防止初始窗口超出屏幕或比例错位）', () => {
+  it('镜像窗口按工作区可用画面等比缩放，顶部高度为标题区行高加边框（防止初始窗口超出屏幕或比例错位）', () => {
     const size = computeWindowSize({
       resolution: { width: 1080, height: 2400 },
       workArea: WORK_AREA,
       toolbarCssWidth: TOOLBAR_WIDTH,
-      titleBarCssHeight: TITLE_BAR_HEIGHT,
+      titleBarCssHeight: TITLE_ROW_HEIGHT,
+      topGapCss: 0,
       borderCss: BORDER,
       gapCss: GAP,
     });
-    // 标题栏悬浮于顶部留白内：chromeW = 56 + 168 = 224, chromeH = 56 + 56 = 112
-    // maxH = 1040 - 64 - 112 = 864, maxW = 1920 - 64 - 224 = 1632
-    // videoW = 864 * 1080 / 2400 = 388.8
-    // width = 388.8 + 224 = 612.8 -> 613, height = 864 + 112 = 976
-    expect(size).toEqual({ width: 613, height: 976 });
+    // chromeW = 24 + 120 = 144, chromeH = (40 + 8) + (16 + 8) = 72
+    // maxH = 1040 - 64 - 72 = 904, maxW = 1920 - 64 - 144 = 1712
+    // videoW = 904 * 1080 / 2400 = 406.8
+    // width = 406.8 + 144 = 550.8 -> 551, height = 904 + 72 = 976
+    expect(size).toEqual({ width: 551, height: 976 });
   });
 
-  it('留白容不下标题栏时标题栏额外占据顶部高度（防止小间距下标题栏与画面重叠）', () => {
+  it('标题区上方显式叠加顶部留白，不再按大小吸收（防止回归旧的标题栏吸收逻辑）', () => {
     const size = computeWindowSize({
       resolution: { width: 1080, height: 2400 },
       workArea: WORK_AREA,
       toolbarCssWidth: TOOLBAR_WIDTH,
-      titleBarCssHeight: TITLE_BAR_HEIGHT,
+      titleBarCssHeight: TITLE_ROW_HEIGHT,
+      topGapCss: 8,
       borderCss: BORDER,
-      gapCss: 16,
+      gapCss: GAP,
     });
-    // 标题栏 32 > 留白 16，额外占高：chromeH = (32 + 16 + 8) + (16 + 8) = 80
+    // chromeH = (40 + 8 + 8) + (16 + 8) = 80
     // maxH = 1040 - 64 - 80 = 896
-    // videoW = 896 * 1080 / 2400 = 403.2 -> width = 403.2 + 160 = 563.2 -> 563
+    // videoW = 896 * 1080 / 2400 = 403.2 -> width = 547.2 -> 547
     // height = 896 + 80 = 976
-    expect(size).toEqual({ width: 563, height: 976 });
+    expect(size).toEqual({ width: 547, height: 976 });
   });
 
   it('宽屏设备画面受限于工作区宽度限制，高度等比反推（防止宽屏设备弹窗溢出显示器）', () => {
@@ -52,16 +55,17 @@ describe('computeWindowSize', () => {
       resolution: { width: 3840, height: 2160 },
       workArea: { width: 1000, height: 900 },
       toolbarCssWidth: TOOLBAR_WIDTH,
-      titleBarCssHeight: TITLE_BAR_HEIGHT,
+      titleBarCssHeight: TITLE_ROW_HEIGHT,
+      topGapCss: 0,
       borderCss: BORDER,
       gapCss: GAP,
       margin: 0,
     });
-    // chromeW = 224, chromeH = 112
-    // maxW = 1000 - 224 = 776, maxH = 900 - 112 = 788
-    // videoW = 788 * 3840 / 2160 = 1400.9 > 776 -> videoW = 776
-    // videoH = 776 * 2160 / 3840 = 436.5 -> height = 436.5 + 112 = 548.5 -> 549
-    expect(size).toEqual({ width: 1000, height: 549 });
+    // chromeW = 144, chromeH = 72
+    // maxW = 1000 - 144 = 856, maxH = 900 - 72 = 828
+    // videoW = 828 * 3840 / 2160 = 1472 > 856 -> videoW = 856
+    // videoH = 856 * 2160 / 3840 = 481.5 -> height = 481.5 + 72 = 553.5 -> 554
+    expect(size).toEqual({ width: 1000, height: 554 });
   });
 
   it('虚拟屏模式下无工具栏与边框间距，无底部控制条，仅按标题栏尺寸计算（防止虚拟屏窗口尺寸偏差与滚动条出现）', () => {
@@ -83,12 +87,13 @@ describe('computeWindowSize', () => {
       resolution: { width: 1080, height: 2400 },
       workArea: { width: 200, height: 200 },
       toolbarCssWidth: TOOLBAR_WIDTH,
-      titleBarCssHeight: TITLE_BAR_HEIGHT,
+      titleBarCssHeight: TITLE_ROW_HEIGHT,
+      topGapCss: 0,
       borderCss: BORDER,
       gapCss: GAP,
     });
-    expect(size.width).toBeGreaterThanOrEqual(240 + 224);
-    expect(size.height).toBeGreaterThanOrEqual(320 + 112);
+    expect(size.width).toBeGreaterThanOrEqual(240 + 144);
+    expect(size.height).toBeGreaterThanOrEqual(320 + 72);
   });
 
   it('分辨率缺失时安全回退默认手机比例（防止 adb 未响应时抛错中断窗口创建）', () => {
@@ -96,11 +101,12 @@ describe('computeWindowSize', () => {
       resolution: null,
       workArea: WORK_AREA,
       toolbarCssWidth: TOOLBAR_WIDTH,
-      titleBarCssHeight: TITLE_BAR_HEIGHT,
+      titleBarCssHeight: TITLE_ROW_HEIGHT,
+      topGapCss: 0,
       borderCss: BORDER,
       gapCss: GAP,
     });
-    expect(size.width).toBe(613);
+    expect(size.width).toBe(551);
     expect(size.height).toBe(976);
   });
 });

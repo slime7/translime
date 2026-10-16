@@ -17,3 +17,8 @@
   font-family: 'Material Symbols Outlined' !important;
   font-feature-settings: 'liga' !important;
 }
+
+/* 淡入淡出：时长与缓动优先取 mde motion 令牌，缺失时回落浏览器默认 */
+.window-fade-fast {
+  transition: opacity var(--mat-sys-motion-duration-short3, 150ms) var(--mat-sys-motion-easing-standard, ease-out);
+}

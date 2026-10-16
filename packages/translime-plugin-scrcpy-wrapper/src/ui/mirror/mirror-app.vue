@@ -1,130 +1,119 @@
 <template>
   <mat-app-root class="mirror-root">
-    <div class="relative h-dvh w-dvw overflow-hidden bg-transparent select-none">
+    <div class="relative flex h-dvh w-dvh flex-col overflow-hidden bg-transparent select-none">
       <!-- 窗口背景卡片 -->
       <div
-        class="pointer-events-none absolute inset-0 transition-opacity duration-200 ease-out window-card-bg"
+        class="window-card-bg window-fade pointer-events-none absolute inset-0"
         :class="chromeVisible ? 'opacity-100' : 'opacity-0'"
       />
 
-      <!-- 顶部留白拖动带：标题栏隐藏时仍可拖动窗口 -->
+      <!-- 顶部标题区：自然流首行，整行可拖动，悬浮标题栏在其中淡入淡出 -->
       <div
-        class="absolute inset-x-0 top-0 z-20 h-12 window-drag-region"
-        style="-webkit-app-region: drag; app-region: drag;"
-      />
-
-      <!-- 标题栏：悬浮于顶部留白内 -->
-      <div
-        class="absolute top-2 inset-x-4 z-30 flex h-8 items-center justify-between px-2 transition-opacity duration-200 ease-out window-drag-region"
-        :class="chromeVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+        class="window-drag-region flex h-10 shrink-0 items-center px-4"
         style="-webkit-app-region: drag; app-region: drag;"
       >
-        <div class="flex min-w-0 items-center pr-2">
-          <span class="truncate text-xs font-medium text-[var(--mat-sys-color-on-surface-variant)]">{{ title }}</span>
-        </div>
         <div
-          class="flex items-center gap-1 window-no-drag"
-          style="-webkit-app-region: no-drag; app-region: no-drag;"
+          class="window-fade flex h-8 min-w-0 grow items-center justify-between"
+          :class="chromeVisible ? 'opacity-100' : 'pointer-events-none opacity-0'"
+          style="-webkit-app-region: drag; app-region: drag;"
         >
-          <mat-btn
-            variant="standard"
-            size="extra-small"
-            icon="remove"
-            label="最小化"
-            class="window-no-drag"
+          <div class="flex min-w-0 items-center pr-2">
+            <span class="truncate text-xs font-medium text-[var(--mat-sys-color-on-surface-variant)]">{{ title }}</span>
+          </div>
+          <div
+            class="window-no-drag flex items-center gap-1"
             style="-webkit-app-region: no-drag; app-region: no-drag;"
-            @click="minimizeWindow"
-          />
-          <mat-btn
-            variant="standard"
-            size="extra-small"
-            icon="close"
-            label="关闭"
-            class="window-no-drag"
-            style="-webkit-app-region: no-drag; app-region: no-drag;"
-            @click="closeWindow"
-          />
+          >
+            <mat-btn
+              variant="standard"
+              size="extra-small"
+              icon="remove"
+              label="最小化"
+              class="window-no-drag"
+              style="-webkit-app-region: no-drag; app-region: no-drag;"
+              @click="minimizeWindow"
+            />
+            <mat-btn
+              variant="standard"
+              size="extra-small"
+              icon="close"
+              label="关闭"
+              class="window-no-drag"
+              style="-webkit-app-region: no-drag; app-region: no-drag;"
+              @click="closeWindow"
+            />
+          </div>
         </div>
       </div>
 
-      <!-- 画面接入前占位提示 -->
-      <div
-        v-if="!sdlRect && !freezeImage"
-        class="pointer-events-none absolute inset-0 flex items-center justify-center"
-      >
-        <span class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">等待画面接入…</span>
+      <!-- 中部：由 SDL 矩形反推的 spacer 与画面框在自然流中互相撑开 -->
+      <div class="flex min-h-0 grow flex-col">
+        <div
+          class="shrink-0"
+          :style="{ height: `${topSpacer}px` }"
+        />
+        <div class="flex min-h-0 grow">
+          <!-- 左侧留白拖动 -->
+          <div
+            class="window-drag-region h-full shrink-0"
+            :style="{ width: `${leftSpacer}px` }"
+          />
+          <!-- 画面框：边框即外轮廓，背景与边框同色填满圆角裁切缝隙 -->
+          <div
+            v-if="sdlRect"
+            class="shrink-0"
+            :style="{
+              boxSizing: 'border-box',
+              width: `${sdlRect.width + SDL_BORDER * 2}px`,
+              height: `${sdlRect.height + SDL_BORDER * 2}px`,
+              border: `${SDL_BORDER}px solid var(--mat-sys-color-outline)`,
+              borderRadius: 'var(--mat-sys-shape-corner-extra-large, 28px)',
+              background: 'var(--mat-sys-color-outline)',
+              boxShadow: 'var(--mat-sys-elevation-level1)',
+            }"
+          >
+            <!-- 画面占位容器：以 scrcpy SDL 实际尺寸撑开画面框 -->
+            <div
+              class="relative h-full w-full overflow-hidden"
+              :style="{ borderRadius: 'var(--mat-sys-shape-corner-large-increased, 20px)' }"
+            >
+              <!-- 缩放过渡冻结帧 -->
+              <div
+                v-if="freezeImage"
+                class="window-fade-fast pointer-events-none absolute inset-0 overflow-hidden"
+                :class="freezeVisible ? 'opacity-100' : 'opacity-0'"
+              >
+                <img
+                  :src="freezeImage"
+                  alt=""
+                  class="h-full w-full scale-110 object-fill blur-2xl"
+                >
+              </div>
+            </div>
+          </div>
+          <!-- 画面接入前占位提示 -->
+          <div
+            v-else
+            class="pointer-events-none flex grow items-center justify-center"
+          >
+            <span class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">等待画面接入…</span>
+          </div>
+          <!-- 右侧工具栏区：可拖动，悬浮工具栏叠加其上 -->
+          <div
+            class="window-drag-region h-full grow"
+          />
+        </div>
+        <!-- 底部留白拖动 -->
+        <div class="window-drag-region h-4 shrink-0" />
       </div>
-
-      <!-- 画面底垫层：与外框同色的圆角底，填满边框内弧与 SDL 圆角裁切边缘的取整缝隙 -->
-      <div
-        v-if="sdlRect"
-        class="pointer-events-none absolute"
-        :style="{
-          left: `${sdlRect.x - 1}px`,
-          top: `${sdlRect.y - 1}px`,
-          width: `${sdlRect.width + 2}px`,
-          height: `${sdlRect.height + 2}px`,
-          background: 'var(--mat-sys-color-outline)',
-          borderRadius: 'var(--mat-sys-shape-corner-large-increased, 20px)',
-        }"
-      />
-
-      <!-- 画面外轮廓边框：实时跟随 SDL 矩形，不加位移过渡以免拖拽期间与画面错位 -->
-      <div
-        v-if="sdlRect"
-        class="pointer-events-none absolute"
-        :style="{
-          left: `${sdlRect.x - 8}px`,
-          top: `${sdlRect.y - 8}px`,
-          width: `${sdlRect.width + 16}px`,
-          height: `${sdlRect.height + 16}px`,
-          borderWidth: '8px',
-          borderStyle: 'solid',
-          borderColor: 'var(--mat-sys-color-outline)',
-          borderRadius: 'var(--mat-sys-shape-corner-extra-large, 28px)',
-          boxShadow: 'var(--mat-sys-elevation-level1)',
-        }"
-      />
-
-      <!-- 缩放过渡冻结帧 -->
-      <div
-        v-if="freezeImage && sdlRect"
-        class="pointer-events-none absolute overflow-hidden transition-opacity duration-150 ease-out"
-        :class="freezeVisible ? 'opacity-100' : 'opacity-0'"
-        :style="{
-          left: `${sdlRect.x}px`,
-          top: `${sdlRect.y}px`,
-          width: `${sdlRect.width}px`,
-          height: `${sdlRect.height}px`,
-          borderRadius: 'var(--mat-sys-shape-corner-large-increased, 20px)',
-        }"
-      >
-        <img
-          :src="freezeImage"
-          alt=""
-          class="h-full w-full scale-110 object-fill blur-2xl"
-        >
-      </div>
-
-      <!-- 右侧可拖动区域 -->
-      <div
-        class="absolute bottom-0 right-0 z-20 transition-opacity duration-200 ease-out window-drag-region"
-        :class="chromeVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-        :style="{
-          top: '48px',
-          left: sdlRect ? `${sdlRect.x + sdlRect.width + 8}px` : 'auto',
-          width: sdlRect ? 'auto' : '136px',
-        }"
-        style="-webkit-app-region: drag; app-region: drag;"
-      />
 
       <!-- 右侧工具栏 -->
       <mat-toolbar
         v-model="chromeVisible"
         variant="floating-right"
         position="start"
-        class="z-30 window-no-drag"
-        style="top: 48px; right: 16px; -webkit-app-region: no-drag; app-region: no-drag;"
+        class="window-no-drag z-30"
+        style="top: 40px; right: 16px; -webkit-app-region: no-drag; app-region: no-drag;"
       >
         <mat-btn
           variant="standard"
@@ -180,11 +169,16 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 defineOptions({
   name: 'ScrcpyMirrorApp',
 });
+
+// 与 src/scrcpy.js 的 TITLE_ROW_CSS_HEIGHT / SDL_BORDER_CSS / OUTER_GAP_CSS 保持一致
+const TITLE_ROW_HEIGHT = 40;
+const SDL_BORDER = 8;
+const OUTER_GAP = 16;
 
 const KEYCODE_BACK = 4;
 const KEYCODE_HOME = 3;
@@ -200,6 +194,15 @@ const hasForegroundApp = ref(false);
 const sdlRect = ref(null);
 const freezeImage = ref('');
 const freezeVisible = ref(false);
+
+// 顶部/左侧 spacer 由 SDL 矩形反推：容纳 fitVideoRect 居中与 DPI 取整偏差，
+// 让画面框在自然流中始终精确包住 SDL 实际位置
+const topSpacer = computed(() => (sdlRect.value
+  ? Math.max(0, sdlRect.value.y - SDL_BORDER - TITLE_ROW_HEIGHT)
+  : 0));
+const leftSpacer = computed(() => (sdlRect.value
+  ? Math.max(0, sdlRect.value.x - SDL_BORDER)
+  : OUTER_GAP));
 
 const sendKey = async (keycode) => {
   if (sending.value) {

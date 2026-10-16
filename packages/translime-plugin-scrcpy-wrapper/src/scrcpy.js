@@ -53,18 +53,20 @@ const FOREGROUND_APP_CHANNEL = `scrcpy-foreground-app@${PLUGIN_ID}`;
 const SDL_RECT_CHANNEL = `scrcpy-sdl-rect@${PLUGIN_ID}`;
 const WINDOW_CONTROL_CHANNEL = `scrcpy-window-control@${PLUGIN_ID}`;
 
-// 画面窗口顶部自绘标题栏 CSS 高度
+// 画面窗口顶部自绘标题栏 CSS 高度（虚拟屏窗口顶部占用）
 export const TITLE_BAR_CSS_HEIGHT = 32;
+// 镜像窗口顶部标题区自然行高（32px 标题栏 + 上下各 4px 呼吸空间）
+export const TITLE_ROW_CSS_HEIGHT = 40;
 // 虚拟屏无底部控制条
 export const BAR_CSS_HEIGHT = 0;
-// 画面窗口右侧垂直工具栏 CSS 宽度（mat-toolbar 浮动宽度为 88px）
-export const TOOLBAR_CSS_WIDTH = 88;
+// 画面窗口右侧垂直工具栏 CSS 宽度（mde floating-right 工具栏：56px 按钮 + 两侧 8px 内边距）
+export const TOOLBAR_CSS_WIDTH = 72;
 // SDL 画面区周围 outline 边框 CSS 宽度
 export const SDL_BORDER_CSS = 8;
 // SDL 画面区内圆角 CSS 半径（20px，与 28px 外圆角扣除 8px 边框后的内圆角一致）
 export const SDL_CORNER_RADIUS_CSS = 20;
-// 画面区四周统一留白（标题栏悬浮在顶部留白内，使四周边缘留白大致相等）
-export const OUTER_GAP_CSS = 48;
+// 画面区左/右/底部统一留白（顶部由标题区行占据）
+export const OUTER_GAP_CSS = 16;
 export const TOOLBAR_GAP_CSS = 24;
 // 控制栏（标题栏、工具栏与背景卡片）隐藏延时：移出或失焦后延迟隐藏，显示仍即时
 export const CHROME_HIDE_DELAY_MS = 2000;
@@ -114,7 +116,7 @@ export const getChromeMetrics = (mode = 'mirror') => {
   }
   const leftOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
   const rightOffset = SDL_BORDER_CSS + TOOLBAR_GAP_CSS + TOOLBAR_CSS_WIDTH + OUTER_GAP_CSS;
-  const topOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
+  const topOffset = TITLE_ROW_CSS_HEIGHT + SDL_BORDER_CSS;
   const bottomOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
   return {
     leftOffset,
@@ -181,6 +183,14 @@ const bustWrapperCache = () => {
 const sessions = new Map();
 // 会话业务键（mirror:<serial> 或 virtual:<serial>:<pkg>）→ sessionId
 const sessionKeys = new Map();
+
+// SDL 子窗口重定位后，新暴露的透明区域可能残留旧帧，
+// 触发渲染层整帧重画（子窗口移动不会使父窗口合成器失效）
+const invalidateWrapper = (session) => {
+  if (session.win && !session.win.isDestroyed()) {
+    session.win.webContents.invalidate();
+  }
+};
 
 // 虚拟屏窗口的原生标题栏按钮跟随宿主主题明暗切换
 const registerOverlayThemeSync = () => {
@@ -624,7 +634,8 @@ export const launchSession = async (options = {}) => {
       },
       toolbarCssWidth: mode === 'mirror' ? TOOLBAR_CSS_WIDTH : 0,
       toolbarGapCss: mode === 'mirror' ? TOOLBAR_GAP_CSS : 24,
-      titleBarCssHeight: TITLE_BAR_CSS_HEIGHT,
+      titleBarCssHeight: mode === 'mirror' ? TITLE_ROW_CSS_HEIGHT : TITLE_BAR_CSS_HEIGHT,
+      topGapCss: 0,
       borderCss: mode === 'mirror' ? SDL_BORDER_CSS : 0,
       gapCss: mode === 'mirror' ? OUTER_GAP_CSS : 0,
       barCssHeight: mode === 'virtual' ? BAR_CSS_HEIGHT : 0,
@@ -792,7 +803,7 @@ export const launchSession = async (options = {}) => {
         y: cssY,
         width: w,
         height: h,
-        topThreshold: OUTER_GAP_CSS + 24,
+        topThreshold: TITLE_ROW_CSS_HEIGHT + 16,
         rightThreshold: TOOLBAR_CSS_WIDTH + TOOLBAR_GAP_CSS + 24,
       });
       if (nextRevealed) {
@@ -850,6 +861,7 @@ export const launchSession = async (options = {}) => {
         checkAndFixProportionalSize(sessionId);
       }
       session.hooks?.syncNow();
+      invalidateWrapper(session);
     });
   };
   const forwardLog = (chunk) => {
@@ -907,11 +919,13 @@ export const launchSession = async (options = {}) => {
       isFrozen: () => session.freezeActive,
       onResizeBurstStart: () => startResizeFreeze(sessionId),
       onResizeSettled: () => settleResize(sessionId),
+      onAfterSettleSync: () => invalidateWrapper(session),
       onRect: sendRect,
     });
     if (mode === 'mirror') {
       checkAndFixProportionalSize(sessionId);
       session.hooks.syncNow();
+      invalidateWrapper(session);
     }
     return { sessionId, title };
   } catch (e) {
