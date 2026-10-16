@@ -4,13 +4,13 @@
     :fill-viewport="false"
   >
     <div class="relative flex h-full w-full flex-col overflow-hidden bg-transparent select-none">
-      <!-- 窗口背景卡片：压到所有内容之下，避免面板显示时盖住画面框 outline -->
+      <!-- 窗口背景卡片 -->
       <div
         class="window-card-bg window-fade pointer-events-none absolute inset-0 -z-10"
         :class="chromeVisible ? 'opacity-100' : 'opacity-0'"
       />
 
-      <!-- 顶部标题区：自然流首行，整行可拖动，悬浮标题栏在其中淡入淡出 -->
+      <!-- 顶部标题区 -->
       <div
         class="window-drag-region flex h-10 shrink-0 items-center px-4"
         style="-webkit-app-region: drag; app-region: drag;"
@@ -27,7 +27,7 @@
             class="window-no-drag flex items-center gap-1"
             style="-webkit-app-region: no-drag; app-region: no-drag;"
           >
-            <!-- aria-label 只作无障碍名：label 会同时成为悬浮 Tooltip 文本 -->
+            <!-- 窗口控制按钮 -->
             <mat-btn
               variant="standard"
               size="extra-small"
@@ -50,19 +50,19 @@
         </div>
       </div>
 
-      <!-- 中部：由 SDL 矩形反推的 spacer 与画面框在自然流中互相撑开 -->
+      <!-- 画面展示区 -->
       <div class="flex min-h-0 grow flex-col">
         <div
           class="shrink-0"
           :style="{ height: `${topSpacer}px` }"
         />
         <div class="flex min-h-0 grow">
-          <!-- 左侧留白拖动 -->
+          <!-- 左侧边距 -->
           <div
             class="window-drag-region h-full shrink-0"
             :style="{ width: `${leftSpacer}px` }"
           />
-          <!-- 画面框：边框即外轮廓，背景与边框同色填满圆角裁切缝隙 -->
+          <!-- 画面外框 -->
           <div
             v-if="sdlRect"
             class="shrink-0"
@@ -76,7 +76,7 @@
               boxShadow: 'var(--mat-sys-elevation-level1)',
             }"
           >
-            <!-- 画面占位容器：以 scrcpy SDL 实际尺寸撑开画面框 -->
+            <!-- 画面容器 -->
             <div
               class="relative h-full w-full overflow-hidden"
               :style="{ borderRadius: 'var(--mat-sys-shape-corner-large-increased, 20px)' }"
@@ -102,19 +102,19 @@
           >
             <span class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">等待画面接入…</span>
           </div>
-          <!-- 右侧工具栏区：可拖动，悬浮工具栏叠加其上 -->
+          <!-- 右侧拖动区域 -->
           <div
             class="window-drag-region h-full grow"
           />
         </div>
-        <!-- 底部留白拖动：底部工具栏布局下同时容纳工具栏条带 -->
+        <!-- 底部拖动区域 -->
         <div
           class="window-drag-region shrink-0"
           :style="{ height: `${bottomSpacerHeight}px` }"
         />
       </div>
 
-      <!-- 侧栏按钮组：竖屏手机贴右侧 start（顶部），平板/横屏手机贴底部 start（左侧） -->
+      <!-- 工具按钮组 -->
       <mat-toolbar
         :variant="toolbarVariant"
         position="start"
@@ -142,13 +142,13 @@
           variant="standard"
           size="small"
           icon="power_settings_new"
-          label="电源"
+          label="屏幕开关"
           :disabled="sending"
           @click="toggleScreen"
         />
       </mat-toolbar>
 
-      <!-- 安卓三大金刚：置于 end（右侧布局贴底 / 底部布局贴右） -->
+      <!-- 系统导航按键：返回、主页、最近任务 -->
       <mat-toolbar
         :variant="toolbarVariant"
         position="end"
@@ -192,8 +192,7 @@ defineOptions({
   name: 'ScrcpyMirrorApp',
 });
 
-// 与 src/mirror-layout.js 的 TITLE_ROW_CSS_HEIGHT / SDL_BORDER_CSS / OUTER_GAP_CSS
-// 及底部工具栏条带（TOOLBAR_GAP_CSS + TOOLBAR_CSS_HEIGHT + OUTER_GAP_CSS）保持一致
+// 布局常量
 const TITLE_ROW_HEIGHT = 40;
 const SDL_BORDER = 8;
 const OUTER_GAP = 16;
@@ -206,11 +205,8 @@ const KEYCODE_APP_SWITCH = 187;
 const query = new URLSearchParams(window.location.search);
 const sessionId = query.get('session') ?? '';
 const title = query.get('title') ?? '画面';
-// 打开镜像时按屏幕比例决定：平板/横屏手机用底部横向工具栏，竖屏手机用右侧垂直工具栏
 const isBottomLayout = query.get('layout') === 'bottom';
 const toolbarVariant = isBottomLayout ? 'floating-bottom' : 'floating-right';
-// 覆盖 mde 悬浮工具栏的默认令牌 inset，对齐窗口的标题区与留白体系；
-// 拖动豁免由 mirror.css 的 window-no-drag 全局规则处理
 const startToolbarStyle = isBottomLayout
   ? { left: `${OUTER_GAP}px`, bottom: `${OUTER_GAP}px` }
   : { top: `${TITLE_ROW_HEIGHT + OUTER_GAP}px`, right: `${OUTER_GAP}px` };
@@ -226,8 +222,7 @@ const sdlRect = ref(null);
 const freezeImage = ref('');
 const freezeVisible = ref(false);
 
-// 顶部/左侧 spacer 由 SDL 矩形反推：容纳 fitVideoRect 居中与 DPI 取整偏差，
-// 让画面框在自然流中始终精确包住 SDL 实际位置
+// 根据 SDL 实际位置计算画面边距
 const topSpacer = computed(() => (sdlRect.value
   ? Math.max(0, sdlRect.value.y - SDL_BORDER - TITLE_ROW_HEIGHT)
   : 0));

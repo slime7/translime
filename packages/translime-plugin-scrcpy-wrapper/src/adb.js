@@ -115,7 +115,7 @@ const adbExecTolerant = async (adbPath, args, { timeoutMs = 15000 } = {}) => {
 };
 
 /**
- * 解析 `adb connect` 输出；部分版本连接失败仍以 0 退出，必须按文本判断
+ * 解析 `adb connect` 输出
  */
 export const parseConnectOutput = (text) => {
   const output = String(text ?? '').trim();
@@ -129,8 +129,7 @@ export const parseConnectOutput = (text) => {
 };
 
 /**
- * 从 adb mdns 服务实例名提取硬件序列号：
- * 实例名通常形如 `adb-<serial>-<6位随机字符>`，部分环境尾随序号 ` (2)`
+ * 从 adb mdns 服务实例名提取硬件序列号
  */
 export const extractSerialFromMdnsInstance = (instance) => {
   const str = String(instance ?? '').trim();
@@ -147,8 +146,7 @@ export const extractSerialFromMdnsInstance = (instance) => {
 };
 
 /**
- * 解析 `adb mdns services` 输出为结构化记录列表：
- * 每项包含 `{ instance, address, ip, port, serial }`
+ * 解析 `adb mdns services` 输出为结构化记录列表
  */
 export const parseMdnsServiceRecords = (text) => {
   const output = String(text ?? '');
@@ -199,8 +197,7 @@ export const parseMdnsServiceRecords = (text) => {
 };
 
 /**
- * 解析 `adb mdns services` 输出中 `_adb-tls-connect._tcp` 服务的连接地址，
- * 兼容行式（`instance<TAB>服务名<TAB>ip:port`）与 track-services 结构化两种输出
+ * 解析 `adb mdns services` 输出中 `_adb-tls-connect._tcp` 服务的连接地址
  */
 export const parseMdnsServices = (text) => {
   const output = String(text ?? '');

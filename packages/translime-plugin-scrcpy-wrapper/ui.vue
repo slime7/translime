@@ -4,7 +4,7 @@
     class="h-full overflow-hidden"
   >
     <div class="flex h-full flex-col gap-3 overflow-hidden p-3">
-      <!-- 顶部设备栏：设备单选按钮组紧随管理设备按钮，满一行自动换行，无滚动条 -->
+      <!-- 顶部设备栏 -->
       <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--mat-sys-color-outline-variant)] pb-2">
         <mat-btn-group
           v-if="devices.length > 0"
@@ -24,7 +24,7 @@
           </mat-btn>
         </mat-btn-group>
 
-        <!-- 管理设备按钮（紧随设备列表，不参与单选） -->
+        <!-- 管理设备按钮 -->
         <mat-btn
           prefix="tune"
           variant="outlined"
@@ -45,7 +45,7 @@
 
       <!-- 已选设备的内容区域 -->
       <template v-else>
-        <!-- 快捷操作行：镜像整屏、连接（仅离线无线）与码率/FPS配置 -->
+        <!-- 快捷操作与流参数配置 -->
         <div class="flex shrink-0 flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2">
             <mat-btn
@@ -127,7 +127,7 @@
           >
             无匹配应用
           </div>
-          <!-- 虚拟滚动：数百个应用包只渲染可见行 -->
+          <!-- 应用列表 -->
           <mat-scroll-area
             v-else
             class="h-full"
@@ -169,7 +169,7 @@
       </template>
     </div>
 
-    <!-- 管理设备弹窗（支持添加 USB 设备、删除设备、无线配对） -->
+    <!-- 管理设备弹窗 -->
     <mat-dialog
       v-model="manageOpen"
       title="管理设备"
@@ -177,7 +177,7 @@
       close-on-back
     >
       <div class="flex flex-col gap-3.5 py-1">
-        <!-- 1. 已保存的设备列表与删除 -->
+        <!-- 已保存设备列表 -->
         <div class="flex flex-col gap-1.5">
           <span class="text-xs font-semibold uppercase tracking-wider text-[var(--mat-sys-color-primary)]">
             已保存设备
@@ -235,7 +235,7 @@
 
         <mat-divider />
 
-        <!-- 2. 检测到的 USB 有线设备 -->
+        <!-- 在线 USB 设备 -->
         <div class="flex flex-col gap-1.5">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold uppercase tracking-wider text-[var(--mat-sys-color-primary)]">
@@ -304,7 +304,7 @@
 
         <mat-divider />
 
-        <!-- 3. 无线调试配对 -->
+        <!-- 无线配对 -->
         <div class="flex flex-col gap-2">
           <span class="text-xs font-semibold uppercase tracking-wider text-[var(--mat-sys-color-primary)]">
             无线调试配对
@@ -319,8 +319,8 @@
           <mat-text-field
             v-model="codeForm.pairingCode"
             block
-            label="配对码（已配对设备可留空）"
-            placeholder="留空则跳过配对直接连接"
+            label="配对码"
+            placeholder="留空直接连接"
             :disabled="pairing"
             :max-length="6"
           />
@@ -348,7 +348,7 @@
           :loading="pairing"
           @click="pairByCode"
         >
-          {{ codeForm.pairingCode.trim() ? '配对并连接' : '直接连接' }}
+          {{ codeForm.pairingCode.trim() ? '配对并连接' : '连接' }}
         </mat-btn>
       </template>
     </mat-dialog>
@@ -376,20 +376,20 @@ const launching = ref(false);
 const connecting = ref(false);
 const error = ref('');
 
-// 设备专属配置
+// 设备参数配置
 const bitRate = ref('16M');
 const maxFps = ref(60);
 
 const bitRateItems = [
   { title: '8 Mbps', value: '8M' },
-  { title: '16 Mbps (推荐)', value: '16M' },
+  { title: '16 Mbps', value: '16M' },
   { title: '24 Mbps', value: '24M' },
-  { title: '32 Mbps (极高)', value: '32M' },
+  { title: '32 Mbps', value: '32M' },
 ];
 
 const fpsItems = [
   { title: '30 fps', value: 30 },
-  { title: '60 fps (推荐)', value: 60 },
+  { title: '60 fps', value: 60 },
   { title: '90 fps', value: 90 },
   { title: '120 fps', value: 120 },
   { title: '不限制', value: 0 },

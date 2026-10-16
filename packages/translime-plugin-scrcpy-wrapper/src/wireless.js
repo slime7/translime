@@ -3,7 +3,7 @@ import scanOpenPorts from './port-scan';
 
 const WIRELESS_SERIAL_RE = /^[\w.-]+:\d{1,5}$/;
 
-// 无线调试端口由内核从临时端口范围随机分配（Linux 默认 32768-60999），5555 兼容经典 tcpip 模式
+// 端口扫描候选：5555 及临时端口范围 (32768-60999)
 const SCAN_PORTS = [5555, ...Array.from({ length: 60999 - 32768 + 1 }, (item, index) => 32768 + index)];
 
 const defaultDelay = (ms) => new Promise((resolve) => {
@@ -54,10 +54,7 @@ const resolveHardwareSerial = (raw, isWireless) => {
 };
 
 /**
- * 合并 adb 在线设备与已保存设备（有线与无线）：
- * 支持按硬件序列号（hardwareSerial）归一化合并，去重同一设备的多个 mDNS/IP 连接；
- * 在线设备回填已保存的机型名并标记 stored 与 connected，
- * 已保存但离线的设备以未连接状态追加，保证设备菜单始终可选
+ * 合并在线设备与已保存设备，按硬件序列号去重并标记状态
  */
 export const mergeWirelessDevices = (devices, stored = []) => {
   const onlineMap = new Map();
@@ -163,7 +160,7 @@ const connectFirstCandidate = async (adb, adbPath, candidates) => {
 };
 
 /**
- * mDNS 不可用时的兜底：扫描手机 IP 的临时端口段，对开放端口逐个尝试 adb connect
+ * 扫描指定 IP 开放端口并尝试连接
  */
 const connectByPortScan = async ({
   adb, adbPath, ip, excludeSerials = [], scan = scanOpenPorts,
@@ -188,7 +185,7 @@ const connectByPortScan = async ({
 };
 
 /**
- * 发现指定 IP 的连接端口并连接：先 mDNS，再端口扫描兜底
+ * 发现指定 IP 端口并连接
  */
 const connectDiscovered = async ({
   adb, adbPath, ip, excludeSerials = [], scan,
@@ -205,11 +202,7 @@ const connectDiscovered = async ({
 };
 
 /**
- * 确保无线设备处于已连接状态：
- * 已在线直接返回；否则按传入地址连接，失败后用 mDNS 发现的当前端口重连，
- * 再不行扫描端口段兜底（高版本安卓每次开关无线调试或重启后端口都会变化），并回报端口变化
- *
- * adb 注入 { listDevices, connectDevice, getMdnsConnectAddresses, getMdnsServiceRecords } 以便单测
+ * 确保无线设备处于已连接状态
  */
 export const ensureWirelessConnected = async ({
   serial, adbPath, adb, ip = null, scan = scanOpenPorts,
@@ -271,9 +264,7 @@ export const ensureWirelessConnected = async ({
 };
 
 /**
- * 配对成功后建立连接：
- * 轮询在线设备识别新上线的无线设备（新版 adb 配对后会自动回连），
- * 期间辅以 mDNS 发现；轮询结束仍未出现时用端口扫描兜底
+ * 配对成功后识别并连接上线设备
  */
 export const connectAfterPairing = async ({
   adbPath,

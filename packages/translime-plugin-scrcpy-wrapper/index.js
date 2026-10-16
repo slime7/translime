@@ -48,8 +48,7 @@ const DEFAULT_DEVICE_CONFIG = {
 };
 
 /**
- * 已保存的设备列表，元素为 { serial, model, type: 'usb' | 'wireless' }
- * 兼容读取历史版本仅存无线设备的 wirelessDevices
+ * 获取已保存设备列表，元素包含 serial、model 与 type
  */
 const getStoredDevices = () => {
   const raw = pluginConfig.get(STORED_DEVICES_KEY, null);
@@ -141,7 +140,7 @@ const listMergedDevices = async () => {
 };
 
 /**
- * 连接成功后把设备存入设置：以硬件 serial 为主键
+ * 保存已连接的无线设备至配置
  */
 const storeWirelessConnection = async (serial) => {
   const adbPath = getAdbPath();
@@ -169,8 +168,7 @@ const storeWirelessConnection = async (serial) => {
 };
 
 /**
- * 启动 scrcpy 会话的共用流程：无线设备先确保连接（端口变化时回写存储），
- * 再按模式交给 scrcpy 模块开窗。IPC 的 `launch` 与深链 `mirror` 共用。
+ * 启动设备投屏会话
  */
 const launchDeviceSession = async ({
   mode,
@@ -230,8 +228,7 @@ const launchDeviceSession = async ({
 };
 
 /**
- * 深链 `translime://plugin/scrcpy-wrapper/mirror[?serial=xxx]`：
- * 未指定 serial 时取第一台在线设备，直接弹出整屏镜像窗口。
+ * 处理深链投屏请求
  */
 const launchMirrorFromDeepLink = async ({ path, params }) => {
   let serial = String(params?.serial ?? '').trim();
@@ -285,7 +282,7 @@ const ipcHandlers = defineIpcHandlers([
       }
       const pairingCodeValue = String(pairingCode ?? '').trim();
       const adbPath = getAdbPath();
-      // 配对码留空：设备应已与本机配对，跳过配对直接连接
+      // 未提供配对码时直接尝试连接
       if (!pairingCodeValue) {
         const ensured = await wirelessModule.ensureWirelessConnected({
           serial: wirelessModule.formatAddress(parsed),
@@ -312,7 +309,7 @@ const ipcHandlers = defineIpcHandlers([
       } catch (e) {
         return { success: false, message: `配对失败：${e.message}` };
       }
-      // 配对成功后识别新上线设备（新版 adb 会自动回连），必要时用 mDNS 主动连接
+      // 配对成功后连接新上线设备
       const connected = await wirelessModule.connectAfterPairing({
         adbPath,
         adb: adbModule,

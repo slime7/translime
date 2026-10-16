@@ -68,7 +68,7 @@ const FOREGROUND_APP_CHANNEL = `scrcpy-foreground-app@${PLUGIN_ID}`;
 const SDL_RECT_CHANNEL = `scrcpy-sdl-rect@${PLUGIN_ID}`;
 const WINDOW_CONTROL_CHANNEL = `scrcpy-window-control@${PLUGIN_ID}`;
 
-// 控制栏（标题栏、工具栏与背景卡片）隐藏延时：移出或失焦后延迟隐藏，显示仍即时
+// 控制栏隐藏延迟（毫秒）
 export const CHROME_HIDE_DELAY_MS = 2000;
 
 // 原生标题栏按钮随宿主主题明暗切换的前景色
@@ -907,8 +907,7 @@ export const launchSession = async (options = {}) => {
       }
     }
   });
-  // scrcpy 输出按行缓冲解析视频纹理尺寸：初始占位窗口比例不可信，
-  // 以解码器输出的真实视频尺寸为准修正窗口比例（设备旋转后尺寸变化会再次输出）
+  // 按行缓冲解析真实视频尺寸以修正窗口比例
   let logBuffer = '';
   const watchVideoSize = (chunk) => {
     logBuffer += String(chunk);
@@ -931,8 +930,7 @@ export const launchSession = async (options = {}) => {
         : null;
       session.resolution = { width, height };
       const ratio = width / height;
-      // 设备横竖屏切换会让比例反转：交换画面宽高保持窗口视觉量级，
-      // 其余尺寸变化仍按单轴等比修正
+      // 比例反转时交换宽高，其他情况单轴等比修正
       if (prevRatio && ((prevRatio < 1 && ratio >= 1) || (prevRatio > 1 && ratio <= 1))) {
         swapMirrorSizeForRotation(sessionId);
       } else {
@@ -966,7 +964,7 @@ export const launchSession = async (options = {}) => {
       shouldAbort: () => proc.exitCode !== null || session.spawnError !== null,
     });
     session.hwnd = hwnd;
-    // 挂载时可能已从 scrcpy 输出解析到真实视频尺寸，读取会话上的最新值
+    // 读取解析到的最新视频比例
     const aspect = mode === 'mirror' ? session.resolution : null;
     const dims = getPhysicalDims(win, mode, session.toolbarLayout);
     const sendRect = (rect) => {
