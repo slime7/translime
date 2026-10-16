@@ -352,6 +352,10 @@ const settleResize = (sessionId) => {
     const [w, h] = session.win.getContentSize();
     session.onSaveMirrorSize?.({ width: w, height: h });
   }
+  if (session.mode === 'virtual' && session.pkg && session.win && !session.win.isDestroyed()) {
+    const [w, h] = session.win.getContentSize();
+    session.onSaveVirtualSize?.({ width: w, height: h });
+  }
   if (!session.freezeActive) {
     return;
   }
@@ -549,8 +553,12 @@ export const launchSession = async (options = {}) => {
     pkg = null,
     resolution: passedResolution = null,
     savedSize = null,
+    savedVirtualSize = null,
     inheritedContentSize = null,
     onSaveMirrorSize = null,
+    onSaveVirtualSize = null,
+    bitRate = null,
+    maxFps = null,
     settingValue = null,
     logger = console,
   } = options;
@@ -604,6 +612,11 @@ export const launchSession = async (options = {}) => {
       width: Math.min(inheritedContentSize.width, display.workArea.width - 32),
       height: Math.min(inheritedContentSize.height, display.workArea.height - 32),
     };
+  } else if (mode === 'virtual' && savedVirtualSize && savedVirtualSize.width > 0 && savedVirtualSize.height > 0) {
+    contentSize = {
+      width: Math.min(savedVirtualSize.width, display.workArea.width - 32),
+      height: Math.min(savedVirtualSize.height, display.workArea.height - 32),
+    };
   } else if (mode === 'mirror' && savedSize && savedSize.width > 0 && savedSize.height > 0) {
     contentSize = restoreMirrorContentSize({
       savedSize,
@@ -650,6 +663,8 @@ export const launchSession = async (options = {}) => {
       }
       : null,
     backgroundColor: mode === 'mirror' ? resolveOutlineColor() : null,
+    bitRate,
+    maxFps,
   });
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
 
@@ -680,6 +695,7 @@ export const launchSession = async (options = {}) => {
     toolbarLayout,
     defaultLauncher: null,
     onSaveMirrorSize,
+    onSaveVirtualSize,
     hooks: null,
     freezeActive: false,
     captureReliable: false,

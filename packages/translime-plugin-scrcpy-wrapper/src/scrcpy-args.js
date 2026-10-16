@@ -63,14 +63,17 @@ export const normalizeHexColor = (value) => {
  * 在高 DPI 下因点/像素取整残留缝隙），并关闭其窗口比例锁避免与外部
  * SetWindowPos 定尺寸互相干预；backgroundColor（RRGGBB）用作
  * letterbox 底色，与外框 outline 同色以贴合圆角。需 scrcpy >= 5.0。
- * virtualDisplaySize 给定时以显式分辨率创建虚拟屏，并开启 flex-display
- * 让虚拟屏连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）。
- * 虚拟屏关闭系统装饰，应用全屏铺满画面区，不显示状态栏、手势栏与标题装饰栏。
+ * virtualDisplaySize 给定时以显式分辨率创建虚拟屏，虚拟屏始终开启
+ * flex-display 连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）。
+ * 虚拟屏关闭系统装饰，应用全屏铺满画面区，不显示状态栏、手势栏与标题装饰栏；
  * 输入法策略设为 local，软键盘弹出在虚拟屏内而不是实体屏（默认 fallback
- * 弹在默认屏，虚拟窗口内看不到输入法）。
- * 音频源设为 playback 独立采集：output（REMOTE_SUBMIX）会禁用设备端播放，
- * 且与整屏镜像会话的 output 采集互斥；playback 只复制播放流，要求
- * Android 13+，采集失败时 scrcpy 默认自动降级为无声继续
+ * 弹在默认屏，虚拟窗口内看不到输入法）；关闭虚拟屏时应用转回实体屏而不是
+ * 销毁（--no-vd-destroy-content）；音频源设为 playback 独立采集：
+ * output（REMOTE_SUBMIX）会禁用设备端播放，且与整屏镜像会话的 output
+ * 采集互斥；playback 只复制播放流，要求 Android 13+，采集失败时 scrcpy
+ * 默认自动降级为无声继续；keep-active 在会话期间保持设备不息屏；
+ * SDL 窗口无边框避免挂载前闪现原生标题栏。bitRate 与 maxFps 可选，
+ * 由设备专属设置传入，有值时在镜像和虚拟屏中同时生效。需 scrcpy >= 5.0。
  */
 export const buildScrcpyArgs = ({
   mode,
@@ -79,12 +82,20 @@ export const buildScrcpyArgs = ({
   title,
   virtualDisplaySize = null,
   backgroundColor = null,
+  bitRate = null,
+  maxFps = null,
 }) => {
   const args = [
     `--serial=${serial}`,
     `--window-title=${title}`,
     '--video-codec=h265',
   ];
+  if (bitRate) {
+    args.push(`--video-bit-rate=${bitRate}`);
+  }
+  if (maxFps) {
+    args.push(`--max-fps=${maxFps}`);
+  }
   if (mode === 'mirror') {
     args.push('--render-fit=stretched', '--no-window-aspect-ratio-lock');
     if (backgroundColor) {
@@ -93,11 +104,19 @@ export const buildScrcpyArgs = ({
   }
   if (mode === 'virtual') {
     if (virtualDisplaySize) {
-      args.push(`--new-display=${virtualDisplaySize.width}x${virtualDisplaySize.height}`, '-x');
+      args.push(`--new-display=${virtualDisplaySize.width}x${virtualDisplaySize.height}`);
     } else {
       args.push('--new-display');
     }
-    args.push('--no-vd-system-decorations', '--display-ime-policy=local', '--audio-source=playback');
+    args.push(
+      '--flex-display',
+      '--no-vd-system-decorations',
+      '--display-ime-policy=local',
+      '--no-vd-destroy-content',
+      '--audio-source=playback',
+      '--keep-active',
+      '--window-borderless',
+    );
   }
   if (pkg) {
     args.push(`--start-app=${pkg}`);

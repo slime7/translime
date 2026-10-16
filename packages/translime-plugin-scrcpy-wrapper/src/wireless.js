@@ -35,16 +35,26 @@ export const parseAddress = (text) => {
 export const formatAddress = ({ ip, port }) => `${ip}:${port}`;
 
 /**
- * 合并 adb 在线设备与已保存的无线设备：
- * 在线的无线 serial 标记 wireless 并回填已保存的机型名，
+ * 合并 adb 在线设备与已保存设备（有线与无线）：
+ * 在线设备回填已保存的机型名并标记 stored 与 connected，
  * 已保存但离线的设备以未连接状态追加，保证设备菜单始终可选
  */
 export const mergeWirelessDevices = (devices, stored = []) => {
   const online = (devices ?? []).map((device) => {
-    if (!isWirelessSerial(device.serial)) {
-      return device;
-    }
+    const isWireless = isWirelessSerial(device.serial);
     const saved = stored.find((item) => item.serial === device.serial);
+    if (!isWireless) {
+      if (!saved) {
+        return device;
+      }
+      return {
+        ...device,
+        model: device.model || saved?.model || '',
+        wireless: false,
+        connected: device.state === 'device',
+        stored: true,
+      };
+    }
     return {
       ...device,
       model: device.model || saved?.model || '',
@@ -56,14 +66,17 @@ export const mergeWirelessDevices = (devices, stored = []) => {
   const onlineSerials = new Set(online.map((device) => device.serial));
   const offline = stored
     .filter((item) => !onlineSerials.has(item.serial))
-    .map((item) => ({
-      serial: item.serial,
-      state: 'offline',
-      model: item.model || '',
-      wireless: true,
-      connected: false,
-      stored: true,
-    }));
+    .map((item) => {
+      const isWireless = isWirelessSerial(item.serial) || item.type === 'wireless';
+      return {
+        serial: item.serial,
+        state: 'offline',
+        model: item.model || '',
+        wireless: isWireless,
+        connected: false,
+        stored: true,
+      };
+    });
   return [...online, ...offline];
 };
 

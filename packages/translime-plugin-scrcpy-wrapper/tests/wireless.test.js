@@ -169,6 +169,39 @@ describe('mergeWirelessDevices', () => {
     expect(new Set(serials).size).toBe(serials.length);
     expect(serials.filter((item) => item === '192.168.1.5:37895')).toHaveLength(1);
   });
+
+  it('已保存的有线设备拔掉后以离线状态追加，插上后恢复 connected', () => {
+    const storedWithUsb = [
+      { serial: 'USB_PHONE_1', model: 'OnePlus Pad', type: 'usb' },
+    ];
+    // 拔掉时
+    const offlineMerged = mergeWirelessDevices([], storedWithUsb);
+    expect(offlineMerged).toEqual([
+      {
+        serial: 'USB_PHONE_1',
+        state: 'offline',
+        model: 'OnePlus Pad',
+        wireless: false,
+        connected: false,
+        stored: true,
+      },
+    ]);
+    // 插上时
+    const onlineMerged = mergeWirelessDevices(
+      [{ serial: 'USB_PHONE_1', state: 'device', model: '' }],
+      storedWithUsb,
+    );
+    expect(onlineMerged).toEqual([
+      {
+        serial: 'USB_PHONE_1',
+        state: 'device',
+        model: 'OnePlus Pad',
+        wireless: false,
+        connected: true,
+        stored: true,
+      },
+    ]);
+  });
 });
 
 describe('ensureWirelessConnected', () => {

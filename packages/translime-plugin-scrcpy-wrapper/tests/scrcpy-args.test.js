@@ -88,7 +88,7 @@ describe('buildScrcpyArgs', () => {
     expect(args.some((arg) => arg.startsWith('--background-color'))).toBe(false);
   });
 
-  it('虚拟屏模式默认仅输出 new-display，并关闭系统装饰保证应用全屏沉浸', () => {
+  it('虚拟屏模式默认输出 new-display 与完整沉浸参数（输入法内嵌、应用回退、独立音频与唤醒）', () => {
     expect(buildScrcpyArgs({
       mode: 'virtual',
       serial: 'ABC123',
@@ -99,11 +99,50 @@ describe('buildScrcpyArgs', () => {
       '--window-title=translime-scrcpy-2',
       '--video-codec=h265',
       '--new-display',
+      '--flex-display',
       '--no-vd-system-decorations',
       '--display-ime-policy=local',
+      '--no-vd-destroy-content',
       '--audio-source=playback',
+      '--keep-active',
+      '--window-borderless',
       '--start-app=com.foo',
     ]);
+  });
+
+  it('镜像与虚拟屏模式均支持动态码率与最高帧率配置', () => {
+    const mirrorArgs = buildScrcpyArgs({
+      mode: 'mirror',
+      serial: 'ABC123',
+      pkg: null,
+      title: 't',
+      bitRate: '16M',
+      maxFps: 60,
+    });
+    expect(mirrorArgs).toContain('--video-bit-rate=16M');
+    expect(mirrorArgs).toContain('--max-fps=60');
+
+    const virtualArgs = buildScrcpyArgs({
+      mode: 'virtual',
+      serial: 'ABC123',
+      pkg: null,
+      title: 't',
+      bitRate: '24M',
+      maxFps: 90,
+    });
+    expect(virtualArgs).toContain('--video-bit-rate=24M');
+    expect(virtualArgs).toContain('--max-fps=90');
+  });
+
+  it('未指定码率或最高帧率时不输出对应 flag', () => {
+    const args = buildScrcpyArgs({
+      mode: 'mirror',
+      serial: 'ABC123',
+      pkg: null,
+      title: 't',
+    });
+    expect(args.some((a) => a.startsWith('--video-bit-rate='))).toBe(false);
+    expect(args.some((a) => a.startsWith('--max-fps='))).toBe(false);
   });
 
   it('虚拟屏模式开启 display-ime-policy=local，输入法弹出在虚拟屏窗口内而非实体屏（默认 fallback 时窗口内看不到输入法）', () => {
@@ -137,7 +176,7 @@ describe('buildScrcpyArgs', () => {
     expect(args.some((arg) => arg.startsWith('--display-ime-policy='))).toBe(false);
   });
 
-  it('虚拟屏模式给定分辨率时输出显式 new-display 并开启 flex-display', () => {
+  it('虚拟屏模式给定分辨率时输出显式 new-display 分辨率', () => {
     expect(buildScrcpyArgs({
       mode: 'virtual',
       serial: 'ABC123',
@@ -149,10 +188,13 @@ describe('buildScrcpyArgs', () => {
       '--window-title=translime-scrcpy-2',
       '--video-codec=h265',
       '--new-display=871x1184',
-      '-x',
+      '--flex-display',
       '--no-vd-system-decorations',
       '--display-ime-policy=local',
+      '--no-vd-destroy-content',
       '--audio-source=playback',
+      '--keep-active',
+      '--window-borderless',
       '--start-app=com.foo',
     ]);
   });
