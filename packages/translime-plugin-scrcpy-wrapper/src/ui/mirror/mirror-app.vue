@@ -3,7 +3,7 @@
     class="mirror-root"
     :fill-viewport="false"
   >
-    <div class="relative flex h-dvh w-dvh flex-col overflow-hidden bg-transparent select-none">
+    <div class="relative flex h-full w-full flex-col overflow-hidden bg-transparent select-none">
       <!-- 窗口背景卡片 -->
       <div
         class="window-card-bg window-fade pointer-events-none absolute inset-0"
@@ -291,11 +291,13 @@ onMounted(() => {
 
 <style scoped>
 .mirror-root {
+  height: 100%;
   background: transparent !important;
-  /* 浮动工具栏会向 mat-app-root 登记边缘内边距，透明悬浮窗口自行管理留白，直接清零 */
-  --mat-app-root-padding-top: 0px;
-  --mat-app-root-padding-bottom: 0px;
-  --mat-app-root-padding-start: 0px;
-  --mat-app-root-padding-end: 0px;
+}
+
+/* 浮动工具栏会把自身占位登记为 __content 的内联 padding（内联令牌无法用类覆盖），
+   直接清零，避免自然流画面框被推移、与 SDL 子窗口实际坐标错位 */
+.mirror-root :deep(.mat-app-root__content) {
+  padding: 0 !important;
 }
 </style>

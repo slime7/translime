@@ -48,4 +48,16 @@ mat-btn {
   app-region: no-drag !important;
 }
 
+/* 悬浮镜像窗口不参与文档滚动：锁死文档尺寸链，杜绝任何溢出滚动条
+   （窗口被拖动区覆盖时滚动条也无法交互，只会成为视觉残留） */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
 
