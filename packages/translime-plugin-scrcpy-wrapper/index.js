@@ -331,6 +331,28 @@ const ipcHandlers = defineIpcHandlers([
       }
     },
   },
+  {
+    // 镜像画面横竖屏切换：锁定设备旋转方向，会话关闭时由主进程恢复原设置
+    type: 'rotate-device',
+    handler: () => async (sessionId) => {
+      const session = scrcpyModule.getSession(sessionId);
+      if (!session) {
+        return { success: false, message: '会话不存在或已关闭' };
+      }
+      try {
+        if (!session.rotationState) {
+          const initial = await adbModule.getSystemRotationState(session.adbPath, session.serial);
+          session.rotationState = { initial, forced: null };
+        }
+        const forced = adbModule.nextForcedRotation(session.rotationState.forced);
+        await adbModule.setDeviceRotation(session.adbPath, session.serial, forced);
+        session.rotationState.forced = forced;
+        return { success: true, rotation: forced };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+  },
 ]);
 
 export default {

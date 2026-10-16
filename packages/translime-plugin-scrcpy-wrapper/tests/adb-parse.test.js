@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { parseAdbDevices, parsePackageList, parseWmSize } from '../src/adb';
+import {
+  nextForcedRotation,
+  parseAdbDevices,
+  parsePackageList,
+  parseSystemSetting,
+  parseWmSize,
+} from '../src/adb';
 
 describe('parseAdbDevices', () => {
   it('仅保留 state 为 device 的行并解析 model', () => {
@@ -43,6 +49,29 @@ describe('parsePackageList', () => {
     expect(parsePackageList('this line has no prefix\npackage:com.ok\n')).toEqual(['com.ok']);
     expect(parsePackageList('')).toEqual([]);
     expect(parsePackageList(undefined)).toEqual([]);
+  });
+});
+
+describe('parseSystemSetting', () => {
+  it('解析 settings get 输出的整数值', () => {
+    expect(parseSystemSetting('1\n')).toBe(1);
+    expect(parseSystemSetting('0')).toBe(0);
+    expect(parseSystemSetting(' 3 ')).toBe(3);
+  });
+
+  it('键不存在或非整数返回 null（恢复旋转设置时跳过未知键）', () => {
+    expect(parseSystemSetting('null\n')).toBeNull();
+    expect(parseSystemSetting('')).toBeNull();
+    expect(parseSystemSetting(undefined)).toBeNull();
+    expect(parseSystemSetting('1.5')).toBeNull();
+  });
+});
+
+describe('nextForcedRotation', () => {
+  it('横竖屏在 0（竖屏）与 1（横屏）之间往返', () => {
+    expect(nextForcedRotation(null)).toBe(1);
+    expect(nextForcedRotation(1)).toBe(0);
+    expect(nextForcedRotation(0)).toBe(1);
   });
 });
 

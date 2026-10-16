@@ -171,8 +171,10 @@ export const calculateProportionalSize = ({
 /**
  * 计算把画面区修正回设备比例所需的窗口内容尺寸。
  *
- * 宽度保持不变、高度按比例取整对齐；偏差在容差内时返回 null（无需修正），
+ * 默认宽度保持不变、高度按比例取整对齐；偏差在容差内时返回 null（无需修正），
  * 避免 DPI 取整误差导致修正与 resize 事件互相触发形成抖动。
+ * 给定画面区上限时（如设备横竖屏切换后比例反转），先按上限裁剪再比对，
+ * 保证修正后的窗口始终留在屏幕内。
  *
  * @param {object} options
  * @param {number} options.width - 当前窗口内容宽度。
@@ -181,6 +183,8 @@ export const calculateProportionalSize = ({
  * @param {number} options.chromeWidth - 水平非画面宽度。
  * @param {number} options.chromeHeight - 垂直非画面高度。
  * @param {number} [options.tolerancePx=1] - 允许的画面区像素偏差。
+ * @param {number} [options.maxVideoWidth] - 画面区宽度上限（CSS 像素）。
+ * @param {number} [options.maxVideoHeight] - 画面区高度上限（CSS 像素）。
  * @returns {{ width: number, height: number } | null} 需要修正时的新尺寸。
  */
 export const calculateAspectCorrection = ({
@@ -190,6 +194,8 @@ export const calculateAspectCorrection = ({
   chromeWidth,
   chromeHeight,
   tolerancePx = 1,
+  maxVideoWidth = null,
+  maxVideoHeight = null,
 }) => {
   if (!Number.isFinite(width) || !Number.isFinite(height) || !ratio || ratio <= 0) {
     return null;
@@ -199,11 +205,20 @@ export const calculateAspectCorrection = ({
   if (videoW <= 0 || videoH <= 0) {
     return null;
   }
-  const idealH = Math.round(videoW / ratio);
-  if (Math.abs(videoH - idealH) <= tolerancePx) {
+  let nextW = videoW;
+  let nextH = Math.round(videoW / ratio);
+  if (maxVideoHeight && nextH > maxVideoHeight) {
+    nextH = maxVideoHeight;
+    nextW = Math.round(nextH * ratio);
+  }
+  if (maxVideoWidth && nextW > maxVideoWidth) {
+    nextW = maxVideoWidth;
+    nextH = Math.round(nextW / ratio);
+  }
+  if (Math.abs(videoH - nextH) <= tolerancePx && Math.abs(videoW - nextW) <= tolerancePx) {
     return null;
   }
-  return { width, height: idealH + chromeHeight };
+  return { width: nextW + chromeWidth, height: nextH + chromeHeight };
 };
 
 /**

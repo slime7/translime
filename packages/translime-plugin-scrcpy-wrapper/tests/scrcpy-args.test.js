@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildScrcpyArgs, nextWindowTitle, parseVideoSize } from '../src/scrcpy-args';
+import {
+  buildScrcpyArgs, nextWindowTitle, normalizeHexColor, parseVideoSize,
+} from '../src/scrcpy-args';
 
 describe('buildScrcpyArgs', () => {
   it('镜像模式包含 serial、窗口标题与 h265 编码', () => {
@@ -52,6 +54,38 @@ describe('buildScrcpyArgs', () => {
       '--no-window-aspect-ratio-lock',
       '--start-app=com.foo',
     ]);
+  });
+
+  it('镜像模式带背景色时输出 background-color（letterbox 底色与外框 outline 同色贴合圆角）', () => {
+    const args = buildScrcpyArgs({
+      mode: 'mirror',
+      serial: 'ABC123',
+      pkg: null,
+      title: 'translime-scrcpy-1',
+      backgroundColor: '79747e',
+    });
+    expect(args).toContain('--background-color=79747e');
+  });
+
+  it('未提供背景色时不输出 background-color（保留 scrcpy 默认行为）', () => {
+    const args = buildScrcpyArgs({
+      mode: 'mirror',
+      serial: 'ABC123',
+      pkg: null,
+      title: 'translime-scrcpy-1',
+    });
+    expect(args.some((arg) => arg.startsWith('--background-color'))).toBe(false);
+  });
+
+  it('虚拟屏模式忽略背景色（无外框与 letterbox，避免误改虚拟屏底色）', () => {
+    const args = buildScrcpyArgs({
+      mode: 'virtual',
+      serial: 'ABC123',
+      pkg: null,
+      title: 't',
+      backgroundColor: '79747e',
+    });
+    expect(args.some((arg) => arg.startsWith('--background-color'))).toBe(false);
   });
 
   it('虚拟屏模式默认仅输出 new-display，并关闭系统装饰保证应用全屏沉浸', () => {
@@ -107,6 +141,21 @@ describe('nextWindowTitle', () => {
     titles.forEach((title) => {
       expect(title).toMatch(/^translime-scrcpy-\d+$/);
     });
+  });
+});
+
+describe('normalizeHexColor', () => {
+  it('接受 # 前缀并输出小写 RRGGBB（宿主主题令牌可直接使用）', () => {
+    expect(normalizeHexColor('#79747E')).toBe('79747e');
+    expect(normalizeHexColor('938F99')).toBe('938f99');
+  });
+
+  it('非法颜色返回 null（防止把错误值传给 scrcpy 导致启动失败）', () => {
+    expect(normalizeHexColor('rgb(121, 116, 126)')).toBeNull();
+    expect(normalizeHexColor('#12345')).toBeNull();
+    expect(normalizeHexColor('#1234567')).toBeNull();
+    expect(normalizeHexColor('')).toBeNull();
+    expect(normalizeHexColor(null)).toBeNull();
   });
 });
 

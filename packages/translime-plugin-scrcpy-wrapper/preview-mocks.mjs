@@ -30,10 +30,12 @@ export default {
   }),
   'list-apps': () => ({
     success: true,
+    // 数百个 mock 包名，便于在 preview 下验证应用列表虚拟滚动
     packages: [
       'com.android.chrome',
       'com.tencent.weread',
       'org.videolan.vlc',
+      ...Array.from({ length: 300 }, (_, index) => `com.mock.app.${String(index + 1).padStart(3, '0')}`),
     ],
   }),
   launch: () => ({

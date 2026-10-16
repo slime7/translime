@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld('scrcpyWrapper', {
     type: `toggle-screen@${PLUGIN_ID}`,
     args: [sessionId],
   }),
+  rotateDevice: (sessionId) => ipcRenderer.invoke('ipc-fn', {
+    type: `rotate-device@${PLUGIN_ID}`,
+    args: [sessionId],
+  }),
   windowControl: {
     minimize: () => {
       ipcRenderer.send(`scrcpy-window-control@${PLUGIN_ID}`, 'minimize');

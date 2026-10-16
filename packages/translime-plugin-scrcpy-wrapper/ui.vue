@@ -104,35 +104,40 @@
         >
           无匹配应用
         </div>
+        <!-- 虚拟滚动：数百个应用包只渲染可见行，避免进入面板时整表渲染阻塞 UI；
+             standard 变体保证行高无额外间隔，虚拟步距与 item-height 精确一致 -->
         <mat-list
           v-else
+          variant="standard"
+          virtual
           interaction="multi-action"
+          :items="filteredApps"
+          :item-height="56"
+          :item-key="(pkg) => pkg"
         >
-          <mat-list-item
-            v-for="pkg in filteredApps"
-            :key="pkg"
-            :value="pkg"
-          >
-            {{ pkg }}
-            <template #trailing>
-              <mat-btn
-                icon="cast"
-                label="镜像"
-                size="small"
-                variant="standard"
-                :disabled="launching"
-                @click="launch('mirror', pkg)"
-              />
-              <mat-btn
-                icon="picture_in_picture"
-                label="虚拟屏"
-                size="small"
-                variant="standard"
-                :disabled="launching"
-                @click="launch('virtual', pkg)"
-              />
-            </template>
-          </mat-list-item>
+          <template #default="{ item }">
+            <mat-list-item :value="item">
+              {{ item }}
+              <template #trailing>
+                <mat-btn
+                  icon="cast"
+                  label="镜像"
+                  size="small"
+                  variant="standard"
+                  :disabled="launching"
+                  @click="launch('mirror', item)"
+                />
+                <mat-btn
+                  icon="picture_in_picture"
+                  label="虚拟屏"
+                  size="small"
+                  variant="standard"
+                  :disabled="launching"
+                  @click="launch('virtual', item)"
+                />
+              </template>
+            </mat-list-item>
+          </template>
         </mat-list>
       </div>
     </div>

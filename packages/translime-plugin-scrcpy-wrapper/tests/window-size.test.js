@@ -236,6 +236,41 @@ describe('calculateAspectCorrection', () => {
       width: 100, height: 1170, ratio, chromeWidth, chromeHeight,
     })).toBeNull();
   });
+
+  it('修正结果超出工作区高度时改为高度驱动（防止设备旋回竖屏后窗口撑出屏幕）', () => {
+    // 横屏窗口 1900x940 切回竖屏比例：videoW=1676 -> 理想高 3724 超上限 864，
+    // 改为高度驱动：videoH=864, videoW=round(864*0.45)=389
+    const result = calculateAspectCorrection({
+      width: 1900,
+      height: 940,
+      ratio,
+      chromeWidth,
+      chromeHeight,
+      maxVideoWidth: 1632,
+      maxVideoHeight: 864,
+    });
+    expect(result).toEqual({ width: 613, height: 976 });
+    const videoRatio = (result.width - chromeWidth) / (result.height - chromeHeight);
+    expect(Math.abs(videoRatio - ratio) / ratio).toBeLessThan(0.005);
+  });
+
+  it('高度驱动后仍超宽时按工作区宽度二次钳制（防止超宽设备横屏画面溢出屏幕）', () => {
+    // 竖屏窗口切超宽比例 2.22：videoW=276 -> 理想高 124 未超高，
+    // 但宽度 276 超上限 100：videoW=100, videoH=round(100/2.2222)=45
+    const wideRatio = 2400 / 1080;
+    const result = calculateAspectCorrection({
+      width: 500,
+      height: 500,
+      ratio: wideRatio,
+      chromeWidth,
+      chromeHeight,
+      maxVideoWidth: 100,
+      maxVideoHeight: 864,
+    });
+    expect(result).toEqual({ width: 324, height: 157 });
+    const videoRatio = (result.width - chromeWidth) / (result.height - chromeHeight);
+    expect(Math.abs(videoRatio - wideRatio) / wideRatio).toBeLessThan(0.005);
+  });
 });
 
 describe('restoreMirrorContentSize', () => {

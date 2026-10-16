@@ -312,6 +312,79 @@ export const toggleScreen = async (adbPath, serial) => {
   return { keycode, wakefulness };
 };
 
+/**
+ * 解析 `settings get` 输出中的整数设置值；键不存在或非整数时返回 null
+ */
+export const parseSystemSetting = (text) => {
+  const trimmed = String(text ?? '').trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    return null;
+  }
+  const value = Number(trimmed);
+  return Number.isSafeInteger(value) ? value : null;
+};
+
+/**
+ * 读取旋转相关系统设置（accelerometer_rotation / user_rotation）；
+ * 读不到的键返回 null，恢复时跳过对应键
+ */
+export const getSystemRotationState = async (adbPath, serial) => {
+  const readSetting = async (key) => {
+    try {
+      const stdout = await adbExec(
+        adbPath,
+        ['-s', serial, 'shell', 'settings', 'get', 'system', key],
+        { timeoutMs: 5000 },
+      );
+      return parseSystemSetting(stdout);
+    } catch {
+      return null;
+    }
+  };
+  const [accelerometer, user] = await Promise.all([
+    readSetting('accelerometer_rotation'),
+    readSetting('user_rotation'),
+  ]);
+  return { accelerometer, user };
+};
+
+/**
+ * 锁定设备旋转方向：0 竖屏、1 横屏；锁定期间关闭自动旋转
+ */
+export const setDeviceRotation = async (adbPath, serial, rotation) => {
+  await adbExec(adbPath, [
+    '-s', serial, 'shell', 'settings', 'put', 'system', 'accelerometer_rotation', '0',
+  ]);
+  await adbExec(adbPath, [
+    '-s', serial, 'shell', 'settings', 'put', 'system', 'user_rotation', String(rotation),
+  ]);
+};
+
+/**
+ * 会话结束前恢复锁定前的旋转设置；无记录的键保持原样
+ */
+export const restoreDeviceRotation = async (adbPath, serial, state) => {
+  if (!state) {
+    return;
+  }
+  if (state.accelerometer !== null) {
+    await adbExec(adbPath, [
+      '-s', serial, 'shell', 'settings', 'put', 'system',
+      'accelerometer_rotation', String(state.accelerometer),
+    ]);
+  }
+  if (state.user !== null) {
+    await adbExec(adbPath, [
+      '-s', serial, 'shell', 'settings', 'put', 'system', 'user_rotation', String(state.user),
+    ]);
+  }
+};
+
+/**
+ * 计算横竖屏切换的下一个锁定方向：竖屏(0) → 横屏(1) → 竖屏
+ */
+export const nextForcedRotation = (current) => (current === 1 ? 0 : 1);
+
 export const getMdnsConnectAddresses = async (adbPath) => {
   try {
     return parseMdnsServices(await adbExec(adbPath, ['mdns', 'services']));

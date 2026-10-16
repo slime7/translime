@@ -8,7 +8,7 @@ import {
   nativeTheme,
   screen,
 } from 'electron';
-import { setupMdeWindow } from 'translime-sdk';
+import { getMainStore, setupMdeWindow } from 'translime-sdk';
 import {
   captureWindowPixels,
   ensureChildOnTop,
@@ -26,9 +26,12 @@ import {
   getDeviceResolution,
   getForegroundApp,
   launchApp,
+  restoreDeviceRotation,
 } from './adb';
 import { resolveAdbPath, resolveScrcpyPath } from './bin-resolver';
-import { buildScrcpyArgs, nextWindowTitle, parseVideoSize } from './scrcpy-args';
+import {
+  buildScrcpyArgs, nextWindowTitle, normalizeHexColor, parseVideoSize,
+} from './scrcpy-args';
 import {
   calculateAspectCorrection,
   calculateProportionalSize,
@@ -66,6 +69,32 @@ export const TOOLBAR_GAP_CSS = 24;
 const OVERLAY_SYMBOL_COLORS = {
   dark: '#ffffff',
   light: '#1f1f1f',
+};
+
+// M3 基线 outline 色：宿主主题令牌缺失时的降级底色
+const OUTLINE_FALLBACK_COLORS = {
+  dark: '#938f99',
+  light: '#79747e',
+};
+
+/**
+ * 解析宿主 M3 主题的 outline 令牌（RRGGBB），作为 scrcpy letterbox
+ * 底色与画面外框同色，消除圆角处残留的默认深灰缝隙。
+ * 每次启动会话时实时读取，主题变更后的新会话自动跟随。
+ */
+const resolveOutlineColor = () => {
+  const store = getMainStore();
+  const css = typeof store?.getMatThemeCss === 'function'
+    ? store.getMatThemeCss()
+    : '';
+  const match = String(css ?? '').match(/--mat-sys-color-outline:\s*#?([0-9a-fA-F]{6})\b/);
+  const normalized = match ? normalizeHexColor(match[1]) : null;
+  if (normalized) {
+    return normalized;
+  }
+  return nativeTheme.shouldUseDarkColors
+    ? OUTLINE_FALLBACK_COLORS.dark
+    : OUTLINE_FALLBACK_COLORS.light;
 };
 
 export const getChromeMetrics = (mode = 'mirror') => {
@@ -248,6 +277,18 @@ const checkAndFixProportionalSize = (sessionId) => {
   }
   const [w, h] = session.win.getContentSize();
   const { chromeWidth, chromeHeight } = getChromeMetrics('mirror');
+  // 横竖屏切换后比例反转时，按修正结果可能超出工作区，须钳制在屏幕内：
+  // 宽度驱动超高时改为高度驱动，避免旋回竖屏把窗口撑出屏幕
+  let maxVideoWidth = null;
+  let maxVideoHeight = null;
+  try {
+    const display = screen.getDisplayMatching(session.win.getBounds());
+    const margin = 64;
+    maxVideoWidth = Math.max(1, display.workArea.width - margin - chromeWidth);
+    maxVideoHeight = Math.max(1, display.workArea.height - margin - chromeHeight);
+  } catch {
+    // 无显示器信息时不设上限
+  }
   // 容差 1px：仅修正在拖拽或 DPI 取整中累积出的可见偏差，
   // 避免与 resize 事件互相触发形成抖动
   const adjusted = calculateAspectCorrection({
@@ -256,6 +297,8 @@ const checkAndFixProportionalSize = (sessionId) => {
     ratio: session.resolution.width / session.resolution.height,
     chromeWidth,
     chromeHeight,
+    maxVideoWidth,
+    maxVideoHeight,
   });
   if (adjusted) {
     session.resizingProgrammatically = true;
@@ -436,6 +479,11 @@ const destroySession = (sessionId) => {
     session.cursorTimer = null;
   }
   cancelCatchUp(sessionId);
+  // 会话期间锁定过设备旋转，退出时恢复锁定前的设置
+  if (session.rotationState && session.rotationState.forced !== null) {
+    restoreDeviceRotation(session.adbPath, session.serial, session.rotationState.initial)
+      .catch(() => {});
+  }
   sessions.delete(sessionId);
   if (session.key && sessionKeys.get(session.key) === sessionId) {
     sessionKeys.delete(session.key);
@@ -552,6 +600,7 @@ export const launchSession = async (options = {}) => {
         )),
       }
       : null,
+    backgroundColor: mode === 'mirror' ? resolveOutlineColor() : null,
   });
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
 
@@ -588,6 +637,7 @@ export const launchSession = async (options = {}) => {
     spawnError: null,
     cursorTimer: null,
     resizingProgrammatically: false,
+    rotationState: null,
   };
   sessions.set(sessionId, session);
   sessionKeys.set(key, sessionId);

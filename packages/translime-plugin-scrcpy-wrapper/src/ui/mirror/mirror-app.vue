@@ -139,6 +139,14 @@
         <mat-btn
           variant="standard"
           size="medium"
+          icon="screen_rotation"
+          label="切换横竖屏"
+          :disabled="sending"
+          @click="rotateDevice"
+        />
+        <mat-btn
+          variant="standard"
+          size="medium"
           icon="open_in_new"
           label="新窗口"
           :disabled="sending || !hasForegroundApp"
@@ -210,6 +218,18 @@ const toggleScreen = async () => {
   sending.value = true;
   try {
     await window.scrcpyWrapper?.toggleScreen(sessionId);
+  } finally {
+    sending.value = false;
+  }
+};
+
+const rotateDevice = async () => {
+  if (sending.value) {
+    return;
+  }
+  sending.value = true;
+  try {
+    await window.scrcpyWrapper?.rotateDevice(sessionId);
   } finally {
     sending.value = false;
   }
