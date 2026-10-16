@@ -100,6 +100,7 @@ const loadBindings = () => {
       decodePoint: (ptr) => koffi.decode(ptr, POINT),
       bitmapInfoSize: koffi.sizeof(BITMAPINFOHEADER),
       FindWindowW: user32.func('intptr_t __stdcall FindWindowW(const str16 lpClassName, const str16 lpWindowName)'),
+      GetForegroundWindow: user32.func('intptr_t __stdcall GetForegroundWindow()'),
       GetWindow: user32.func('intptr_t __stdcall GetWindow(intptr_t hWnd, uint32_t nCmd)'),
       SetParent: user32.func('intptr_t __stdcall SetParent(intptr_t hWndChild, intptr_t hWndNewParent)'),
       GetAncestor: user32.func('intptr_t __stdcall GetAncestor(intptr_t hWnd, uint32_t nCmd)'),
@@ -158,6 +159,24 @@ export const getCursorPosInClient = (wrapperWin) => {
     return null;
   }
   return b.decodePoint(b.pointPtr);
+};
+
+/**
+ * 判断 wrapper 窗口（含其 SDL 子窗口）是否为前台窗口。
+ *
+ * 点击画面后 Win32 焦点落在 scrcpy 进程的 SDL 子窗口上，Electron 的
+ * win.isFocused() 会返回 false，因此按前台窗口的根窗口归属判定。
+ */
+export const isWrapperWindowActive = (wrapperWin) => {
+  if (!wrapperWin || wrapperWin.isDestroyed()) {
+    return false;
+  }
+  const b = loadBindings();
+  const foreground = b.GetForegroundWindow();
+  if (!foreground) {
+    return false;
+  }
+  return b.GetAncestor(foreground, GA_ROOT) === hwndFromWindow(wrapperWin);
 };
 
 /**
@@ -406,14 +425,21 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
     debounceMs,
     onBurstStart: () => onResizeBurstStart?.(),
     onSettle: () => {
-      sync();
+      // 先让上层做比例修正与尺寸收尾，再按最终窗口尺寸摆放画面
       onResizeSettled?.();
+      sync();
     },
   });
 
   const schedule = () => scheduler.notifyResize();
+  // 拖动期间每个 resize 事件实时跟随摆放，避免画面停留旧矩形、松手后整体跳变；
+  // 冻结层覆盖期间 SDL 位于覆盖层下方，仅保证位置同步、不产生视觉拉伸
+  const onResized = () => {
+    sync();
+    schedule();
+  };
   const settleNow = () => scheduler.settle();
-  wrapperWin.on('resize', schedule);
+  wrapperWin.on('resize', onResized);
   wrapperWin.on('will-resize', schedule);
   wrapperWin.on('resized', settleNow);
   wrapperWin.hookWindowMessage(WM_EXITSIZEMOVE, settleNow);
@@ -438,7 +464,7 @@ export const setupResizeSync = (wrapperWin, sdlHwnd, options = {}) => {
       } catch {
         // 窗口可能已销毁
       }
-      wrapperWin.removeListener('resize', schedule);
+      wrapperWin.removeListener('resize', onResized);
       wrapperWin.removeListener('will-resize', schedule);
       wrapperWin.removeListener('resized', settleNow);
     },

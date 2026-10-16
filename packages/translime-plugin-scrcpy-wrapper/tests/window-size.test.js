@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { calculateProportionalSize, computeWindowSize, fitVideoRect } from '../src/window-size';
+import {
+  calculateAspectCorrection,
+  calculateProportionalSize,
+  computeWindowSize,
+  fitVideoRect,
+  restoreMirrorContentSize,
+} from '../src/window-size';
 
 const TITLE_BAR_HEIGHT = 32;
 const TOOLBAR_WIDTH = 88;
@@ -196,5 +202,90 @@ describe('fitVideoRect', () => {
     const rect = fitVideoRect({ areaWidth: 0, areaHeight: 0, aspect: { width: 1080, height: 2400 } });
     expect(rect.width).toBeGreaterThanOrEqual(1);
     expect(rect.height).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('calculateAspectCorrection', () => {
+  const chromeWidth = 224;
+  const chromeHeight = 112;
+  const ratio = 1080 / 2400; // 0.45
+
+  it('画面区偏差不超过 1px 时不修正（防止修正与 resize 事件互相触发形成抖动）', () => {
+    // videoW=476, idealH=1058, videoH=1058 -> 偏差 0
+    expect(calculateAspectCorrection({
+      width: 700, height: 1170, ratio, chromeWidth, chromeHeight,
+    })).toBeNull();
+    // videoH=1059 -> 偏差 1，仍在容差内
+    expect(calculateAspectCorrection({
+      width: 700, height: 1171, ratio, chromeWidth, chromeHeight,
+    })).toBeNull();
+  });
+
+  it('画面区偏差超过容差时保持宽度并修正高度到等比（防止残留 letterbox 导致留白不均）', () => {
+    // videoH=1088，偏差 30px
+    expect(calculateAspectCorrection({
+      width: 700, height: 1200, ratio, chromeWidth, chromeHeight,
+    })).toEqual({ width: 700, height: 1170 });
+  });
+
+  it('比例缺失或画面区非法时安全跳过（防止除零或负尺寸）', () => {
+    expect(calculateAspectCorrection({
+      width: 700, height: 1170, ratio: 0, chromeWidth, chromeHeight,
+    })).toBeNull();
+    expect(calculateAspectCorrection({
+      width: 100, height: 1170, ratio, chromeWidth, chromeHeight,
+    })).toBeNull();
+  });
+});
+
+describe('restoreMirrorContentSize', () => {
+  const chromeWidth = 224;
+  const chromeHeight = 112;
+  const ratio = 1080 / 2400; // 0.45
+
+  it('保存尺寸在屏幕内且比例正确时原样恢复（防止无谓改变用户调整的窗口尺寸）', () => {
+    expect(restoreMirrorContentSize({
+      savedSize: { width: 700, height: 1170 },
+      ratio,
+      chromeWidth,
+      chromeHeight,
+      maxWidth: 1920,
+      maxHeight: 1200,
+    })).toEqual({ width: 700, height: 1170 });
+  });
+
+  it('保存尺寸超出工作区时先裁剪再保设备比例（防止恢复出超屏且比例异常的窗口）', () => {
+    // 裁剪到 max 1000x900 后按高度等比：videoH=788, videoW=round(788*0.45)=355
+    expect(restoreMirrorContentSize({
+      savedSize: { width: 1800, height: 1400 },
+      ratio,
+      chromeWidth,
+      chromeHeight,
+      maxWidth: 1000,
+      maxHeight: 900,
+    })).toEqual({ width: 579, height: 900 });
+  });
+
+  it('保存值比例偏差大时修正回设备比例（防止把偏差尺寸一代代传递下去）', () => {
+    // 保存宽度可用：videoW=476 -> videoH=1058
+    expect(restoreMirrorContentSize({
+      savedSize: { width: 700, height: 1500 },
+      ratio,
+      chromeWidth,
+      chromeHeight,
+      maxWidth: 1920,
+      maxHeight: 1200,
+    })).toEqual({ width: 700, height: 1170 });
+  });
+
+  it('比例缺失时仅按工作区裁剪（防止 adb 未响应时恢复流程抛错）', () => {
+    expect(restoreMirrorContentSize({
+      savedSize: { width: 700, height: 1170 },
+      ratio: null,
+      chromeWidth,
+      chromeHeight,
+      maxWidth: 600,
+      maxHeight: 1200,
+    })).toEqual({ width: 600, height: 1170 });
   });
 });

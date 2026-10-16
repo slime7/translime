@@ -17,6 +17,7 @@ export const MIN_VIDEO_HEIGHT = 320;
  * @param {{ width: number, height: number } | null} options.resolution - 设备分辨率，缺失时用常见手机比例。
  * @param {{ width: number, height: number }} options.workArea - 目标显示器工作区（CSS 像素）。
  * @param {number} [options.toolbarCssWidth=0] - 右侧垂直工具栏 CSS 宽度。
+ * @param {number} [options.toolbarGapCss=24] - 工具栏与画面区的 CSS 间距。
  * @param {number} [options.titleBarCssHeight=0] - 顶部自绘标题栏 CSS 高度。
  * @param {number} [options.borderCss=0] - SDL 四周 outline 边框 CSS 宽度。
  * @param {number} [options.gapCss=0] - 画面区四周统一留白（标题栏悬浮其中）。
@@ -28,6 +29,7 @@ export const computeWindowSize = ({
   resolution,
   workArea,
   toolbarCssWidth = 0,
+  toolbarGapCss = 24,
   titleBarCssHeight = 0,
   borderCss = 0,
   gapCss = 0,
@@ -42,7 +44,7 @@ export const computeWindowSize = ({
   const isMirror = toolbarCssWidth > 0;
   const leftOffset = gapCss + borderCss;
   const rightOffset = isMirror
-    ? borderCss + 24 + toolbarCssWidth + gapCss
+    ? borderCss + toolbarGapCss + toolbarCssWidth + gapCss
     : borderCss + gapCss + toolbarCssWidth;
   const topExtra = titleBarCssHeight > gapCss ? titleBarCssHeight : 0;
   const topOffset = topExtra + gapCss + borderCss;
@@ -163,6 +165,86 @@ export const calculateProportionalSize = ({
   return {
     width: Math.round(videoW + chromeWidth),
     height: Math.round(videoH + chromeHeight),
+  };
+};
+
+/**
+ * 计算把画面区修正回设备比例所需的窗口内容尺寸。
+ *
+ * 宽度保持不变、高度按比例取整对齐；偏差在容差内时返回 null（无需修正），
+ * 避免 DPI 取整误差导致修正与 resize 事件互相触发形成抖动。
+ *
+ * @param {object} options
+ * @param {number} options.width - 当前窗口内容宽度。
+ * @param {number} options.height - 当前窗口内容高度。
+ * @param {number} options.ratio - 视频宽高比。
+ * @param {number} options.chromeWidth - 水平非画面宽度。
+ * @param {number} options.chromeHeight - 垂直非画面高度。
+ * @param {number} [options.tolerancePx=1] - 允许的画面区像素偏差。
+ * @returns {{ width: number, height: number } | null} 需要修正时的新尺寸。
+ */
+export const calculateAspectCorrection = ({
+  width,
+  height,
+  ratio,
+  chromeWidth,
+  chromeHeight,
+  tolerancePx = 1,
+}) => {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || !ratio || ratio <= 0) {
+    return null;
+  }
+  const videoW = width - chromeWidth;
+  const videoH = height - chromeHeight;
+  if (videoW <= 0 || videoH <= 0) {
+    return null;
+  }
+  const idealH = Math.round(videoW / ratio);
+  if (Math.abs(videoH - idealH) <= tolerancePx) {
+    return null;
+  }
+  return { width, height: idealH + chromeHeight };
+};
+
+/**
+ * 恢复保存的镜像窗口尺寸：先按工作区上限裁剪，再修正回设备比例。
+ *
+ * 保存值可能来自比例修正生效前或另一块 DPI 不同的屏幕，直接恢复会带出
+ * 偏离比例的窗口，画面 letterbox 后四周留白不再固定。
+ *
+ * @param {object} options
+ * @param {{ width: number, height: number }} options.savedSize - 上次保存的内容尺寸。
+ * @param {number | null} options.ratio - 视频宽高比，缺失时仅裁剪。
+ * @param {number} options.chromeWidth - 水平非画面宽度。
+ * @param {number} options.chromeHeight - 垂直非画面高度。
+ * @param {number} options.maxWidth - 工作区允许的最大宽度。
+ * @param {number} options.maxHeight - 工作区允许的最大高度。
+ * @returns {{ width: number, height: number }}
+ */
+export const restoreMirrorContentSize = ({
+  savedSize,
+  ratio,
+  chromeWidth,
+  chromeHeight,
+  maxWidth,
+  maxHeight,
+}) => {
+  const maxVideoW = Math.max(1, maxWidth - chromeWidth);
+  const maxVideoH = Math.max(1, maxHeight - chromeHeight);
+  let videoW = Math.max(1, Math.min(savedSize.width - chromeWidth, maxVideoW));
+  let videoH = Math.max(1, Math.min(savedSize.height - chromeHeight, maxVideoH));
+  if (ratio && ratio > 0) {
+    // 先按保存宽度等比还原；高度超出上限（如换到更矮的屏幕）时改按高度等比
+    const heightByWidth = Math.round(videoW / ratio);
+    if (heightByWidth <= maxVideoH) {
+      videoH = heightByWidth;
+    } else {
+      videoW = Math.round(videoH * ratio);
+    }
+  }
+  return {
+    width: videoW + chromeWidth,
+    height: videoH + chromeHeight,
   };
 };
 

@@ -14,6 +14,7 @@ import {
   ensureChildOnTop,
   findWindowByTitle,
   getCursorPosInClient,
+  isWrapperWindowActive,
   lowerWindowBelowSiblings,
   mountSdlToElectron,
   setupResizeSync,
@@ -27,8 +28,13 @@ import {
   launchApp,
 } from './adb';
 import { resolveAdbPath, resolveScrcpyPath } from './bin-resolver';
-import { buildScrcpyArgs, nextWindowTitle } from './scrcpy-args';
-import { calculateProportionalSize, computeWindowSize } from './window-size';
+import { buildScrcpyArgs, nextWindowTitle, parseVideoSize } from './scrcpy-args';
+import {
+  calculateAspectCorrection,
+  calculateProportionalSize,
+  computeWindowSize,
+  restoreMirrorContentSize,
+} from './window-size';
 import { isChromeRevealed } from './chrome-reveal';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -219,7 +225,8 @@ const revealFreeze = (sessionId) => {
   if (session.win.isDestroyed()) {
     return;
   }
-  [0, 80, 200, 400, 700, 1000].forEach((delayMs) => {
+  // 等渲染层 150ms 淡出完成后再抬升 SDL，避免模糊层被立即盖住产生闪变
+  [180, 400, 700, 1000].forEach((delayMs) => {
     setTimeout(() => {
       if (session.freezeActive || !session.hwnd || session.win.isDestroyed()) {
         return;
@@ -241,23 +248,16 @@ const checkAndFixProportionalSize = (sessionId) => {
   }
   const [w, h] = session.win.getContentSize();
   const { chromeWidth, chromeHeight } = getChromeMetrics('mirror');
-  const videoW = w - chromeWidth;
-  const videoH = h - chromeHeight;
-  if (videoW <= 0 || videoH <= 0) {
-    return;
-  }
-  const ratio = session.resolution.width / session.resolution.height;
-  const currentRatio = videoW / videoH;
-  if (Math.abs(currentRatio - ratio) / ratio > 0.005) {
-    const adjusted = calculateProportionalSize({
-      targetWidth: w,
-      targetHeight: h,
-      currentWidth: w,
-      currentHeight: h,
-      ratio,
-      chromeWidth,
-      chromeHeight,
-    });
+  // 容差 1px：仅修正在拖拽或 DPI 取整中累积出的可见偏差，
+  // 避免与 resize 事件互相触发形成抖动
+  const adjusted = calculateAspectCorrection({
+    width: w,
+    height: h,
+    ratio: session.resolution.width / session.resolution.height,
+    chromeWidth,
+    chromeHeight,
+  });
+  if (adjusted) {
     session.resizingProgrammatically = true;
     try {
       session.win.setContentSize(adjusted.width, adjusted.height);
@@ -276,13 +276,14 @@ const settleResize = (sessionId) => {
     return;
   }
   if (session.mode === 'mirror' && session.win && !session.win.isDestroyed()) {
+    // 先修正回设备比例再保存，避免把偏差窗口尺寸带入下次启动恢复
+    checkAndFixProportionalSize(sessionId);
     const [w, h] = session.win.getContentSize();
     session.onSaveMirrorSize?.({ width: w, height: h });
   }
   if (!session.freezeActive) {
     return;
   }
-  checkAndFixProportionalSize(sessionId);
   if (session.mode !== 'virtual') {
     revealFreeze(sessionId);
     return;
@@ -510,12 +511,16 @@ export const launchSession = async (options = {}) => {
       height: Math.min(inheritedContentSize.height, display.workArea.height - 32),
     };
   } else if (mode === 'mirror' && savedSize && savedSize.width > 0 && savedSize.height > 0) {
-    const maxW = display.workArea.width - 64;
-    const maxH = display.workArea.height - 64;
-    contentSize = {
-      width: Math.min(savedSize.width, maxW),
-      height: Math.min(savedSize.height, maxH),
-    };
+    contentSize = restoreMirrorContentSize({
+      savedSize,
+      ratio: resolution && resolution.width > 0 && resolution.height > 0
+        ? resolution.width / resolution.height
+        : null,
+      chromeWidth,
+      chromeHeight,
+      maxWidth: display.workArea.width - 64,
+      maxHeight: display.workArea.height - 64,
+    });
   } else {
     contentSize = computeWindowSize({
       resolution,
@@ -524,6 +529,7 @@ export const launchSession = async (options = {}) => {
         height: display.workArea.height,
       },
       toolbarCssWidth: mode === 'mirror' ? TOOLBAR_CSS_WIDTH : 0,
+      toolbarGapCss: mode === 'mirror' ? TOOLBAR_GAP_CSS : 24,
       titleBarCssHeight: TITLE_BAR_CSS_HEIGHT,
       borderCss: mode === 'mirror' ? SDL_BORDER_CSS : 0,
       gapCss: mode === 'mirror' ? OUTER_GAP_CSS : 0,
@@ -623,9 +629,22 @@ export const launchSession = async (options = {}) => {
       });
       if (adjusted.width !== newBounds.width || adjusted.height !== newBounds.height) {
         event.preventDefault();
+        // 拖动左/上边缘时锚定右/下边缘：只 setContentSize 会把窗口左上角钉死，
+        // 左上边缘拖不动并回弹
+        const edge = details?.edge ?? '';
+        const bounds = {
+          x: edge.includes('left')
+            ? newBounds.x + (newBounds.width - adjusted.width)
+            : newBounds.x,
+          y: edge.includes('top')
+            ? newBounds.y + (newBounds.height - adjusted.height)
+            : newBounds.y,
+          width: adjusted.width,
+          height: adjusted.height,
+        };
         session.resizingProgrammatically = true;
         try {
-          win.setContentSize(adjusted.width, adjusted.height);
+          win.setBounds(bounds);
         } finally {
           session.resizingProgrammatically = false;
         }
@@ -640,6 +659,15 @@ export const launchSession = async (options = {}) => {
         if (session.cursorTimer) {
           clearInterval(session.cursorTimer);
           session.cursorTimer = null;
+        }
+        return;
+      }
+      // 窗口不在前台（其他应用持焦、被遮挡或最小化）时不触发面板显示；
+      // 点击画面后焦点在 SDL 子窗口上，须按前台根窗口判定而非 win.isFocused()
+      if (!isWrapperWindowActive(win)) {
+        if (chromeRevealed) {
+          chromeRevealed = false;
+          win.webContents.send(CHROME_VISIBLE_CHANNEL, false);
         }
         return;
       }
@@ -701,13 +729,12 @@ export const launchSession = async (options = {}) => {
     const lines = logBuffer.split(/\r?\n/);
     logBuffer = lines.pop() ?? '';
     lines.forEach((line) => {
-      const match = line.match(/Texture \([^)]*\): (\d+)x(\d+)/);
-      if (!match || mode !== 'mirror') {
+      const videoSize = parseVideoSize(line);
+      if (!videoSize || mode !== 'mirror') {
         return;
       }
-      const width = Number(match[1]);
-      const height = Number(match[2]);
-      if (width <= 0 || height <= 0 || win.isDestroyed()) {
+      const { width, height } = videoSize;
+      if (win.isDestroyed()) {
         return;
       }
       if (session.resolution && session.resolution.width === width && session.resolution.height === height) {

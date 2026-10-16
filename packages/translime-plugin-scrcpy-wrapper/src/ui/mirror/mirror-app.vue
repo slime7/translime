@@ -55,10 +55,10 @@
         <span class="text-sm text-[var(--mat-sys-color-on-surface-variant)]">等待画面接入…</span>
       </div>
 
-      <!-- 画面外轮廓边框 -->
+      <!-- 画面外轮廓边框：实时跟随 SDL 矩形，不加位移过渡以免拖拽期间与画面错位 -->
       <div
         v-if="sdlRect"
-        class="pointer-events-none absolute transition-all duration-100 ease-out"
+        class="pointer-events-none absolute"
         :style="{
           left: `${sdlRect.x - 8}px`,
           top: `${sdlRect.y - 8}px`,

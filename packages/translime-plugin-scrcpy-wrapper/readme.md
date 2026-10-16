@@ -22,6 +22,8 @@
 - Windows 10/11 x64
 - 设备端开启开发者选项与 USB / 无线调试
 - 本机需安装 scrcpy 与 adb（可将路径加入系统 PATH，或在插件设置中指定 scrcpy 路径）
+- scrcpy >= 5.0：整屏镜像依赖 `--render-fit=stretched` 与 `--no-window-aspect-ratio-lock`
+  （帧铺满窗口、窗口比例由插件接管），独立虚拟屏依赖 `--new-display` 与 `--flex-display`
 
 ## 插件配置项
 
