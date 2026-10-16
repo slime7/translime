@@ -65,7 +65,8 @@ export const normalizeHexColor = (value) => {
  * letterbox 底色，与外框 outline 同色以贴合圆角。需 scrcpy >= 5.0。
  * virtualDisplaySize 给定时以显式分辨率创建虚拟屏，并开启 flex-display
  * 让虚拟屏连续跟随窗口尺寸（内容随拉伸重排，不出现黑边）。
- * 虚拟屏关闭系统装饰，应用全屏铺满画面区，不显示状态栏、手势栏与标题装饰栏
+ * 虚拟屏关闭系统装饰，应用全屏铺满画面区，不显示状态栏、手势栏与标题装饰栏。
+ * stayAwake 时开启 --stay-awake，会话期间保持设备不息屏（仅设备接通电源时生效）
  */
 export const buildScrcpyArgs = ({
   mode,
@@ -74,6 +75,7 @@ export const buildScrcpyArgs = ({
   title,
   virtualDisplaySize = null,
   backgroundColor = null,
+  stayAwake = false,
 }) => {
   const args = [
     `--serial=${serial}`,
@@ -96,6 +98,9 @@ export const buildScrcpyArgs = ({
   }
   if (pkg) {
     args.push(`--start-app=${pkg}`);
+  }
+  if (stayAwake) {
+    args.push('--stay-awake');
   }
   return args;
 };

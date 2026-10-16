@@ -572,6 +572,7 @@ export const launchSession = async (options = {}) => {
     inheritedContentSize = null,
     onSaveMirrorSize = null,
     settingValue = null,
+    stayAwake = false,
     logger = console,
   } = options;
   if (!serial) {
@@ -664,6 +665,7 @@ export const launchSession = async (options = {}) => {
       }
       : null,
     backgroundColor: mode === 'mirror' ? resolveOutlineColor() : null,
+    stayAwake,
   });
   const wrapperTitle = pkg ? `${pkg} - ${serial}` : `${serial} 画面`;
 

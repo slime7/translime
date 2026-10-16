@@ -111,12 +111,12 @@
         <div class="window-drag-region h-4 shrink-0" />
       </div>
 
-      <!-- 右侧工具栏 -->
+      <!-- 右侧工具栏：不绑定 v-model 独立收起，透明度跟随面板一起淡入淡出 -->
       <mat-toolbar
-        v-model="chromeVisible"
         variant="floating-right"
         position="start"
-        class="window-no-drag z-30"
+        class="window-no-drag z-30 mirror-toolbar"
+        :class="{ 'mirror-toolbar--hidden': !chromeVisible }"
         style="top: 56px; right: 16px; -webkit-app-region: no-drag; app-region: no-drag;"
       >
         <mat-btn
@@ -300,5 +300,18 @@ onMounted(() => {
    直接清零，避免自然流画面框被推移、与 SDL 子窗口实际坐标错位 */
 .mirror-root :deep(.mat-app-root__content) {
   padding: 0 !important;
+}
+
+/* mde 工具栏的 v-model 收起是 surface 滑出动画，与面板淡出不同步；
+   改在根节点用透明度+可见性过渡，隐藏末端再切 visibility 保证淡出可见 */
+.mirror-toolbar {
+  transition:
+    opacity var(--mat-sys-motion-duration-short4, 200ms) var(--mat-sys-motion-easing-standard, ease-out),
+    visibility var(--mat-sys-motion-duration-short4, 200ms) linear;
+}
+
+.mirror-toolbar--hidden {
+  opacity: 0;
+  visibility: hidden;
 }
 </style>
