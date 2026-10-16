@@ -24,19 +24,9 @@ const settingMenu = [
       properties: ['openFile', 'dontAddToRecent'],
     },
   },
-  {
-    // scrcpy 的 --stay-awake 是启动参数，无法对运行中的会话切换，因此做成设置项：
-    // 下次启动画面会话时生效
-    key: 'stayAwake',
-    type: 'switch',
-    name: '保持设备唤醒（画面运行期间不息屏）',
-    required: false,
-  },
 ];
 
 const getScrcpySetting = () => pluginConfig.get('scrcpyPath', null);
-
-const getStayAwakeSetting = () => pluginConfig.get('stayAwake', false) === true;
 
 const getAdbPath = () => {
   const scrcpyInfo = resolveScrcpyPath({ settingValue: getScrcpySetting() });
@@ -259,7 +249,6 @@ const ipcHandlers = defineIpcHandlers([
           savedSize: mode === 'mirror' ? getSavedMirrorSize(actualSerial) : null,
           onSaveMirrorSize: (size) => saveMirrorSize(actualSerial, size),
           settingValue: getScrcpySetting(),
-          stayAwake: getStayAwakeSetting(),
           logger,
         });
         return { success: true, serial: actualSerial, ...result };
@@ -318,7 +307,6 @@ const ipcHandlers = defineIpcHandlers([
           pkg: targetPkg,
           inheritedContentSize,
           settingValue: getScrcpySetting(),
-          stayAwake: getStayAwakeSetting(),
           logger,
         });
         return { success: true, pkg: targetPkg, ...result };

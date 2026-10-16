@@ -132,33 +132,6 @@ describe('buildScrcpyArgs', () => {
     expect(args).toContain('--new-display');
     expect(args.some((arg) => arg.startsWith('--start-app='))).toBe(false);
   });
-
-  it('stayAwake 开启时输出 --stay-awake（防止设置打开却未传给 scrcpy，设备仍然息屏）', () => {
-    const args = buildScrcpyArgs({
-      mode: 'mirror',
-      serial: 'ABC123',
-      pkg: null,
-      title: 't',
-      stayAwake: true,
-    });
-    expect(args).toContain('--stay-awake');
-  });
-
-  it('stayAwake 缺省或为假时不输出 --stay-awake（保留 scrcpy 默认息屏行为）', () => {
-    expect(buildScrcpyArgs({
-      mode: 'mirror',
-      serial: 'ABC123',
-      pkg: null,
-      title: 't',
-    })).not.toContain('--stay-awake');
-    expect(buildScrcpyArgs({
-      mode: 'virtual',
-      serial: 'ABC123',
-      pkg: null,
-      title: 't',
-      stayAwake: false,
-    })).not.toContain('--stay-awake');
-  });
 });
 
 describe('nextWindowTitle', () => {

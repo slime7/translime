@@ -301,17 +301,4 @@ onMounted(() => {
 .mirror-root :deep(.mat-app-root__content) {
   padding: 0 !important;
 }
-
-/* mde 工具栏的 v-model 收起是 surface 滑出动画，与面板淡出不同步；
-   改在根节点用透明度+可见性过渡，隐藏末端再切 visibility 保证淡出可见 */
-.mirror-toolbar {
-  transition:
-    opacity var(--mat-sys-motion-duration-short4, 200ms) var(--mat-sys-motion-easing-standard, ease-out),
-    visibility var(--mat-sys-motion-duration-short4, 200ms) linear;
-}
-
-.mirror-toolbar--hidden {
-  opacity: 0;
-  visibility: hidden;
-}
 </style>
