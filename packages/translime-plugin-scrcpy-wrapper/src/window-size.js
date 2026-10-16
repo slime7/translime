@@ -2,7 +2,8 @@
  * 画面窗口初始尺寸与等比缩放计算。
  *
  * 比例以 SDL 画面区比例（即设备分辨率宽高比）为准，
- * 窗口总尺寸 = 画面尺寸 + 标题区行高 + 右侧工具栏 + 8px outline 边框 + 四周留白。
+ * 窗口总尺寸 = 画面尺寸 + 标题区行高 + 工具栏区 + 8px outline 边框 + 四周留白；
+ * 工具栏区随布局占用右侧（side）或底部（bottom），底部布局下左右两侧对称。
  * 镜像模式的标题栏悬浮在顶部标题区行内，行高即全部顶部占用；
  * 虚拟屏模式顶部仅剩原生标题栏高度。
  */
@@ -17,7 +18,9 @@ export const MIN_VIDEO_HEIGHT = 320;
  * @param {object} options
  * @param {{ width: number, height: number } | null} options.resolution - 设备分辨率，缺失时用常见手机比例。
  * @param {{ width: number, height: number }} options.workArea - 目标显示器工作区（CSS 像素）。
- * @param {number} [options.toolbarCssWidth=0] - 右侧垂直工具栏 CSS 宽度。
+ * @param {number} [options.toolbarCssWidth=0] - 垂直工具栏 CSS 宽度。
+ * @param {number} [options.toolbarCssHeight=0] - 横向工具栏 CSS 高度。
+ * @param {string} [options.toolbarLayout='side'] - 工具栏布局：`side` 占右侧，`bottom` 占底部。
  * @param {number} [options.toolbarGapCss=24] - 工具栏与画面区的 CSS 间距。
  * @param {number} [options.titleBarCssHeight=0] - 顶部标题区 CSS 高度。
  * @param {number} [options.topGapCss=0] - 标题区上方的额外顶部留白。
@@ -31,6 +34,8 @@ export const computeWindowSize = ({
   resolution,
   workArea,
   toolbarCssWidth = 0,
+  toolbarCssHeight = 0,
+  toolbarLayout = 'side',
   toolbarGapCss = 24,
   titleBarCssHeight = 0,
   topGapCss = 0,
@@ -44,13 +49,20 @@ export const computeWindowSize = ({
     : FALLBACK_RESOLUTION;
   const ratio = device.width / device.height;
 
-  const isMirror = toolbarCssWidth > 0;
+  const isMirror = toolbarCssWidth > 0 || toolbarCssHeight > 0;
+  const isBottomToolbar = isMirror && toolbarLayout === 'bottom';
   const leftOffset = gapCss + borderCss;
-  const rightOffset = isMirror
-    ? borderCss + toolbarGapCss + toolbarCssWidth + gapCss
-    : borderCss + gapCss + toolbarCssWidth;
+  let rightOffset;
+  if (!isMirror) {
+    rightOffset = borderCss + gapCss + toolbarCssWidth;
+  } else if (isBottomToolbar) {
+    rightOffset = borderCss + gapCss;
+  } else {
+    rightOffset = borderCss + toolbarGapCss + toolbarCssWidth + gapCss;
+  }
   const topOffset = titleBarCssHeight + topGapCss + borderCss;
-  const bottomOffset = gapCss + borderCss + barCssHeight;
+  const bottomOffset = gapCss + borderCss + barCssHeight
+    + (isBottomToolbar ? toolbarGapCss + toolbarCssHeight : 0);
 
   const chromeW = leftOffset + rightOffset;
   const chromeH = topOffset + bottomOffset;

@@ -22,6 +22,22 @@ describe('isChromeRevealed', () => {
     expect(isChromeRevealed({ ...windowSize, x: 412, y: 300 })).toBe(true);
   });
 
+  it('底部工具栏布局：鼠标靠近底部工具栏区域时显示（防止底部布局工具栏无法唤出）', () => {
+    // 高 800，阈值 104，y >= 696 时触发
+    expect(isChromeRevealed({
+      ...windowSize, x: 200, y: 780, rightThreshold: null, bottomThreshold: 104,
+    })).toBe(true);
+    expect(isChromeRevealed({
+      ...windowSize, x: 200, y: 696, rightThreshold: null, bottomThreshold: 104,
+    })).toBe(true);
+  });
+
+  it('底部工具栏布局：右侧不再触发显示', () => {
+    expect(isChromeRevealed({
+      ...windowSize, x: 450, y: 300, rightThreshold: null, bottomThreshold: 104,
+    })).toBe(false);
+  });
+
   it('鼠标处于中央画面区时隐藏', () => {
     expect(isChromeRevealed({ ...windowSize, x: 200, y: 300 })).toBe(false);
     expect(isChromeRevealed({ ...windowSize, x: 300, y: 400 })).toBe(false);

@@ -33,6 +33,21 @@ import {
   buildScrcpyArgs, nextWindowTitle, normalizeHexColor, parseVideoSize,
 } from './scrcpy-args';
 import {
+  BAR_CSS_HEIGHT,
+  getChromeMetrics,
+  OUTER_GAP_CSS,
+  resolveMirrorToolbarLayout,
+  SDL_BORDER_CSS,
+  SDL_CORNER_RADIUS_CSS,
+  TITLE_BAR_CSS_HEIGHT,
+  TITLE_ROW_CSS_HEIGHT,
+  TOOLBAR_CSS_HEIGHT,
+  TOOLBAR_CSS_WIDTH,
+  TOOLBAR_GAP_CSS,
+  TOOLBAR_LAYOUT_BOTTOM,
+  TOOLBAR_LAYOUT_SIDE,
+} from './mirror-layout';
+import {
   calculateAspectCorrection,
   calculateProportionalSize,
   computeWindowSize,
@@ -53,21 +68,6 @@ const FOREGROUND_APP_CHANNEL = `scrcpy-foreground-app@${PLUGIN_ID}`;
 const SDL_RECT_CHANNEL = `scrcpy-sdl-rect@${PLUGIN_ID}`;
 const WINDOW_CONTROL_CHANNEL = `scrcpy-window-control@${PLUGIN_ID}`;
 
-// 画面窗口顶部自绘标题栏 CSS 高度（虚拟屏窗口顶部占用）
-export const TITLE_BAR_CSS_HEIGHT = 32;
-// 镜像窗口顶部标题区自然行高（32px 标题栏 + 上下各 4px 呼吸空间）
-export const TITLE_ROW_CSS_HEIGHT = 40;
-// 虚拟屏无底部控制条
-export const BAR_CSS_HEIGHT = 0;
-// 画面窗口右侧垂直工具栏 CSS 宽度（mde floating-right 工具栏：40px small 按钮 + 两侧 8px 内边距）
-export const TOOLBAR_CSS_WIDTH = 56;
-// SDL 画面区周围 outline 边框 CSS 宽度
-export const SDL_BORDER_CSS = 8;
-// SDL 画面区内圆角 CSS 半径（20px，与 28px 外圆角扣除 8px 边框后的内圆角一致）
-export const SDL_CORNER_RADIUS_CSS = 20;
-// 画面区四周统一留白（顶部为标题区与画面框之间，右缘为工具栏到窗口边缘）
-export const OUTER_GAP_CSS = 16;
-export const TOOLBAR_GAP_CSS = 24;
 // 控制栏（标题栏、工具栏与背景卡片）隐藏延时：移出或失焦后延迟隐藏，显示仍即时
 export const CHROME_HIDE_DELAY_MS = 2000;
 
@@ -101,31 +101,6 @@ const resolveOutlineColor = () => {
   return nativeTheme.shouldUseDarkColors
     ? OUTLINE_FALLBACK_COLORS.dark
     : OUTLINE_FALLBACK_COLORS.light;
-};
-
-export const getChromeMetrics = (mode = 'mirror') => {
-  if (mode === 'virtual') {
-    return {
-      leftOffset: 0,
-      rightOffset: 0,
-      topOffset: TITLE_BAR_CSS_HEIGHT,
-      bottomOffset: 0,
-      chromeWidth: 0,
-      chromeHeight: TITLE_BAR_CSS_HEIGHT,
-    };
-  }
-  const leftOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
-  const rightOffset = SDL_BORDER_CSS + TOOLBAR_GAP_CSS + TOOLBAR_CSS_WIDTH + OUTER_GAP_CSS;
-  const topOffset = TITLE_ROW_CSS_HEIGHT + OUTER_GAP_CSS + SDL_BORDER_CSS;
-  const bottomOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
-  return {
-    leftOffset,
-    rightOffset,
-    topOffset,
-    bottomOffset,
-    chromeWidth: leftOffset + rightOffset,
-    chromeHeight: topOffset + bottomOffset,
-  };
 };
 
 const registerWindowControlHandler = () => {
@@ -214,7 +189,7 @@ export const sessionKey = ({ serial, mode = 'mirror', pkg = null }) => (
 
 export const getSessionIdByKey = (key) => sessionKeys.get(key) ?? null;
 
-const getPhysicalDims = (win, mode = 'mirror') => {
+const getPhysicalDims = (win, mode = 'mirror', toolbarLayout = TOOLBAR_LAYOUT_SIDE) => {
   let scale = 1;
   try {
     const display = screen.getDisplayMatching(win.getBounds());
@@ -222,11 +197,10 @@ const getPhysicalDims = (win, mode = 'mirror') => {
   } catch {
     scale = 1;
   }
-  const m = getChromeMetrics(mode);
+  const m = getChromeMetrics(mode, toolbarLayout);
   return {
     scale,
     topBar: Math.round(TITLE_BAR_CSS_HEIGHT * scale),
-    toolbar: Math.round(TOOLBAR_CSS_WIDTH * scale),
     border: Math.round(SDL_BORDER_CSS * scale),
     gap: Math.round(OUTER_GAP_CSS * scale),
     leftOffset: Math.round(m.leftOffset * scale),
@@ -290,7 +264,7 @@ const checkAndFixProportionalSize = (sessionId) => {
     return;
   }
   const [w, h] = session.win.getContentSize();
-  const { chromeWidth, chromeHeight } = getChromeMetrics('mirror');
+  const { chromeWidth, chromeHeight } = getChromeMetrics('mirror', session.toolbarLayout);
   // 横竖屏切换后比例反转时，按修正结果可能超出工作区，须钳制在屏幕内：
   // 宽度驱动超高时改为高度驱动，避免旋回竖屏把窗口撑出屏幕
   let maxVideoWidth = null;
@@ -336,7 +310,7 @@ const swapMirrorSizeForRotation = (sessionId) => {
     return;
   }
   const [w, h] = session.win.getContentSize();
-  const { chromeWidth, chromeHeight } = getChromeMetrics('mirror');
+  const { chromeWidth, chromeHeight } = getChromeMetrics('mirror', session.toolbarLayout);
   // 交换结果可能超出工作区（如竖屏窗口换横屏后宽度超屏），按比例整体缩小
   let maxVideoWidth = null;
   let maxVideoHeight = null;
@@ -414,7 +388,7 @@ const startResizeFreeze = (sessionId) => {
 };
 
 const createWrapperWindow = ({
-  title, sessionId, contentSize, mode = 'mirror',
+  title, sessionId, contentSize, mode = 'mirror', toolbarLayout = TOOLBAR_LAYOUT_SIDE,
 }) => {
   registerWindowControlHandler();
   registerOverlayThemeSync();
@@ -484,7 +458,13 @@ const createWrapperWindow = ({
     event.preventDefault();
   });
   const htmlFile = isMirror ? 'mirror.html' : 'virtual.html';
-  win.loadFile(path.join(dirname, htmlFile), { query: { session: sessionId, title } });
+  win.loadFile(path.join(dirname, htmlFile), {
+    query: {
+      session: sessionId,
+      title,
+      ...(isMirror ? { layout: toolbarLayout } : {}),
+    },
+  });
   return win;
 };
 
@@ -611,8 +591,12 @@ export const launchSession = async (options = {}) => {
   const resolution = (passedResolution && passedResolution.width > 0 && passedResolution.height > 0)
     ? passedResolution
     : await getDeviceResolution(adbPath, serial);
+  // 工具栏布局随打开时的屏幕比例确定，会话期间（含设备旋转）保持不变
+  const toolbarLayout = mode === 'mirror'
+    ? resolveMirrorToolbarLayout(resolution)
+    : TOOLBAR_LAYOUT_SIDE;
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  const { chromeWidth, chromeHeight } = getChromeMetrics(mode);
+  const { chromeWidth, chromeHeight } = getChromeMetrics(mode, toolbarLayout);
 
   let contentSize;
   if (mode === 'virtual' && inheritedContentSize && inheritedContentSize.width > 0 && inheritedContentSize.height > 0) {
@@ -639,6 +623,8 @@ export const launchSession = async (options = {}) => {
         height: display.workArea.height,
       },
       toolbarCssWidth: mode === 'mirror' ? TOOLBAR_CSS_WIDTH : 0,
+      toolbarCssHeight: mode === 'mirror' ? TOOLBAR_CSS_HEIGHT : 0,
+      toolbarLayout: mode === 'mirror' ? toolbarLayout : TOOLBAR_LAYOUT_SIDE,
       toolbarGapCss: mode === 'mirror' ? TOOLBAR_GAP_CSS : 24,
       titleBarCssHeight: mode === 'mirror' ? TITLE_ROW_CSS_HEIGHT : TITLE_BAR_CSS_HEIGHT,
       topGapCss: mode === 'mirror' ? OUTER_GAP_CSS : 0,
@@ -678,7 +664,7 @@ export const launchSession = async (options = {}) => {
     env,
   });
   const win = createWrapperWindow({
-    title: wrapperTitle, sessionId, contentSize, mode,
+    title: wrapperTitle, sessionId, contentSize, mode, toolbarLayout,
   });
   const session = {
     id: sessionId,
@@ -691,6 +677,7 @@ export const launchSession = async (options = {}) => {
     win,
     adbPath,
     resolution,
+    toolbarLayout,
     defaultLauncher: null,
     onSaveMirrorSize,
     hooks: null,
@@ -808,16 +795,24 @@ export const launchSession = async (options = {}) => {
         return;
       }
       const [w, h] = win.getContentSize();
-      const dims = getPhysicalDims(win, mode);
+      const dims = getPhysicalDims(win, mode, session.toolbarLayout);
       const cssX = pt.x / dims.scale;
       const cssY = pt.y / dims.scale;
+      // 底部工具栏布局改为悬停底部区域唤出，右侧不再有可交互 chrome
       const nextRevealed = isChromeRevealed({
         x: cssX,
         y: cssY,
         width: w,
         height: h,
         topThreshold: TITLE_ROW_CSS_HEIGHT + OUTER_GAP_CSS + 16,
-        rightThreshold: TOOLBAR_CSS_WIDTH + TOOLBAR_GAP_CSS + 24,
+        ...(session.toolbarLayout === TOOLBAR_LAYOUT_BOTTOM
+          ? {
+            rightThreshold: null,
+            bottomThreshold: TOOLBAR_CSS_HEIGHT + TOOLBAR_GAP_CSS + 24,
+          }
+          : {
+            rightThreshold: TOOLBAR_CSS_WIDTH + TOOLBAR_GAP_CSS + 24,
+          }),
       });
       if (nextRevealed) {
         chromeVisibility.show();
@@ -903,7 +898,7 @@ export const launchSession = async (options = {}) => {
     session.hwnd = hwnd;
     // 挂载时可能已从 scrcpy 输出解析到真实视频尺寸，读取会话上的最新值
     const aspect = mode === 'mirror' ? session.resolution : null;
-    const dims = getPhysicalDims(win, mode);
+    const dims = getPhysicalDims(win, mode, session.toolbarLayout);
     const sendRect = (rect) => {
       if (!win.isDestroyed()) {
         win.webContents.send(SDL_RECT_CHANNEL, rect);
@@ -921,13 +916,13 @@ export const launchSession = async (options = {}) => {
       onRect: sendRect,
     });
     session.hooks = setupResizeSync(win, hwnd, {
-      getLeftOffsetPhysical: () => getPhysicalDims(win, mode).leftOffset,
-      getTopOffsetPhysical: () => getPhysicalDims(win, mode).topOffset,
-      getRightOffsetPhysical: () => getPhysicalDims(win, mode).rightOffset,
-      getBottomOffsetPhysical: () => getPhysicalDims(win, mode).bottomOffset,
-      getBorderPhysical: () => getPhysicalDims(win, mode).border,
+      getLeftOffsetPhysical: () => getPhysicalDims(win, mode, session.toolbarLayout).leftOffset,
+      getTopOffsetPhysical: () => getPhysicalDims(win, mode, session.toolbarLayout).topOffset,
+      getRightOffsetPhysical: () => getPhysicalDims(win, mode, session.toolbarLayout).rightOffset,
+      getBottomOffsetPhysical: () => getPhysicalDims(win, mode, session.toolbarLayout).bottomOffset,
+      getBorderPhysical: () => getPhysicalDims(win, mode, session.toolbarLayout).border,
       getCornerRadiusCss: () => (mode === 'mirror' ? SDL_CORNER_RADIUS_CSS : 0),
-      getScaleFactor: () => getPhysicalDims(win, mode).scale,
+      getScaleFactor: () => getPhysicalDims(win, mode, session.toolbarLayout).scale,
       getAspect: () => (mode === 'mirror' ? session.resolution : null),
       isFrozen: () => session.freezeActive,
       onResizeBurstStart: () => startResizeFreeze(sessionId),

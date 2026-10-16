@@ -11,6 +11,7 @@ import {
 const TITLE_ROW_HEIGHT = 40;
 const TITLE_BAR_HEIGHT = 32;
 const TOOLBAR_WIDTH = 56;
+const TOOLBAR_HEIGHT = 56;
 const BORDER = 8;
 const GAP = 16;
 const WORK_AREA = { width: 1920, height: 1040 };
@@ -108,6 +109,27 @@ describe('computeWindowSize', () => {
     });
     expect(size.width).toBe(528);
     expect(size.height).toBe(976);
+  });
+
+  it('底部工具栏布局：工具栏条带转移到高度，左右按对称留白计算（防止平板/横屏镜像窗口两侧过宽）', () => {
+    const size = computeWindowSize({
+      resolution: { width: 1600, height: 800 },
+      workArea: WORK_AREA,
+      toolbarCssWidth: TOOLBAR_WIDTH,
+      toolbarCssHeight: TOOLBAR_HEIGHT,
+      toolbarLayout: 'bottom',
+      toolbarGapCss: 24,
+      titleBarCssHeight: TITLE_ROW_HEIGHT,
+      topGapCss: GAP,
+      borderCss: BORDER,
+      gapCss: GAP,
+    });
+    // chromeW = 24 + 24 = 48, chromeH = 64 + (16 + 8 + 24 + 56) = 168
+    // maxH = 1040 - 64 - 168 = 808 -> videoW = 808 * 2 = 1616
+    // width = 1616 + 48 = 1664, height = 808 + 168 = 976
+    expect(size).toEqual({ width: 1664, height: 976 });
+    // 画面区保持设备比例：条带转移不得引入 letterbox
+    expect((size.width - 48) / (size.height - 168)).toBeCloseTo(2, 5);
   });
 });
 

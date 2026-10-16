@@ -7,7 +7,8 @@
  * @param {number} options.width - 窗口客户区 CSS 宽度。
  * @param {number} options.height - 窗口客户区 CSS 高度。
  * @param {number} [options.topThreshold=56] - 触发顶部标题栏区域的 Y 坐标阈值。
- * @param {number} [options.rightThreshold=88] - 触发右侧工具栏区域的右侧边距阈值。
+ * @param {number|null} [options.rightThreshold=88] - 触发右侧工具栏区域的右侧边距阈值，null 时不检测。
+ * @param {number|null} [options.bottomThreshold=null] - 触发底部工具栏区域的底部边距阈值，null 时不检测。
  * @returns {boolean}
  */
 export const isChromeRevealed = ({
@@ -17,6 +18,7 @@ export const isChromeRevealed = ({
   height,
   topThreshold = 56,
   rightThreshold = 88,
+  bottomThreshold = null,
 }) => {
   if (typeof x !== 'number' || typeof y !== 'number') {
     return false;
@@ -27,7 +29,10 @@ export const isChromeRevealed = ({
   if (y <= topThreshold) {
     return true;
   }
-  if (x >= width - rightThreshold) {
+  if (rightThreshold != null && x >= width - rightThreshold) {
+    return true;
+  }
+  if (bottomThreshold != null && y >= height - bottomThreshold) {
     return true;
   }
   return false;
