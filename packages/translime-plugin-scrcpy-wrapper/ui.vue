@@ -4,50 +4,34 @@
     class="h-full overflow-hidden"
   >
     <div class="flex h-full flex-col gap-3 overflow-hidden p-3">
-      <!-- 顶部设备栏：左侧单选已保存设备，右侧添加/配对与刷新 -->
-      <div class="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--mat-sys-color-outline-variant)] pb-2">
-        <div class="flex min-w-0 grow items-center gap-2 overflow-x-auto py-0.5">
-          <div
-            v-if="devices.length === 0"
-            class="text-sm text-[var(--mat-sys-color-on-surface-variant)]"
+      <!-- 顶部设备栏：设备单选按钮组紧随管理设备按钮，无刷新按钮，无多余滚动条 -->
+      <div class="flex shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-[var(--mat-sys-color-outline-variant)] pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <mat-btn-group
+          v-if="devices.length > 0"
+          variant="connected"
+          selection="single"
+          :selected="serial"
+          @select="onSelectDevice($event.nextSelected)"
+        >
+          <mat-btn
+            v-for="device in devices"
+            :key="device.serial"
+            :value="device.serial"
+            :prefix="device.wireless ? 'wifi' : 'smartphone'"
           >
-            暂未添加设备，请点击右侧「添加设备」
-          </div>
-          <mat-btn-group
-            v-else
-            variant="connected"
-            selection="single"
-            :selected="serial"
-            @select="onSelectDevice($event.nextSelected)"
-          >
-            <mat-btn
-              v-for="device in devices"
-              :key="device.serial"
-              :value="device.serial"
-              :prefix="device.wireless ? 'wifi' : 'smartphone'"
-            >
-              {{ deviceBtnLabel(device) }}
-            </mat-btn>
-          </mat-btn-group>
-        </div>
+            {{ deviceDisplayLabel(device) }}
+          </mat-btn>
+        </mat-btn-group>
 
-        <div class="flex shrink-0 items-center gap-1">
-          <mat-btn
-            icon="add_link"
-            label="添加设备"
-            variant="text"
-            class="shrink-0"
-            @click="openPairDialog"
-          />
-          <mat-btn
-            icon="refresh"
-            label="刷新"
-            variant="text"
-            class="shrink-0"
-            :loading="loadingDevices"
-            @click="loadDevices"
-          />
-        </div>
+        <!-- 管理设备按钮（紧随设备列表，不参与单选） -->
+        <mat-btn
+          prefix="tune"
+          variant="outlined"
+          class="shrink-0"
+          @click="openManageDialog"
+        >
+          管理设备
+        </mat-btn>
       </div>
 
       <!-- 未选择设备提示 -->
@@ -55,12 +39,12 @@
         v-if="!serial"
         class="flex min-h-0 grow items-center justify-center text-sm text-[var(--mat-sys-color-on-surface-variant)]"
       >
-        请在顶部选择设备，或点击右侧「添加设备」
+        请在上方选择设备，或点击「管理设备」添加
       </div>
 
       <!-- 已选设备的内容区域 -->
       <template v-else>
-        <!-- 快捷操作与设备专属设置行 -->
+        <!-- 快捷操作行：镜像整屏、连接（仅离线无线）与码率/FPS配置 -->
         <div class="flex shrink-0 flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2">
             <mat-btn
@@ -82,14 +66,6 @@
               :disabled="connecting"
               :loading="connecting"
               @click="connectSelected"
-            />
-            <mat-btn
-              icon="delete"
-              label="移除设备"
-              variant="text"
-              :disabled="forgetting"
-              :loading="forgetting"
-              @click="removeSelectedDevice"
             />
           </div>
 
@@ -192,19 +168,60 @@
       </template>
     </div>
 
-    <!-- 添加设备 / 配对弹窗 -->
+    <!-- 管理设备弹窗（支持添加 USB 设备、删除设备、无线配对） -->
     <mat-dialog
-      v-model="pairOpen"
-      title="添加设备"
+      v-model="manageOpen"
+      title="管理设备"
       :width="460"
       close-on-back
     >
-      <div class="flex flex-col gap-3 py-1">
-        <!-- 上方：检测到的有线设备 (USB) -->
-        <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-3.5 py-1">
+        <!-- 1. 已保存的设备列表与删除 -->
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--mat-sys-color-primary)]">
+            已保存设备
+          </span>
+          <div
+            v-if="savedDevices.length === 0"
+            class="rounded-lg bg-[var(--mat-sys-color-surface-container)] p-2.5 text-xs text-[var(--mat-sys-color-on-surface-variant)]"
+          >
+            暂无已保存设备
+          </div>
+          <div
+            v-for="dev in savedDevices"
+            :key="dev.serial"
+            class="flex items-center justify-between rounded-lg bg-[var(--mat-sys-color-surface-container)] px-3 py-2"
+          >
+            <div class="flex min-w-0 flex-col">
+              <span class="truncate text-sm font-medium">
+                {{ dev.model || dev.serial }}
+                <span
+                  class="ml-1 text-xs font-normal"
+                  :class="isOnline(dev) ? 'text-[var(--mat-sys-color-primary)]' : 'text-[var(--mat-sys-color-outline)]'"
+                >
+                  {{ isOnline(dev) ? '在线' : '离线' }}
+                </span>
+              </span>
+              <span class="truncate text-xs text-[var(--mat-sys-color-on-surface-variant)]">{{ dev.serial }}</span>
+            </div>
+            <mat-btn
+              icon="delete"
+              variant="standard"
+              size="small"
+              class="text-[var(--mat-sys-color-error)]"
+              :disabled="deletingSerial === dev.serial"
+              @click="removeStoredDevice(dev.serial)"
+            />
+          </div>
+        </div>
+
+        <mat-divider />
+
+        <!-- 2. 检测到的 USB 有线设备 -->
+        <div class="flex flex-col gap-1.5">
           <div class="flex items-center justify-between">
-            <span class="text-sm font-semibold text-[var(--mat-sys-color-on-surface)]">
-              检测到的有线设备 (USB)
+            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--mat-sys-color-primary)]">
+              检测到的 USB 设备
             </span>
             <mat-btn
               icon="refresh"
@@ -217,9 +234,9 @@
 
           <div
             v-if="usbCandidates.length === 0"
-            class="rounded-lg bg-[var(--mat-sys-color-surface-container)] p-3 text-xs text-[var(--mat-sys-color-on-surface-variant)]"
+            class="rounded-lg bg-[var(--mat-sys-color-surface-container)] p-2.5 text-xs text-[var(--mat-sys-color-on-surface-variant)]"
           >
-            {{ loadingUsb ? '正在检测 USB 连接设备...' : '未检测到在线的 USB 设备，请确认已开启 USB 调试并信任此电脑' }}
+            {{ loadingUsb ? '正在检测 USB 连接设备...' : '未检测到在线的 USB 设备，请确认已开启 USB 调试' }}
           </div>
 
           <div
@@ -233,12 +250,13 @@
             </div>
             <mat-btn
               v-if="!usb.stored"
-              label="添加"
               size="small"
               variant="filled-tonal"
               :loading="addingSerial === usb.serial"
               @click="addUsbDevice(usb)"
-            />
+            >
+              添加
+            </mat-btn>
             <span
               v-else
               class="px-2 text-xs text-[var(--mat-sys-color-outline)]"
@@ -250,15 +268,11 @@
 
         <mat-divider />
 
-        <!-- 下方：无线调试配对 -->
+        <!-- 3. 无线调试配对 -->
         <div class="flex flex-col gap-2">
-          <span class="text-sm font-semibold text-[var(--mat-sys-color-on-surface)]">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--mat-sys-color-primary)]">
             无线调试配对
           </span>
-          <p class="text-xs text-[var(--mat-sys-color-on-surface-variant)]">
-            首次使用：手机进入 无线调试 → 使用配对码配对设备，按配对页显示的 IP:端口 和 6 位配对码填写。
-            已配对设备：配对码留空，直接填 IP:端口 连接并保存。
-          </p>
           <mat-text-field
             v-model="codeForm.address"
             block
@@ -289,9 +303,9 @@
         <mat-btn
           variant="text"
           :disabled="pairing"
-          @click="pairOpen = false"
+          @click="manageOpen = false"
         >
-          取消
+          关闭
         </mat-btn>
         <mat-btn
           variant="filled"
@@ -324,7 +338,6 @@ const loadingDevices = ref(false);
 const loadingApps = ref(false);
 const launching = ref(false);
 const connecting = ref(false);
-const forgetting = ref(false);
 const error = ref('');
 
 // 设备专属配置
@@ -346,40 +359,42 @@ const fpsItems = [
   { title: '不限制', value: 0 },
 ];
 
-// 添加/配对弹窗状态
-const pairOpen = ref(false);
+// 管理设备弹窗状态
+const manageOpen = ref(false);
 const loadingUsb = ref(false);
 const usbCandidates = ref([]);
 const addingSerial = ref('');
+const deletingSerial = ref('');
 const pairing = ref(false);
 const pairError = ref('');
 const createCodeForm = () => ({ address: '', pairingCode: '' });
 const codeForm = ref(createCodeForm());
 
-const currentDevice = computed(() => devices.value.find((d) => d.serial === serial.value) || null);
-
-const isDeviceOnline = computed(() => {
-  if (!currentDevice.value) {
+const isOnline = (device) => {
+  if (!device) {
     return false;
   }
-  return currentDevice.value.connected !== false && currentDevice.value.state !== 'offline';
-});
+  return device.state === 'device' || device.connected === true;
+};
+
+const currentDevice = computed(() => devices.value.find((d) => d.serial === serial.value) || null);
+
+const isDeviceOnline = computed(() => isOnline(currentDevice.value));
+
+const savedDevices = computed(() => devices.value.filter((d) => Boolean(d.stored)));
 
 const selectedOfflineWireless = computed(() => Boolean(
-  currentDevice.value?.wireless && !currentDevice.value?.connected,
+  currentDevice.value?.wireless && !isOnline(currentDevice.value),
 ));
 
-const deviceBtnLabel = (device) => {
+const deviceDisplayLabel = (device) => {
   const name = device.model || device.serial;
-  if (!device.connected || device.state === 'offline') {
-    return `${name} · 离线`;
-  }
-  return name;
+  return isOnline(device) ? name : `${name} (离线)`;
 };
 
 const appEmptyText = computed(() => {
   if (!serial.value) {
-    return '请在顶部选择设备';
+    return '请在上方选择设备';
   }
   if (!isDeviceOnline.value) {
     return selectedOfflineWireless.value ? '设备未连接，请点击上方「连接设备」' : '设备已离线';
@@ -444,8 +459,7 @@ const loadDevices = async () => {
     devices.value = result.devices;
     const stillAvailable = result.devices.some((device) => device.serial === serial.value);
     if (!stillAvailable) {
-      // 优先选择第一个在线设备，否则选第一个保存的设备
-      const firstOnline = result.devices.find((d) => d.connected !== false && d.state !== 'offline');
+      const firstOnline = result.devices.find((d) => isOnline(d));
       serial.value = firstOnline?.serial || (result.devices[0]?.serial ?? '');
     }
     if (serial.value) {
@@ -542,23 +556,23 @@ const connectSelected = async () => {
   }
 };
 
-const removeSelectedDevice = async () => {
-  if (!serial.value || forgetting.value) {
-    return;
-  }
-  forgetting.value = true;
-  error.value = '';
+const removeStoredDevice = async (targetSerial) => {
+  deletingSerial.value = targetSerial;
   try {
-    const result = await ipc.invoke('remove-stored-device', { serial: serial.value });
+    const result = await ipc.invoke('remove-stored-device', { serial: targetSerial });
     if (!result?.success) {
       throw new Error(result?.message || '移除失败');
     }
-    serial.value = '';
     await loadDevices();
+    await loadUsbCandidates();
+    if (serial.value === targetSerial) {
+      const firstOnline = devices.value.find((d) => isOnline(d));
+      serial.value = firstOnline?.serial || (devices.value[0]?.serial ?? '');
+    }
   } catch (e) {
     error.value = e.message;
   } finally {
-    forgetting.value = false;
+    deletingSerial.value = '';
   }
 };
 
@@ -585,8 +599,8 @@ const addUsbDevice = async (usb) => {
       type: 'usb',
     });
     if (res?.success) {
-      pairOpen.value = false;
       await loadDevices();
+      await loadUsbCandidates();
       serial.value = usb.serial;
     }
   } catch {
@@ -596,10 +610,10 @@ const addUsbDevice = async (usb) => {
   }
 };
 
-const openPairDialog = () => {
+const openManageDialog = () => {
   codeForm.value = createCodeForm();
   pairError.value = '';
-  pairOpen.value = true;
+  manageOpen.value = true;
   loadUsbCandidates();
 };
 
@@ -617,7 +631,7 @@ const pairByCode = async () => {
     if (!result?.success) {
       throw new Error(result?.message || '配对失败');
     }
-    pairOpen.value = false;
+    manageOpen.value = false;
     await loadDevices();
     if (result.serial) {
       serial.value = result.serial;

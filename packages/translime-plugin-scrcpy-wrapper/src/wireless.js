@@ -45,7 +45,12 @@ export const mergeWirelessDevices = (devices, stored = []) => {
     const saved = stored.find((item) => item.serial === device.serial);
     if (!isWireless) {
       if (!saved) {
-        return device;
+        return {
+          ...device,
+          wireless: false,
+          connected: device.state === 'device',
+          stored: false,
+        };
       }
       return {
         ...device,

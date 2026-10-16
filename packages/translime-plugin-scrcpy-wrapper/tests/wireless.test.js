@@ -122,12 +122,19 @@ describe('mergeWirelessDevices', () => {
     { serial: '192.168.1.9:40001', model: '平板' },
   ];
 
-  it('USB 设备原样保留，不附加无线标记', () => {
+  it('USB 设备不附加无线标记，带有正确的 connected 状态', () => {
     const merged = mergeWirelessDevices(
       [{ serial: 'ABC123', state: 'device', model: 'Pixel 6 Pro' }],
       [],
     );
-    expect(merged).toEqual([{ serial: 'ABC123', state: 'device', model: 'Pixel 6 Pro' }]);
+    expect(merged).toEqual([{
+      serial: 'ABC123',
+      state: 'device',
+      model: 'Pixel 6 Pro',
+      wireless: false,
+      connected: true,
+      stored: false,
+    }]);
   });
 
   it('在线无线设备标记 wireless 并回填已保存的机型名', () => {
