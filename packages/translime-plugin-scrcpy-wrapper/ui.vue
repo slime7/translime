@@ -414,6 +414,13 @@ const isOnline = (device) => {
   return device.state === 'device' || device.connected === true;
 };
 
+const isWirelessSerial = (targetSerial) => {
+  const str = String(targetSerial ?? '').trim();
+  return /^(?:\d{1,3}\.){3}\d{1,3}:\d{1,5}$/.test(str)
+    || str.startsWith('adb-')
+    || str.includes('_adb-tls-');
+};
+
 const currentDevice = computed(() => devices.value.find((d) => d.serial === serial.value) || null);
 
 const isDeviceOnline = computed(() => isOnline(currentDevice.value));
