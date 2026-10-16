@@ -65,7 +65,7 @@ export const TOOLBAR_CSS_WIDTH = 72;
 export const SDL_BORDER_CSS = 8;
 // SDL 画面区内圆角 CSS 半径（20px，与 28px 外圆角扣除 8px 边框后的内圆角一致）
 export const SDL_CORNER_RADIUS_CSS = 20;
-// 画面区左/右/底部统一留白（顶部由标题区行占据）
+// 画面区四周统一留白（顶部为标题区与画面框之间，右缘为工具栏到窗口边缘）
 export const OUTER_GAP_CSS = 16;
 export const TOOLBAR_GAP_CSS = 24;
 // 控制栏（标题栏、工具栏与背景卡片）隐藏延时：移出或失焦后延迟隐藏，显示仍即时
@@ -116,7 +116,7 @@ export const getChromeMetrics = (mode = 'mirror') => {
   }
   const leftOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
   const rightOffset = SDL_BORDER_CSS + TOOLBAR_GAP_CSS + TOOLBAR_CSS_WIDTH + OUTER_GAP_CSS;
-  const topOffset = TITLE_ROW_CSS_HEIGHT + SDL_BORDER_CSS;
+  const topOffset = TITLE_ROW_CSS_HEIGHT + OUTER_GAP_CSS + SDL_BORDER_CSS;
   const bottomOffset = OUTER_GAP_CSS + SDL_BORDER_CSS;
   return {
     leftOffset,
@@ -635,7 +635,7 @@ export const launchSession = async (options = {}) => {
       toolbarCssWidth: mode === 'mirror' ? TOOLBAR_CSS_WIDTH : 0,
       toolbarGapCss: mode === 'mirror' ? TOOLBAR_GAP_CSS : 24,
       titleBarCssHeight: mode === 'mirror' ? TITLE_ROW_CSS_HEIGHT : TITLE_BAR_CSS_HEIGHT,
-      topGapCss: 0,
+      topGapCss: mode === 'mirror' ? OUTER_GAP_CSS : 0,
       borderCss: mode === 'mirror' ? SDL_BORDER_CSS : 0,
       gapCss: mode === 'mirror' ? OUTER_GAP_CSS : 0,
       barCssHeight: mode === 'virtual' ? BAR_CSS_HEIGHT : 0,
@@ -803,7 +803,7 @@ export const launchSession = async (options = {}) => {
         y: cssY,
         width: w,
         height: h,
-        topThreshold: TITLE_ROW_CSS_HEIGHT + 16,
+        topThreshold: TITLE_ROW_CSS_HEIGHT + OUTER_GAP_CSS + 16,
         rightThreshold: TOOLBAR_CSS_WIDTH + TOOLBAR_GAP_CSS + 24,
       });
       if (nextRevealed) {

@@ -1,5 +1,8 @@
 <template>
-  <mat-app-root class="mirror-root">
+  <mat-app-root
+    class="mirror-root"
+    :fill-viewport="false"
+  >
     <div class="relative flex h-dvh w-dvh flex-col overflow-hidden bg-transparent select-none">
       <!-- 窗口背景卡片 -->
       <div
@@ -113,7 +116,7 @@
         variant="floating-right"
         position="start"
         class="window-no-drag z-30"
-        style="top: 40px; right: 16px; -webkit-app-region: no-drag; app-region: no-drag;"
+        style="top: 56px; right: 16px; -webkit-app-region: no-drag; app-region: no-drag;"
       >
         <mat-btn
           variant="standard"
@@ -289,5 +292,10 @@ onMounted(() => {
 <style scoped>
 .mirror-root {
   background: transparent !important;
+  /* 浮动工具栏会向 mat-app-root 登记边缘内边距，透明悬浮窗口自行管理留白，直接清零 */
+  --mat-app-root-padding-top: 0px;
+  --mat-app-root-padding-bottom: 0px;
+  --mat-app-root-padding-start: 0px;
+  --mat-app-root-padding-end: 0px;
 }
 </style>

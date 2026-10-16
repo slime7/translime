@@ -16,21 +16,21 @@ const GAP = 16;
 const WORK_AREA = { width: 1920, height: 1040 };
 
 describe('computeWindowSize', () => {
-  it('镜像窗口按工作区可用画面等比缩放，顶部高度为标题区行高加边框（防止初始窗口超出屏幕或比例错位）', () => {
+  it('镜像窗口按工作区可用画面等比缩放，顶部为标题区行高加上留白（防止初始窗口超出屏幕或比例错位）', () => {
     const size = computeWindowSize({
       resolution: { width: 1080, height: 2400 },
       workArea: WORK_AREA,
       toolbarCssWidth: TOOLBAR_WIDTH,
       titleBarCssHeight: TITLE_ROW_HEIGHT,
-      topGapCss: 0,
+      topGapCss: GAP,
       borderCss: BORDER,
       gapCss: GAP,
     });
-    // chromeW = 24 + 120 = 144, chromeH = (40 + 8) + (16 + 8) = 72
-    // maxH = 1040 - 64 - 72 = 904, maxW = 1920 - 64 - 144 = 1712
-    // videoW = 904 * 1080 / 2400 = 406.8
-    // width = 406.8 + 144 = 550.8 -> 551, height = 904 + 72 = 976
-    expect(size).toEqual({ width: 551, height: 976 });
+    // chromeW = 24 + 120 = 144, chromeH = (40 + 16 + 8) + (16 + 8) = 88
+    // maxH = 1040 - 64 - 88 = 888, maxW = 1920 - 64 - 144 = 1712
+    // videoW = 888 * 1080 / 2400 = 399.6
+    // width = 399.6 + 144 = 543.6 -> 544, height = 888 + 88 = 976
+    expect(size).toEqual({ width: 544, height: 976 });
   });
 
   it('标题区上方显式叠加顶部留白，不再按大小吸收（防止回归旧的标题栏吸收逻辑）', () => {
@@ -39,15 +39,15 @@ describe('computeWindowSize', () => {
       workArea: WORK_AREA,
       toolbarCssWidth: TOOLBAR_WIDTH,
       titleBarCssHeight: TITLE_ROW_HEIGHT,
-      topGapCss: 8,
+      topGapCss: 24,
       borderCss: BORDER,
       gapCss: GAP,
     });
-    // chromeH = (40 + 8 + 8) + (16 + 8) = 80
-    // maxH = 1040 - 64 - 80 = 896
-    // videoW = 896 * 1080 / 2400 = 403.2 -> width = 547.2 -> 547
-    // height = 896 + 80 = 976
-    expect(size).toEqual({ width: 547, height: 976 });
+    // chromeH = (40 + 24 + 8) + (16 + 8) = 96
+    // maxH = 1040 - 64 - 96 = 880
+    // videoW = 880 * 1080 / 2400 = 396 -> width = 396 + 144 = 540
+    // height = 880 + 96 = 976
+    expect(size).toEqual({ width: 540, height: 976 });
   });
 
   it('宽屏设备画面受限于工作区宽度限制，高度等比反推（防止宽屏设备弹窗溢出显示器）', () => {
@@ -56,16 +56,16 @@ describe('computeWindowSize', () => {
       workArea: { width: 1000, height: 900 },
       toolbarCssWidth: TOOLBAR_WIDTH,
       titleBarCssHeight: TITLE_ROW_HEIGHT,
-      topGapCss: 0,
+      topGapCss: GAP,
       borderCss: BORDER,
       gapCss: GAP,
       margin: 0,
     });
-    // chromeW = 144, chromeH = 72
-    // maxW = 1000 - 144 = 856, maxH = 900 - 72 = 828
-    // videoW = 828 * 3840 / 2160 = 1472 > 856 -> videoW = 856
-    // videoH = 856 * 2160 / 3840 = 481.5 -> height = 481.5 + 72 = 553.5 -> 554
-    expect(size).toEqual({ width: 1000, height: 554 });
+    // chromeW = 144, chromeH = 88
+    // maxW = 1000 - 144 = 856, maxH = 900 - 88 = 812
+    // videoW = 812 * 3840 / 2160 = 1443.6 > 856 -> videoW = 856
+    // videoH = 856 * 2160 / 3840 = 481.5 -> height = 481.5 + 88 = 569.5 -> 570
+    expect(size).toEqual({ width: 1000, height: 570 });
   });
 
   it('虚拟屏模式下无工具栏与边框间距，无底部控制条，仅按标题栏尺寸计算（防止虚拟屏窗口尺寸偏差与滚动条出现）', () => {
@@ -88,12 +88,12 @@ describe('computeWindowSize', () => {
       workArea: { width: 200, height: 200 },
       toolbarCssWidth: TOOLBAR_WIDTH,
       titleBarCssHeight: TITLE_ROW_HEIGHT,
-      topGapCss: 0,
+      topGapCss: GAP,
       borderCss: BORDER,
       gapCss: GAP,
     });
     expect(size.width).toBeGreaterThanOrEqual(240 + 144);
-    expect(size.height).toBeGreaterThanOrEqual(320 + 72);
+    expect(size.height).toBeGreaterThanOrEqual(320 + 88);
   });
 
   it('分辨率缺失时安全回退默认手机比例（防止 adb 未响应时抛错中断窗口创建）', () => {
@@ -102,11 +102,11 @@ describe('computeWindowSize', () => {
       workArea: WORK_AREA,
       toolbarCssWidth: TOOLBAR_WIDTH,
       titleBarCssHeight: TITLE_ROW_HEIGHT,
-      topGapCss: 0,
+      topGapCss: GAP,
       borderCss: BORDER,
       gapCss: GAP,
     });
-    expect(size.width).toBe(551);
+    expect(size.width).toBe(544);
     expect(size.height).toBe(976);
   });
 });
