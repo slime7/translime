@@ -39,7 +39,7 @@
     "electron-updater": "^6.7.3",
     "js-yaml": "^4.1.1",
     "json5": "^2.2.3",
-    "mde-vue": "git+https://github.com/slime7/mde-vue.git#4e797673d2a3711dddfc02930a4350c3665f1041",
+    "mde-vue": "git+https://github.com/slime7/mde-vue.git#16db2cf24b2ec7c14e302841ecc5c5a3ed9e1621",
     "pinia": "^4.0.3",
     "semver": "^7.8.5",
     "semver-compare": "^1.0.0",
