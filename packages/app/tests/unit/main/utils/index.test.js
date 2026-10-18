@@ -114,6 +114,18 @@ describe('parseDeepLink', () => {
     });
   });
 
+  it('应解析插件深链的路径段并去首尾斜杠（防止插件深链转发丢路径）', () => {
+    const result = parseDeepLink('translime://plugin/scrcpy-wrapper/abc?foo=bar');
+    expect(result.main).toBe('plugin');
+    expect(result.path).toBe('scrcpy-wrapper/abc');
+    expect(result.params.foo).toBe('bar');
+  });
+
+  it('无路径的链接 path 为空字符串（防止插件根路径被解析为 undefined）', () => {
+    const result = parseDeepLink('translime://open');
+    expect(result.path).toBe('');
+  });
+
   it('无查询参数时 params 应为空对象', () => {
     const result = parseDeepLink('translime://plugin');
     expect(result.params).toEqual({});

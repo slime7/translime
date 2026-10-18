@@ -21,6 +21,7 @@ const SHARED_VUE_IMPORT_PATH = './libs/vue/vue.esm-browser.js';
 const SHARED_MDE_CSS_SOURCE = normalizePath(resolve(MODULES_ROOT, './mde-vue/dist/styles.css'));
 const SHARED_MDE_TAILWIND_SOURCE = normalizePath(resolve(MODULES_ROOT, './mde-vue/dist/tailwind.css'));
 const SHARED_MDE_BOOTSTRAP_SOURCE = normalizePath(resolve(RENDERER_ROOT, './libs/mde/bootstrap.js'));
+const SHARED_MATERIAL_SYMBOL_FONT_SOURCE = normalizePath(resolve(RENDERER_ROOT, './assets/fonts/material icons/MaterialSymbol.woff2'));
 
 const createSharedVueImportMapPlugin = (isDev, mdeStandaloneSource) => {
   let sharedVueDevUrl = new URL(SHARED_VUE_DEV_URL, DEFAULT_VITE_ORIGIN).href;
@@ -38,6 +39,7 @@ const createSharedVueImportMapPlugin = (isDev, mdeStandaloneSource) => {
     '/libs/mde/mde.css': { source: SHARED_MDE_CSS_SOURCE, type: 'text/css; charset=utf-8' },
     '/libs/mde/mde-tailwind.css': { source: SHARED_MDE_TAILWIND_SOURCE, type: 'text/css; charset=utf-8' },
     '/libs/mde/bootstrap.js': { source: SHARED_MDE_BOOTSTRAP_SOURCE, type: 'text/javascript; charset=utf-8' },
+    '/libs/fonts/MaterialSymbol.woff2': { source: SHARED_MATERIAL_SYMBOL_FONT_SOURCE, type: 'font/woff2' },
   };
 
   return {
@@ -74,7 +76,10 @@ const createSharedVueImportMapPlugin = (isDev, mdeStandaloneSource) => {
 
         const mdeRoute = devRoutes[requestPath];
         if (mdeRoute) {
-          response.writeHead(200, { 'Content-Type': mdeRoute.type });
+          response.writeHead(200, {
+            'Content-Type': mdeRoute.type,
+            'Access-Control-Allow-Origin': '*',
+          });
           response.end(readFileSync(mdeRoute.source));
           return;
         }
@@ -147,6 +152,11 @@ export default defineConfig(async ({ mode }) => {
             src: SHARED_MDE_BOOTSTRAP_SOURCE,
             dest: 'libs/mde',
             rename: { stripBase: true, name: 'bootstrap.js' },
+          },
+          {
+            src: SHARED_MATERIAL_SYMBOL_FONT_SOURCE,
+            dest: 'libs/fonts',
+            rename: { stripBase: true, name: 'MaterialSymbol.woff2' },
           },
         ],
       }),

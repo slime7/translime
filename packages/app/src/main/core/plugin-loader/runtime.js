@@ -3,6 +3,7 @@ import appManager from '../../utils/useAppManager';
 import logger from '../../utils/logger';
 import pluginInterop from '../pluginInterop';
 import titleBarRegistry from '../titleBarRegistry';
+import deepLinkRegistry from '../deepLinkRegistry';
 import {
   ACTIVATION_ON_VIEW,
   PLUGIN_SOURCE_DEV,
@@ -72,6 +73,7 @@ const cleanupRuntimeRegistrations = (loader, plugin) => {
   }
   pluginInterop.unregister(plugin.packageName);
   titleBarRegistry.clearTitleBarActions(plugin.packageName);
+  deepLinkRegistry.clearDeepLinkHandlers(plugin.packageName);
   if (plugin.commands?.length) {
     plugin.commands.forEach((command) => {
       loader.runtimeCommandHandlers.delete(command.id);
@@ -581,6 +583,7 @@ const disablePlugin = (loader, packageName, options = {}) => {
 
   pluginInterop.unregister(plugin.packageName);
   titleBarRegistry.clearTitleBarActions(plugin.packageName);
+  deepLinkRegistry.clearDeepLinkHandlers(plugin.packageName);
   if (plugin.commands?.length) {
     plugin.commands.forEach((command) => {
       loader.runtimeCommandHandlers.delete(command.id);

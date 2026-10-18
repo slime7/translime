@@ -65,6 +65,53 @@ describe('windowRuntime - setupMdeWindow 行为验证', () => {
     expect(mockWebContents.removeListener).toHaveBeenCalledWith('dom-ready', expect.any(Function));
   });
 
+  it('监听宿主 themeColor 与 theme 变更并触发 applyTheme 及派发事件', async () => {
+    const storeListeners = {};
+    const unsubs = [vi.fn(), vi.fn()];
+    global.mainStore = {
+      config: {
+        get: vi.fn((key) => {
+          if (key === 'setting.themeColor') return '#2196f3';
+          if (key === 'setting.theme') return 'dark';
+          return null;
+        }),
+        onDidChange: vi.fn((key, cb) => {
+          storeListeners[key] = cb;
+          return key === 'setting.themeColor' ? unsubs[0] : unsubs[1];
+        }),
+      },
+    };
+
+    const mockWebContents = {
+      insertCSS: vi.fn(async () => 'css-key-theme'),
+      removeInsertedCSS: vi.fn(async () => {}),
+      executeJavaScript: vi.fn(async () => {}),
+      send: vi.fn(),
+      on: vi.fn(),
+      once: vi.fn(),
+      removeListener: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+    };
+
+    const handle = setupMdeWindow(mockWebContents, { syncTheme: true });
+
+    expect(global.mainStore.config.onDidChange).toHaveBeenCalledWith('setting.themeColor', expect.any(Function));
+    expect(global.mainStore.config.onDidChange).toHaveBeenCalledWith('setting.theme', expect.any(Function));
+
+    // 模拟宿主主题色改变
+    await storeListeners['setting.themeColor']();
+    expect(mockWebContents.insertCSS).toHaveBeenCalled();
+    expect(mockWebContents.send).toHaveBeenCalledWith('translime:theme-updated', expect.objectContaining({
+      css: expect.any(String),
+    }));
+
+    handle.remove();
+    expect(unsubs[0]).toHaveBeenCalled();
+    expect(unsubs[1]).toHaveBeenCalled();
+
+    delete global.mainStore;
+  });
+
   it('传入非法目标抛出明确错误', () => {
     expect(() => setupMdeWindow(null)).toThrow(/无法从参数中解析/);
     expect(() => setupMdeWindow({})).toThrow(/无法从参数中解析/);

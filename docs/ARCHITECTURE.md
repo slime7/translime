@@ -72,12 +72,15 @@ flowchart LR
   - `main/isolated-child/`：隔离模式子进程引导脚本（`vite.isolated-child.config.js` 构建为 `dist/isolated-child/index.cjs`，零 Electron 依赖）
 - `core/ipcHandler.js`：注册宿主与插件的 IPC handler，提供插件激活入口。
 - `core/Ipc.js`：IPC 基础封装。
-- `core/pluginInterop.js`：已激活插件之间的 API 共享。
+- `core/pluginInterop.js`：已激活插件之间的 API 共享（静态 `libs` 导出与 SDK `registerLib` 运行期注册共用同一登记，其他插件经 `getExports` / `waitForPlugin` 探知调用）。
+- `core/deepLinkRegistry.js`：插件深链注册表（SDK `registerDeepLinkHandlers` 声明路径处理函数），随插件停用/重启清理。
 - `core/titleBarRegistry.js`：插件顶栏按钮区注册表（SDK `setTitleBarActions` 动态声明），
   保留点击函数、序列化描述随 `get-plugins` 下发，变更经 `title-bar-actions-changed` 推送，
   点击经 `run-title-bar-action` 回传分发；插件停用/重启时随运行期注册一并清除。
 - `core/autoUpdate.js`：基于 electron-updater 的自动更新。
-- `core/deepLink.js`：`translime://` 深链注册与分发。
+- `core/deepLink.js`：`translime://` 深链注册与分发；`translime://plugin/<插件名>/<路径>`
+  会先激活目标插件（插件名可省略 `translime-plugin-` 前缀），再转发到其经 SDK
+  `registerDeepLinkHandlers` 注册的路径处理函数，全程在主进程内完成。
 - `core/netHandler.js`：暴露给 `window.ts.net` 的网络请求层。
 - `core/tray.js`：系统托盘。
 - `utils/`：配置存储、窗口、日志、manifest 读取、应用管理等。
@@ -101,7 +104,7 @@ flowchart LR
 
 ### SDK（packages/sdk）
 
-- `src/index.js` 与 `src/index.d.ts`：运行时 API 与类型（主进程、渲染进程、通用三组）；`useIpc(pluginId)` 为事件名自动补全 `@插件ID` 后缀，`defineIpcHandlers()` 在激活前校验 `ipcHandlers` 导出结构，`setTitleBarActions()` 声明插件顶栏按钮区（宿主过旧时静默降级返回 false）。
+- `src/index.js` 与 `src/index.d.ts`：运行时 API 与类型（主进程、渲染进程、通用三组）；`useIpc(pluginId)` 为事件名自动补全 `@插件ID` 后缀，`defineIpcHandlers()` 在激活前校验 `ipcHandlers` 导出结构，`setTitleBarActions()` 声明插件顶栏按钮区（宿主过旧时静默降级返回 false），`registerDeepLinkHandlers()` 声明插件深链路径处理函数，`registerLib()` 为 lib 型插件运行期注册公共库（与静态 `libs` 导出等价、可覆盖）。
 - `src/vite-plugin.js`：`translimeSdk()` Vite 插件与 `createPluginCssIsolationPlugins()` CSS 提取、注入和去重封装；插件选择器作用域由宿主 app 运行时完成。preview 模式支持 `previewIpcMocks` 声明式 IPC mock。
 - `src/preview/` 与 `src/preview-mock.js`：浏览器 preview 模式 shell 与 mock 实现。
 - `src/electronNetAdapter.js`：基于 `window.ts.net` 的 axios adapter。
@@ -119,7 +122,7 @@ flowchart LR
 3. IPC 调用：插件 UI 通过 `ipc.invoke('事件名@插件ID', ...)` 调用；宿主按插件 ID 路由到对应 `ipcHandlers`，handler 可拿到 `sendToClient` 主动推送；若插件尚未激活且声明了 `onIpc`，宿主先激活再路由。
 4. 插件 UI 加载：渲染进程请求 `load-plugin-ui`，`ui` 由 `PluginRender.vue` 在宿主 renderer 文档中动态加载（该路径可位于缓存的 webview 中），`windowUrl` 在独立窗口中加载；webview 实例在路由切换时缓存复用。
 5. 设置读写：`getPluginSetting` / `setPluginSetting` 读写配置中 `plugin.<插件ID>.settings.*`。
-6. 插件间通信：已激活插件通过 `pluginInterop.getExports()` / `waitForPlugin()` 访问其他插件导出的 API；依赖关系优先在 manifest 中声明。
+6. 插件间通信：已激活插件通过 `pluginInterop.getExports()` / `waitForPlugin()` 访问其他插件导出的 API（静态 `libs` 导出或 SDK `registerLib` 运行期注册）；依赖关系优先在 manifest 中声明。
 
 ```mermaid
 flowchart TD
@@ -148,7 +151,7 @@ flowchart TD
   - `build.yaml`：打 tag `v*.*.*` 或手动触发，在 windows-latest 与 ubuntu-latest + Node 20 矩阵上安装依赖并构建宿主，产物（Windows exe/yml 与 Linux AppImage/tar.gz）上传为 draft release。
   - `publish-package.yaml`：`master` 上 SDK 或插件的版本清单变化时，在固定的 Windows 2022 runner 上扫描本地版本；只构建、测试、打包并发布 npm 中尚不存在且高于最新版本的包，也可手动指定包名补发。发布使用 npm Trusted Publishing/OIDC，不依赖长期 npm token。
   - `github-page.yaml`：push 到 `master` 分支时把 `github-page/` 部署到 GitHub Pages。
-- 深链：宿主注册 `translime://` 协议，`translime://open/...` 会转发到主窗口；`pnpm dev:isolate` 模式以 `--user-data-dir` 指向独立的 `translime-dev` 数据目录启动并注册 `translime-dev://`，dev 与安装版实例可共存且数据、深链路由互不影响；常规开发模式（`pnpm dev`）则使用默认用户数据目录。
+- 深链：宿主注册 `translime://` 协议，`translime://open/...` 会转发到主窗口；`translime://plugin/<插件名>/<路径>` 在主进程内激活并转发到对应插件注册的深链处理函数；`pnpm dev:isolate` 模式以 `--user-data-dir` 指向独立的 `translime-dev` 数据目录启动并注册 `translime-dev://`，dev 与安装版实例可共存且数据、深链路由互不影响；常规开发模式（`pnpm dev`）则使用默认用户数据目录。
 
 ## 内嵌插件样式隔离
 
