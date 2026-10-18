@@ -50,8 +50,14 @@ test('only accepts an optional package name argument', () => {
   assert.deepEqual(parseArgs(['--name', 'translime-sdk']), {
     name: 'translime-sdk',
   });
+  // pnpm 会把 `--` 分隔符转发给脚本（npm 会剥掉），补发入口依赖这一形式可用
+  assert.deepEqual(parseArgs(['--', '--name', 'translime-sdk']), {
+    name: 'translime-sdk',
+  });
   assert.throws(() => parseArgs(['--name']));
   assert.throws(() => parseArgs(['--unknown', 'value']));
+  assert.throws(() => parseArgs(['--', '--name']));
+  assert.throws(() => parseArgs(['name']));
 });
 
 test('collects runtime entry points and plugin assets', () => {

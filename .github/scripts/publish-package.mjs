@@ -224,15 +224,17 @@ export function discoverPublishablePackages(repoRoot) {
  */
 export function parseArgs(argv) {
   const args = {};
+  // pnpm 把分隔符 `--` 原样转发给脚本，npm 会剥掉它，两种调用形式都要接受
+  const tokens = argv[0] === '--' ? argv.slice(1) : argv;
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const current = argv[index];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const current = tokens[index];
 
     if (current !== '--name') {
       throw new Error(`Unknown argument: ${current}`);
     }
 
-    const name = argv[index + 1];
+    const name = tokens[index + 1];
 
     if (!name || name.startsWith('--')) {
       throw new Error('Missing required value for --name');
@@ -638,7 +640,10 @@ async function main() {
       );
     });
   } catch (error) {
-    state.failed.push(error instanceof Error ? error.message : String(error));
+    const message = error instanceof Error ? error.message : String(error);
+    state.failed.push(message);
+    // 摘要只写 GITHUB_STEP_SUMMARY，CI 日志里同样要能看到失败原因
+    process.stderr.write(`${message}\n`);
     process.exitCode = 1;
   } finally {
     temporaryDirectories.forEach((temporaryDirectory) => {
