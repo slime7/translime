@@ -1,38 +1,30 @@
 <template>
-  <v-app :theme="currentTheme">
-    <v-main>
-      <!-- 简洁的预览模式提示 -->
-      <v-banner
-        density="compact"
-        color="info"
-        lines="one"
+  <mat-app-root>
+    <!-- 简洁的预览模式提示 -->
+    <header class="preview-banner">
+      <span>Preview 模式 - Electron API 已 mock</span>
+      <mat-btn
+        icon
+        variant="standard"
+        :aria-label="currentTheme === 'light' ? '切换到深色主题' : '切换到浅色主题'"
+        @click="toggleTheme"
       >
-        <template #text>
-          <span class="text-body-small">Preview 模式 - Electron API 已 mock</span>
-        </template>
-        <template #actions>
-          <v-btn
-            variant="text"
-            :icon="currentTheme === 'light' ? 'dark_mode' : 'light_mode'"
-            @click="toggleTheme"
-          />
-        </template>
-      </v-banner>
+        {{ currentTheme === 'light' ? 'dark_mode' : 'light_mode' }}
+      </mat-btn>
+    </header>
 
-      <!-- 插件组件 -->
-      <component
-        :is="pluginComponent"
-        v-if="pluginComponent"
-      />
-      <div
-        v-else
-        class="d-flex align-center justify-center"
-        style="height: 200px;"
-      >
-        <span class="text-medium-emphasis">加载中...</span>
-      </div>
-    </v-main>
-  </v-app>
+    <!-- 插件组件 -->
+    <component
+      :is="pluginComponent"
+      v-if="pluginComponent"
+    />
+    <div
+      v-else
+      class="preview-loading"
+    >
+      加载中...
+    </div>
+  </mat-app-root>
 </template>
 
 <script setup>
@@ -78,5 +70,25 @@ defineExpose({
 </script>
 
 <style scoped>
-/* Preview 模式特定样式 */
+.preview-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 8px 4px 16px;
+  color: var(--mat-sys-color-on-primary-container);
+  background: var(--mat-sys-color-primary-container);
+}
+
+.preview-banner > span {
+  flex-grow: 1;
+  font: var(--mat-sys-typescale-body-small);
+}
+
+.preview-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 200px;
+  color: var(--mat-sys-color-on-surface-variant);
+}
 </style>

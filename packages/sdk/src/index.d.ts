@@ -238,34 +238,9 @@ export interface WindowControlClient {
   close(win?: any): Promise<any>;
 }
 
-/**
- * 宿主注入的 Vuetify 4 运行时（window.vuetify$）
- */
-export interface VuetifyRuntime {
-  components: Record<string, any>;
-  directives: Record<string, any>;
-  labs?: Record<string, any>;
-  instance?: any;
-}
-
 // ----------------------------------------------------------------------
 // 渲染进程 API
 // ----------------------------------------------------------------------
-
-/**
- * 获取 Vuetify 实例（渲染进程；宿主提供 window.vuetify$，缺失时返回空对象）
- */
-export function useVuetify(): VuetifyRuntime;
-
-/**
- * 获取所有 Vuetify 组件
- */
-export function useVuetifyComponents(): Record<string, any>;
-
-/**
- * 获取所有 Vuetify 指令
- */
-export function useVuetifyDirectives(): Record<string, any>;
 
 /**
  * mde-vue 主题控制器（Material 2025 动态主题）的宿主侧实例

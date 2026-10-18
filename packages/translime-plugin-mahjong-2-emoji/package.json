@@ -1,6 +1,6 @@
 {
   "name": "translime-plugin-mahjong-2-emoji",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "将麻将字符串转成方便复制的 emoji",
   "license": "MIT",
   "repository": {
@@ -37,6 +37,9 @@
     "description": "将麻将字符串转成方便复制的 emoji",
     "icon": "src/icon.webp",
     "ui": "dist/ui.esm.js"
+  },
+  "engines": {
+    "translime": ">=0.9.0"
   },
   "peerDependencies": {
     "vue": "^3.5.40"

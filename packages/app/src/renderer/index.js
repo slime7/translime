@@ -1,8 +1,6 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import '@/assets/styles/app.css';
-import vuetify from '@/plugins/vuetify';
-import '@/plugins/vuetifyCompat';
 import matUi from '@/plugins/matUi';
 import '@/assets/styles/tailwind.css';
 import App from './App.vue';
@@ -27,7 +25,6 @@ const app = createApp(App);
 app
   .use(router)
   .use(pinia)
-  .use(vuetify)
   .use(matUi)
   .directive('navi', createNaviDirective(app))
   .mount('#app');

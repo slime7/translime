@@ -18,8 +18,7 @@
 | 技术 | 用途 |
 | --- | --- |
 | Electron ~39 | 宿主运行时 |
-| Vue 3 + mde-vue | 宿主 UI（Material 3 Expressive 组件与主题） |
-| Vue 3 + Vuetify 4 | 插件 UI 运行时（由宿主提供 `window.vuetify$`） |
+| Vue 3 + mde-vue | 宿主 UI 与插件 UI（Material 3 Expressive 组件与主题，插件由宿主提供 `window.mde$`） |
 | Tailwind CSS v4 | 宿主与部分插件的样式 |
 | Vite 8 | 宿主、SDK 与插件的构建 |
 | Pinia | 宿主渲染进程状态 |
@@ -27,8 +26,8 @@
 | winston | 日志 |
 | vitest | 单元测试 |
 | electron-updater | 自动更新 |
-| mde-vue（GitHub 仓库锁定提交） | 宿主渲染进程的 M3 2025 动态主题与 `--mat-sys-color-*` 令牌来源 |
-| @material/material-color-utilities 0.4.0 | 宿主为插件桥接 Vuetify 主题色时的 M3 2025 配色生成 |
+| mde-vue（GitHub 仓库锁定 Tag） | 宿主与插件的 M3 2025 动态主题与 `--mat-sys-color-*` 令牌来源 |
+| @material/material-color-utilities 0.4.0 | 宿主主题配色的 M3 2025 生成（取色器与自定义配色） |
 | pnpm workspace | 多包管理 |
 
 宿主源码为 ESM（`"type": "module"`），构建时主进程产物为 CJS（`dist/main/index.cjs`），渲染进程产物为 ESM。
@@ -88,12 +87,11 @@ flowchart LR
 ### 渲染进程（packages/app/src/renderer）
 
 - 宿主 UI 基于 mde-vue（`plugins/matUi.js` 安装 `createMatUi`）：主题由 `useMatTheme` 主题控制器驱动，向 `document.documentElement` 写入 53 个 `--mat-sys-color-*` 令牌与 `data-mat-theme` 属性；明暗模式、种子色与配色变体（Expressive/TonalSpot/Vibrant/Neutral，M3 2025 规范）由 `hooks/useTheme.js` 双向同步。
-- 插件兼容层（`plugins/vuetify.js` + `plugins/vuetifyCompat.js`）：Vuetify 4 仍随宿主初始化，并向所有加载宿主页面的文档（主窗口、插件窗口、内嵌 webview）提供 `window.vuetify$`（components/labs/directives）；`hooks/useTheme.js` 通过 `mdColorHelper`（@material/material-color-utilities）把配色写入 Vuetify theme，保证插件 UI 与宿主配色一致。
-- `plugins/matUi.js` 同时向插件提供 mde-vue 运行时 `window.mde$`（components/directives/functions/theme，functions 为 `snackbar()`/`dialog()`/`confirm()` 等命令式函数，与 `window.vuetify$` 对称），SDK 会把插件源码中的 `mat-*` / `mde-*` 组件引用注入为对该对象的解构；宿主与 SDK preview 均通过 `createMatUi` 全局注册 `mat-*` 组件与 `v-intersection`、`v-state-layer` 指令。
+- 插件 UI 与宿主共用同一份 mde-vue 运行时：`plugins/matUi.js` 向所有加载宿主页面的文档（主窗口、插件窗口、内嵌 webview）提供 `window.mde$`（components/directives/functions/theme，functions 为 `snackbar()`/`dialog()`/`confirm()` 等命令式函数），SDK 会把插件源码中的 `mat-*` / `mde-*` 组件引用注入为对该对象的解构；宿主与 SDK preview 均通过 `createMatUi` 全局注册 `mat-*` 组件与 `v-intersection`、`v-state-layer`、`v-ripple` 指令，插件 UI 直接继承宿主的 `--mat-sys-color-*` 主题令牌。
 - `views/plugins/`：插件列表、插件页与设置面板；`PluginRender.vue` 负责在 app renderer 中加载内嵌插件 UI，`EmbeddedPluginWebviews.vue` 负责在 `<webview>` 中加载插件 UI。
 - `views/Layout/components/PluginTitleBar.vue`：插件页顶栏（标题菜单 + inspect）；其旁的 `PluginTitleBarActions.vue` 渲染插件动态声明的顶栏按钮区（数据为 `get-plugins` 下发、`title-bar-actions-changed` 增量合并进 globalStore 的 `titleBarItems`，点击回传 `run-title-bar-action`）。
 - `utils/pluginStyleIsolation.js`：监听动态 `style`/`link` 节点，为内嵌插件样式保留插件 layer 并包裹 `@scope (.plugin-ui-loader[data-plugin-id="插件ID"])`；对 `:root`、`:host`、`html`、`body` 根级规则提供 `:scope` 兼容转换。
-- `components/JsonTree.vue`：日志详情的懒加载 JSON 树（替代 Vuetify labs 的 v-treeview）。
+- `components/JsonTree.vue`：日志详情的懒加载 JSON 树。
 - `PluginWindow.vue` 与 `views/Layout/PluginWindow.vue`：独立 BrowserWindow 形态的插件窗口。
 - `store/`、`hooks/`、`components/`：宿主自身的状态与 UI 组件。
 

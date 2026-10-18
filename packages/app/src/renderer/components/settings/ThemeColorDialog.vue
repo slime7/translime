@@ -105,7 +105,6 @@ import useGlobalStore from '@/store/globalStore';
 import ColorPicker from '@/components/ColorPicker.vue';
 import ThemeColorPreviewCard from '@/components/ThemeColorPreviewCard.vue';
 import {
-  DEFAULT_THEME_COLOR_SOURCE,
   DEFAULT_THEME_COLOR_VARIANT,
   normalizeThemeColor,
 } from '@/utils/themeColorConfig';
@@ -226,24 +225,11 @@ const generateRandomColor = () => {
 };
 
 const setColorDialogConfirm = () => {
-  const themeColor = normalizeThemeColor({
+  theme.setCustomTheme(normalizeThemeColor({
     name: dialogState.selected,
     source: dialogState.customColor,
     variant: dialogState.customColorVariant,
-  });
-  let themeColorItem;
-
-  if (dialogState.selected === 'system' || dialogState.selected === 'custom') {
-    themeColorItem = dialogState.customThemeList.find(
-      (item) => item.variant === dialogState.customColorVariant,
-    );
-  } else if (dialogState.selected === 'translime') {
-    const themeResult = mdColor.getThemeColorFromColor(DEFAULT_THEME_COLOR_SOURCE, DEFAULT_THEME_COLOR_VARIANT);
-    themeColorItem = { schemes: themeResult.schemes };
-  }
-
-  const vuetifyColors = mdColor.getVuetifyColors({ schemes: themeColorItem.schemes });
-  theme.setCustomTheme(vuetifyColors, themeColor);
+  }));
   visible.value = false;
 };
 

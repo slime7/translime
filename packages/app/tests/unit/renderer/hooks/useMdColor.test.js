@@ -10,7 +10,6 @@ describe('useMdColor', () => {
     expect(mdColor).toHaveProperty('getThemeColorFromColor');
     expect(mdColor).toHaveProperty('getThemeColorFromImage');
     expect(mdColor).toHaveProperty('getThemeCssVars');
-    expect(mdColor).toHaveProperty('getVuetifyColors');
     expect(mdColor).toHaveProperty('argbToHex');
     expect(mdColor).toHaveProperty('hexToArgb');
   });
@@ -95,20 +94,6 @@ describe('useMdColor', () => {
       const keys = Object.keys(cssVars);
       expect(keys.length).toBeGreaterThan(0);
       expect(keys.every((key) => key.startsWith('--md-color-'))).toBe(true);
-    });
-  });
-
-  describe('getVuetifyColors', () => {
-    it('应该生成 Vuetify 兼容的颜色对象', () => {
-      const { getThemeColorFromColor, getVuetifyColors } = useMdColor();
-
-      const theme = getThemeColorFromColor('#20a6fc');
-      const vuetifyColors = getVuetifyColors(theme);
-
-      expect(vuetifyColors).toHaveProperty('light');
-      expect(vuetifyColors).toHaveProperty('dark');
-      expect(vuetifyColors.light).toHaveProperty('primary');
-      expect(vuetifyColors.light).toHaveProperty('on-primary');
     });
   });
 });

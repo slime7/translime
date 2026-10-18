@@ -124,8 +124,8 @@ export function createPluginCssIsolationPlugins(styleId) {
  * Translime SDK 的 Vite 插件
  *
  * 功能：
- * 1. **自动组件导入**: 扫描 Vue/JS 文件，自动从 `window.vuetify$.components` 注入使用到的 Vuetify 组件，
- *    避免在插件源码中手动 import Vuetify 组件（减小插件体积）。
+ * 1. **自动组件导入**: 扫描 Vue/JS 文件，自动从 `window.mde$.components` 注入使用到的 mde-vue 组件，
+ *    避免在插件源码中手动 import mde-vue 组件（减小插件体积）。
  * 2. **Preview 模式支持**: 提供完整的本地预览环境，包含 HMR、Mock API 和样式注入。
  *
  * @param {Object} options - 插件选项
@@ -199,9 +199,9 @@ export function translimeSdk(options = {}) {
               external: [], // Preview 模式下需要打包所有依赖
             },
           },
-          // 优化依赖: 排除 vuetify / mde-vue（使用运行时完整 ESM，避免二次打包 Vue 实例）
+          // 优化依赖: 排除 mde-vue（使用运行时完整 ESM，避免二次打包 Vue 实例）
           optimizeDeps: {
-            exclude: ['vuetify', 'mde-vue'],
+            exclude: ['mde-vue'],
           },
         };
       }
@@ -280,38 +280,19 @@ ${mocksImport}startPreview(PluginComponent, { ipcMocks: ${mocksArg} });
         return null;
       }
 
-      const matches = new Set();
       const matMatches = new Set();
-
-      // 扫描 JS/TS 中的组件名（例如 VBtn、VCard）
-      const componentRegex = /\b(V[A-Z][\w$]+)\b/g;
-      let match;
-      match = componentRegex.exec(code);
-      while (match !== null) {
-        matches.add(match[1]);
-        match = componentRegex.exec(code);
-      }
 
       // 扫描 JS/TS 中的 mde-vue 组件名（例如 MatBtn、MdeDynamicText）
       const matComponentRegex = /\b((?:Mat|Mde)[A-Z][\w$]+)\b/g;
+      let match;
       match = matComponentRegex.exec(code);
       while (match !== null) {
         matMatches.add(match[1]);
         match = matComponentRegex.exec(code);
       }
 
-      // 扫描 Vue 模板中的 kebab-case 标签（例如 <v-btn>）
+      // 扫描 Vue 模板中的 mde-vue 标签（例如 <mat-btn>、<mde-dynamic-text>）
       if (id.endsWith('.vue')) {
-        const templateTagRegex = /<v-([a-z0-9-]+)\b/g;
-        match = templateTagRegex.exec(code);
-        while (match !== null) {
-          // 转成 camelCase：v-btn -> VBtn
-          const name = `V${match[1].split('-').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join('')}`;
-          matches.add(name);
-          match = templateTagRegex.exec(code);
-        }
-
-        // 扫描 Vue 模板中的 mde-vue 标签（例如 <mat-btn>、<mde-dynamic-text>）
         const matTagRegex = /<(mat|mde)-([a-z0-9-]+)\b/g;
         match = matTagRegex.exec(code);
         while (match !== null) {
@@ -322,7 +303,7 @@ ${mocksImport}startPreview(PluginComponent, { ipcMocks: ${mocksArg} });
         }
       }
 
-      if (matches.size === 0 && matMatches.size === 0) {
+      if (matMatches.size === 0) {
         return null;
       }
 
@@ -342,23 +323,15 @@ ${mocksImport}startPreview(PluginComponent, { ipcMocks: ${mocksArg} });
         }
         return true;
       });
-      const used = filterKnownNames(Array.from(matches));
       const matUsed = filterKnownNames(Array.from(matMatches));
 
-      if (used.length === 0 && matUsed.length === 0) {
+      if (matUsed.length === 0) {
         return null;
       }
 
       // 注入代码
-      // 如果运行在渲染进程（有 window.vuetify$ / window.mde$），则从中解构；否则为空对象
-      const injections = [];
-      if (used.length > 0) {
-        injections.push(`const { ${used.join(', ')} } = (typeof window !== 'undefined' && window.vuetify$?.components || {});`);
-      }
-      if (matUsed.length > 0) {
-        injections.push(`const { ${matUsed.join(', ')} } = (typeof window !== 'undefined' && window.mde$?.components || {});`);
-      }
-      const injection = `\n/* 由 translime-sdk 自动注入 */\n${injections.join('\n')}\n`;
+      // 如果运行在渲染进程（有 window.mde$），则从中解构；否则为空对象
+      const injection = `\n/* 由 translime-sdk 自动注入 */\nconst { ${matUsed.join(', ')} } = (typeof window !== 'undefined' && window.mde$?.components || {});\n`;
 
       let newCode = code;
       if (id.endsWith('.vue')) {

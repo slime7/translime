@@ -1,38 +1,38 @@
 <template>
-  <v-container fluid class="plugin-main">
+  <mat-container class="plugin-main">
     <div>
-      <v-text-field
+      <mat-text-field
         v-model="pai"
         label="手牌"
         placeholder="123m456p789s5z x11x 0p"
-        outlined
-        hide-details
-        @change="copied = false"
+        variant="outlined"
+        color="primary"
+        @update:model-value="copied = false"
       />
     </div>
 
     <div class="mt-4">
-      <v-btn color="primary" @click="copy">
+      <mat-btn color="primary" @click="copy">
         {{ copied ? '已' : '' }}复制
-      </v-btn>
+      </mat-btn>
     </div>
 
     <div class="emoji mt-4">
       {{ parsedPai }}
     </div>
-  </v-container>
+  </mat-container>
 </template>
 
 <script>
 import mahjongEmoji from './emoji.json';
 
-const vuetify = window.vuetify$.components;
+const mat = window.mde$.components;
 
 export default {
   name: 'PluginUi',
 
   components: {
-    ...vuetify,
+    ...mat,
   },
 
   data: () => ({

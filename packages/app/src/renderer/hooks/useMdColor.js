@@ -2,7 +2,6 @@ import { argbFromHex, hexFromArgb } from '@material/material-color-utilities';
 import {
   getReadableColors,
   getThemeStyles,
-  getVuetifyColors,
   themeFromImage,
   themeFromSourceColor,
 } from '@/utils/mdColorHelper';
@@ -116,22 +115,21 @@ const hexToArgb = (hex) => argbFromHex(hex);
 /**
  * Material Design 颜色工具 Hook
  *
- * 提供从颜色或图片生成 M3 配色方案的能力。
- * 生成的主题可用于设置 Vuetify 主题或作为 CSS 变量应用。
+ * 提供从颜色或图片生成 M3 配色方案的能力，
+ * 生成的主题用于取色预览或作为 CSS 变量应用。
  *
  * @returns {object} 颜色工具对象
  *
  * @example
  * const { getThemeColorFromColor, getThemeCssVars } = useMdColor();
  * const theme = getThemeColorFromColor('#6750A4', 'SchemeVibrant');
- * // 应用到 Vuetify 或 CSS 变量
+ * const cssVars = getThemeCssVars(theme, { dark: true });
  */
 export default function useMdColor() {
   return {
     getThemeColorFromColor,
     getThemeColorFromImage,
     getThemeCssVars,
-    getVuetifyColors,
     argbToHex,
     hexToArgb,
   };

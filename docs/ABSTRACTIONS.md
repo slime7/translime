@@ -146,7 +146,7 @@ config store，保存时的 `pluginSettingSaved` 仅在插件处于激活态时�
 | API | 环境 |
 |  --- | --- |
 | `getMainStore()`、`usePluginConfig()`、`usePluginInterop()`、`defineIpcHandlers()`、`setTitleBarActions()`、`registerDeepLinkHandlers()`、`registerLib()` | 主进程（除 `defineIpcHandlers` 外在隔离模式下抛错） |
-| `useIpc()`、`useVuetify*()`、`useMat()` / `useMde()`、`useMatComponents()`、`useMatDirectives()`、`useMatFunctions()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
+| `useIpc()`、`useMat()` / `useMde()`、`useMatComponents()`、`useMatDirectives()`、`useMatFunctions()`、`useDialog()`、`useShell()`、`useClipboard()`、`useWindowControl()`、`openLink()`、`getPluginSetting()`、`setPluginSetting()`、`executePluginCommand()`、`electronNetAdapter()` | 渲染进程 |
 | `useLogger()`、`isPreviewMode()`、`isIsolatedMode()` | 通用 |
 
 跨环境调用（如在渲染进程访问主进程 Store）是禁止的。插件间通信通过 `usePluginInterop()` 的
@@ -180,7 +180,7 @@ manifest 声明 `plugin.isolated: true` 时，插件主进程代码运行在独�
 
 - 插件 ID 全局唯一且等于包名。
 - 激活时机必须声明，不把重初始化堆到启动阶段；`engines.translime` 默认兼容，声明即校验。
-- 插件 UI 与宿主 DOM/CSS 隔离；宿主 UI 基于 mde-vue。插件 UI 支持 Vuetify 4（宿主提供 `window.vuetify$` 运行时与 `--v-theme-*` 主题变量）或 mde-vue（宿主提供 `window.mde$` 运行时：components/directives/functions/theme，需 `engines.translime >= 0.7.0`）；运行时均由宿主提供，插件不打包组件库。
+- 插件 UI 与宿主 DOM/CSS 隔离；宿主与插件 UI 统一基于 mde-vue：宿主提供 `window.mde$` 运行时（components/directives/functions/theme）与 `--mat-sys-color-*` 主题令牌，需 `engines.translime >= 0.9.0`；运行时不打包进插件。
 - 宿主页面带 CSP 基线（禁远程脚本，`script-src 'self' 'unsafe-eval' blob:`），后续目标是移除 `unsafe-eval`。
 - `main-renderer-ready` 只允许主窗口首屏（含首屏关键字体）就绪后触发，插件渲染页不得重复触发；宿主收到该事件后先完成 `onStartup` 激活再展示主窗口，启动动画持续到内容就绪。
 - 真实宿主是主要验证环境，preview 模式不替代宿主内验证。

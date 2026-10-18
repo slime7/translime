@@ -1,74 +1,69 @@
 <template>
-  <v-container fluid class="plugin-main">
-    <v-row>
-      <v-col
+  <mat-container class="plugin-main">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <mat-card
         v-for="server in servers"
         :key="server.port"
-        cols="3"
+        class="rounded-2xl h-full"
       >
-        <v-card
-          class="rounded-2xl h-full"
-          rounded
+        <mat-card-content class="flex flex-col">
+          <div>{{ server.path }}</div>
+          <a href="javascript:;" @click="open(server.port)">:{{ server.port }}</a>
+        </mat-card-content>
+
+        <mat-card-actions>
+          <mat-btn variant="text" @click="open(server.port)">
+            查看
+          </mat-btn>
+          <mat-btn variant="text" @click="closeServer(server.port)">
+            关闭
+          </mat-btn>
+        </mat-card-actions>
+      </mat-card>
+
+      <mat-card class="server-card rounded-2xl">
+        <mat-card-action-area
+          class="w-full h-full flex items-center justify-center"
+          aria-label="新建服务器"
+          @click="newServer"
         >
-          <v-card-text class="flex flex-col">
-            <div>{{ server.path }}</div>
-            <a href="javascript:;" @click="open(server.port)">:{{ server.port }}</a>
-          </v-card-text>
-
-          <v-card-actions>
-            <v-spacer />
-            <v-btn @click="open(server.port)">
-              查看
-            </v-btn>
-            <v-btn @click="closeServer(server.port)">
-              关闭
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-col>
-
-      <v-col cols="3">
-        <v-card link class="server-card" @click="newServer">
-          <div class="h-full flex items-center justify-center">
-            <v-icon size="64">
-              add
-            </v-icon>
-          </div>
-        </v-card>
-      </v-col>
-    </v-row>
+          <mat-icon icon="add" size="64px" />
+        </mat-card-action-area>
+      </mat-card>
+    </div>
 
     <template v-if="displayHistoryServers.length">
-      <div class="select-none text-lg my-2">
+      <div class="select-none text-lg my-2 flex items-center gap-2">
         <span>历史记录</span>
-        <v-btn
-          class="ml-2"
-          small
-          outlined
+        <mat-btn
+          size="extra-small"
+          variant="outlined"
           @click="clearHistory"
         >
           清空
-        </v-btn>
+        </mat-btn>
       </div>
 
       <div class="flex flex-wrap gap-2">
-        <div
+        <mat-tooltip
           v-for="server in displayHistoryServers"
           :key="server.path"
-          class="shrink-0"
+          :content="server.path"
+          location="top"
         >
-          <v-btn
-            class="text-one-line select-none"
-            variant="tonal"
-            @click="openServerIpc(server.path)"
-          >
-            {{ server.path }}
-            <v-tooltip activator="parent" :text="server.path" location="top" />
-          </v-btn>
-        </div>
+          <template #activator>
+            <mat-btn
+              class="text-one-line max-w-64"
+              variant="filled-tonal"
+              @click="openServerIpc(server.path)"
+            >
+              {{ server.path }}
+            </mat-btn>
+          </template>
+        </mat-tooltip>
       </div>
     </template>
-  </v-container>
+  </mat-container>
 </template>
 
 <script setup>
@@ -79,8 +74,9 @@ defineOptions({
 });
 
 const {
-  VContainer, VRow, VCol, VCard, VCardText, VCardActions, VSpacer, VBtn, VIcon, VTooltip,
-} = window.vuetify$.components;
+  MatContainer, MatCard, MatCardContent, MatCardActions, MatCardActionArea,
+  MatBtn, MatIcon, MatTooltip,
+} = window.mde$.components;
 const ipc = window.electron.useIpc();
 
 const servers = ref([]);

@@ -1,21 +1,48 @@
 /**
  * Preview 模式入口
- * 初始化 Vue + Vuetify + mde-vue 并挂载 Preview Shell
+ * 初始化 Vue + mde-vue 并挂载 Preview Shell
  */
-// 必须在 vuetify/styles 与 mde-vue/styles 之前导入，确保 CSS layer 顺序正确
+// 必须在 mde-vue/styles.css 之前导入，确保 CSS layer 顺序正确
 import './layers.css';
+import 'mde-vue/styles.css';
 
 import { createApp } from 'vue';
-import { createVuetify } from 'vuetify';
-import { zhHans } from 'vuetify/locale';
-import * as components from 'vuetify/components';
-import * as directives from 'vuetify/directives';
-import { aliases, md } from 'vuetify/iconsets/md';
-import { md3 } from 'vuetify/blueprints';
-import 'vuetify/styles';
-
 import { initPreviewMock, setPreviewIpcMocks } from '../preview-mock';
 import PreviewApp from './App.vue';
+
+const MAT_FUNCTION_NAMES = new Set(['snackbar', 'toast', 'dialog', 'alert', 'confirm', 'prompt']);
+
+/**
+ * 收集 mde-vue 根入口导出的组件、指令与命令式函数，
+ * 按 `window.mde$` 的形状暴露给插件源码（与宿主注入的运行时一致）。
+ * @param {object} matUi - createMatUi 返回的插件实例
+ * @param {Record<string, any>} mdeVue - mde-vue 根入口的具名导出
+ * @returns {{ components: object, directives: object, functions: object, theme: object }}
+ */
+const createMatRuntime = (matUi, mdeVue) => {
+  const components = {};
+  const directives = {};
+  const functions = {};
+  Object.entries(mdeVue).forEach(([name, exported]) => {
+    if (name === 'Intersection' || name === 'StateLayer' || name === 'Ripple') {
+      directives[name] = exported;
+      return;
+    }
+    if (MAT_FUNCTION_NAMES.has(name) && typeof exported === 'function') {
+      functions[name] = exported;
+      return;
+    }
+    if (/^(Mat|Mde)[A-Z]/.test(name)) {
+      components[name] = exported;
+    }
+  });
+  return {
+    components,
+    directives,
+    functions,
+    theme: matUi.theme,
+  };
+};
 
 /**
  * 启动 Preview 模式
@@ -35,197 +62,12 @@ export async function startPreview(pluginComponent, options = {}) {
     setPreviewIpcMocks(ipcMocks);
   }
 
-  // 创建 Vuetify 实例（与主程序保持一致）
-  const vuetify = createVuetify({
-    components,
-    directives,
-    locale: {
-      locale: 'zhHans',
-      messages: { zhHans },
-    },
-    icons: {
-      defaultSet: 'md',
-      aliases,
-      sets: { md },
-    },
-    theme: {
-      defaultTheme: 'light',
-      themes: {
-        light: {
-          colors: {
-            primary: '#00639b',
-            'on-primary': '#ffffff',
-            'primary-container': '#cee5ff',
-            'on-primary-container': '#004a76',
-            'inverse-primary': '#96cbff',
-            'primary-fixed': '#cee5ff',
-            'primary-fixed-dim': '#96cbff',
-            'on-primary-fixed': '#001d33',
-            'on-primary-fixed-variant': '#004a76',
-            secondary: '#51606f',
-            'on-secondary': '#ffffff',
-            'secondary-container': '#d5e4f7',
-            'on-secondary-container': '#3a4857',
-            'secondary-fixed': '#d5e4f7',
-            'secondary-fixed-dim': '#b9c8da',
-            'on-secondary-fixed': '#0e1d2a',
-            'on-secondary-fixed-variant': '#3a4857',
-            tertiary: '#68587a',
-            'on-tertiary': '#ffffff',
-            'tertiary-container': '#eedbff',
-            'on-tertiary-container': '#504061',
-            'tertiary-fixed': '#eedbff',
-            'tertiary-fixed-dim': '#d3bfe6',
-            'on-tertiary-fixed': '#231533',
-            'on-tertiary-fixed-variant': '#504061',
-            error: '#ba1a1a',
-            'on-error': '#ffffff',
-            'error-container': '#ffdad6',
-            'on-error-container': '#93000a',
-            'surface-dim': '#dadada',
-            surface: '#f9f9f9',
-            'surface-bright': '#f9f9f9',
-            'surface-container-lowest': '#ffffff',
-            'surface-container-low': '#f3f3f3',
-            'surface-container': '#eeeeee',
-            'surface-container-high': '#e8e8e8',
-            'surface-container-highest': '#e2e2e2',
-            'on-surface': '#1b1b1b',
-            'on-surface-variant': '#474747',
-            outline: '#777777',
-            'outline-variant': '#c6c6c6',
-            'inverse-surface': '#303030',
-            'inverse-on-surface': '#f1f1f1',
-            'surface-variant': '#e2e2e2',
-            'surface-tint': '#00639b',
-            background: '#f9f9f9',
-            'on-background': '#1b1b1b',
-            shadow: '#000000',
-            scrim: '#000000',
-          },
-          dark: false,
-        },
-        dark: {
-          colors: {
-            primary: '#96cbff',
-            'on-primary': '#003353',
-            'primary-container': '#004a76',
-            'on-primary-container': '#cee5ff',
-            'inverse-primary': '#00639b',
-            'primary-fixed': '#cee5ff',
-            'primary-fixed-dim': '#96cbff',
-            'on-primary-fixed': '#001d33',
-            'on-primary-fixed-variant': '#004a76',
-            secondary: '#b9c8da',
-            'on-secondary': '#233240',
-            'secondary-container': '#3a4857',
-            'on-secondary-container': '#d5e4f7',
-            'secondary-fixed': '#d5e4f7',
-            'secondary-fixed-dim': '#b9c8da',
-            'on-secondary-fixed': '#0e1d2a',
-            'on-secondary-fixed-variant': '#3a4857',
-            tertiary: '#d3bfe6',
-            'on-tertiary': '#382a49',
-            'tertiary-container': '#504061',
-            'on-tertiary-container': '#eedbff',
-            'tertiary-fixed': '#eedbff',
-            'tertiary-fixed-dim': '#d3bfe6',
-            'on-tertiary-fixed': '#231533',
-            'on-tertiary-fixed-variant': '#504061',
-            error: '#ffb4ab',
-            'on-error': '#690005',
-            'error-container': '#93000a',
-            'on-error-container': '#ffdad6',
-            'surface-dim': '#131313',
-            surface: '#131313',
-            'surface-bright': '#393939',
-            'surface-container-lowest': '#0e0e0e',
-            'surface-container-low': '#1b1b1b',
-            'surface-container': '#1f1f1f',
-            'surface-container-high': '#2a2a2a',
-            'surface-container-highest': '#353535',
-            'on-surface': '#e2e2e2',
-            'on-surface-variant': '#c6c6c6',
-            outline: '#919191',
-            'outline-variant': '#474747',
-            'inverse-surface': '#e2e2e2',
-            'inverse-on-surface': '#303030',
-            'surface-variant': '#474747',
-            'surface-tint': '#96cbff',
-            background: '#131313',
-            'on-background': '#e2e2e2',
-            shadow: '#000000',
-            scrim: '#000000',
-          },
-          dark: true,
-        },
-      },
-    },
-    defaults: {
-      VBtn: {
-        class: 'normal-case',
-        rounded: 'pill',
-      },
-      VBtnGroup: {
-        rounded: 'pill',
-      },
-      VSwitch: {
-        color: 'primary',
-        hideDetails: true,
-        inset: true,
-        trueIcon: 'check',
-      },
-      VCard: {
-        color: 'surface-container',
-      },
-    },
-    blueprint: md3,
+  // 初始化 mde-vue（与宿主保持一致），并提供插件运行时
+  const mdeVue = await import('mde-vue');
+  const matUi = mdeVue.createMatUi({
+    iconClass: 'material-icons',
   });
-
-  // 将 Vuetify 组件和指令注入到 window，供 SDK 使用
-  window.vuetify$ = {
-    instance: vuetify,
-    components,
-    directives,
-  };
-
-  // 初始化 mde-vue（与宿主保持一致），并提供插件运行时。
-  // mde-vue 由宿主或插件按需安装，未安装时跳过，不影响其余预览能力。
-  let matUi = null;
-  try {
-    const [mdeVue] = await Promise.all([
-      import('mde-vue'),
-      import('mde-vue/styles.css'),
-    ]);
-    matUi = mdeVue.createMatUi({
-      iconClass: 'material-icons',
-    });
-    const mdeComponents = {};
-    const mdeDirectives = {};
-    const mdeFunctions = {};
-    const matFunctionNames = new Set(['snackbar', 'toast', 'dialog', 'alert', 'confirm', 'prompt']);
-    Object.entries(mdeVue).forEach(([name, exported]) => {
-      if (name === 'Intersection' || name === 'StateLayer') {
-        mdeDirectives[name] = exported;
-        return;
-      }
-      if (matFunctionNames.has(name) && typeof exported === 'function') {
-        mdeFunctions[name] = exported;
-        return;
-      }
-      if (/^(Mat|Mde)[A-Z]/.test(name)) {
-        mdeComponents[name] = exported;
-      }
-    });
-    window.mde$ = {
-      components: mdeComponents,
-      directives: mdeDirectives,
-      functions: mdeFunctions,
-      theme: matUi.theme,
-    };
-  } catch {
-    // mde-vue 未安装：忽略
-  }
+  window.mde$ = createMatRuntime(matUi, mdeVue);
 
   // 设置插件组件到全局变量
   // eslint-disable-next-line no-underscore-dangle
@@ -233,10 +75,7 @@ export async function startPreview(pluginComponent, options = {}) {
 
   // 创建并挂载应用
   const app = createApp(PreviewApp);
-  app.use(vuetify);
-  if (matUi) {
-    app.use(matUi);
-  }
+  app.use(matUi);
 
   // 挂载前确保 DOM 元素存在
   let mountEl = document.getElementById(mountId);

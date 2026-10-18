@@ -26,21 +26,18 @@ const listFiles = async (dir) => {
   ];
 };
 
-describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）', () => {
+const packagesRoot = resolve(appRoot, '..');
+
+describe('宿主 mde-vue + Tailwind 样式契约', () => {
   describe('CSS layer 顺序', () => {
     const officialOrder = [
       'tailwind-theme',
       'tailwind-reset',
-      'vuetify-core',
-      'vuetify-components',
-      'vuetify-overrides',
       'mde.tokens',
       'mde.components',
       'mde.utilities',
-      'vuetify-utilities',
       'tailwind-utilities',
       'mde-final',
-      'vuetify-final',
       'translime-plugin',
     ];
 
@@ -64,11 +61,6 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
       expect(layersImport).toBeGreaterThan(-1);
       expect(mdeStylesImport).toBeGreaterThan(layersImport);
     });
-
-    it('app.css 不再声明旧的 tailwind 中间层顺序', async () => {
-      const css = await read('src/renderer/assets/styles/app.css');
-      expect(css).not.toContain('vuetify-overrides, tailwind');
-    });
   });
 
   describe('tailwind.css 配置', () => {
@@ -89,7 +81,7 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
       expect(css).toContain('@custom-variant dark (&:where([data-mat-theme="dark"], [data-mat-theme="dark"] *));');
     });
 
-    it('断点与 Vuetify 阈值对齐（0/600/960/1280/1920/2560，xxl 命名）', async () => {
+    it('断点与宿主既有阈值对齐（0/600/960/1280/1920/2560，xxl 命名）', async () => {
       const css = await read('src/renderer/assets/styles/tailwind.css');
 
       expect(css).toContain('--breakpoint-*: initial;');
@@ -124,25 +116,20 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
       });
     });
 
-    it('保留 Vuetify rounded 工具类等价物并按文档接入 mde-vue/tailwind.css', async () => {
+    it('接入 mde-vue/tailwind.css 并保持排版工具类由组件库提供', async () => {
       const css = await read('src/renderer/assets/styles/tailwind.css');
 
-      expect(css).toContain('@utility rounded-pill');
-      expect(css).toContain('@utility rounded-circle');
-      expect(css).toContain('@utility rounded-shaped');
       expect(css).toContain('@import "mde-vue/tailwind.css";');
       expect(css).not.toContain('@utility text-body-large');
     });
   });
 
-  describe('构建与 Vuetify 配置', () => {
-    it('vite 插件中 tailwindcss() 注册在 vuetify() 之前', async () => {
+  describe('构建配置', () => {
+    it('vite 渲染配置不再注册 vite-plugin-vuetify', async () => {
       const js = await read('src/vite.renderer.config.js');
-      const tailwindIndex = js.indexOf('tailwindcss(),');
-      const vuetifyIndex = js.indexOf('vuetify(),');
 
-      expect(tailwindIndex).toBeGreaterThan(-1);
-      expect(vuetifyIndex).toBeGreaterThan(tailwindIndex);
+      expect(js).not.toContain('vite-plugin-vuetify');
+      expect(js).not.toContain('vuetify()');
     });
 
     it('vite 渲染配置不再使用 styles.configFile 与 preprocessorOptions', async () => {
@@ -151,22 +138,6 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
       expect(js).not.toContain('configFile');
       expect(js).not.toContain('preprocessorOptions');
       expect(js).not.toContain('settings.scss');
-      expect(js).toContain('vuetify(),');
-    });
-
-    it('vuetify.js 保留运行时主题工具类并显式对齐 display 阈值', async () => {
-      const js = await read('src/renderer/plugins/vuetify.js');
-
-      expect(js).not.toContain('utilities: false');
-      expect(js).toContain("mobileBreakpoint: 'md'");
-      expect(js).toContain('xs: 0, sm: 600, md: 960, lg: 1280, xl: 1920, xxl: 2560');
-    });
-
-    it('vuetify.js 将 VBtn 与 VBtnGroup 默认圆角重置为 pill 药丸形态', async () => {
-      const js = await read('src/renderer/plugins/vuetify.js');
-
-      expect(js).toMatch(/VBtn:\s*\{[\s\S]*rounded:\s*'pill'/);
-      expect(js).toMatch(/VBtnGroup:\s*\{[\s\S]*rounded:\s*'pill'/);
     });
 
     it('开发模式应让宿主和插件使用同一个 Vue URL', async () => {
@@ -179,33 +150,31 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
       expect(config).toContain('server.middlewares.use');
       expect(config).toContain('server.resolvedUrls');
       expect(config).toContain('external: true');
-      expect(config).toMatch(/exclude:\s*\[[\s\S]*'vue',[\s\S]*'vuetify',[\s\S]*'mde-vue'/);
+      expect(config).toMatch(/exclude:\s*\[[\s\S]*'vue',[\s\S]*'mde-vue',[\s\S]*'vue-router'/);
       expect(html).toContain('"vue": "./libs/vue/vue.esm-browser.js"');
     });
 
-    it('宿主入口同时安装 Vuetify（插件兼容）与 mde-vue（宿主 UI）', async () => {
+    it('宿主入口只安装 mde-vue（宿主 UI 与插件 UI 共用）', async () => {
       const main = await read('src/renderer/index.js');
 
-      expect(main).toContain("@/plugins/vuetify'");
-      expect(main).toContain('@/plugins/vuetifyCompat');
       expect(main).toContain("@/plugins/matUi'");
-      expect(main.indexOf('plugins/vuetify')).toBeLessThan(main.indexOf('plugins/matUi'));
+      expect(main).not.toContain('plugins/vuetify');
+      expect(main).not.toContain('vuetifyCompat');
     });
 
-    it('vuetifyCompat 提供插件所需的 window.vuetify$', async () => {
-      const compat = await read('src/renderer/plugins/vuetifyCompat.js');
+    it('matUi 提供插件所需的 window.mde$ 运行时', async () => {
+      const matUi = await read('src/renderer/plugins/matUi.js');
 
-      expect(compat).toContain("from 'vuetify/components'");
-      expect(compat).toContain("from 'vuetify/labs/components'");
-      expect(compat).toContain("from 'vuetify/directives'");
-      expect(compat).toContain('window.vuetify$');
+      expect(matUi).toContain("from 'mde-vue'");
+      expect(matUi).toContain('createMatUi');
+      expect(matUi).toContain('window.mde$');
     });
 
     it('插件 CSS layer 应位于宿主层级之后', async () => {
       const css = await read('src/renderer/assets/styles/layers.css');
 
       expect(css).toContain('@layer translime-plugin;');
-      expect(css.indexOf('@layer translime-plugin;')).toBeGreaterThan(css.indexOf('@layer vuetify-final;'));
+      expect(css.indexOf('@layer translime-plugin;')).toBeGreaterThan(css.indexOf('@layer mde-final;'));
     });
   });
 
@@ -327,42 +296,47 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
 
       expect(css).toContain('@layer tailwind-theme;');
       expect(css).toContain('@layer tailwind-utilities;');
+      expect(css).toContain('@layer mde.tokens;');
       const themeIndex = css.indexOf('@layer tailwind-theme;');
+      const componentsIndex = css.indexOf('@layer mde.components;');
       const utilitiesIndex = css.indexOf('@layer tailwind-utilities;');
-      const vuetifyUtilitiesIndex = css.indexOf('@layer vuetify-utilities;');
-      const finalIndex = css.indexOf('@layer vuetify-final;');
+      const finalIndex = css.indexOf('@layer mde-final;');
 
-      expect(utilitiesIndex).toBeGreaterThan(vuetifyUtilitiesIndex);
+      expect(themeIndex).toBeLessThan(componentsIndex);
+      expect(utilitiesIndex).toBeGreaterThan(componentsIndex);
       expect(finalIndex).toBeGreaterThan(utilitiesIndex);
-      expect(themeIndex).toBeLessThan(vuetifyUtilitiesIndex);
     });
 
-    it('preview 使用预编译 vuetify/styles，不再依赖 settings.scss', async () => {
+    it('preview 使用 mde-vue 样式入口，不再依赖 Vuetify 与 settings.scss', async () => {
       const main = await readSdk('src/preview/main.js');
       const plugin = await readSdk('src/vite-plugin.js');
       const layers = await readSdk('src/preview/layers.css');
 
-      expect(main).toContain("import 'vuetify/styles'");
-      expect(main).not.toContain('settings.scss');
+      expect(main).toContain("import 'mde-vue/styles.css'");
+      expect(main).toContain('createMatUi');
+      expect(main).not.toContain('vuetify');
       expect(plugin).not.toContain('getPreviewSettingsPath');
       expect(plugin).not.toContain('preprocessorOptions');
       expect(plugin).not.toContain('settings.scss');
       expect(layers).toContain('@layer translime-plugin;');
     });
 
-    it('preview App.vue 恢复原 Vuetify 工具类写法', async () => {
-      const vue = await readSdk('src/preview/App.vue');
+    it('SDK vite 插件只自动注入 mde-vue 组件，不再处理 Vuetify 组件', async () => {
+      const plugin = await readSdk('src/vite-plugin.js');
 
-      expect(vue).toContain('d-flex');
-      expect(vue).toContain('text-medium-emphasis');
-      expect(vue).toContain('text-body-small');
+      expect(plugin).toContain('window.mde$?.components');
+      expect(plugin).not.toContain('window.vuetify$');
+      expect(plugin).not.toContain('V[A-Z]');
+      expect(plugin).not.toContain('<v-');
     });
 
-    it('preview main.js 同步将 VBtn 与 VBtnGroup 默认圆角重置为 pill 药丸形态', async () => {
-      const js = await readSdk('src/preview/main.js');
+    it('SDK 不再导出 Vuetify 运行时访问器', async () => {
+      const index = await readSdk('src/index.js');
+      const types = await readSdk('src/index.d.ts');
 
-      expect(js).toMatch(/VBtn:\s*\{[\s\S]*rounded:\s*'pill'/);
-      expect(js).toMatch(/VBtnGroup:\s*\{[\s\S]*rounded:\s*'pill'/);
+      expect(index).not.toContain('useVuetify');
+      expect(types).not.toContain('useVuetify');
+      expect(index).toContain('export function useMat()');
     });
   });
 
@@ -398,17 +372,61 @@ describe('宿主 mde-vue + Tailwind 样式契约（Vuetify 仅为插件保留）
       expect(template).not.toMatch(/\.plugin-main\s*\{\s*\.red\s*\{/s);
     });
 
-    it('app.css 通过 --v-font-body/--v-font-heading 覆盖字体栈', async () => {
+    it('app.css 通过 mde-vue 参考字体变量覆盖字体栈', async () => {
       const css = await read('src/renderer/assets/styles/app.css');
 
-      expect(css).toContain("--v-font-body: 'Roboto', 'Noto Sans SC'");
-      expect(css).toContain("--v-font-heading: 'Roboto', 'Noto Sans SC'");
+      expect(css).toContain("--mat-ref-typeface-brand: 'Roboto', 'Noto Sans SC'");
+      expect(css).toContain("--mat-ref-typeface-plain: 'Roboto', 'Noto Sans SC'");
     });
 
     it('SDK post-build 不再拷贝 settings.scss', async () => {
       const script = await readFile(resolve(sdkRoot, 'scripts/post-build.mjs'), 'utf8');
 
       expect(script).not.toContain('settings.scss');
+    });
+  });
+
+  describe('Vuetify 移除守卫', () => {
+    it('宿主、SDK 与插件源码不再引用 Vuetify', async () => {
+      const scannedRoots = [
+        resolve(appRoot, 'src'),
+        resolve(sdkRoot, 'src'),
+        // 本文件自身需要写出被禁止的标识符，扫描时排除
+        resolve(appRoot, 'tests/e2e'),
+        resolve(appRoot, 'tests/mocks'),
+        ...['template-translime-plugin', 'translime-plugin-bangumi-logs', 'translime-plugin-mahjong-2-emoji', 'translime-plugin-rtmp-recorder', 'translime-plugin-static-server']
+          .flatMap((name) => [resolve(packagesRoot, name, 'src'), resolve(packagesRoot, name, 'package.json')]),
+      ];
+      const files = (await Promise.all(scannedRoots.map(async (target) => {
+        try {
+          return await listFiles(target);
+        } catch {
+          return [target];
+        }
+      }))).flat();
+      const offenders = await Promise.all(files.map(async (file) => {
+        if (!/\.(js|vue|json|mjs|css|ts)$/.test(file)) {
+          return null;
+        }
+        const content = await readFile(file, 'utf8');
+        return /vuetify/i.test(content) ? file : null;
+      }));
+
+      expect(offenders.filter(Boolean)).toEqual([]);
+    });
+
+    it('工作区依赖中不再声明 vuetify 与 vite-plugin-vuetify', async () => {
+      const manifests = await Promise.all([
+        read('package.json'),
+        readSdk('package.json'),
+        ...['template-translime-plugin', 'translime-plugin-bangumi-logs', 'translime-plugin-mahjong-2-emoji', 'translime-plugin-rtmp-recorder', 'translime-plugin-static-server']
+          .map(async (name) => readFile(resolve(packagesRoot, name, 'package.json'), 'utf8')),
+      ]);
+
+      manifests.forEach((manifest) => {
+        expect(manifest).not.toContain('vite-plugin-vuetify');
+        expect(manifest).not.toContain('"vuetify"');
+      });
     });
   });
 });

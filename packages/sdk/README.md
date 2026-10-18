@@ -94,10 +94,10 @@ const myValue = config.get('settingsKey', 'default');
 ### 插件 UI
 
 ```javascript
-import { useIpc, useVuetifyComponents } from 'translime-sdk';
+import { useIpc, useMatComponents } from 'translime-sdk';
 
 const ipc = useIpc();
-const { VBtn, VCard } = useVuetifyComponents();
+const { MatBtn, MatCard } = useMatComponents();
 ```
 
 ## 核心 API
@@ -215,9 +215,6 @@ await ipc.invoke('get-data', query);      // 实际调用 'get-data@my-plugin-id
 ipc.on('data-changed', (data) => { ... }); // 接收主进程 sendToClient 推送
 ```
 
-- `useVuetify()`: 获取 Vuetify 实例。
-- `useVuetifyComponents()`: 获取所有 Vuetify 组件。
-- `useVuetifyDirectives()`: 获取所有 Vuetify 指令。
 - `useMat()` / `useMde()`: 获取宿主提供的 mde-vue 运行时（`{ components, directives, functions, theme }`）。
 - `useMatComponents()`: 获取所有宿主注册的 mde-vue 组件（mat-* / mde-*）。
 - `useMatDirectives()`: 获取 mde-vue 指令（`v-intersection` / `v-state-layer`）。
@@ -234,7 +231,7 @@ ipc.on('data-changed', (data) => { ... }); // 接收主进程 sendToClient 推�
 
 ### mde-vue 支持
 
-宿主 UI 基于 [mde-vue](https://github.com/slime7/mde-vue)（Material 3 Expressive），并通过 `window.mde$` 向插件 UI 提供 mde-vue 运行时。插件无需安装或打包 mde-vue：
+宿主 UI 与插件 UI 都基于 [mde-vue](https://github.com/slime7/mde-vue)（Material 3 Expressive），宿主通过 `window.mde$` 向插件 UI 提供该运行时。插件无需安装或打包 mde-vue：
 
 ```vue
 <script setup>
@@ -253,7 +250,7 @@ const { MatBtn } = useMatComponents();
 
 说明：
 
-- SDK 的 Vite 插件会扫描插件源码中的 `mat-*` / `mde-*` 标签与 `Mat*` / `Mde*` 组件引用，并从 `window.mde$.components` 自动注入，行为与 Vuetify 支持完全一致。
+- SDK 的 Vite 插件会扫描插件源码中的 `mat-*` / `mde-*` 标签与 `Mat*` / `Mde*` 组件引用，并从 `window.mde$.components` 自动注入。
 - 宿主与 preview Shell 都通过 `createMatUi` 全局注册了所有 `mat-*` / `Mat*` 组件及 `v-intersection`、`v-state-layer` 指令。
 - `window.mde$.theme` 是宿主的 mde-vue 主题控制器（Material 2025 动态主题），可用于读取或跟随宿主的种子色、明暗模式与配色变体。
 - `window.mde$.functions` 暴露 mde-vue 的命令式函数，推荐通过 `useMatFunctions()` 获取；不可用时返回空对象，调用前应判空：
@@ -268,7 +265,7 @@ if (ok) {
 }
 ```
 
-- 插件本地 preview 想启用 mde 时，在插件中安装 `mde-vue`（GitHub 仓库依赖）即可；未安装时 preview 自动跳过 mde 能力。
+- preview 与宿主一致：插件在 `devDependencies` 中安装 `mde-vue`（GitHub 仓库依赖）后，Preview Shell 会用它全局注册 `mat-*` 组件并提供 `window.mde$`。
 
 ### 通用 (Common)
 
@@ -334,8 +331,7 @@ Preview 模式允许你在普通浏览器中预览和调试插件 UI，无需依
 ### 特性
 
 - 零配置：SDK 会自动检测 preview 模式并注入 mock 实现。
-- 完整的 Vuetify 支持：Preview Shell 自动提供 Vuetify 组件和主题。
-- mde-vue 支持：插件安装 mde-vue 后，Preview Shell 自动全局注册 mat-* 组件并提供 `window.mde$`（未安装时自动跳过）。
+- 完整的 mde-vue 支持：Preview Shell 自动全局注册 mat-* 组件、提供 `window.mde$` 与明暗主题切换。
 - API Mock：IPC、Dialog、Shell、插件设置等接口都有对应 mock。
 - 声明式 IPC Mock：通过 `previewIpcMocks` 提供 mock handler 表，`invoke` 命中时返回 mock 结果而不是 `null`，UI 联调不再只靠日志。
 - 设置持久化：插件设置使用 `localStorage` 存储。

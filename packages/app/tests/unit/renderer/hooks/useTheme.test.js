@@ -29,19 +29,6 @@ vi.mock('@/plugins/matUi', () => ({
   },
 }));
 
-// Mock Vuetify useTheme
-vi.mock('vuetify', () => ({
-  useTheme: () => ({
-    change: vi.fn(),
-    themes: {
-      value: {
-        light: { colors: { 'on-surface-light': '#1d1b20' } },
-        dark: { colors: { 'on-surface-light': '#e6e0e9' } },
-      },
-    },
-  }),
-}));
-
 // Mock appConfigStore
 vi.mock('@/utils', () => ({
   appConfigStore: {
@@ -128,31 +115,26 @@ describe('useTheme', () => {
   });
 
   describe('setCustomTheme', () => {
-    it('应该接受自定义颜色对象', () => {
+    it('保存配色元数据并同步到 mde-vue 主题控制器', () => {
       const theme = useTheme();
-      const colors = {
-        light: { primary: '#FF5722' },
-        dark: { primary: '#FF7043' },
-      };
 
-      expect(() => theme.setCustomTheme(colors)).not.toThrow();
-    });
-
-    it('应该接受带 themeColor 元数据的颜色对象', () => {
-      const theme = useTheme();
-      const colors = {
-        light: { primary: '#FF5722' },
-        dark: { primary: '#FF7043' },
-      };
-      const themeColor = {
+      theme.setCustomTheme({
         name: 'custom',
         source: '#FF5722',
         variant: 'SchemeTonalSpot',
-      };
+      });
 
-      expect(() => theme.setCustomTheme(colors, themeColor)).not.toThrow();
       expect(matThemeMock.setSeedColor).toHaveBeenCalledWith('#FF5722');
       expect(matThemeMock.setSchemeVariant).toHaveBeenCalledWith('tonal-spot');
+      expect(mockIpc.send).toHaveBeenCalledWith(ipcType.THEME_COLOR_UPDATED);
+    });
+
+    it('未传配色元数据时不做任何处理', () => {
+      const theme = useTheme();
+
+      expect(() => theme.setCustomTheme()).not.toThrow();
+      expect(matThemeMock.setSeedColor).not.toHaveBeenCalled();
+      expect(mockIpc.send).not.toHaveBeenCalled();
     });
   });
 
@@ -167,7 +149,15 @@ describe('useTheme', () => {
   });
 
   describe('syncOverlayColor', () => {
-    it('主题色可规范化时发送 hex 图标色', () => {
+    // syncOverlayColor 从文档根节点读取 mde-vue 写入的 --mat-sys-color-* 令牌，
+    // jsdom 不做样式计算，按测试需要伪造令牌取值
+    const stubMatColorToken = (value) => {
+      vi.spyOn(window, 'getComputedStyle').mockImplementation(() => ({
+        getPropertyValue: (name) => (name === '--mat-sys-color-on-surface' ? value : ''),
+      }));
+    };
+
+    it('令牌色可规范化时发送 hex 图标色', () => {
       const fakeCtx = { fillStyle: '#000000' };
       vi.spyOn(document, 'createElement').mockImplementation((tag) => {
         if (tag === 'canvas') {
@@ -175,6 +165,7 @@ describe('useTheme', () => {
         }
         return document.createElement(tag);
       });
+      stubMatColorToken('#1d1b20');
       const theme = useTheme();
 
       theme.syncOverlayColor();
@@ -192,6 +183,7 @@ describe('useTheme', () => {
         }
         return document.createElement(tag);
       });
+      stubMatColorToken('#1d1b20');
       const theme = useTheme();
 
       theme.syncOverlayColor('plugin-window-demo');
@@ -202,7 +194,7 @@ describe('useTheme', () => {
       });
     });
 
-    it('WCO 可用时也不回写高度（高度由系统决定）', () => {
+    it('令牌缺失时回退模式默认色', () => {
       const fakeCtx = { fillStyle: '#000000' };
       vi.spyOn(document, 'createElement').mockImplementation((tag) => {
         if (tag === 'canvas') {
@@ -210,17 +202,14 @@ describe('useTheme', () => {
         }
         return document.createElement(tag);
       });
-      Object.defineProperty(navigator, 'windowControlsOverlay', {
-        configurable: true,
-        value: { getTitlebarAreaRect: () => ({ height: 40, width: 150 }) },
-      });
+      stubMatColorToken('');
       const theme = useTheme();
 
       theme.syncOverlayColor();
 
       expect(mockIpc.send).toHaveBeenCalledWith(ipcType.SET_TITLE_BAR_OVERLAY, {
         win: 'app',
-        symbolColor: '#1d1b20',
+        symbolColor: '#1f1f1f',
       });
     });
   });

@@ -11,6 +11,12 @@ defineOptions({
   name: 'UiRtmpRecorder',
 });
 
+const {
+  MatContainer, MatCard, MatCardContent, MatList, MatListItem, MatAvatar,
+  MatIcon, MatBtn, MatSpacer, MatTextField, MatSelect, MatProgress, MatBottomSheet,
+} = window.mde$.components;
+const { alert: showAlert, confirm: showConfirm } = window.mde$.functions;
+
 const useStore = () => {
   const pluginId = 'translime-plugin-rtmp-recorder';
   const url = ref('');
@@ -66,43 +72,14 @@ const { getPluginSetting, setPluginSetting } = window.ts;
 const getSaveFilenameTemplate = () => dayjs().format(store.otherOptions.value.saveFilenameTemplate);
 const getUuiD = (randomLength = 8) => Number(Math.random().toString().substring(2, 2 + randomLength) + +Date.now()).toString(36);
 
-const useAlert = () => {
-  const isVisible = ref(false);
-  const confirmPromise = ref(null);
-  const message = ref('');
-
-  function onConfirm() {
-    confirmPromise.value(true);
-    confirmPromise.value = null;
-    isVisible.value = false;
-  }
-
-  function onCancel() {
-    if (confirmPromise.value) {
-      confirmPromise.value(false);
-    }
-    confirmPromise.value = null;
-    isVisible.value = false;
-  }
-
-  function show(msg) {
-    message.value = msg;
-    isVisible.value = true;
-    return new Promise((resolve) => {
-      confirmPromise.value = resolve;
-    });
-  }
-
-  return {
-    isVisible,
-    show,
-    onConfirm,
-    onCancel,
-    message,
-  };
-};
-const alert = useAlert();
-const confirm = useAlert();
+// 主进程按数字判断是否自动分割，文本输入统一收敛为数字后再写回设置
+const splitTimeoutInput = computed({
+  get: () => String(otherOptions.value.splitTimeout ?? ''),
+  set: (value) => {
+    const numericValue = Number(value);
+    otherOptions.value.splitTimeout = Number.isFinite(numericValue) ? numericValue : 0;
+  },
+});
 
 const useSelectDir = () => {
   const selectDirError = ref('');
@@ -193,7 +170,7 @@ const useRecord = (state) => {
   const start = () => {
     const checkResult = checkOptions();
     if (checkResult) {
-      alert.show(checkResult);
+      showAlert({ title: '出错了', content: checkResult });
       return;
     }
     const taskId = getUuiD();
@@ -207,7 +184,7 @@ const useRecord = (state) => {
       currentProgress: {},
       error: '',
       checkProgressTimer: setTimeout(() => {
-        confirm.show('录制进程30没有返回进度信息，是否强制关闭录制进程已。')
+        showConfirm({ title: '提示', content: '录制进程30没有返回进度信息，是否强制关闭录制进程已。' })
           .then((result) => {
             if (result) {
               stop(taskId);
@@ -340,283 +317,275 @@ onMounted(() => {
 });
 </script>
 
-<script>
-const vuetify = window.vuetify$.components;
-
-export default {
-  name: 'PluginUi',
-
-  components: {
-    ...vuetify,
-  },
-};
-</script>
-
 <template>
-  <v-container class="plugin-main">
-    <v-row class="mb-2">
-      <v-col
-        sm="12"
-        md="6"
-        lg="4"
+  <mat-container class="plugin-main">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <mat-card
         v-for="task in tasks"
         :key="task.taskId"
+        class="rounded-2xl cursor-pointer"
+        @click="record.showDetailPanel(task.taskId)"
       >
-        <v-card
-          class="rounded-2xl"
-          rounded
-          flat
-          :disabled="task.tryStop"
-          @click="record.showDetailPanel(task.taskId)"
-        >
-          <v-list>
-            <v-list-item>
-              <template #prepend>
-                <v-avatar color="primary">
-                  <v-progress-circular v-if="task.isProcessing" indeterminate />
-                  <v-icon v-else>
-                    done
-                  </v-icon>
-                </v-avatar>
-              </template>
+        <mat-list>
+          <mat-list-item lines="2">
+            <template #leading>
+              <mat-avatar color="primary">
+                <mat-progress v-if="task.isProcessing" variant="circular" indeterminate :size="24" />
+                <mat-icon v-else icon="done" />
+              </mat-avatar>
+            </template>
 
-              <template #append>
-                <v-btn v-if="!task.isProcessing" icon="close" variant="plain" @click.stop="record.remove(task.taskId)" />
-                <v-btn v-else icon="stop" variant="plain" @click.stop="record.stop(task.taskId)" />
-              </template>
+            <template #trailing>
+              <mat-btn
+                v-if="!task.isProcessing"
+                icon="close"
+                label="移除任务"
+                variant="text"
+                size="small"
+                @click.stop="record.remove(task.taskId)"
+              />
+              <mat-btn
+                v-else
+                icon="stop"
+                label="停止任务"
+                variant="text"
+                size="small"
+                @click.stop="record.stop(task.taskId)"
+              />
+            </template>
 
-              <v-list-item-title :title="task.recordInfo.url">
-                {{ task.recordInfo.url }}
-              </v-list-item-title>
+            <span :title="task.recordInfo.url">{{ task.recordInfo.url }}</span>
 
-              <v-list-item-subtitle v-if="!task.error">
+            <template #supporting>
+              <template v-if="!task.error">
                 <span>时长：</span>
                 <span v-text="task.currentProgress?.timemark" />
                 <span class="ml-2">frames：</span>
                 <span v-text="task.currentProgress?.frames" />
                 <span class="ml-2">fps：</span>
                 <span v-text="task.currentProgress?.currentFps" />
-              </v-list-item-subtitle>
-              <v-list-item-subtitle v-else :title="task.error">
-                {{ task.error }}
-              </v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
-        </v-card>
-      </v-col>
-    </v-row>
+              </template>
+              <span v-else :title="task.error">{{ task.error }}</span>
+            </template>
+          </mat-list-item>
+        </mat-list>
+      </mat-card>
+    </div>
 
-    <v-card
-      class="rounded-2xl"
-      rounded
-      flat
-    >
-      <div class="my-2">
-        <v-list-item bg-color="surface-container">
-          <template #prepend>
-            <v-avatar color="primary">
-              <v-icon>radio_button_checked</v-icon>
-            </v-avatar>
+    <mat-card class="rounded-2xl">
+      <mat-list>
+        <mat-list-item>
+          <template #leading>
+            <mat-avatar color="primary">
+              <mat-icon icon="radio_button_checked" />
+            </mat-avatar>
           </template>
-          <v-list-item-title>填写直播源开始录制</v-list-item-title>
-        </v-list-item>
-      </div>
 
-      <v-card-text>
+          填写直播源开始录制
+        </mat-list-item>
+      </mat-list>
+
+      <mat-card-content>
         <div>
           <!-- todo: 选择直播平台填入房间号自动获取直播源，原直播源选项放入自定义选项中 -->
-          <v-text-field v-model="url" color="primary" label="直播源" placeholder="设置直播来源" />
-        </div>
-
-        <div class="mt-4">
-          <v-text-field
-            v-model="saveDir"
+          <mat-text-field
+            v-model="url"
+            class="w-full"
             color="primary"
-            label="保存文件夹"
-            readonly
-            append-icon="folder_open"
-            @click:append="selectSaveDir"
+            label="直播源"
+            placeholder="设置直播来源"
           />
         </div>
 
-        <div class="flex items-center mt-4">
-          <v-spacer />
+        <div class="mt-4">
+          <mat-text-field
+            v-model="saveDir"
+            class="w-full"
+            color="primary"
+            label="保存文件夹"
+            readonly
+            @click="selectSaveDir"
+          >
+            <template #trailing>
+              <mat-btn
+                icon="folder_open"
+                label="选择保存文件夹"
+                variant="text"
+                size="small"
+                @click.stop="selectSaveDir"
+              />
+            </template>
+          </mat-text-field>
+        </div>
 
-          <v-btn
+        <div class="flex items-center mt-4">
+          <mat-spacer />
+
+          <mat-btn
             v-if="hasProcessingTasks"
             class="mr-4"
             color="primary"
-            rounded="pill"
             variant="outlined"
             @click="record.stop()"
           >
             全部停止
-          </v-btn>
+          </mat-btn>
 
-          <v-btn
+          <mat-btn
             class="mr-4"
             color="primary"
-            rounded="pill"
             @click="record.start"
           >
             持续录制
-          </v-btn>
+          </mat-btn>
 
-          <v-btn
+          <mat-btn
             color="primary"
-            rounded="pill"
             @click="record.start"
           >
             一次性录制
-          </v-btn>
+          </mat-btn>
         </div>
-      </v-card-text>
-    </v-card>
+      </mat-card-content>
+    </mat-card>
 
-    <v-card class="mt-4 rounded-2xl" rounded flat>
-      <div class="my-2">
-        <v-list-item>
-          <template #prepend>
-            <v-avatar color="primary">
-              <v-icon>settings</v-icon>
-            </v-avatar>
+    <mat-card class="mt-4 rounded-2xl">
+      <mat-list>
+        <mat-list-item>
+          <template #leading>
+            <mat-avatar color="primary">
+              <mat-icon icon="settings" />
+            </mat-avatar>
           </template>
-          <v-list-item-title>设置更多录制参数</v-list-item-title>
-        </v-list-item>
-      </div>
 
-      <v-card-text>
-        <v-row>
-          <v-col cols="6">
-            <v-text-field
-              v-model="otherOptions.splitTimeout"
-              color="primary"
-              label="自动分割(单位：秒)"
-              placeholder="设置自动分割间隔"
-              hide-details
-            />
-          </v-col>
+          设置更多录制参数
+        </mat-list-item>
+      </mat-list>
 
-          <v-col cols="6">
-            <v-select
-              color="primary"
-              label="快捷选择自动分割"
-              hide-details
-              :items="[
-                { title: '不分割', value: 0 },
-                { title: '1分钟', value: 60 },
-                { title: '2分钟', value: 120 },
-                { title: '3分钟', value: 180 },
-                { title: '5分钟', value: 300 },
-                { title: '10分钟', value: 600 },
-                { title: '15分钟', value: 900 },
-                { title: '20分钟', value: 1200 },
-                { title: '30分钟', value: 1800 },
-                { title: '45分钟', value: 2700 },
-                { title: '1小时', value: 3600 },
-                { title: '2小时', value: 7200 },
-              ]"
-              @update:model-value="record.onQuickSelectSplitTimeout"
-            />
-          </v-col>
-        </v-row>
+      <mat-card-content>
+        <div class="grid grid-cols-2 gap-4">
+          <mat-text-field
+            v-model="splitTimeoutInput"
+            class="w-full"
+            color="primary"
+            label="自动分割(单位：秒)"
+            placeholder="设置自动分割间隔"
+          />
 
-        <v-row class="mt-4">
-          <v-col cols="6">
-            <v-text-field
-              v-model="otherOptions.audioCodec"
-              color="primary"
-              label="音频编码"
-              placeholder="设置音频编码"
-              hide-details
-            />
-          </v-col>
+          <mat-select
+            v-model="otherOptions.splitTimeout"
+            class="w-full"
+            color="primary"
+            label="快捷选择自动分割"
+            :items="[
+              { title: '不分割', value: 0 },
+              { title: '1分钟', value: 60 },
+              { title: '2分钟', value: 120 },
+              { title: '3分钟', value: 180 },
+              { title: '5分钟', value: 300 },
+              { title: '10分钟', value: 600 },
+              { title: '15分钟', value: 900 },
+              { title: '20分钟', value: 1200 },
+              { title: '30分钟', value: 1800 },
+              { title: '45分钟', value: 2700 },
+              { title: '1小时', value: 3600 },
+              { title: '2小时', value: 7200 },
+            ]"
+            @update:model-value="record.onQuickSelectSplitTimeout"
+          />
+        </div>
 
-          <v-col cols="6">
-            <v-text-field
-              v-model="otherOptions.videoCodec"
-              color="primary"
-              label="视频编码"
-              placeholder="设置视频编码"
-              hide-details
-            />
-          </v-col>
-        </v-row>
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <mat-text-field
+            v-model="otherOptions.audioCodec"
+            class="w-full"
+            color="primary"
+            label="音频编码"
+            placeholder="设置音频编码"
+          />
 
-        <v-row class="mt-4">
-          <v-col>
-            <v-text-field
-              v-model="otherOptions.saveFilenameTemplate"
-              color="primary"
-              label="保存文件名模板"
-              :hint="`预览：${previewFilenameResult}`"
-              :error="previewFilenameError"
-              @update:model-value="getPreviewFilename"
-              @focus="getPreviewFilename"
-            />
-          </v-col>
+          <mat-text-field
+            v-model="otherOptions.videoCodec"
+            class="w-full"
+            color="primary"
+            label="视频编码"
+            placeholder="设置视频编码"
+          />
+        </div>
 
-          <v-col col="4">
-            <v-select
-              v-model="otherOptions.saveFormat"
-              color="primary"
-              label="视频格式"
-              placeholder="选择要保存的视频格式"
-              hide-details
-              :items="[
-                { title: 'MPEG-4(.mp4)', value: 'mp4' },
-                { title: 'Flash Video(.flv)', value: 'flv' },
-                { title: 'QuickTime(.mov)', value: 'mov' },
-                { title: 'Matroska(.mkv)', value: 'mkv' },
-              ]"
-            />
-          </v-col>
-        </v-row>
-      </v-card-text>
-    </v-card>
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <mat-text-field
+            v-model="otherOptions.saveFilenameTemplate"
+            class="w-full"
+            color="primary"
+            label="保存文件名模板"
+            :supporting-text="`预览：${previewFilenameResult}`"
+            :error="previewFilenameError"
+            :error-text="previewFilenameError ? '文件模板格式不正确' : undefined"
+            @update:model-value="getPreviewFilename"
+            @focus="getPreviewFilename"
+          />
 
-    <v-bottom-sheet v-model="recordTaskPanel.visible" inset>
-      <v-sheet class="rounded-t-xl overflow-hidden flex flex-col">
+          <mat-select
+            v-model="otherOptions.saveFormat"
+            class="w-full"
+            color="primary"
+            label="视频格式"
+            placeholder="选择要保存的视频格式"
+            :items="[
+              { title: 'MPEG-4(.mp4)', value: 'mp4' },
+              { title: 'Flash Video(.flv)', value: 'flv' },
+              { title: 'QuickTime(.mov)', value: 'mov' },
+              { title: 'Matroska(.mkv)', value: 'mkv' },
+            ]"
+          />
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-bottom-sheet
+      v-model="recordTaskPanel.visible"
+      variant="modal"
+      expanded="max"
+    >
+      <div
+        v-if="currentTaskDetail"
+        class="flex flex-col min-h-0 h-full"
+      >
         <div class="shrink-0">
-          <v-list>
-            <v-list-item>
-              <template #prepend>
-                <v-avatar color="primary">
-                  <v-progress-circular v-if="currentTaskDetail.isProcessing" indeterminate />
-                  <v-icon v-else>
-                    done
-                  </v-icon>
-                </v-avatar>
+          <mat-list>
+            <mat-list-item lines="2">
+              <template #leading>
+                <mat-avatar color="primary">
+                  <mat-progress v-if="currentTaskDetail.isProcessing" variant="circular" indeterminate :size="24" />
+                  <mat-icon v-else icon="done" />
+                </mat-avatar>
               </template>
 
-              <v-list-item-title :title="currentTaskDetail.recordInfo.url">
-                {{ currentTaskDetail.recordInfo.url }}
-              </v-list-item-title>
+              <span :title="currentTaskDetail.recordInfo.url">{{ currentTaskDetail.recordInfo.url }}</span>
 
-              <v-list-item-subtitle v-if="!currentTaskDetail.error">
-                <span>时长：</span>
-                <span v-text="currentTaskDetail.currentProgress?.timemark" />
-                <span class="ml-2">frames：</span>
-                <span v-text="currentTaskDetail.currentProgress?.frames" />
-                <span class="ml-2">fps：</span>
-                <span v-text="currentTaskDetail.currentProgress?.currentFps" />
-              </v-list-item-subtitle>
-              <v-list-item-subtitle v-else :title="currentTaskDetail.error">
-                {{ currentTaskDetail.error }}
-              </v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
+              <template #supporting>
+                <template v-if="!currentTaskDetail.error">
+                  <span>时长：</span>
+                  <span v-text="currentTaskDetail.currentProgress?.timemark" />
+                  <span class="ml-2">frames：</span>
+                  <span v-text="currentTaskDetail.currentProgress?.frames" />
+                  <span class="ml-2">fps：</span>
+                  <span v-text="currentTaskDetail.currentProgress?.currentFps" />
+                </template>
+                <span v-else :title="currentTaskDetail.error">{{ currentTaskDetail.error }}</span>
+              </template>
+            </mat-list-item>
+          </mat-list>
         </div>
 
         <div class="grow overflow-auto min-h-0 p-4">
           <p>录制源：{{ currentTaskDetail.recordInfo.url }}</p>
           <p>保存位置：{{ currentTaskDetail.recordInfo.saveDir }}</p>
 
-          <v-sheet
+          <div
             v-if="currentTaskDetail.stdLines.latest || currentTaskDetail.stdLines.logs.length"
-            class="mt-4 text-white"
-            color="#300a24"
-            rounded
+            class="mt-4 rounded bg-record-console"
           >
             <pre
               class="log-area p-2"
@@ -629,70 +598,25 @@ export default {
               class="latest-line"
               v-text="currentTaskDetail.stdLines.latest"
             /></pre>
-          </v-sheet>
+          </div>
 
           <div class="mt-4 flex">
-            <v-spacer />
+            <mat-spacer />
 
-            <v-btn
+            <mat-btn
               v-if="currentTaskDetail.stdLines.latest || currentTaskDetail.stdLines.logs.length"
               class="mr-4"
               color="primary"
-              rounded="pill"
               variant="outlined"
               @click="currentTaskDetail.stdLines.oneLine = !currentTaskDetail.stdLines.oneLine"
             >
               切换输出窗口
-            </v-btn>
+            </mat-btn>
           </div>
         </div>
-      </v-sheet>
-    </v-bottom-sheet>
-
-    <v-dialog
-      :model-value="alert.isVisible.value"
-      width="350"
-      persistent
-      @update:model-value="alert.onCancel"
-    >
-      <v-card class="rounded-2xl" rounded>
-        <v-card-title>出错了</v-card-title>
-
-        <v-card-text>{{ alert.message.value }}</v-card-text>
-
-        <v-card-actions>
-          <v-spacer />
-          <v-btn color="primary" rounded="pill" @click="alert.onCancel">
-            确定
-          </v-btn>
-          <v-spacer />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog
-      :model-value="confirm.isVisible.value"
-      width="350"
-      persistent
-      @update:model-value="confirm.onCancel"
-    >
-      <v-card class="rounded-2xl" rounded>
-        <v-card-title>提示</v-card-title>
-
-        <v-card-text>{{ confirm.message.value }}</v-card-text>
-
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="confirm.onCancel">
-            取消
-          </v-btn>
-          <v-btn color="primary" @click="confirm.onConfirm">
-            确定
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  </v-container>
+      </div>
+    </mat-bottom-sheet>
+  </mat-container>
 </template>
 
 <style>
@@ -705,6 +629,10 @@ export default {
 </style>
 
 <style scoped>
+.bg-record-console {
+  background: #300a24;
+}
+
 .log-area {
   max-height: 280px;
   color: #eeeeec;

@@ -1,4 +1,3 @@
-import { useTheme as useVTheme } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import matUi from '@/plugins/matUi';
 import { useIpc } from '@/hooks/electron';
@@ -32,10 +31,23 @@ const toRgbHex = (cssColor) => {
     : null;
 };
 
+/**
+ * 读取 mde-vue 写入文档根节点的系统颜色令牌
+ * @param {string} token - 不含前缀的颜色角色名，如 'on-surface'
+ * @returns {string} 令牌值的原始文本，未定义时为空字符串
+ */
+const getMatColorToken = (token) => {
+  if (typeof document === 'undefined') {
+    return '';
+  }
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(`--mat-sys-color-${token}`);
+  return value ? value.trim() : '';
+};
+
 const useTheme = () => {
   const ipc = useIpc();
   const store = useGlobalStore();
-  const vTheme = useVTheme();
   const matTheme = matUi.theme;
 
   const getNativeTheme = () => ipc.invoke(ipcType.GET_NATIVE_THEME);
@@ -46,9 +58,8 @@ const useTheme = () => {
    * @param {string} [win] - 目标窗口名，默认主窗口 'app'
    */
   const syncOverlayColor = (win = 'app') => {
-    const scheme = vTheme.themes.value[store.dark ? 'dark' : 'light'];
-    const rawColor = scheme?.colors?.['on-surface-light'] || scheme?.colors?.['on-surface'];
-    const symbolHex = toRgbHex(rawColor) || DEFAULT_SYMBOL_COLORS[store.dark ? 'dark' : 'light'];
+    const symbolHex = toRgbHex(getMatColorToken('on-surface'))
+      || DEFAULT_SYMBOL_COLORS[store.dark ? 'dark' : 'light'];
     ipc.send(ipcType.SET_TITLE_BAR_OVERLAY, {
       win,
       symbolColor: symbolHex,
@@ -57,7 +68,6 @@ const useTheme = () => {
 
   const setDark = (dark) => {
     store.dark = dark;
-    vTheme.change(dark ? 'dark' : 'light');
     matTheme.setMode(dark ? 'dark' : 'light');
   };
 
@@ -89,31 +99,22 @@ const useTheme = () => {
   };
 
   /**
-   * 设置自定义主题颜色 (合并模式，不会覆盖已有的其他颜色)
+   * 应用自定义主题配色：保存配色元数据并同步到 mde-vue 主题控制器
    *
-   * @param {object} colors - Vuetify 兼容的配色对象，包含 light 和 dark 两个属性
-   * @param {object} colors.light - 浅色模式下的颜色 (kebab-case 格式)
-   * @param {object} colors.dark - 深色模式下的颜色 (kebab-case 格式)
-   * @param {object} [themeColor] - 可选，主题配色元数据，传入时会保存到 store 和配置
-   * @param {string} themeColor.name - 配色名称 ('translime' | 'custom')
+   * @param {object} [themeColor] - 主题配色元数据，传入时会保存到 store 和配置
+   * @param {string} themeColor.name - 配色名称 ('translime' | 'system' | 'custom')
    * @param {string} themeColor.source - 源颜色 (十六进制格式)
    * @param {string} themeColor.variant - 使用 M3 2025 规范的配色方案变体
    */
-  const setCustomTheme = (colors, themeColor) => {
-    if (colors.light) {
-      Object.assign(vTheme.themes.value.light.colors, colors.light);
+  const setCustomTheme = (themeColor) => {
+    if (!themeColor) {
+      return;
     }
-    if (colors.dark) {
-      Object.assign(vTheme.themes.value.dark.colors, colors.dark);
-    }
-    // 如果提供了 themeColor，则保存到 store 和配置
-    if (themeColor) {
-      const normalizedThemeColor = normalizeThemeColor(themeColor);
-      store.setAppThemeColor(normalizedThemeColor);
-      appConfigStore.set('setting.themeColor', normalizedThemeColor);
-      ipc.send(ipcType.THEME_COLOR_UPDATED);
-      syncMatTheme(normalizedThemeColor);
-    }
+    const normalizedThemeColor = normalizeThemeColor(themeColor);
+    store.setAppThemeColor(normalizedThemeColor);
+    appConfigStore.set('setting.themeColor', normalizedThemeColor);
+    ipc.send(ipcType.THEME_COLOR_UPDATED);
+    syncMatTheme(normalizedThemeColor);
   };
 
   return {

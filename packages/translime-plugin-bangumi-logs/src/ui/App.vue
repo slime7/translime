@@ -1,9 +1,9 @@
 <template>
-  <v-container fluid class="bg-background min-h-full py-8 px-4 sm:px-6 lg:px-8" style="overflow-y: auto;">
+  <mat-container fluid class="bg-background min-h-full py-8 px-4 sm:px-6 lg:px-8" style="overflow-y: auto;">
     <div class="mx-auto max-w-[1400px] flex flex-col gap-8">
       <!-- Loading State -->
       <div v-if="!state.ready" class="flex justify-center items-center py-32">
-        <v-progress-circular indeterminate color="primary" size="64" width="4" />
+        <mat-progress variant="circular" indeterminate color="primary" :size="64" thickness="heavy" />
       </div>
 
       <!-- Unauthenticated State -->
@@ -21,65 +21,59 @@
           </div>
 
           <div class="flex flex-wrap gap-4 mb-10">
-            <v-btn
+            <mat-btn
               color="primary"
-              variant="flat"
+              variant="filled"
               size="large"
-              rounded="pill"
+              prefix="open_in_new"
               class="px-8 font-medium tracking-wide"
-              prepend-icon="open_in_new"
               @click="openTokenPage"
             >
               获取 Token
-            </v-btn>
-            <v-btn
-              variant="tonal"
+            </mat-btn>
+            <mat-btn
+              variant="filled-tonal"
               color="secondary"
               size="large"
-              rounded="pill"
+              prefix="refresh"
               class="px-8 font-medium tracking-wide"
-              prepend-icon="refresh"
               @click="syncStatus"
             >
               检查登录状态
-            </v-btn>
+            </mat-btn>
           </div>
 
           <div class="bg-surface-container-lowest p-6 rounded-[1.5rem] border border-outline-variant/50">
             <label class="block text-sm font-bold text-on-surface mb-3 ml-1">Access Token</label>
-            <v-text-field
+            <mat-text-field
               v-model="state.tokenInput"
+              block
               placeholder="粘贴从 Bangumi 复制的 token..."
-              variant="solo"
-              flat
-              bg-color="surface-container"
-              hide-details
-              class="rounded-xl custom-textfield"
+              variant="filled"
+              class="rounded-xl"
             >
-              <template #prepend-inner>
-                <v-icon icon="vpn_key" color="primary" class="mr-2" />
+              <template #leading>
+                <mat-icon icon="vpn_key" color="primary" class="mr-2" />
               </template>
-            </v-text-field>
+            </mat-text-field>
             <div class="mt-6 flex flex-col gap-4">
-              <v-btn
+              <mat-btn
                 color="primary"
-                variant="flat"
+                variant="filled"
                 size="large"
-                rounded="pill"
                 class="px-10 font-medium tracking-wide self-end"
                 :loading="state.authenticating"
                 @click="verifyToken"
               >
                 保存并连接
-              </v-btn>
-              <v-alert
+              </mat-btn>
+              <div
                 v-if="state.errorMessage"
-                type="error"
-                variant="tonal"
-                class="rounded-xl w-full"
+                role="alert"
+                class="rounded-xl w-full p-4 bg-error-container text-on-error-container"
               >
                 {{ state.errorMessage }}
-              </v-alert>
+              </div>
             </div>
           </div>
         </section>
@@ -171,12 +165,18 @@
           <aside class="xl:col-span-1 flex flex-col gap-6">
             <!-- User Profile Card -->
             <div class="rounded-3xl bg-surface p-6 border border-outline-variant/30 shadow-sm flex flex-col items-center text-center outline-avatar-container">
-              <v-avatar size="80" class="mb-4 shadow-sm ring-4 ring-surface ring-offset-2 ring-offset-primary/10">
-                <v-img v-if="state.viewer?.avatar" :src="state.viewer.avatar" cover />
-                <span v-else class="text-3xl font-bold bg-primary text-on-primary w-full h-full flex items-center justify-center">
-                  {{ (state.viewer?.nickname || state.viewer?.username || 'B').slice(0, 1) }}
-                </span>
-              </v-avatar>
+              <mat-avatar
+                v-if="state.viewer?.avatar"
+                :src="state.viewer.avatar"
+                :size="80"
+                class="mb-4 shadow-sm ring-4 ring-surface ring-offset-2 ring-offset-primary/10"
+              />
+              <div
+                v-else
+                class="w-20 h-20 rounded-full mb-4 text-3xl font-bold bg-primary text-on-primary flex items-center justify-center"
+              >
+                {{ (state.viewer?.nickname || state.viewer?.username || 'B').slice(0, 1) }}
+              </div>
               <h3 class="text-xl font-bold text-on-surface truncate w-full px-2">
                 {{ state.viewer?.nickname }}
               </h3>
@@ -185,24 +185,22 @@
               </p>
 
               <div class="w-full flex items-center gap-3">
-                <v-btn
+                <mat-btn
                   color="primary"
-                  variant="flat"
-                  rounded="pill"
-                  class="flex-1 font-medium"
-                  prepend-icon="refresh"
+                  variant="filled"
+                  class="grow font-medium"
+                  prefix="refresh"
                   :loading="state.refreshing"
                   @click="loadDashboard(state.filterType)"
                 >
                   刷新列表
-                </v-btn>
-                <v-btn
-                  variant="tonal"
+                </mat-btn>
+                <mat-btn
+                  variant="filled-tonal"
                   color="error"
                   icon="logout"
-                  rounded="lg"
+                  label="退出登录"
                   class="shrink-0"
-                  size="default"
                   @click="logout"
                 />
               </div>
@@ -211,45 +209,41 @@
             <!-- Filters -->
             <div class="rounded-3xl bg-surface p-6 border border-outline-variant/30 shadow-sm">
               <span class="text-primary font-bold tracking-widest text-xs uppercase mb-4 block">查看筛选</span>
-              <v-select
+              <mat-select
+                block
+                variant="filled"
+                label="查看筛选"
                 :model-value="state.filterType"
                 :items="filterOptions"
-                variant="solo-filled"
-                flat
-                bg-color="surface-container-lowest"
-                hide-details
-                class="rounded-xl custom-textfield"
                 @update:model-value="loadDashboard"
-              >
-                <template #selection="{ item }">
-                  <span class="font-bold text-on-surface">{{ item.title }}</span>
-                </template>
-              </v-select>
+              />
             </div>
 
             <!-- Search Area -->
             <div class="rounded-3xl bg-surface p-6 border border-outline-variant/30 shadow-sm flex flex-col bg-gradient-to-b from-surface to-surface-container-lowest">
               <div class="flex items-center justify-between mb-4 shrink-0 flex-none">
                 <span class="text-primary font-bold tracking-widest text-xs uppercase block">搜索条目</span>
-                <v-progress-circular v-if="state.searching" indeterminate size="20" width="2" color="primary" />
+                <mat-progress v-if="state.searching" variant="circular" indeterminate color="primary" :size="24" />
               </div>
 
               <div class="shrink-0 flex-none mb-4">
-                <v-text-field
+                <mat-text-field
                   v-model="state.searchKeyword"
-                  variant="solo"
-                  flat
-                  density="comfortable"
-                  bg-color="surface-container"
+                  block
+                  variant="filled"
                   placeholder="输入动画标题..."
-                  hide-details
-                  class="rounded-xl custom-textfield"
                   @keydown.enter.prevent="searchSubjects"
                 >
-                  <template #append-inner>
-                    <v-icon icon="search" class="cursor-pointer hover:text-primary transition-colors" @click="searchSubjects" />
+                  <template #trailing>
+                    <mat-btn
+                      icon="search"
+                      label="搜索条目"
+                      variant="text"
+                      size="small"
+                      @click.stop="searchSubjects"
+                    />
                   </template>
-                </v-text-field>
+                </mat-text-field>
               </div>
 
               <div v-if="state.searchKeyword && !state.searchResults.length && !state.searching" class="text-sm text-on-surface-variant text-center py-6 bg-surface-container-highest/20 rounded-xl shrink-0 flex-none">
@@ -263,13 +257,19 @@
                   class="search-item-card group p-3 rounded-[1.25rem] bg-surface border border-outline-variant/20 transition-all duration-300 flex flex-col gap-3"
                 >
                   <div class="flex gap-4">
-                    <v-avatar rounded="xl" size="64" class="shadow-sm border border-outline-variant/20 bg-surface-variant">
-                      <v-img v-if="item.cover" :src="item.cover" cover />
-                      <div v-else class="w-full h-full text-on-surface-variant flex items-center justify-center font-bold text-xl">
-                        {{ item.title.slice(0, 1) }}
-                      </div>
-                    </v-avatar>
-                    <div class="flex-1 min-w-0 py-1 flex flex-col justify-center">
+                    <mat-image
+                      v-if="item.cover"
+                      :src="item.cover"
+                      alt=""
+                      fit="cover"
+                      :radius="16"
+                      :outline="false"
+                      class="w-16 h-16 shrink-0 overflow-hidden"
+                    />
+                    <div v-else class="w-16 h-16 shrink-0 rounded-2xl bg-surface-variant text-on-surface-variant flex items-center justify-center font-bold text-xl">
+                      {{ item.title.slice(0, 1) }}
+                    </div>
+                    <div class="grow min-w-0 py-1 flex flex-col justify-center">
                       <h4 class="font-bold text-on-surface text-sm truncate mb-1">
                         {{ item.title }}
                       </h4>
@@ -282,17 +282,16 @@
                       </div>
                     </div>
                   </div>
-                  <v-btn
+                  <mat-btn
                     color="primary"
-                    variant="tonal"
-                    rounded="xl"
+                    variant="filled-tonal"
                     size="small"
                     class="w-full font-bold shadow-sm opacity-90 group-hover:opacity-100 transition-opacity"
                     :loading="actionLoading"
                     @click="collectSubject(item.id)"
                   >
                     加入收藏
-                  </v-btn>
+                  </mat-btn>
                 </div>
               </div>
             </div>
@@ -314,7 +313,7 @@
               </div>
 
               <div v-if="!state.collections.length" class="flex flex-col items-center justify-center py-32 text-center flex-1">
-                <v-icon icon="auto_awesome_motion" size="64" class="text-outline-variant/50 mb-6" />
+                <mat-icon icon="auto_awesome_motion" size="64px" class="text-outline-variant/50 mb-6" />
                 <h3 class="text-xl font-bold text-on-surface mb-2">
                   当前列表为空
                 </h3>
@@ -335,21 +334,29 @@
                   <div class="flex gap-5 relative z-10 w-full h-full">
                     <div class="w-24 shrink-0 flex flex-col h-full">
                       <div class="aspect-[3/4] rounded-2xl overflow-hidden shadow-sm bg-surface-variant cover-wrapper border border-outline-variant/20">
-                        <v-img v-if="item.cover" :src="item.cover" cover class="w-full h-full" />
+                        <mat-image
+                          v-if="item.cover"
+                          :src="item.cover"
+                          alt=""
+                          fit="cover"
+                          :radius="0"
+                          :outline="false"
+                          class="w-full h-full"
+                        />
                         <div v-else class="w-full h-full flex flex-col items-center justify-center text-on-surface-variant font-bold text-3xl">
                           {{ item.title.slice(0, 1) }}
                         </div>
                       </div>
                     </div>
 
-                    <div class="flex-1 min-w-0 flex flex-col pt-1 w-full">
+                    <div class="grow min-w-0 flex flex-col pt-1 w-full">
                       <div class="flex items-start justify-between gap-2 mb-2 w-full">
-                        <h3 class="text-lg font-bold text-on-surface leading-tight line-clamp-2 group-hover:text-primary transition-colors flex-1" :title="item.title">
+                        <h3 class="text-lg font-bold text-on-surface leading-tight line-clamp-2 group-hover:text-primary transition-colors grow" :title="item.title">
                           {{ item.title }}
                         </h3>
-                        <v-chip size="x-small" :color="item.collectionTypeTone" variant="tonal" class="font-bold shrink-0">
+                        <mat-chip :color="chipTone(item.collectionTypeTone)" class="font-bold shrink-0">
                           {{ item.collectionTypeLabel }}
-                        </v-chip>
+                        </mat-chip>
                       </div>
 
                       <p class="text-xs text-on-surface-variant mb-3 truncate w-full" :title="item.originalTitle">
@@ -359,7 +366,7 @@
                       <div class="mt-auto pt-3 border-t border-outline-variant/30 w-full">
                         <div class="flex justify-between items-end">
                           <div>
-                            <span class="text-[0.65rem] font-bold text-medium-emphasis uppercase tracking-widest block mb-1 leading-none">当前进度</span>
+                            <span class="text-[0.65rem] font-bold text-on-surface-variant uppercase tracking-widest block mb-1 leading-none">当前进度</span>
                             <div class="flex flex-wrap gap-[3px] mt-1.5 max-w-[140px]">
                               <template v-for="n in (item.eps || 0)" :key="n">
                                 <span
@@ -380,7 +387,7 @@
                               <span v-if="!item.eps" class="text-xs font-black text-primary leading-none">{{ item.progressText }}</span>
                             </div>
                           </div>
-                          <v-icon icon="arrow_forward" size="small" class="text-medium-emphasis opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
+                          <mat-icon icon="arrow_forward" size="small" class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
                         </div>
                       </div>
                     </div>
@@ -394,238 +401,241 @@
     </div>
 
     <!-- Detail Dialog -->
-    <v-dialog
-      :model-value="state.detailDialogOpen"
-      max-width="960"
-      transition="dialog-bottom-transition"
+    <mat-dialog
+      v-model="state.detailDialogOpen"
+      :width="960"
+      close-on-back
       @update:model-value="handleDetailDialogChange"
     >
-      <v-card class="rounded-[2rem] overflow-hidden bg-surface shadow-2xl border border-outline-variant/30">
-        <template v-if="selectedCollection">
-          <v-btn
-            icon="close"
-            variant="tonal"
-            size="small"
-            color="on-surface"
-            class="absolute top-4 right-4 z-20 bg-surface/50 backdrop-blur"
-            @click="closeCollectionDetail"
-          />
-          <div class="overflow-y-auto max-h-[85vh] custom-scrollbar">
-            <div class="relative bg-surface-container-lowest border-b border-outline-variant/30 overflow-hidden shrink-0">
-              <div class="absolute inset-0 opacity-10 blur-3xl pointer-events-none scale-110" :style="selectedCollection.cover ? `background-image: url(${selectedCollection.cover}); background-size: cover; background-position: center;` : ''" />
+      <div
+        v-if="selectedCollection"
+        class="relative rounded-[2rem] overflow-hidden bg-surface shadow-2xl border border-outline-variant/30"
+      >
+        <mat-btn
+          icon="close"
+          label="关闭详情"
+          variant="filled-tonal"
+          color="surface-container-highest"
+          size="small"
+          class="absolute top-4 right-4 z-20"
+          @click="closeCollectionDetail"
+        />
+        <div class="overflow-y-auto max-h-[80vh] custom-scrollbar">
+          <div class="relative bg-surface-container-lowest border-b border-outline-variant/30 overflow-hidden shrink-0">
+            <div class="absolute inset-0 opacity-10 blur-3xl pointer-events-none scale-110" :style="selectedCollection.cover ? `background-image: url(${selectedCollection.cover}); background-size: cover; background-position: center;` : ''" />
 
-              <div class="relative z-10 p-6 sm:p-10 flex flex-col sm:flex-row gap-8">
-                <div class="w-32 sm:w-48 shrink-0 mx-auto sm:mx-0">
-                  <div class="aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-outline-variant/20 bg-surface-variant">
-                    <v-img v-if="selectedCollection.cover" :src="selectedCollection.cover" cover class="w-full h-full" />
-                    <div v-else class="w-full h-full flex items-center justify-center font-bold text-5xl text-on-surface-variant">
-                      {{ selectedCollection.title.slice(0, 1) }}
-                    </div>
+            <div class="relative z-10 p-6 sm:p-10 flex flex-col sm:flex-row gap-8">
+              <div class="w-32 sm:w-48 shrink-0 mx-auto sm:mx-0">
+                <div class="aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-outline-variant/20 bg-surface-variant">
+                  <mat-image
+                    v-if="selectedCollection.cover"
+                    :src="selectedCollection.cover"
+                    alt=""
+                    fit="cover"
+                    :radius="0"
+                    :outline="false"
+                    class="w-full h-full"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center font-bold text-5xl text-on-surface-variant">
+                    {{ selectedCollection.title.slice(0, 1) }}
                   </div>
                 </div>
+              </div>
 
-                <div class="flex-1 flex flex-col min-w-0">
-                  <div class="mb-4">
-                    <v-chip size="small" :color="selectedCollection.collectionTypeTone" variant="tonal" class="mb-3 font-bold px-3">
-                      {{ selectedCollection.collectionTypeLabel }}
-                    </v-chip>
-                    <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-on-surface leading-tight mb-2">
-                      {{ selectedCollection.title }}
-                    </h2>
-                    <p class="text-sm text-on-surface-variant">
-                      {{ selectedCollection.originalTitle || '未知原始标题' }}
-                    </p>
-                  </div>
-
-                  <p class="text-sm text-on-surface-variant leading-relaxed line-clamp-3 sm:line-clamp-4 mb-6 custom-scrollbar pr-2" style="overflow-y: auto;">
-                    {{ selectedCollection.summary || '暂无简介' }}
+              <div class="grow flex flex-col min-w-0">
+                <div class="mb-4">
+                  <mat-chip :color="chipTone(selectedCollection.collectionTypeTone)" class="mb-3 font-bold px-3">
+                    {{ selectedCollection.collectionTypeLabel }}
+                  </mat-chip>
+                  <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-on-surface leading-tight mb-2">
+                    {{ selectedCollection.title }}
+                  </h2>
+                  <p class="text-sm text-on-surface-variant">
+                    {{ selectedCollection.originalTitle || '未知原始标题' }}
                   </p>
-
-                  <div class="mt-auto flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                    <div class="flex gap-4 p-3 bg-surface rounded-xl border border-outline-variant/30">
-                      <div class="flex flex-col px-3 border-r border-outline-variant/30">
-                        <span class="text-[0.65rem] font-bold text-medium-emphasis uppercase tracking-widest mb-1 leading-none">评分</span>
-                        <span class="text-lg font-black text-on-surface leading-none">{{ selectedCollection.score || '-' }}</span>
-                      </div>
-                      <div class="flex flex-col px-3 border-r border-outline-variant/30">
-                        <span class="text-[0.65rem] font-bold text-medium-emphasis uppercase tracking-widest mb-1 leading-none">排名</span>
-                        <span class="text-lg font-black text-on-surface leading-none">{{ selectedCollection.rank ? `#${selectedCollection.rank}` : '-' }}</span>
-                      </div>
-                      <div class="flex flex-col px-3">
-                        <span class="text-[0.65rem] font-bold text-medium-emphasis uppercase tracking-widest mb-1 leading-none">总进度</span>
-                        <span class="text-lg font-black text-primary leading-none">{{ selectedCollection.progressText }}</span>
-                      </div>
-                    </div>
-
-                    <div class="w-full sm:w-auto min-w-[200px]">
-                      <v-select
-                        :model-value="selectedCollection.collectionType"
-                        :items="filterOptions"
-                        variant="outlined"
-                        density="comfortable"
-                        hide-details
-                        bg-color="surface"
-                        class="custom-textfield font-bold"
-                        @update:model-value="updateCollectionType(selectedCollection.subjectId, $event)"
-                      >
-                        <template #selection="{ item }">
-                          <span class="font-bold px-1">{{ item.title }}</span>
-                        </template>
-                      </v-select>
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div class="p-6 sm:p-10 bg-surface min-h-[400px]">
-              <div class="flex items-center gap-4 mb-8">
-                <h3 class="text-xl font-extrabold text-on-surface">
-                  分集进度
-                </h3>
-                <v-progress-circular v-if="detailLoading" indeterminate size="24" width="3" color="primary" />
-              </div>
-
-              <div v-if="!selectedEpisodes.length && !detailLoading" class="flex flex-col items-center justify-center py-20 bg-surface-container-lowest rounded-3xl border border-outline-variant/30">
-                <v-icon icon="history" size="48" class="text-outline-variant/50 mb-4" />
-                <p class="text-on-surface-variant font-medium">
-                  无分集数据，请确认条目已加入收藏
+                <p class="text-sm text-on-surface-variant leading-relaxed line-clamp-3 sm:line-clamp-4 mb-6 custom-scrollbar pr-2" style="overflow-y: auto;">
+                  {{ selectedCollection.summary || '暂无简介' }}
                 </p>
-              </div>
 
-              <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div
-                  v-for="episode in selectedEpisodes"
-                  :key="episode.id"
-                  class="flex flex-col p-4 rounded-2xl border transition-all duration-300 group"
-                  :class="[
-                    episode.watched ? 'bg-primary/5 border-primary/30' : 'bg-surface border-outline-variant/40 hover:border-outline-variant',
-                    episode.isAired === false ? 'opacity-70 bg-surface-container-low/50' : ''
-                  ]"
-                >
-                  <div class="flex justify-between items-start mb-2 gap-2">
-                    <div class="flex gap-2 items-center">
-                      <span class="bg-surface-container-high border border-outline-variant/20 text-on-surface font-black text-xs px-2.5 py-1 rounded-lg shrink-0">
-                        {{ episode.sort || '?' }} 话<template v-if="episode.ep != null"> ({{ episode.ep }})</template>
-                      </span>
-                      <v-chip
-                        v-if="episode.isAired === false"
-                        size="x-small"
-                        color="outline"
-                        variant="tonal"
-                        class="font-black px-2 py-0 h-5"
-                      >
-                        未开播
-                      </v-chip>
+                <div class="mt-auto flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                  <div class="flex gap-4 p-3 bg-surface rounded-xl border border-outline-variant/30">
+                    <div class="flex flex-col px-3 border-r border-outline-variant/30">
+                      <span class="text-[0.65rem] font-bold text-on-surface-variant uppercase tracking-widest mb-1 leading-none">评分</span>
+                      <span class="text-lg font-black text-on-surface leading-none">{{ selectedCollection.score || '-' }}</span>
                     </div>
-                    <v-chip
-                      size="small"
-                      :color="episodeCollectionTone(episode.collectionType)"
-                      :variant="episode.watched ? 'flat' : 'tonal'"
-                      class="font-bold shrink-0"
-                    >
-                      {{ episodeCollectionLabel(episode.collectionType) }}
-                    </v-chip>
+                    <div class="flex flex-col px-3 border-r border-outline-variant/30">
+                      <span class="text-[0.65rem] font-bold text-on-surface-variant uppercase tracking-widest mb-1 leading-none">排名</span>
+                      <span class="text-lg font-black text-on-surface leading-none">{{ selectedCollection.rank ? `#${selectedCollection.rank}` : '-' }}</span>
+                    </div>
+                    <div class="flex flex-col px-3">
+                      <span class="text-[0.65rem] font-bold text-on-surface-variant uppercase tracking-widest mb-1 leading-none">总进度</span>
+                      <span class="text-lg font-black text-primary leading-none">{{ selectedCollection.progressText }}</span>
+                    </div>
                   </div>
 
-                  <div class="mb-3 flex-1">
-                    <h4 class="font-bold text-on-surface text-sm leading-snug line-clamp-1" :title="episode.nameCn || episode.name">
-                      {{ episode.nameCn || episode.name || `第 ${episode.sort || '?'} 话` }}
-                    </h4>
-                    <p
-                      v-if="episode.nameCn && episode.name && episode.nameCn !== episode.name"
-                      class="text-xs text-on-surface-variant mt-0.5 truncate"
-                      :title="episode.name"
-                    >
-                      {{ episode.name }}
-                    </p>
-                  </div>
-
-                  <div v-if="episode.airdate || episode.duration" class="flex flex-wrap gap-x-3 gap-y-1 text-[0.65rem] text-on-surface-variant mb-3">
-                    <span v-if="episode.airdate" class="flex items-center gap-1">
-                      <v-icon icon="calendar_today" size="12" />
-                      {{ episode.airdate }}
-                    </span>
-                    <span v-if="episode.duration" class="flex items-center gap-1">
-                      <v-icon icon="schedule" size="12" />
-                      {{ episode.duration }}
-                    </span>
-                  </div>
-
-                  <div class="flex gap-2 mt-auto w-full">
-                    <v-btn
-                      size="small"
-                      rounded="lg"
-                      color="primary"
-                      variant="flat"
-                      class="flex-1 font-bold tracking-wide shadow-none"
-                      :disabled="episode.watched || actionLoading"
-                      @click="markEpisodeWatched(episode.id)"
-                    >
-                      看过
-                    </v-btn>
-                    <v-btn
-                      size="small"
-                      rounded="lg"
-                      variant="tonal"
-                      color="secondary"
-                      class="flex-1 font-bold tracking-wide"
-                      :disabled="episode.watched || actionLoading"
-                      @click="markProgressToEpisode(selectedCollection.subjectId, episode.id)"
-                    >
-                      看到这
-                    </v-btn>
-                    <v-menu>
-                      <template #activator="{ props: menuProps }">
-                        <v-btn
-                          size="small"
-                          rounded="lg"
-                          variant="tonal"
-                          color="on-surface-variant"
-                          icon="more_horiz"
-                          class="h-[28px]"
-                          :disabled="actionLoading"
-                          v-bind="menuProps"
-                        />
-                      </template>
-                      <v-list density="compact" class="rounded-xl" bg-color="surface-container">
-                        <v-list-item
-                          :disabled="episode.collectionType === episodeCollectionTypes.WISH || actionLoading"
-                          @click="markEpisodeState(episode.id, episodeCollectionTypes.WISH)"
-                        >
-                          <template #prepend>
-                            <v-icon icon="bookmark_border" size="small" />
-                          </template>
-                          <v-list-item-title class="text-sm font-medium">
-                            想看
-                          </v-list-item-title>
-                        </v-list-item>
-                        <v-list-item
-                          :disabled="episode.collectionType === episodeCollectionTypes.DROPPED || actionLoading"
-                          @click="markEpisodeState(episode.id, episodeCollectionTypes.DROPPED)"
-                        >
-                          <template #prepend>
-                            <v-icon icon="block" size="small" />
-                          </template>
-                          <v-list-item-title class="text-sm font-medium">
-                            抛弃
-                          </v-list-item-title>
-                        </v-list-item>
-                      </v-list>
-                    </v-menu>
+                  <div class="w-full sm:w-auto min-w-[200px]">
+                    <mat-select
+                      block
+                      variant="outlined"
+                      class="font-bold"
+                      :model-value="selectedCollection.collectionType"
+                      :items="filterOptions"
+                      @update:model-value="updateCollectionType(selectedCollection.subjectId, $event)"
+                    />
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          <div class="p-6 sm:p-10 bg-surface min-h-[400px]">
+            <div class="flex items-center gap-4 mb-8">
+              <h3 class="text-xl font-extrabold text-on-surface">
+                分集进度
+              </h3>
+              <mat-progress v-if="detailLoading" variant="circular" indeterminate color="primary" :size="24" />
+            </div>
+
+            <div v-if="!selectedEpisodes.length && !detailLoading" class="flex flex-col items-center justify-center py-20 bg-surface-container-lowest rounded-3xl border border-outline-variant/30">
+              <mat-icon icon="history" size="48px" class="text-outline-variant/50 mb-4" />
+              <p class="text-on-surface-variant font-medium">
+                无分集数据，请确认条目已加入收藏
+              </p>
+            </div>
+
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div
+                v-for="episode in selectedEpisodes"
+                :key="episode.id"
+                class="flex flex-col p-4 rounded-2xl border transition-all duration-300 group"
+                :class="[
+                  episode.watched ? 'bg-primary/5 border-primary/30' : 'bg-surface border-outline-variant/40 hover:border-outline-variant',
+                  episode.isAired === false ? 'opacity-70 bg-surface-container-low/50' : ''
+                ]"
+              >
+                <div class="flex justify-between items-start mb-2 gap-2">
+                  <div class="flex gap-2 items-center">
+                    <span class="bg-surface-container-high border border-outline-variant/20 text-on-surface font-black text-xs px-2.5 py-1 rounded-lg shrink-0">
+                      {{ episode.sort || '?' }} 话<template v-if="episode.ep != null"> ({{ episode.ep }})</template>
+                    </span>
+                    <mat-chip
+                      v-if="episode.isAired === false"
+                      color="surface-container-highest"
+                      class="font-black shrink-0"
+                    >
+                      未开播
+                    </mat-chip>
+                  </div>
+                  <mat-chip
+                    :color="chipTone(episodeCollectionTone(episode.collectionType))"
+                    class="font-bold shrink-0"
+                  >
+                    {{ episodeCollectionLabel(episode.collectionType) }}
+                  </mat-chip>
+                </div>
+
+                <div class="mb-3 grow">
+                  <h4 class="font-bold text-on-surface text-sm leading-snug line-clamp-1" :title="episode.nameCn || episode.name">
+                    {{ episode.nameCn || episode.name || `第 ${episode.sort || '?'} 话` }}
+                  </h4>
+                  <p
+                    v-if="episode.nameCn && episode.name && episode.nameCn !== episode.name"
+                    class="text-xs text-on-surface-variant mt-0.5 truncate"
+                    :title="episode.name"
+                  >
+                    {{ episode.name }}
+                  </p>
+                </div>
+
+                <div v-if="episode.airdate || episode.duration" class="flex flex-wrap gap-x-3 gap-y-1 text-[0.65rem] text-on-surface-variant mb-3">
+                  <span v-if="episode.airdate" class="flex items-center gap-1">
+                    <mat-icon icon="calendar_today" size="14px" />
+                    {{ episode.airdate }}
+                  </span>
+                  <span v-if="episode.duration" class="flex items-center gap-1">
+                    <mat-icon icon="schedule" size="14px" />
+                    {{ episode.duration }}
+                  </span>
+                </div>
+
+                <div class="flex gap-2 mt-auto w-full">
+                  <mat-btn
+                    size="small"
+                    shape="square"
+                    color="primary"
+                    variant="filled"
+                    class="grow font-bold tracking-wide"
+                    :disabled="episode.watched || actionLoading"
+                    @click="markEpisodeWatched(episode.id)"
+                  >
+                    看过
+                  </mat-btn>
+                  <mat-btn
+                    size="small"
+                    shape="square"
+                    variant="filled-tonal"
+                    color="secondary"
+                    class="grow font-bold tracking-wide"
+                    :disabled="episode.watched || actionLoading"
+                    @click="markProgressToEpisode(selectedCollection.subjectId, episode.id)"
+                  >
+                    看到这
+                  </mat-btn>
+                  <mat-btn
+                    :id="`episode-menu-${episode.id}`"
+                    size="small"
+                    shape="square"
+                    variant="filled-tonal"
+                    color="surface-container-highest"
+                    icon="more_horiz"
+                    label="更多分集操作"
+                    aria-haspopup="menu"
+                    :aria-expanded="isEpisodeMenuOpen(episode.id)"
+                    aria-controls="episode-actions-menu"
+                    :disabled="actionLoading"
+                    @click="openEpisodeMenu(episode.id)"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </mat-dialog>
+
+    <!-- 分集操作菜单：所有分集共用一个实例，锚点为触发的更多按钮 -->
+    <mat-menu
+      id="episode-actions-menu"
+      v-model="episodeMenu.open"
+      :anchor="episodeMenuAnchor"
+      variant="standard"
+    >
+      <mat-menu-item
+        :disabled="menuTargetEpisode?.collectionType === episodeCollectionTypes.WISH || actionLoading"
+        @click="markEpisodeState(episodeMenu.episodeId, episodeCollectionTypes.WISH)"
+      >
+        <template #leading>
+          <mat-icon icon="bookmark_border" aria-hidden="true" />
         </template>
-      </v-card>
-    </v-dialog>
-  </v-container>
+        想看
+      </mat-menu-item>
+      <mat-menu-item
+        :disabled="menuTargetEpisode?.collectionType === episodeCollectionTypes.DROPPED || actionLoading"
+        @click="markEpisodeState(episodeMenu.episodeId, episodeCollectionTypes.DROPPED)"
+      >
+        <template #leading>
+          <mat-icon icon="block" aria-hidden="true" />
+        </template>
+        抛弃
+      </mat-menu-item>
+    </mat-menu>
+  </mat-container>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   EPISODE_COLLECTION_LABELS,
   EPISODE_COLLECTION_TONES,
@@ -666,9 +676,30 @@ const activeFilterLabel = computed(() => SUBJECT_FILTER_OPTIONS.find(
 
 const episodeCollectionLabel = (type) => EPISODE_COLLECTION_LABELS[type] || '未看';
 const episodeCollectionTone = (type) => EPISODE_COLLECTION_TONES[type] || 'surface-variant';
+// mde-vue 只有四个语义色，搁置态沿用 tertiary
+const chipTone = (tone) => (tone === 'warning' ? 'tertiary' : tone);
+
+// 分集操作菜单：单个实例按需切换锚点，避免每个分集各挂一个菜单。
+// anchor 需要触发元素的 id（不是选择器），所以这里不带 '#' 前缀
+const episodeMenu = ref({ open: false, episodeId: null });
+const episodeMenuAnchor = computed(() => (
+  episodeMenu.value.episodeId ? `episode-menu-${episodeMenu.value.episodeId}` : undefined
+));
+const isEpisodeMenuOpen = (episodeId) => (
+  episodeMenu.value.open && episodeMenu.value.episodeId === episodeId
+);
+const menuTargetEpisode = computed(() => selectedEpisodes.value.find(
+  (episode) => episode.id === episodeMenu.value.episodeId,
+) || null);
+const openEpisodeMenu = (episodeId) => {
+  const isSameTarget = episodeMenu.value.episodeId === episodeId;
+  episodeMenu.value = { open: !(isSameTarget && episodeMenu.value.open), episodeId };
+};
 
 const handleDetailDialogChange = (value) => {
   if (!value) {
+    // 详情关闭时一并收起分集操作菜单，避免菜单残留在已离场的锚点上
+    episodeMenu.value = { open: false, episodeId: null };
     closeCollectionDetail();
   }
 };
@@ -692,17 +723,17 @@ onMounted(async () => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgb(var(--v-theme-outline-variant), .5);
+  background: color-mix(in srgb, var(--mat-sys-color-outline-variant) 50%, transparent);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--v-theme-outline-variant));
+  background: var(--mat-sys-color-outline-variant);
 }
 
 .search-item-card:hover {
-  background: rgb(var(--v-theme-surface-container-low));
-  border-color: rgb(var(--v-theme-outline-variant));
+  background: var(--mat-sys-color-surface-container-low);
+  border-color: var(--mat-sys-color-outline-variant);
 }
 
 .collection-card {
@@ -713,20 +744,16 @@ onMounted(async () => {
 
 .collection-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px -8px rgb(var(--v-shadow-color), .15) !important;
-  border-color: rgb(var(--v-theme-primary), .4);
+  box-shadow: 0 12px 24px -8px color-mix(in srgb, var(--mat-sys-color-scrim) 15%, transparent);
+  border-color: color-mix(in srgb, var(--mat-sys-color-primary) 40%, transparent);
 }
 
-.cover-wrapper .v-img {
+.cover-wrapper :deep(img) {
   transition: transform .3s ease;
 }
 
-.collection-card:hover .cover-wrapper .v-img {
+.collection-card:hover .cover-wrapper :deep(img) {
   transform: scale(1.05);
-}
-
-.custom-textfield :deep(.v-field) {
-  border-radius: 1rem;
 }
 
 .progress-dot {
@@ -737,15 +764,15 @@ onMounted(async () => {
 }
 
 .progress-dot--filled {
-  background: rgb(var(--v-theme-primary));
+  background: var(--mat-sys-color-primary);
 }
 
 .progress-dot--available {
-  background: rgb(var(--v-theme-tertiary));
+  background: var(--mat-sys-color-tertiary);
 }
 
 .progress-dot--unaired {
-  background: rgb(var(--v-theme-surface-variant), .2);
-  box-shadow: inset 0 0 0 1px rgb(var(--v-theme-outline-variant), .4);
+  background: color-mix(in srgb, var(--mat-sys-color-surface-variant) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mat-sys-color-outline-variant) 40%, transparent);
 }
 </style>

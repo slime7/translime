@@ -34,8 +34,8 @@ translime 是一个基于 Electron 的小功能加载器，用于快速加载以
 
 - 环境隔离：插件主进程代码使用 `getMainStore()`、`usePluginConfig()`、`usePluginInterop()`；插件渲染进程代码使用 `useIpc()`、`getPluginSetting()`、`setPluginSetting()`、`useWindowControl()` 等 UI API，禁止跨环境调用。
 - IPC 命名：所有 `ipc.invoke` 事件必须遵循 `事件名@插件ID` 格式。
-- 图标：使用 Material Design Icons（md）风格，禁止 `mdi-` 前缀，例如 `<v-icon icon="home" />`。
-- 样式隔离：插件样式不得污染宿主。宿主启用了 Vuetify 与 Tailwind，插件使用 Tailwind 时必须采用 `@layer` 降权、prefix 或禁用 preflight 等方式隔离。
+- 图标：使用 Material Symbols 图标名，禁止 `mdi-` 前缀，例如 `<mat-icon icon="home" />`。
+- 样式隔离：插件样式不得污染宿主。宿主启用 mde-vue 与 Tailwind，插件使用 Tailwind 时必须采用 `@layer` 降权、prefix 或禁用 preflight 等方式隔离。
 - 插件 UI 渲染在隔离的 `<webview>` 或独立 BrowserWindow 中运行，宿主会缓存 webview 实例，路由切换时只切换显示状态。
 - `main-renderer-ready` 只允许主窗口首屏渲染完成后触发，插件渲染页不得重复触发宿主启动初始化逻辑。
 - 修改宿主主进程逻辑时，同步更新 `src/main/core/ipcHandler.js` 与 `src/share/utils/ipcConstant.js` 中的对应事件。

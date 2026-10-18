@@ -6,7 +6,6 @@ import { builtinModules } from 'node:module';
 import { defineConfig, normalizePath } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
-import vuetify from 'vite-plugin-vuetify';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 // eslint-disable-next-line import-x/extensions
 import { buildStandaloneMdeBundle } from './main/utils/mdeBundleHelper.js';
@@ -169,12 +168,10 @@ export default defineConfig(async ({ mode }) => {
         },
       }),
       tailwindcss(),
-      vuetify(),
     ],
     optimizeDeps: {
       exclude: [
         'vue',
-        'vuetify',
         'mde-vue',
         'vue-router',
       ],

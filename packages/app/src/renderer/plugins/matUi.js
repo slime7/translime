@@ -8,7 +8,7 @@ import {
 
 /**
  * 宿主 UI 框架（Material 3 Expressive）。
- * 插件 UI 仍基于 Vuetify（见 plugins/vuetify.js），本插件只服务宿主自身组件。
+ * 同时向插件 UI 暴露 window.mde$ 运行时（见文件末尾），宿主与插件共用同一份 mde-vue。
  */
 const matUi = createMatUi({
   iconClass: 'material-icons',
@@ -44,9 +44,11 @@ const components = {};
 const directives = {};
 // mde-vue 根入口的命令式函数（snackbar/toast/dialog/alert/confirm/prompt）
 const MAT_FUNCTION_NAMES = new Set(['snackbar', 'toast', 'dialog', 'alert', 'confirm', 'prompt']);
+// 根入口导出的指令（模板中对应 v-intersection / v-state-layer / v-ripple）
+const MAT_DIRECTIVE_NAMES = new Set(['Intersection', 'StateLayer', 'Ripple']);
 const functions = {};
 Object.entries(mdeVue).forEach(([name, exported]) => {
-  if (name === 'Intersection' || name === 'StateLayer') {
+  if (MAT_DIRECTIVE_NAMES.has(name)) {
     directives[name] = exported;
     return;
   }
@@ -60,7 +62,7 @@ Object.entries(mdeVue).forEach(([name, exported]) => {
 });
 
 /**
- * 插件 UI 的 mde-vue 运行时（与 window.vuetify$ 对称）。
+ * 插件 UI 的 mde-vue 运行时。
  * 插件构建时由 SDK 注入 window.mde$ 的解构（不打包 mde-vue），
  * 同时暴露命令式函数与主题控制器供插件使用或跟随宿主主题。
  */

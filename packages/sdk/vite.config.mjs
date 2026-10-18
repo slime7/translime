@@ -3,7 +3,6 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import vue from '@vitejs/plugin-vue';
-import vuetify from 'vite-plugin-vuetify';
 
 const dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -16,7 +15,6 @@ const libEntry = {
 
 const plugins = [
   vue(),
-  vuetify({ autoImport: true }),
 ];
 
 const fileName = (format, entryName) => {
@@ -30,13 +28,6 @@ const baseBuild = {
     external: [
       'electron',
       'vue',
-      'vuetify',
-      'vuetify/components',
-      'vuetify/directives',
-      'vuetify/iconsets/md',
-      'vuetify/blueprints',
-      'vuetify/styles',
-      'vuetify/locale',
       'mde-vue',
       'mde-vue/styles.css',
       'fs',

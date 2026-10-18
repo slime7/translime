@@ -9,7 +9,6 @@ import { onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import useTheme from '@/hooks/useTheme';
-import useMdColor from '@/hooks/useMdColor';
 import { useIpc } from '@/hooks/electron';
 import useAlert from '@/hooks/useAlert';
 import useToast from '@/hooks/useToast';
@@ -29,7 +28,6 @@ const ipcRaw = useIpc(false);
 const store = globalStore();
 const updateStore = useUpdateStore();
 const theme = useTheme();
-const mdColor = useMdColor();
 const alert = useAlert();
 const toast = useToast();
 const router = useRouter();
@@ -69,25 +67,19 @@ const getTheme = async () => {
 };
 /**
  * 读取设置中的主题配色并应用
- * 如果配色名不是 'translime' (默认值)，则从 source 和 variant 生成 M3 配色并应用
+ * 如果配色名是 'system'，则先用系统取色替换源色再交给 mde-vue 主题控制器生成令牌
  */
 const getThemeColors = async () => {
   const storedThemeColor = await appConfigStore.get('setting.themeColor', getDefaultThemeColor());
   const themeColor = normalizeThemeColor(storedThemeColor);
-  // 如果不是默认配色，则应用自定义配色
-  if (themeColor.name !== 'translime') {
-    let { source } = themeColor;
-    if (themeColor.name === 'system') {
-      const systemColor = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
-      if (systemColor) {
-        source = systemColor;
-      }
+  let appliedThemeColor = themeColor;
+  if (themeColor.name === 'system') {
+    const systemColor = await ipc.invoke(ipcType.GET_SYSTEM_COLOR);
+    if (systemColor) {
+      appliedThemeColor = { ...themeColor, source: systemColor };
     }
-    const themeResult = mdColor.getThemeColorFromColor(source, themeColor.variant);
-    const vuetifyColors = mdColor.getVuetifyColors(themeResult);
-    theme.setCustomTheme(vuetifyColors);
   }
-  theme.syncMatTheme(themeColor);
+  theme.syncMatTheme(appliedThemeColor);
   syncOverlayColor();
 };
 const themeUpdated = () => {

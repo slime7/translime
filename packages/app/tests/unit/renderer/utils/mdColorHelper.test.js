@@ -6,7 +6,6 @@ import {
   customColor,
   getReadableColors,
   getThemeStyles,
-  getVuetifyColors,
   themeFromSourceColor,
 } from '@/utils/mdColorHelper';
 import {
@@ -204,41 +203,5 @@ describe('getThemeStyles', () => {
     values.forEach((value) => {
       expect(value).toMatch(/^#[0-9a-fA-F]{6}$/);
     });
-  });
-});
-
-describe('getVuetifyColors', () => {
-  it('应该将 camelCase 键名转换为 kebab-case', () => {
-    const theme = themeFromSourceColor(TEST_SOURCE_COLOR);
-    const readable = getReadableColors(theme);
-    const vuetifyColors = getVuetifyColors(readable);
-
-    // 检查 kebab-case 格式
-    expect(vuetifyColors.light).toHaveProperty('primary');
-    expect(vuetifyColors.light).toHaveProperty('on-primary');
-    expect(vuetifyColors.light).toHaveProperty('primary-container');
-    expect(vuetifyColors.light).toHaveProperty('on-primary-container');
-    expect(vuetifyColors.light).toHaveProperty('primary-dim');
-    expect(vuetifyColors.light).toHaveProperty('secondary-dim');
-    expect(vuetifyColors.light).toHaveProperty('tertiary-dim');
-    expect(vuetifyColors.light).toHaveProperty('error-dim');
-  });
-
-  it('应该同时包含 light 和 dark 配色方案', () => {
-    const theme = themeFromSourceColor(TEST_SOURCE_COLOR);
-    const readable = getReadableColors(theme);
-    const vuetifyColors = getVuetifyColors(readable);
-
-    expect(vuetifyColors).toHaveProperty('light');
-    expect(vuetifyColors).toHaveProperty('dark');
-  });
-
-  it('颜色值应该保持为十六进制字符串', () => {
-    const theme = themeFromSourceColor(TEST_SOURCE_COLOR);
-    const readable = getReadableColors(theme);
-    const vuetifyColors = getVuetifyColors(readable);
-
-    expect(vuetifyColors.light.primary).toMatch(/^#[0-9a-fA-F]{6}$/);
-    expect(vuetifyColors.dark.primary).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 });

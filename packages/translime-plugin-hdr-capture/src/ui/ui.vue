@@ -170,11 +170,8 @@
           </div>
 
           <!-- HDR 映射子设置，仅在启用时显示 -->
-          <mat-expand-transition>
-            <div
-              v-show="settings.enableHdrMapping"
-              class="hdr-mapping-options ml-4"
-            >
+          <mat-simple-expansion :model-value="settings.enableHdrMapping">
+            <div class="hdr-mapping-options ml-4">
               <!-- SDR 输出最大值 -->
               <div class="slider-setting mb-4">
                 <div class="slider-header">
@@ -260,7 +257,7 @@
                 保存 HDR 原始文件
               </mat-switch>
             </div>
-          </mat-expand-transition>
+          </mat-simple-expansion>
         </div>
 
         <mat-divider class="my-4" />

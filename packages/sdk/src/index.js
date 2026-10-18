@@ -290,34 +290,6 @@ export function defineIpcHandlers(handlers) {
 }
 
 /**
- * 获取 Vuetify 实例
- * @description 仅在 **渲染进程** 环境可用，用于访问 Vuetify 的全局配置
- * @returns {Object} Vuetify 实例对象
- */
-export function useVuetify() {
-  if (typeof window !== 'undefined' && window.vuetify$) {
-    return window.vuetify$;
-  }
-  return {};
-}
-
-/**
- * 获取全局注册的 Vuetify 组件
- * @returns {Record<string, any>}
- */
-export function useVuetifyComponents() {
-  return useVuetify().components || {};
-}
-
-/**
- * 获取全局注册的 Vuetify 指令
- * @returns {Record<string, any>}
- */
-export function useVuetifyDirectives() {
-  return useVuetify().directives || {};
-}
-
-/**
  * 获取宿主提供的 mde-vue 运行时
  * @description 仅在渲染进程环境可用，返回 { components, directives, functions, theme }；
  * 组件/指令也可直接使用全局注册的 mat-* 标签与 v-intersection / v-state-layer 指令

@@ -177,7 +177,6 @@
 import { onMounted, ref, version as vueVersion } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
-import { version as vuetifyVersion } from 'vuetify';
 import * as ipcType from '@pkg/share/utils/ipcConstant';
 import { useIpc } from '@/hooks/electron';
 import globalStore from '@/store/globalStore';
@@ -204,7 +203,6 @@ export default {
       const result = await ipc.invoke(ipcType.APP_VERSIONS);
       versions.value = result;
       versions.value.vue = vueVersion;
-      versions.value.vuetify = vuetifyVersion;
     };
 
     // 测试方法

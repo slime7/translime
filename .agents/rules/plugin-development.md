@@ -20,7 +20,7 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
     *   可用：`getMainStore()`, `usePluginConfig(pluginId)`。
     *   禁用：`useIpc()`, `useWindowControl()`, `useDialog()` 等 UI 相关 Hook。
 *   **渲染进程 (Renderer Process)**: 源码通常为 `src/ui.vue`。
-    *   可用：`useIpc()`, `useVuetifyComponents()`, `getPluginSetting()`, `setPluginSetting()`, `useWindowControl()`, `openLink()` 等。
+    *   可用：`useIpc()`, `useMatComponents()`, `getPluginSetting()`, `setPluginSetting()`, `useWindowControl()`, `openLink()` 等。
     *   禁用：`getMainStore()` 等直接访问 Node.js 主进程 Store 的函数。
 
 ## 3. 编译与模块规范
@@ -36,9 +36,9 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 
 ## 4. UI 组件与图标规范
 
-*   **组件库**: 核心 UI 必须基于 `Vuetify 4`。
+*   **组件库**: 核心 UI 必须基于 `mde-vue`（Material 3 Expressive）。宿主通过 `window.mde$` 提供运行时，插件不打包组件库；模板中直接使用 `mat-*` 标签（如 `<mat-btn>`、`<mat-select>`），SDK 编译期自动注入组件。
 *   **图标规范**: 
-    *   组件库默认选用 **Material Design Icons (md)** 风格，建议写法为 `<v-icon icon="home" />` 或 `<v-icon>home</v-icon>`。
+    *   使用 `mat-icon` 并传入 Material Symbols 图标名，建议写法为 `<mat-icon icon="home" />` 或 `<mat-icon>home</mat-icon>`。
     *   **严禁使用 `mdi-` 前缀的图标名**（例如 `mdi-home` 是无效的）。
 *   **图标文件**: 插件图标（`plugin.icon`）是**可选**项。若提供，可存放在项目内**任何位置**，只需在 `package.json` 中准确指定路径。
 
@@ -67,7 +67,7 @@ SDK 提供的函数具有严格的运行环境限制，开发时必须区分：
 
 ## 7. 样式隔离与 Tailwind CSS 规范
 
-**严禁全局样式污染**：主程序按 Vuetify 官方文档采用 Tailwind 主导的样式体系（CSS layer 顺序为 `tailwind-theme → tailwind-reset → vuetify-* → tailwind-utilities → vuetify-final`，`tailwind-utilities` 位于 `vuetify-utilities` 之上；与 Tailwind 冲突的 Vuetify 工具类按需禁用，Vuetify 运行时主题工具类与调色板保留，`dark:`/`light:` 变体跟随 `.v-theme--*`，断点与 Vuetify 阈值对齐）。内嵌插件样式由宿主 app 运行时放入 `translime-plugin` layer，并通过 `@scope (.plugin-ui-loader[data-plugin-id="插件ID"])` 限制选择器匹配范围。
+**严禁全局样式污染**：宿主与插件共用 `mde-vue` + Tailwind 的样式体系（CSS layer 顺序为 `tailwind-theme → tailwind-reset → mde.tokens → mde.components → mde.utilities → tailwind-utilities → mde-final → translime-plugin`；`dark:`/`light:` 变体跟随根元素上的 `[data-mat-theme]`，断点由宿主统一定义）。内嵌插件样式由宿主 app 运行时放入 `translime-plugin` layer，并通过 `@scope (.plugin-ui-loader[data-plugin-id="插件ID"])` 限制选择器匹配范围。主题颜色统一使用 `--mat-sys-color-*` 令牌，不要使用其他组件库的 `--v-theme-*` 变量。
 
 如果你在插件开发中使用了 Tailwind CSS，必须同时遵守以下规则：
 

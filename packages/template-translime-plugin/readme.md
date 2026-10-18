@@ -65,7 +65,7 @@
   "type": "module", // 主进程入口为 ESM 产物
   "main": "./dist/index.esm.js", // 插件后端逻辑入口（保持单文件 bundle）
   "engines": {
-    "translime": ">=0.7.0" // 要求的宿主版本（semver 范围）；未声明时默认兼容任意版本。UI 使用 mde-vue 时需 >=0.7.0
+    "translime": ">=0.9.0" // 要求的宿主版本（semver 范围）；未声明时默认兼容任意版本。UI 使用 mde-vue 运行时（window.mde$）需 >=0.9.0
   },
   "plugin": {
     "title": "插件标题",
@@ -114,7 +114,7 @@
 
 ### 宿主版本兼容（engines.translime）
 
-- 在 `package.json` 的 `engines` 中声明 `translime` 字段（semver 范围），例如 `">=0.7.0"`。
+- 在 `package.json` 的 `engines` 中声明 `translime` 字段（semver 范围），例如 `">=0.9.0"`（UI 依赖宿主提供的 mde-vue 运行时）。
 - 宿主加载插件时会校验该范围；不满足时插件标记为 `incompatible` 并保持停用，不会执行入口代码。
 - 未声明（或声明为 `*`）视为兼容任意宿主版本，旧插件无需改动即可继续运行。
 
