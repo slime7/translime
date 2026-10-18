@@ -149,8 +149,8 @@ const buildPluginMenu = async (loader, packageName) => {
     {
       id: 'copy-plugin-link',
       label: '复制分享链接',
-      click() {
-        clipboard.writeText(
+      async click() {
+        await clipboard.writeText(
           `https://slime7.github.io/translime/open/?install=${packageName}`,
         );
         ipcEv.sendToMain(ipcType.IPC_TOAST, ['链接已复制']);

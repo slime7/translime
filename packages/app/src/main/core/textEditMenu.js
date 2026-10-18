@@ -21,9 +21,10 @@ const invokeWhenAlive = (sender, method) => () => {
  *
  * @param {import('electron').WebContents} sender - 发起菜单请求的 webContents。
  * @param {{selectedText?: string}} [options] - 渲染端传入的当前选中文本。
- * @returns {{menuId: string, items: Array<object>}} 渲染端菜单描述。
+ * @returns {Promise<{menuId: string, items: Array<object>}>} 渲染端菜单描述。
  */
-const buildTextEditMenu = (sender, { selectedText = '' } = {}) => {
+const buildTextEditMenu = async (sender, { selectedText = '' } = {}) => {
+  const hasClipboardText = Boolean(await clipboard.readText());
   const textMenuItems = [
     {
       id: 'undo',
@@ -56,7 +57,7 @@ const buildTextEditMenu = (sender, { selectedText = '' } = {}) => {
       id: 'paste',
       label: '粘贴',
       shortcut: 'CommandOrControl+V',
-      enabled: Boolean(clipboard.readText()),
+      enabled: hasClipboardText,
       click: invokeWhenAlive(sender, 'paste'),
     },
   ];

@@ -229,3 +229,11 @@ HDR 截图路径中，SDR 输出白点按以下优先级使用：
 *   当前仅将系统 SDR 白点用于 HDR 捕获后的 `scRGB -> sRGB` 转换。
 *   `hdrMaxNits` 仍然保留为用户手动调整参数，暂未改为系统自动读取。
 *   日志会记录当前屏幕读取到的 `system_sdr_white_level` 和 `system_sdr_white_nits`，便于排查颜色偏差。
+
+## 2026-10 剪贴板接口兼容
+
+复制截图统一走 `src/main/clipboard.js` 的 `writePngToClipboard`，不要在别处直接调用 Electron 剪贴板接口。
+
+*   **Electron 44 起**：`clipboard.writeImage` / `clipboard.readImage` 已移除，图像必须经 `clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })])` 写入，`clipboard.write` 返回 Promise。
+*   **宿主 0.8.3**：仍基于 Electron 39，该运行时没有 `ClipboardItem`，只能使用 `clipboard.writeImage`。`engines.translime` 下限仍是 `>=0.8.3`，因此两套接口都要保留。
+*   **写入必须在返回前完成**：复制结果会通过 `capture-complete` 事件广播给其他插件，写入未落盘就广播会让订阅方读到旧内容或空剪贴板。

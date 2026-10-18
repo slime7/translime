@@ -13,7 +13,12 @@ import { PLUGIN_MODULES_PATH } from '@main/core/plugin-loader/constants';
 
 const {
   mockShell, mockApp, mockDialog, mockNativeTheme, NotificationMock, mockSystemPreferences,
+  mockClipboard,
 } = vi.hoisted(() => ({
+  mockClipboard: {
+    readText: vi.fn(),
+    writeText: vi.fn(async () => {}),
+  },
   mockShell: {
     openExternal: vi.fn(),
     openPath: vi.fn().mockResolvedValue(''),
@@ -64,9 +69,7 @@ vi.mock('electron', () => ({
   Menu: {
     buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
   },
-  clipboard: {
-    readText: vi.fn(),
-  },
+  clipboard: mockClipboard,
 }));
 
 const { mockWin, mockIpc } = vi.hoisted(() => ({
@@ -284,6 +287,35 @@ describe('ipcHandler', () => {
       const versions = ipcHandler[ipcType.APP_VERSIONS]();
       expect(versions).toHaveProperty('app', '1.0.0');
       expect(versions).toHaveProperty('electron');
+    });
+  });
+
+  describe('Clipboard', () => {
+    it('COPY_TEXT 应写入字符串并在落盘后才返回', async () => {
+      let resolveWrite;
+      mockClipboard.writeText.mockReturnValue(new Promise((resolve) => {
+        resolveWrite = resolve;
+      }));
+
+      let settled = false;
+      const pending = ipcHandler[ipcType.COPY_TEXT](12345).then((result) => {
+        settled = true;
+        return result;
+      });
+
+      await Promise.resolve();
+      expect(mockClipboard.writeText).toHaveBeenCalledWith('12345');
+      // 剪贴板写入自 Electron 44 起为异步，提前返回会让调用方在内容就绪前就去粘贴
+      expect(settled).toBe(false);
+
+      resolveWrite();
+      await expect(pending).resolves.toBe(true);
+    });
+
+    it('READ_CLIPBOARD_TEXT 应透传异步读取到的文本', async () => {
+      mockClipboard.readText.mockResolvedValue('剪贴板内容');
+
+      await expect(ipcHandler[ipcType.READ_CLIPBOARD_TEXT]()).resolves.toBe('剪贴板内容');
     });
   });
 

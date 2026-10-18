@@ -10,6 +10,7 @@ import EventEmitter from 'node:events';
 import { setupMdeWindow, useLogger, usePluginConfig } from 'translime-sdk';
 import * as capture from './capture';
 import { isIncompleteShortcut, normalizeShortcut } from './main/shortcut-state';
+import writePngToClipboard from './main/clipboard';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1050,9 +1051,7 @@ export const ipcHandlers = [
 
         if (pngBuffer && pngBuffer.length > 0) {
           logger.info(`编码成功, Buffer 长度: ${pngBuffer.length}, 开始写入剪贴板`);
-          const { clipboard, nativeImage } = await import('electron');
-          const image = nativeImage.createFromBuffer(pngBuffer);
-          clipboard.writeImage(image);
+          await writePngToClipboard(pngBuffer);
           logger.info('写入剪贴板完成');
           bus.emit('capture-complete', { path: null, hdrPath: null, type: 'copy' });
           return true;

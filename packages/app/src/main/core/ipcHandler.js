@@ -581,8 +581,8 @@ const ipcHandler = {
   async [ipcType.GET_LOG_RECORDS](date) {
     return readLogRecords(mainStore.APPDATA_PATH, date);
   },
-  [ipcType.COPY_TEXT](text = '') {
-    clipboard.writeText(String(text));
+  async [ipcType.COPY_TEXT](text = '') {
+    await clipboard.writeText(String(text));
     return true;
   },
   [ipcType.READ_CLIPBOARD_TEXT]() {

@@ -26,7 +26,7 @@ vi.mock('electron', () => ({
     getPath: vi.fn(() => 'C:/mock-userdata'),
   },
   clipboard: {
-    writeText: vi.fn(),
+    writeText: vi.fn(async () => {}),
   },
   shell: {
     openPath: mockShellOpenPath,
@@ -316,10 +316,15 @@ describe('plugin-loader/menu', () => {
 
     dispatchMenuAction(menuId, 'copy-plugin-link');
 
+    // 剪贴板写入自 Electron 44 起为异步，提示须在写入落盘后发出
+    await vi.waitFor(() => {
+      expect(mockSendToMain).toHaveBeenCalledWith('ipc-toast', ['链接已复制']);
+    });
     expect(clipboard.writeText).toHaveBeenCalledWith(
       'https://slime7.github.io/translime/open/?install=translime-plugin-demo',
     );
-    expect(mockSendToMain).toHaveBeenCalledWith('ipc-toast', ['链接已复制']);
+    expect(clipboard.writeText.mock.invocationCallOrder[0])
+      .toBeLessThan(mockSendToMain.mock.invocationCallOrder[0]);
   });
 
   it('回传动作应执行插件自定义菜单的点击处理', async () => {

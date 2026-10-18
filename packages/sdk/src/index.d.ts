@@ -227,8 +227,6 @@ export interface ElectronShell {
 export interface ClipboardClient {
   readText(): Promise<string | null>;
   writeText(text: string): Promise<void>;
-  readImage(): Promise<any>;
-  writeImage(image: any): Promise<void>;
 }
 
 export interface WindowControlClient {
